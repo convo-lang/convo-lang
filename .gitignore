@@ -69,3 +69,11 @@ __pycache__
 venv
 
 /local-config
+
+# Injected packages
+/packages/at-dot-css
+/packages/iyio-common
+/packages/media-common
+/packages/node-common
+/packages/react-common
+/packages/syn-taxi
