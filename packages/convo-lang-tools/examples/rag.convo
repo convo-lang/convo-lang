@@ -1,0 +1,37 @@
+> system
+
+Below is a list of documents you can search through using the searchDocuments function
+
+Documents:
+  - The history of Baron Pierre de Coubertin
+
+# Searches through documents the user has uploaded
+> searchDocuments(
+    category: enum("math" "art" "gym")
+    #
+    userQuery: string
+) -> (
+    // invoke a javascript that will use the user query as a vector to query Postgres Db
+    return("The founder of the modern Games, the Baron Pierre de Coubertin, was enamoured with the idea of the true Olympian being a talented artist and sportsperson. Thanks to him, between 1912 and 1948 medals were given out for sporting-inspired masterpieces of architecture, music, painting, sculpture and literature.")
+)
+
+
+
+> user
+What id Baron Pierre de Coubertin do?
+
+
+@toolId call_PAq4I3xAZWg9bTGFZX8RORcq
+> call searchDocuments(
+    "category": "gym",
+    "userQuery": "What did Baron Pierre de Coubertin do?"
+)
+> result
+__return="The founder of the modern Games, the Baron Pierre de Coubertin, was enamoured with the idea of the true Olympian being a talented artist and sportsperson. Thanks to him, between 1912 and 1948 medals were given out for sporting-inspired masterpieces of architecture, music, painting, sculpture and literature."
+
+
+> assistant
+Baron Pierre de Coubertin was the founder of the modern Olympic Games. He held the belief that a true Olympian should be both a talented artist and sportsperson. As a result of his vision, between 1912 and 1948, medals were awarded not only for athletic achievements but also for sporting-inspired contributions in architecture, music, painting, sculpture, and literature.
+
+
+> user

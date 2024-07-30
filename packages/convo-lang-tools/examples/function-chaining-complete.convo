@@ -1,0 +1,102 @@
+> system
+You are a friendly personal assistant. You are helping a user with a very busy schedule so please
+keep your responses short and straight to the point.
+
+> define
+
+# Gets the current weather conditions for the given location. Returned values use the metric system.
+> getWeather(
+    # The location to get weather conditions for
+    location:string
+) -> (
+
+    weather=httpGet('https://6tnpcnzjbtwa5z4qorusxrfaqu0sqqhs.lambda-url.us-east-1.on.aws/',location)
+
+    return(weather)
+)
+
+# Gets the users current location
+> getLocation() -> (
+    return({location:'Cincinnati'})
+)
+
+# Sets the state of the users
+> setHouseState(
+    windows?:enum("open" "closed")
+    lights?:enum("on" "off")
+) -> (
+    return({updated:true})
+)
+
+> user
+Can you get the house ready for the day based on todays weather
+
+
+@tokenUsage 161 / 9 / $0.0018800000000000002
+@toolId call_L87T2cY57lD1RD44hsUrDDC9
+> call getLocation()
+> result
+__return={
+    "location": "Cincinnati"
+}
+
+
+@tokenUsage 183 / 15 / $0.0022800000000000003
+@toolId call_tzErx0aD5Jy8Adk6fV0iowyJ
+> call getWeather(
+    "location": "Cincinnati"
+)
+> result
+__return={
+    "data": {
+        "time": "2023-12-18T14:05:00Z",
+        "values": {
+            "cloudBase": 0.35,
+            "cloudCeiling": 0.35,
+            "cloudCover": 100,
+            "dewPoint": -0.63,
+            "freezingRainIntensity": 0,
+            "humidity": 81,
+            "precipitationProbability": 0,
+            "pressureSurfaceLevel": 988.41,
+            "rainIntensity": 0,
+            "sleetIntensity": 0,
+            "snowIntensity": 0,
+            "temperature": 2.31,
+            "temperatureApparent": -2.21,
+            "uvHealthConcern": 0,
+            "uvIndex": 0,
+            "visibility": 16,
+            "weatherCode": 1001,
+            "windDirection": 287,
+            "windGust": 11.81,
+            "windSpeed": 5.31
+        }
+    },
+    "location": {
+        "lat": 39.1014518737793,
+        "lon": -84.51245880126953,
+        "name": "Cincinnati, Hamilton County, Ohio, United States",
+        "type": "administrative"
+    }
+}
+
+
+@tokenUsage 393 / 19 / $0.0045000000000000005
+@toolId call_XmTbxCKagHj0sYn8O2NGgPsl
+> call setHouseState(
+    "windows": "closed",
+    "lights": "on"
+)
+> result
+__return={
+    "updated": true
+}
+
+
+@tokenUsage 426 / 25 / $0.0050100000000000006
+> assistant
+The house is ready for the day. Windows are closed and lights are on because it's overcast and chilly outside.
+
+
+> user

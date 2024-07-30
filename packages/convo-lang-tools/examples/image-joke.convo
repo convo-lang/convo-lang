@@ -1,0 +1,44 @@
+@enableVision
+> user
+Tell me a joke about this image
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)
+
+
+@toolId call_1Qdz3N5FMa2FTRYXaG94f6bj
+> call queryImage(
+    "query": "Tell me a joke about this image",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={"result":"Why did the Beatles cross the road? Because they knew it was the only way to get to the other side of their Abbey Road album!"}
+
+
+> assistant
+Why did the Beatles cross the road? Because they knew it was the only way to get to the other side
+of their Abbey Road album!
+
+
+> user
+Who is the person wearing the white suite?
+
+@toolId call_Ld39lvjGHRSQjkTraJIt5ZZf
+> call queryImage(
+    "query": "Identify the person wearing the white suit",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={"result":"I can't identify the person in the image, but I can tell you that the individual wearing the white suit is crossing a zebra crossing and is part of a group of four people who are all walking in line on the crosswalk."}
+
+
+> assistant
+I can't identify the person in the image, but I can tell you that the individual wearing the white
+suit is part of a group of four people who are all walking in line on a zebra crossing. If this
+image is related to the iconic Abbey Road album by the Beatles, then the person in the white suit
+would be John Lennon.
+
+
+> user

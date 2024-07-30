@@ -1,0 +1,58 @@
+POST http://localhost:8080
+Content-Type: application/json
+
+[
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob",
+    "The quick brown fox said shit",
+    "123",
+    "http://localhost:8080?text=Hi+i+bob"
+]
+
+
+GET http://localhost:8080?text=Hi+i+bob
+
+GET http://localhost:8080
+    ?document-location=https://liirnspace-bucksmediabucket70ce2cea-11rljmkq8tolk.s3.amazonaws.com/bn3Pk99FQrKYNduH8zj4Rw8FeFjurMSkeA4Xp1nhCbXg
+    &content-type=application/pdf
+    &source-id=abc-123
+
+
+
+GET http://localhost:8080/health-check
+
+GET http://localhost:8080/any-path/health-check

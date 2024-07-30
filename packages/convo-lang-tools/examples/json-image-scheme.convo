@@ -1,0 +1,55 @@
+@enableVision
+> define
+Person = struct(
+    name?:string
+    description?:string
+)
+
+@json Person[]
+@responseAssign dudes
+> user
+Describe each person in this picture.
+
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)
+
+
+
+@tokenUsage 213 / 49 / $0.0036000000000000003
+@toolId call_dfpKG4bnDRA3UTBjspQr2O4s
+> call queryImage(
+    "query": "describe each person in this picture",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={
+    "result": "The image shows four individuals crossing the street in single file on a zebra crossing. They are all adult males, and they appear to be dressed in distinct styles:\n\n1. The first person, walking from right to left, has long hair and is wearing a white suit. He is barefoot and steps off with his right foot onto the crossing.\n\n2. The second individual has darker hair and is wearing a black suit with a white shirt and no tie. He is also stepping off with his right foot, wearing black shoes.\n\n3. The third man is wearing a suit as well, looking somewhat casually dressed compared to the second person. He has a beard and long hair and is wearing an open neck shirt with a black suit, and he is mid-step onto the zebra with his left foot forward, wearing black shoes.\n\n4. The fourth man brings up the rear and is dressed most casually. He wears a denim jacket and jeans with a white shirt underneath. He has shoulder-length hair and is taking a step with his right foot, wearing dark-colored shoes.\n\nThe setting appears to be a quiet, tree-lined street with cars parked on either side, and there is a white Volkswagen Beetle and a black car visible behind them, among other vehicles. The architecture in the background suggests this might be a residential area. The image has a calm, orderly feel, indicative of an everyday urban scene albeit with a touch of timeless style."
+}
+
+
+@tokenUsage 564 / 252 / $0.0132
+@format json
+@assign dudes
+> assistant
+[
+    {
+        "name": "first person",
+        "description": "The first person, walking from right to left, has long hair and is wearing a white suit. He is barefoot and steps off with his right foot onto the crossing."
+    },
+    {
+        "name": "second person",
+        "description": "The second individual has darker hair and is wearing a black suit with a white shirt and no tie. He is also stepping off with his right foot, wearing black shoes."
+    },
+    {
+        "name": "third person",
+        "description": "The third man is wearing a suit as well, looking somewhat casually dressed compared to the second person. He has a beard and long hair and is wearing an open neck shirt with a black suit, and he is mid-step onto the zebra with his left foot forward, wearing black shoes."
+    },
+    {
+        "name": "fourth person",
+        "description": "The fourth man brings up the rear and is dressed most casually. He wears a denim jacket and jeans with a white shirt underneath. He has shoulder-length hair and is taking a step with his right foot, wearing dark-colored shoes."
+    }
+]
+
+
+> user

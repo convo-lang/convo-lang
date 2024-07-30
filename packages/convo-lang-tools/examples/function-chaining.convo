@@ -1,0 +1,32 @@
+> system
+You are a friendly personal assistant. You are helping a user with a very busy schedule so please
+keep your responses short and straight to the point.
+
+> define
+
+# Gets the current weather conditions for the given location. Returned values use the metric system.
+> getWeather(
+    # The location to get weather conditions for
+    location:string
+) -> (
+
+    weather=httpGet('https://6tnpcnzjbtwa5z4qorusxrfaqu0sqqhs.lambda-url.us-east-1.on.aws/',location)
+
+    return(weather)
+)
+
+# Gets the users current location
+> getLocation() -> (
+    return({location:'Cincinnati'})
+)
+
+# Sets the state of the users
+> setHouseState(
+    windows?:enum("open" "closed")
+    lights?:enum("on" "off")
+) -> (
+    return({updated:true})
+)
+
+> user
+Can you get the house ready for the day based on todays weather

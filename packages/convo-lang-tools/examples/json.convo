@@ -1,0 +1,10 @@
+> define
+Person = struct(
+    name:string
+    age:number
+    personality:string
+)
+
+@json Person[]
+> user
+List 4 funny people

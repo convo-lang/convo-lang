@@ -1,0 +1,90 @@
+# Grades a paper
+> gradePaper(
+
+    # Score 1 to 10
+    score: number
+
+    # Email of user ) ->
+    email?: string
+
+    # The users job
+    job: array(struct(
+        name: string
+    ))
+
+) -> grade (
+
+    lable1: beans.xy = 'good'
+    lable?: beanx = dIt()
+    lable3: bean3 = beans
+    lable3: bean4 = beans.xy
+    lable3: bean3 = 0.5
+
+    map(
+        name: 'jeff'
+        age: 55
+        items: map(
+            jewels: 100
+        )
+    )
+
+    saveGrade( grade )
+
+    dude.otherStuff(
+        value: add( grade.email value2:"f" 'i\'_bob' 77.65 .87 "I \"links\"" 88 )
+    )
+
+    moreStuff( undefined true false null )
+
+    types( number string bool boolean time void )
+
+    sendEmail(grade.email)
+
+    gotoJob(grade.job)
+
+    if( mt(grade.score 8) ) then (
+        return('passed')
+    ) elif ( lt(grade.score 3) ) then (
+        return(map( score:0 message:"did not meat min grad"))
+    ) else (
+        log('we are moving on')
+    )
+
+    beans = 'good'
+
+    list = array( beans 'corn' 3.14 )
+
+    for( item in list ) do(
+        log('me item is {{item}}')
+    )
+
+    getHeader(age:80)
+
+    return('my name is slim')
+)
+
+
+
+# Returns a header system message
+> local getHeader( age:number ) -> (
+    return('James is a funky monkey {{age}} years old')
+)
+
+> dude
+I'm okxc
+
+> system
+You are a friendly ghost. {{getHeader(age:22)}}
+
+> user
+My name is {{name}}
+
+
+> call gradePaper(
+    score: 1
+    email: 'bob@tom.com'
+    job:map( name: 'salad fingers' )
+)
+
+
+# end

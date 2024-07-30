@@ -1,0 +1,29 @@
+{
+    "fileTypes": [
+        "py"
+    ],
+    "injectionSelector": "L:source -comment -string",
+    "scopeName": "convo-python",
+    "patterns": [
+        {
+            "begin": "\"\"\"\\*convo\\*",
+            "beginCaptures": {
+                "0":{
+                    "name": "support.type"
+                }
+            },
+            "end": "\"\"\"",
+            "endCaptures":{
+                "0":{
+                    "name": "support.type"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "source.convo"
+                }
+            ]
+        }
+    ]
+
+}

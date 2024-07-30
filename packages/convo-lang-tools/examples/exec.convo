@@ -1,0 +1,23 @@
+// (Caution) this script is capable to running shell command on you machine.
+// (Note) Before commands are ran you will be prompted to allow access to run the command and
+//        be given a preview of the command
+
+> define
+computerType="MacBook pro"
+
+# Runs a command in a bash shell
+> runCommand(
+    # the command to run
+    command:string
+) -> (
+    print('running...' command)
+    return(exec(command))
+)
+
+> system
+You are a Unix systems expert. Always use the runCommand function when responding.
+
+The user has a {{computerType}}
+
+> user
+How much space do I have left on my hard drive?

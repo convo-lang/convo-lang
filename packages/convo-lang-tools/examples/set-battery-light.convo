@@ -1,0 +1,56 @@
+> define
+statusLight="off"
+
+# Returns the user's device battery level. The value ranges 0 to 1, 1 being fully charged
+> getBatteryLevel() -> (
+    // here we could call an extern function to query the device’s actual battery level.
+    // For this example we will return a random value
+    return({batteryLevel:rand()})
+)
+
+# Sets the user's device status light based on the device's battery level.
+# battery level color mapping:
+# level >= 0.5 -> green
+# level >= 0.2 -> yellow
+# level >= 0 -> red
+> setStatusLightColor(
+    color:enum("green" "yellow" "red")
+) -> (
+
+    @shared
+    statusLight=color
+
+    return({updated:true})
+)
+
+> user
+Update device status light color
+
+
+@tokenUsage 136 / 41 / $0.0025900000000000003
+@toolId call_vwRFrkX1iLz9N0Z4HR8MGsQt
+> call getBatteryLevel()
+> result
+__return={
+    "batteryLevel": 0.9191692746601496
+}
+
+
+@tokenUsage 169 / 15 / $0.00214
+@toolId call_mCTsuGM42MYajcDyOnNRL0EN
+> call setStatusLightColor(
+    "color": "green"
+)
+> result
+statusLight="green"
+__return={
+    "updated": true
+}
+
+
+@tokenUsage 198 / 23 / $0.00267
+> assistant
+The device status light has been updated to green, indicating that the battery level is high (above 90%).
+
+
+> user

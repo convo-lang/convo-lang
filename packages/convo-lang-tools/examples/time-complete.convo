@@ -1,0 +1,20 @@
+# Returns the current date and time
+> getCurrentDateTime() -> (
+    return(dateTime())
+)
+
+> user
+What time is it?
+
+
+@toolId call_ARxHMtfvOJIQlo2NkaoYdvfe
+> call getCurrentDateTime()
+> result
+__return="2023-12-08T08:39:18-05:00"
+
+
+> assistant
+The current date and time are December 8, 2023, 08:39 AM Eastern Standard Time (EST).
+
+
+> user

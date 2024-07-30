@@ -1,0 +1,44 @@
+> system
+You are helping a user categorize messages in the the following categories:
+- statement
+- question
+- instructions
+- other
+
+Only responde with one or more of the categories above. Seperate categories with a comma. Do not include any other information.
+
+> user
+Categorize message below.
+
+> user
+The conditions have been set. Now, based on this, we need to consider the following for maximizing yield:
+
+1. Soil preparation and fertility enhancement
+2. Choice of seed variety adapted to local conditions
+3. Planting times and density
+4. Water management and irrigation
+5. Pest and disease control
+6. Weed management
+
+We can start by discussing soil preparation and fertility. Have you done a soil test recently?
+
+
+> assistant
+instructions, question
+
+
+> user
+Apples products are over priced
+
+> assistant
+statement
+
+
+> user
+Figjam big bam who ha
+
+> assistant
+other
+
+
+> user

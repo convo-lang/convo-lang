@@ -1,0 +1,118 @@
+// Top level statements defining shared variables and custom user types. Top level statements
+// can start with (> define), (> do), or (> result)
+> define
+
+location = "Cincinnati, OH"
+
+Animal = struct(
+
+    species: string
+
+    # Weight in pounds
+    weight: int
+
+    type: enum( "carnivore" "omnivore" "herbivore")
+
+    # Price in USD to buy the animal
+    price: number
+
+)
+
+
+
+// This is a function that can be called by an LLM
+# Builds a new exhibit featuring a collection of animals
+> buildExhibit(
+
+    # The featured animals
+    animals: array(Animal)
+
+    # Price in USD to build the exhibit excluding the animals
+    price: number
+
+    # The size of the exhibit in square feet
+    size: number
+
+    # A short description of the exhibit
+    description: string
+) -> (
+
+    print('Building new exhibit with {{animals.length}} animals')
+
+    totalPrice = price
+
+    foreach( a=in(animals) ) do (
+        // Uncomment the line below after you provide an extern function for buyAnimal
+        //buyAnimal(a)
+        inc(totalPrice a.price)
+    )
+
+    return(map(
+        animalsBought: animals.length
+        totalPrice: totalPrice
+        success: true
+
+    ))
+)
+
+// This function is not visible to LLMs and will be used to call an extern function
+// defined in Javascript
+> local buyAnimal(animal:Animal)
+
+
+// This is a system prompt that tells the LLM who they are
+> system
+You are a funny and helpful zoo keeper helping the user build a new zoo. The zoo is located
+in {{location}}.
+
+
+
+// This is a user prompt that the LLM will respond to
+> user
+The Bengals are going to be sponsoring the zoo this year. Lets build an exhibit they will like.
+Response using the buildExhibit function
+
+
+// This is a function call returned by the LLM
+> call buildExhibit(
+    "animals": [
+        {
+            "species": "Bengal Tiger",
+            "weight": 420,
+            "type": "carnivore",
+            "price": 20000
+        },
+        {
+            "species": "White Bengal Tiger",
+            "weight": 400,
+            "type": "carnivore",
+            "price": 25000
+        },
+        {
+            "species": "Bengal Fox",
+            "weight": 20,
+            "type": "omnivore",
+            "price": 5000
+        }
+    ],
+    "price": 1500000,
+    "size": 50000,
+    "description": "A mesmerizing tribute to the wild beauty of Bengal, the 'Bengals' Kingdom' features stunning Bengal Tigers, including the rare and captivating White Bengal Tiger, and the cunning Bengal Fox. The Bengals' Kingdom spans 50,000 square feet, providing plenty of prowling room for the resident animals. Bengals' fans and animal lovers alike will enjoy this enchanting walk on the wild side!"
+)
+> result
+// Value returned by the call to buildExhibit
+__return={"animalsBought":3,"totalPrice":1550000,"success":true}
+
+
+// Response from the LLM based on the return value of buildExhibit
+> assistant
+Great news! We've successfully built the 'Bengals' Kingdom'!
+
+Here's a sneak peek:
+
+- It's home to the magnificent Bengal Tiger, the rare White Bengal Tiger, and the wily Bengal Fox.
+- The exhibit is an enormous 50,000 square feet! That's gonna be a lot of tiger prowling action!
+- And the total cost, including our new furry residents? A cool $1,550,000. Yes, tigers are a bit on the pricier side, but hey, they're worth every penny.
+
+Would you like to add anything else to our new zoo?
+

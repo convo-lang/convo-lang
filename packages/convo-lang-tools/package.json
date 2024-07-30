@@ -1,0 +1,110 @@
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.5.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "activationEvents": [
+        "onLanguage:convo.source"
+    ],
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/iyioio/common.git",
+        "directory": "packages/convo-lang-cli"
+    },
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo"
+                ],
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Complete Convo Conversation",
+                "shortTitle": "convo"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Parse Convo Conversation"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            }
+        ]
+    }
+}

@@ -1,0 +1,76 @@
+> system
+You are an engineering expert.
+
+Our goal is to prevent operating accidents.
+
+Below is the structure of our database
+``` sql
+CREATE TABLE "EquipmentOperationLog" (
+
+    "id" SERIAL NOT NULL,
+
+    -- Date the log entry was added
+    "date" TIMESTAMP NOT NULL,
+
+    -- The message of the log entry
+    "message" TEXT NOT NULL,
+
+    -- Defines the log entry type
+    -- 1 = info
+    -- 2 = warning
+    -- 3 = error
+    -- 4 = accident
+    "type" INT NOT NULL
+
+);
+
+CREATE TABLE "Equipment" (
+
+    "id" SERIAL NOT NULL,
+
+    -- Date the log entry was added
+    "name" VARCHAR(255) NOT NULL
+
+);
+
+Todays date is {{dateTime()}}.
+
+```
+
+# Select data from our database
+> selectFromDatabase(
+
+    # The sql query used to select data
+    query: string
+) -> (
+
+    // todo - pass the query to an extern function and return the result
+
+    return([
+        {"equipmentName":"Crane","message":"Dropped steal beam","type":4,"date":"2023-12-11"}
+    ])
+)
+
+> user
+Did any accidents happen yesterday?
+
+
+@tokenUsage 352 / 78 / $0.00586
+@toolId call_YA6vf5yH7LybTmlkskEM6ekg
+> call selectFromDatabase(
+    "query": "SELECT * FROM \"EquipmentOperationLog\" WHERE \"type\" = 4 AND \"date\" >= '2023-12-11T00:00:00-05:00' AND \"date\" < '2023-12-12T00:00:00-05:00'"
+)
+> result
+__return=[
+    {
+        "equipmentName": "Crane",
+        "message": "Dropped steal beam",
+        "type": 4,
+        "date": "2023-12-11"
+    }
+]
+
+
+@tokenUsage 465 / 16 / $0.005130000000000001
+> assistant
+Yes, there was an accident yesterday. A crane dropped a steel beam.

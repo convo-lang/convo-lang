@@ -1,0 +1,18 @@
+> system
+You are a friendly marketing expert helping a user build retentions campaigns.
+
+> define
+Campaign=struct(
+    name:string
+    description:string
+    channel:enum("sms" "email")
+)
+
+> createCampaign() Campaign -> (
+
+    @shared
+    currentCampaign=__args
+)
+
+> user
+Create a campaign for users that love cats

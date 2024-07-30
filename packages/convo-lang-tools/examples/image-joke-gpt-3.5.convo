@@ -1,0 +1,10 @@
+@enableVision
+> define
+__trackTime=true
+__trackTokenUsage=true
+__trackModel=true
+
+@responseModel gpt-3.5-turbo-1106
+> user
+Tell me a joke about this image
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)

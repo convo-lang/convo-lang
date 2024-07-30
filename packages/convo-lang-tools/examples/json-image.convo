@@ -1,0 +1,67 @@
+@enableVision
+@json
+> user
+Describe each person in this picture.
+
+Return a json array
+
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)
+
+
+
+@tokenUsage 167 / 49 / $0.00314
+@toolId call_5EkQSv5ar3VIeMM5qBxur0tP
+> call queryImage(
+    "query": "Describe each person in the picture.",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={
+    "result": "In the image, we see four individuals crossing a street in a line on a pedestrian crossing. From left to right:\n\n1. The first person is wearing a white suit with long hair and is stepping off the curb with his left foot forward. He has a full beard and is looking straight ahead.\n\n2. The second person from the left is dressed in a dark suit and is stepping with his right foot forward. He has his hands in his pockets and is also looking straight ahead, with his hair styled in a manner typical of the late 1960s or early 1970s.\n\n3. The third individual is wearing a dark suit similar to the second person and has long hair and a beard. He is also stepping with his right foot forward and seems to be looking down slightly as he walks.\n\n4. The last person on the right is wearing a denim jacket and denim jeans, in contrast to the suits of the others. He is stepping with his left foot forward and his hands are at his sides. Like the others, he also has long hair and is looking straight ahead while walking across the street.\n\nThey appear to be walking confidently, and the scene is rather casual and relaxed. The background depicts a clear day with trees lining the street, and some cars parked alongside the road."
+}
+
+
+@tokenUsage 491 / 255 / $0.01256
+@format json
+> assistant
+{
+    "people": [
+        {
+            "position": "first from the left",
+            "clothing": "white suit",
+            "hair": "long",
+            "facial_hair": "full beard",
+            "foot_forward": "left",
+            "gaze": "straight ahead"
+        },
+        {
+            "position": "second from the left",
+            "clothing": "dark suit",
+            "hands": "in pockets",
+            "foot_forward": "right",
+            "hair_style": "typical of late 1960s or early 1970s",
+            "gaze": "straight ahead"
+        },
+        {
+            "position": "third from the left",
+            "clothing": "dark suit",
+            "hair": "long",
+            "facial_hair": "beard",
+            "foot_forward": "right",
+            "gaze": "slightly down"
+        },
+        {
+            "position": "last on the right",
+            "clothing": "denim jacket and jeans",
+            "hair": "long",
+            "foot_forward": "left",
+            "hands": "at sides",
+            "gaze": "straight ahead"
+        }
+    ]
+}
+
+
+> user

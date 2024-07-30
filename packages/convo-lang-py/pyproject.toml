@@ -1,0 +1,23 @@
+[project]
+name = "convo_lang"
+version = "0.5.11"
+authors = [
+  { name="Scott Vance", email="scott@iyio.io" },
+]
+repository = "https://github.com/iyioio/common"
+description = "A conversational prompting and programming language"
+keywords = ["prompt", "prompt-engineering", "open-ai", "ai", "convo-lang"]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.hatch.build]
+ignore-vcs = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

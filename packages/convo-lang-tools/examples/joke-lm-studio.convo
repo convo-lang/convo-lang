@@ -1,0 +1,6 @@
+> define
+// Sets the default completion to http://localhost:1234/v1 which points to LM Studio on your machine - https://lmstudio.ai/
+__endpoint='http://localhost:1234/v1'
+
+> user
+Tell me a joke

@@ -1,0 +1,40 @@
+@enableVision
+> user
+Tell me a joke about this image
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)
+
+
+@toolId call_Q8foCtL5TvFqm9ybmnA9cksb
+> call queryImage(
+    "query": "joke",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={"result":"This is an iconic image of four men crossing the street on a pedestrian crossing. It's known for being the cover of a famous album by a well-known British band from the 1960s. They are depicted in mid-stride, and the scene is set against a backdrop of a city road flanked by trees and cars. The composition of this photo has been widely recognized and parodied countless times."}
+
+
+> assistant
+Why did the Beatles cross the road in that iconic album cover? To 'Abbey' honest, they were just trying to get to the other 'sideshow'! 🎵🚶‍♂️🚶‍♂️🚶‍♂️🚶‍♂️
+
+
+> user
+Is anybody in the picture waring a white suite?
+
+@toolId call_qdZxE5UsBqIA744DgnUFdYLB
+> call queryImage(
+    "query": "Is anyone in the picture wearing a white suit?",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={"result":"Yes, the person on the right side of the image is wearing a white suit."}
+
+
+> assistant
+Yes, in the image, the person on the right side is wearing a white suit.
+
+
+> user

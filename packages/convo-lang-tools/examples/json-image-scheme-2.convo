@@ -1,0 +1,69 @@
+@enableVision
+> define
+Person = struct(
+
+    pantsColor:string
+
+    pantsType:enum("dress" "jeans" "casual")
+
+    shirtColor:string
+
+    shirtType:enum("jacket" "t-shirt" "other")
+)
+
+@json Person[]
+@responseAssign dudes
+> user
+Describe each person in this picture.
+
+![](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg)
+
+
+
+@tokenUsage 265 / 68 / $0.00469
+@toolId call_Ti6FQ2MnHkDHX9TzIwyvNHsB
+> call queryImage(
+    "query": "Describe the clothing, specifically the pants and shirt, for each person in this picture, including the colors and types of these items.",
+    "imageUrls": [
+        "https://raw.githubusercontent.com/iyioio/common/main/assets/convo/lXwM70CjMOa6EC3PXBbJ.jpg"
+    ]
+)
+> result
+__return={
+    "result": "In the image, you see four individuals crossing the road in single file. From left to right:\n\n- The first person is wearing a blue denim jacket with blue jeans, creating a denim-on-denim look, which is commonly referred to as a \"Canadian tuxedo.\"\n- The second person is dressed in a dark suit with a white shirt, and he does not appear to be wearing a tie. His pants are black and match the suit jacket.\n- The third individual is also in a suit, but his is a dark, possibly black or charcoal, pinstripe pattern. He is paired with a black or dark shirt, and his pants match his suit jacket.\n- The fourth person is wearing a white suit with a light-colored shirt beneath. His pants are white, consistent with his suit jacket."
+}
+
+
+@tokenUsage 506 / 160 / $0.00986
+@format json
+@assign dudes
+> assistant
+[
+    {
+        "pantsColor": "blue",
+        "pantsType": "jeans",
+        "shirtColor": "blue",
+        "shirtType": "jacket"
+    },
+    {
+        "pantsColor": "black",
+        "pantsType": "casual",
+        "shirtColor": "white",
+        "shirtType": "other"
+    },
+    {
+        "pantsColor": "dark",
+        "pantsType": "casual",
+        "shirtColor": "dark",
+        "shirtType": "other"
+    },
+    {
+        "pantsColor": "white",
+        "pantsType": "casual",
+        "shirtColor": "light-colored",
+        "shirtType": "other"
+    }
+]
+
+
+> user
