@@ -1,0 +1,46 @@
+{
+    "compileOnSave": false,
+    "compilerOptions": {
+        "rootDir": ".",
+        "sourceMap": true,
+        "declaration": false,
+        "moduleResolution": "node",
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "importHelpers": true,
+        "target": "es2015",
+        "module": "esnext",
+        "strict": true,
+        "lib": [
+            "es2017",
+            "dom"
+        ],
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@iyio/ai-complete": [
+                "packages/ai-complete/src/index.ts"
+            ],
+            "@iyio/ai-complete-openai": [
+                "packages/ai-complete-openai/src/index.ts"
+            ],
+            "@iyio/convo-crawler": [
+                "packages/convo-crawler/src/index.ts"
+            ],
+            "@iyio/convo-lang": [
+                "packages/convo-lang/src/index.ts"
+            ],
+            "@iyio/convo-lang-cli": [
+                "packages/convo-lang-cli/src/index.ts"
+            ],
+            "@iyio/convo-lang-react": [
+                "packages/convo-lang-react/src/index.ts"
+            ]
+        }
+    },
+    "exclude": [
+        "node_modules",
+        "tmp"
+    ]
+}

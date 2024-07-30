@@ -1,0 +1,88 @@
+{
+    "name": "convo-crawler",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "packages/convo-crawler/src",
+    "projectType": "library",
+    "targets": {
+        "build": {
+            "executor": "@iyio/nx-common:lib-builder",
+            "outputs": ["{options.outputPath}"],
+            "options": {
+                "outputPath": "dist/packages/convo-crawler",
+                "main": "packages/convo-crawler/src/index.ts",
+                "tsConfig": "packages/convo-crawler/tsconfig.lib.json",
+                "assets": ["packages/convo-crawler/*.md","packages/convo-crawler/docker/*"],
+                "esbuildTargets":[
+                    {
+                        "srcDir":"packages/convo-crawler/src/bin",
+                        "outDir":"dist/packages/convo-crawler/bin",
+                        "options":{
+                            "bundle":true,
+                            "platform":"node",
+                            "target":"node18",
+                            "minify":false,
+                            "banner": {"js":"#!/usr/bin/env node"},
+                            "sourcemap":"external"
+                        }
+                    }
+                ]
+            }
+        },
+        "build-ngrok": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "cp node_modules/ngrok/bin/ngrok dist/packages/convo-crawler/bin && mv dist/packages/convo-crawler/bin/convo-web.js dist/packages/convo-crawler/bin/convo-web && chmod +x dist/packages/convo-crawler/bin/convo-web && cd dist/packages/convo-crawler && zip -vr convo-web.zip bin -x \"*.DS_Store\""
+            },
+            "dependsOn": ["build"]
+        },
+        "build-docker": {
+            "executor": "nx:run-commands",
+            "options": {
+                "cwd": "dist/packages/convo-crawler/docker",
+                "command": "./build-container.sh"
+            },
+            "dependsOn": ["build"]
+        },
+        "publish": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node tools/scripts/publish.mjs convo-crawler {args.ver} {args.tag}"
+            },
+            "dependsOn": ["build"]
+        },
+        "run": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-crawler/tsconfig.lib.json packages/convo-crawler/src/bin/convo-web.ts $@"
+            }
+        },
+        "dev": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-crawler/tsconfig.lib.json packages/convo-crawler/src/bin/convo-web.ts --dev --autoTunnel $@"
+            }
+        },
+        "lint": {
+            "executor": "@nrwl/linter:eslint",
+            "outputs": ["{options.outputFile}"],
+            "options": {
+                "lintFilePatterns": ["packages/convo-crawler/**/*.ts"]
+            }
+        },
+        "test": {
+            "executor": "@nrwl/jest:jest",
+            "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+            "options": {
+                "jestConfig": "packages/convo-crawler/jest.config.ts",
+                "passWithNoTests": true
+            },
+            "configurations": {
+                "ci": {
+                    "ci": true,
+                    "codeCoverage": true
+                }
+            }
+        }
+    },
+    "tags": []
+}

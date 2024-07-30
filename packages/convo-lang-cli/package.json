@@ -1,0 +1,22 @@
+{
+    "name": "@iyio/convo-lang-cli",
+    "version": "0.5.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "bin": {
+        "convo": "bin/convo.js"
+    },
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/iyioio/common.git",
+        "directory": "packages/convo-lang-cli"
+    }
+}

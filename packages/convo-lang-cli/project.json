@@ -1,0 +1,79 @@
+{
+    "name": "convo-lang-cli",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "packages/convo-lang-cli/src",
+    "projectType": "library",
+    "targets": {
+        "build": {
+            "executor": "@iyio/nx-common:lib-builder",
+            "outputs": ["{options.outputPath}"],
+            "options": {
+                "outputPath": "dist/packages/convo-lang-cli",
+                "main": "packages/convo-lang-cli/src/index.ts",
+                "tsConfig": "packages/convo-lang-cli/tsconfig.lib.json",
+                "assets": ["packages/convo-lang-cli/*.md"],
+                "esbuildTargets":[
+                    {
+                        "srcDir":"packages/convo-lang-cli/src/bin",
+                        "outDir":"dist/packages/convo-lang-cli/bin",
+                        "options":{
+                            "bundle":true,
+                            "platform":"node",
+                            "target":"node18",
+                            "minify":false,
+                            "banner": {"js":"#!/usr/bin/env node"},
+                            "sourcemap":"external"
+                        }
+                    }
+                ]
+            }
+        },
+        "publish": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node tools/scripts/publish.mjs convo-lang-cli {args.ver} {args.tag}"
+            },
+            "dependsOn": ["build"]
+        },
+        "lint": {
+            "executor": "@nrwl/linter:eslint",
+            "outputs": ["{options.outputFile}"],
+            "options": {
+                "lintFilePatterns": ["packages/convo-lang-cli/**/*.ts"]
+            }
+        },
+        "test": {
+            "executor": "@nrwl/jest:jest",
+            "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+            "options": {
+                "jestConfig": "packages/convo-lang-cli/jest.config.ts",
+                "passWithNoTests": true
+            },
+            "configurations": {
+                "ci": {
+                    "ci": true,
+                    "codeCoverage": true
+                }
+            }
+        },
+        "example": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo"
+            }
+        },
+        "example-parse": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo --parse --parseFormat 4"
+            }
+        },
+        "example-exec": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/exec.convo"
+            }
+        }
+    },
+    "tags": []
+}

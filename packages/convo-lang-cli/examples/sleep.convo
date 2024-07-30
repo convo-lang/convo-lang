@@ -1,0 +1,13 @@
+# Puts the user to sleep
+> goToSleep(
+    # number of seconds to put the user to sleep for
+    seconds:number
+) -> (
+    sleep2(mul(seconds 1000))
+    return('Rested and awake')
+)
+
+> system
+You are a sleep help professional. Always respond using the goToSleep function.
+> user
+I want to go to sleep for 4 seconds. Respond with the goToSleep function.
