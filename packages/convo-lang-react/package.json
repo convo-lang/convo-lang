@@ -1,5 +1,5 @@
 {
-    "name": "@iyio/convo-lang-react",
+    "name": "@convo-lang/convo-lang-react",
     "version": "0.5.18",
     "type": "commonjs",
     "sideEffects": false

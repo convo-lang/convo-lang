@@ -1,5 +1,5 @@
+import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { ConversationUiCtrl } from "@iyio/convo-lang";
 import { Form } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";

@@ -25,16 +25,16 @@
             "@iyio/ai-complete-openai": [
                 "packages/ai-complete-openai/src/index.ts"
             ],
-            "@iyio/convo-crawler": [
+            "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
-            "@iyio/convo-lang": [
+            "@convo-lang/convo-lang": [
                 "packages/convo-lang/src/index.ts"
             ],
-            "@iyio/convo-lang-cli": [
+            "@convo-lang/convo-lang-cli": [
                 "packages/convo-lang-cli/src/index.ts"
             ],
-            "@iyio/convo-lang-react": [
+            "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
             ],
             "@iyio/nx-common": [

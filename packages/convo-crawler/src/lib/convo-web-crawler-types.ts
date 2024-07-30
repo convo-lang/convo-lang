@@ -1,4 +1,4 @@
-import { ConvoTokenUsage } from "@iyio/convo-lang";
+import { ConvoTokenUsage } from "@convo-lang/convo-lang";
 import type { Browser, Page } from "puppeteer";
 
 export interface ConvoWebCrawlerOptions

@@ -1,6 +1,6 @@
+import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { stopWatchingObj, wSetProp, watchObj } from "@iyio/common";
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@iyio/convo-lang";
 import { Text, useSubject } from "@iyio/react-common";
 import { useEffect, useState } from "react";
 import { BehaviorSubject } from "rxjs";

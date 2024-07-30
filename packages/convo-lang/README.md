@@ -29,26 +29,26 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 
 
 ## Packages
-- @iyio/convo-lang - Contains the convo-lang parser, runtime, and a Typescript/Javascript library to use convo-lang in your application.
-- @iyio/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
-- @iyio/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
+- @convo-lang/convo-lang - Contains the convo-lang parser, runtime, and a Typescript/Javascript library to use convo-lang in your application.
+- @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
+- @convo-lang/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
   in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 - (pypi) convo-lang - Python package for executing convo-lang
 
 
 ## Installation
-For use in an application install the @iyio/convo-lang package
+For use in an application install the @convo-lang/convo-lang package
 ``` sh
-npm i @iyio/convo-lang
+npm i @convo-lang/convo-lang
 
 # To use OpenAI as a completion provider you will need to install @iyio/ai-complete and @iyio/ai-complete-openai as well
 npm i @iyio/ai-complete @iyio/ai-complete-openai
 ```
 
-For use on the command line install the @iyio/convo-lang-cli package
+For use on the command line install the @convo-lang/convo-lang-cli package
 ``` sh
-npm i @iyio/convo-lang-cli -g
+npm i @convo-lang/convo-lang-cli -g
 ```
 
 For use in python projects
@@ -70,7 +70,7 @@ Conversation objects store the messages of a convo script and allow new messages
 and LLMs to respond to messages from the user.
 
 ``` js
-import { Conversation } from '@iyio/convo-lang';
+import { Conversation } from '@convo-lang/convo-lang';
 import { initRootScope, EnvParams } from '@iyio/common';
 import { aiCompleteConvoModule } from '@iyio/ai-complete';
 import { openAiModule } from '@iyio/ai-complete-openai';

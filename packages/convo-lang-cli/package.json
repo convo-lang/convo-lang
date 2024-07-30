@@ -1,5 +1,5 @@
 {
-    "name": "@iyio/convo-lang-cli",
+    "name": "@convo-lang/convo-lang-cli",
     "version": "0.5.18",
     "type": "commonjs",
     "sideEffects": false,

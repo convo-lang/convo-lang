@@ -1,4 +1,4 @@
-import { Conversation, ConversationUiCtrl, FlatConvoMessage } from "@iyio/convo-lang";
+import { Conversation, ConversationUiCtrl, FlatConvoMessage } from "@convo-lang/convo-lang";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext } from "react";
 import { ConvoLangTheme } from "./convo-lang-theme";

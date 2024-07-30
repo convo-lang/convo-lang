@@ -1,4 +1,4 @@
-import { escapeConvoMessageContent } from "@iyio/convo-lang";
+import { escapeConvoMessageContent } from "@convo-lang/convo-lang";
 import { pathExistsAsync, readFileAsJsonAsync } from "@iyio/node-common";
 import { mkdir } from "fs/promises";
 import { join } from "path";

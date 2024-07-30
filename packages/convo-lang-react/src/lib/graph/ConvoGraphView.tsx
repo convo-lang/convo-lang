@@ -1,6 +1,6 @@
+import { ConvoGraphCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { escapeHtml, shortUuid, wAryPush, wSetProp } from "@iyio/common";
-import { ConvoGraphCtrl } from "@iyio/convo-lang";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoGraphCanvas } from "./ConvoGraphCanvas";

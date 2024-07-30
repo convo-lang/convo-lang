@@ -1,5 +1,5 @@
+import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { BaseLayoutProps, bcn } from "@iyio/common";
-import { ConversationUiCtrl } from "@iyio/convo-lang";
 import { useSubject } from "@iyio/react-common";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 

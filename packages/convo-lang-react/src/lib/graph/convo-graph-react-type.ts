@@ -1,5 +1,5 @@
+import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
 import { Point, Rect } from "@iyio/common";
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@iyio/convo-lang";
 import { BehaviorSubject } from "rxjs";
 
 export interface ConvoEntityLayoutCtrl

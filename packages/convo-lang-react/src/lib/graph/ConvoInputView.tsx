@@ -1,6 +1,6 @@
+import { ConvoInputTemplate } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { wAryRemove, wSetProp, wSetPropOrDeleteFalsy } from "@iyio/common";
-import { ConvoInputTemplate } from "@iyio/convo-lang";
 import { ScrollView, SlimButton, Text, View, useSubject, useWProp } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback, useState } from "react";

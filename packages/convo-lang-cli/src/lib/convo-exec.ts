@@ -1,4 +1,4 @@
-import { convoVars, createConvoScopeFunction } from "@iyio/convo-lang";
+import { convoVars, createConvoScopeFunction } from "@convo-lang/convo-lang";
 import { execAsync } from "@iyio/node-common";
 import { ConvoExecConfirmCallback } from "./convo-cli-types";
 
