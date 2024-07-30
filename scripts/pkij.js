@@ -29,7 +29,7 @@ let linkMode='hard-link';
 const linkModes=['hard-link','sym-link','copy'];
 
 /** @type {string[]} */
-const ignoreList=['.DS_Store','node_modules'];
+const ignoreList=['.DS_Store','node_modules','venv'];
 
 let gitIgnoreFile='.gitignore';
 let tsConfigFile='tsconfig.base.json';
