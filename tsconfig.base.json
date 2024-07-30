@@ -36,6 +36,9 @@
             ],
             "@iyio/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
+            ],
+            "@iyio/nx-common": [
+                "packages/nx-common/src/index.ts"
             ]
         }
     },

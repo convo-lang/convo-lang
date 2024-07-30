@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "outputCapture": "direct-nodejs",
+  "title": "IYIO Typescript Library Build Target",
+  "description": "Builds treeshakable hybrid Typescript libraries that are CommonJs and ESM compatible. This executor assumes the target library is configured to be built as a CommonJs library, which is the default for libraries created using the @nrwl/js:tsc generator. Options for this executor are a super set of the options for the @nrwl/nx:tsc executor - https://github.com/nrwl/nx/blob/master/packages/js/src/executors/tsc/schema.json, https://github.com/nrwl/nx/blob/master/packages/js/src/utils/schema.d.ts",
+  "cli": "nx",
+  "type": "object",
+  "properties": {
+
+    "passthrough":{
+        "type":"boolean",
+        "description":"If true all execution will be passed directory to the @nrwl@js:tcs executor",
+        "default":false
+    },
+    "noSideEffects":{
+        "type":"boolean",
+        "description":"If true output package.json file will have sideEffects set to file. This helps to enabled tree shaking",
+        "default":true
+    },
+
+    "commonJsTsConfig":{
+        "type":"string",
+        "description":"The tsconfig file used for building CommonJs. If a value of auto is provided the value of tsConfig will be used",
+        "default":"auto",
+        "x-completion-type": "file",
+        "x-completion-glob": "tsconfig.*.json"
+    },
+    "approximatelyDeps":{
+        "type":"string",
+        "description":"Converts dependencies that start with the given value in the approximately dependencies. Only exact version dependencies are effected. The NX_LIB_APPROXIMATELY_DEPS env var is used as a fallback value"
+    },
+    "compatibleDeps":{
+        "type":"string",
+        "description":"Converts dependencies that start with the given value in the compatible dependencies. Only exact version dependencies are effected. The NX_LIB_COMPATIBLE_DEPS env var is used as a fallback value"
+    },
+    "moreThanEqDeps":{
+        "type":"boolean",
+        "description":"If true all exact version deps will be converted into a more than equal dep. This can be useful for allowing maximum compatibility of dependencies."
+    },
+
+    "disableEsm":{
+        "type":"boolean",
+        "description":"If true ESM output will not be generated. If watch is set to true esm will be automatically disabled",
+        "default":false
+    },
+    "esmDir":{
+        "type":"string",
+        "description":"The subdirectory in the output folder where ESM code will be placed",
+        "default":"esm"
+    },
+    "esmTsConfig":{
+        "type":"string",
+        "description":"The tsconfig file used for building ESM. If a value of auto is provided value of tsConfig will be used and -esm will be added before the .json extension",
+        "default":"auto",
+        "x-completion-type": "file",
+        "x-completion-glob": "tsconfig.*.json"
+    },
+    "esmModuleType":{
+        "type":"string",
+        "description":"Defines the module type used for building ESM code",
+        "default":"ES2015"
+    },
+    "autoCreateEsmConfig":{
+        "type":"boolean",
+        "description":"If true a tsconfig file for ESM will be auto created that extends the default tsconfig file and sets the module type to the value of esmModuleType. The auto created tsconfig file can be ignored by git as the file will always be auto created when needed.",
+        "default":true
+    },
+
+    "esbuildTargets":{
+        "type":"array",
+        "description":"Builds additional esbuild targets",
+        "items":{
+            "type":"object",
+            "required":["srcDir","outDir","options"],
+            "properties":{
+                "srcDir":{
+                    "type":"string"
+                },
+                "outDir":{
+                    "type":"string"
+                },
+                "outputIndexAsIndex":{
+                    "type":"boolean"
+                },
+                "recursive":{
+                    "type":"boolean"
+                },
+                "filterReg":{
+                    "type":"string"
+                },
+                "filterRegFlags":{
+                    "type":"string"
+                },
+                "options":{
+                    "type":"object",
+                    "properties":{
+                        "bundle":{
+                            "type":"boolean"
+                        },
+                        "splitting":{
+                            "type":"boolean"
+                        },
+                        "preserveSymlinks":{
+                            "type":"boolean"
+                        },
+                        "metafile":{
+                            "type":"boolean"
+                        },
+                        "outbase":{
+                            "type":"string"
+                        },
+                        "external":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        },
+                        "packages":{
+                            "type":"string"
+                        },
+                        "alias":{
+                            "type":"object",
+                            "properties":{}
+                        },
+                        "loader":{
+                            "type":"object",
+                            "properties":{}
+                        },
+                        "resolveExtensions":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        },
+                        "mainFields":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        },
+                        "conditions":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        },
+                        "allowOverwrite":{
+                            "type":"boolean"
+                        },
+                        "tsconfig":{
+                            "type":"string"
+                        },
+                        "outExtension":{
+                            "type":"object",
+                            "properties":{}
+                        },
+                        "publicPath":{
+                            "type":"string"
+                        },
+                        "entryNames":{
+                            "type":"string"
+                        },
+                        "chunkNames":{
+                            "type":"string"
+                        },
+                        "assetNames":{
+                            "type":"string"
+                        },
+                        "inject":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        },
+                        "banner":{
+                            "type":"object",
+                            "properties":{}
+                        },
+                        "footer":{
+                            "type":"object",
+                            "properties":{}
+                        },
+                        "plugins":{
+                            "type":"array",
+                            "items":{
+                                "type":"object",
+                                "properties":{}
+                            }
+                        },
+                        "absWorkingDir":{
+                            "type":"string"
+                        },
+                        "nodePaths":{
+                            "type":"array",
+                            "items":{
+                                "type":"string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+
+
+    "main": {
+      "type": "string",
+      "description": "The name of the main entry-point file.",
+      "x-completion-type": "file",
+      "x-completion-glob": "main@(.js|.ts|.jsx|.tsx)"
+    },
+    "rootDir": {
+      "type": "string",
+      "description": "Sets the rootDir for TypeScript compilation. When not defined, it uses the root of project."
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "The output path of the generated files.",
+      "x-completion-type": "directory"
+    },
+    "tsConfig": {
+      "type": "string",
+      "description": "The path to the Typescript configuration file.",
+      "x-completion-type": "file",
+      "x-completion-glob": "tsconfig.*.json"
+    },
+    "assets": {
+      "type": "array",
+      "description": "List of static assets.",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "watch": {
+      "type": "boolean",
+      "description": "Enable re-building when files change.",
+      "default": false
+    },
+    "clean": {
+      "type": "boolean",
+      "description": "Remove previous output before build.",
+      "default": true
+    },
+    "transformers": {
+      "type": "array",
+      "description": "List of TypeScript Transformer Plugins.",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/transformerPattern"
+      }
+    },
+    "updateBuildableProjectDepsInPackageJson": {
+      "type": "boolean",
+      "description": "Whether to update the buildable project dependencies in `package.json`.",
+      "default": true
+    },
+    "buildableProjectDepsInPackageJsonType": {
+      "type": "string",
+      "description": "When `updateBuildableProjectDepsInPackageJson` is `true`, this adds dependencies to either `peerDependencies` or `dependencies`.",
+      "enum": ["dependencies", "peerDependencies"],
+      "default": "peerDependencies"
+    },
+    "external": {
+      "description": "A list projects to be treated as external. This feature is experimental",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["all", "none"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "externalBuildTargets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of target names that annotate a build target for a project",
+      "default": ["build"]
+    }
+  },
+  "required": ["main", "outputPath", "tsConfig"],
+  "definitions": {
+    "assetPattern": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "glob": {
+              "type": "string",
+              "description": "The pattern to match."
+            },
+            "input": {
+              "type": "string",
+              "description": "The input directory path in which to apply 'glob'. Defaults to the project root."
+            },
+            "ignore": {
+              "description": "An array of globs to ignore.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "output": {
+              "type": "string",
+              "description": "Absolute path within the output."
+            }
+          },
+          "additionalProperties": false,
+          "required": ["glob", "input", "output"]
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "transformerPattern": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false,
+          "required": ["name"]
+        }
+      ]
+    }
+  }
+}

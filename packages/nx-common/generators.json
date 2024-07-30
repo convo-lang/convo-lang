@@ -1,0 +1,12 @@
+{
+    "$schema": "http://json-schema.org/schema",
+    "name": "nx-common",
+    "version": "0.0.1",
+    "generators": {
+        "nx-common": {
+            "factory": "./src/generators/nx-common/generator",
+            "schema": "./src/generators/nx-common/schema.json",
+            "description": "nx-common generator"
+        }
+    }
+}

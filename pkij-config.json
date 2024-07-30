@@ -4,6 +4,7 @@
         {"dir":"../iyio-common/packages/iyio-common"},
         {"dir":"../iyio-common/packages/media-common"},
         {"dir":"../iyio-common/packages/node-common"},
+        {"dir":"../iyio-common/packages/nx-common"},
         {"dir":"../iyio-common/packages/react-common"},
         {"dir":"../iyio-common/packages/syn-taxi"}
     ]
