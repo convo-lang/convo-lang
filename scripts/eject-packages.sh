@@ -2,4 +2,6 @@
 set -e
 cd "$(dirname "$0")/.."
 
-node scripts/pkij.js --eject $@
+# to install pkij run `npm install -g @iyio/pkij`
+
+npx pkij --eject $@
