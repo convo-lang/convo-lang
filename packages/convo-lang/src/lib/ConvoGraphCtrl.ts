@@ -417,8 +417,18 @@ export class ConvoGraphCtrl
 
         if(edges.length){
             await Promise.all(edges.map((edge,i)=>{
-                if(i===0){
-                    return this.traverseEdgeAsync(tv,edge);
+                if(i===0 && !edge.loop){
+                    if(edge.loop){
+                        tv.exeState='stopped';
+                        this.triggerEvent({
+                            type:'traversal-stopped',
+                            text:'Traversal yeilded to loop',
+                            traverser:tv,
+                            node,
+                        })
+                    }else{
+                        return this.traverseEdgeAsync(tv,edge);
+                    }
                 }
                 // create fork
                 return this.createTvAsync(
@@ -588,8 +598,6 @@ export class ConvoGraphCtrl
         stepIndex:number,
         exeCtx:ConvoNodeExecCtx
     ):Promise<CallTargetResult|undefined>{
-
-        console.log('hio 👋 👋 👋 input',exeCtx.defaultVars['input']);
 
         // lock here
         const release=await this.stepLock.waitAsync();
