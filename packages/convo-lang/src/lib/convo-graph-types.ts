@@ -1,7 +1,7 @@
 import { CancelToken } from "@iyio/common";
 import { BehaviorSubject, Observable } from "rxjs";
 import { ZodType } from "zod";
-import { Conversation } from "./Conversation";
+import { Conversation, ConversationOptions } from "./Conversation";
 
 export interface ConvoGraph
 {
@@ -81,6 +81,11 @@ export interface ConvoNodeStep
      * The convo script for the step
      */
     convo:string;
+
+    /**
+     * If true the step will reset the node conversation before executing
+     */
+    resetConvo?:boolean;
 }
 
 export interface ConvoNodeExecCtx extends ConvoMetadataAndTypeMap
@@ -95,12 +100,17 @@ export interface ConvoNodeExecCtx extends ConvoMetadataAndTypeMap
      * Variable defaults passed to the conversations
      */
     defaultVars:Record<string,any>;
+
+    convo:Conversation;
+
+    convoOptions?:ConversationOptions;
+
+    node:ConvoNode;
 }
 
 export interface ConvoNodeExecCtxStep
 {
     nodeStep:ConvoNodeStep;
-    convo:Conversation;
 }
 
 export interface ConvoNodeOutput extends ConvoNodeTypeMetadata
@@ -189,6 +199,21 @@ export interface ConvoEdge
      * Defines conditions for pausing the traversal of a traverser crossing the edge.
      */
     pause?:ConvoTraversalPause;
+
+    /**
+     * A dot path used to select a sub-property of the input to pass to the to destination
+     */
+    selectPath?:string;
+
+    /**
+     * If true the edge should loop over its payload if the payload is an array
+     */
+    loop?:boolean;
+
+    /**
+     * A dot path used to select a sub-property looped items
+     */
+    loopSelectPath?:string;
 
     x?:number;
     y?:number;

@@ -20,6 +20,9 @@ export function ConvoEdgeView({
     const to=useWProp(edge,'to');
     const from=useWProp(edge,'from');
     const code=useWProp(edge,'conditionConvo');
+    const loop=useWProp(edge,'loop')??false;
+    const selectPath=useWProp(edge,'selectPath');
+    const loopSelectPath=useWProp(edge,'loopSelectPath');
 
     const setCode=useCallback((v:string)=>{
         wSetPropOrDeleteFalsy(edge,'conditionConvo',v);
@@ -31,8 +34,23 @@ export function ConvoEdgeView({
             <View gridLeftAuto2 g050 alignCenter>
                 From
                 <ConvoNodeSelector flex1 value={from} onChange={v=>wSetProp(edge,'from',v??'')} />
+
                 To
                 <ConvoNodeSelector flex1 value={to} onChange={v=>wSetProp(edge,'to',v??'')} />
+
+                Select
+                <input type="text" placeholder="Select path" value={selectPath??''} onChange={e=>wSetPropOrDeleteFalsy(edge,'selectPath',e.target.value)}/>
+
+                Loop
+                <View row>
+                    <input type="checkbox" checked={loop} onChange={e=>wSetPropOrDeleteFalsy(edge,'loop',e.target.checked)}/>
+                </View>
+
+                {loop && <>
+                    LPath
+                    <input type="text" placeholder="Loop select path" value={loopSelectPath??''} onChange={e=>wSetPropOrDeleteFalsy(edge,'loopSelectPath',e.target.value)}/>
+                </>}
+
             </View>
 
             <View col g050>

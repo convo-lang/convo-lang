@@ -5,7 +5,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -833,7 +833,7 @@ export class Conversation
         }else{
             this._isCompleting.next(true);
             try{
-                return await this._completeAsync(additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
+                return await this._completeAsync(true,additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
             }finally{
                 this._isCompleting.next(false);
             }
@@ -845,6 +845,7 @@ export class Conversation
     public get isCompleting(){return this._isCompleting.value}
 
     private async _completeAsync(
+        isSourceMessage:boolean,
         usage:ConvoTokenUsage|undefined,
         task:string|undefined,
         additionalOptions:ConvoCompletionOptions|undefined,
@@ -876,7 +877,9 @@ export class Conversation
                 task,
                 discardTemplates:!isDefaultTask || templates!==undefined,
                 threadFilter:additionalOptions?.threadFilter,
+                toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
             });
+
             if(flat.templates && !templates){
                 templates=flat.templates;
             }
@@ -1080,7 +1083,7 @@ export class Conversation
                     }
                 }
             }else if(lastResultValue!==undefined && autoCompleteDepth<this.maxAutoCompleteDepth && !additionalOptions?.returnOnCalled){
-                return await this._completeAsync(undefined,task,additionalOptions,getCompletion,autoCompleteDepth+1,completion,returnValues,templates,undefined,lastFnCall);
+                return await this._completeAsync(false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth+1,completion,returnValues,templates,undefined,lastFnCall);
             }
 
             if(isDefaultTask && templates?.length){
@@ -1171,7 +1174,7 @@ export class Conversation
         const remove:ConvoSubTask[]=[];
 
         const subs=tasks.map<ConvoSubTask>(task=>{
-            const promise=this._completeAsync(undefined,task,additionalOptions,getCompletion,autoCompleteDepth);
+            const promise=this._completeAsync(false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth);
             const sub:ConvoSubTask={
                 name:task,
                 promise
@@ -1348,6 +1351,7 @@ export class Conversation
             setCurrent=task===defaultConvoTask,
             discardTemplates,
             threadFilter,
+            toolChoice,
         }:FlattenConvoOptions={}
     ):Promise<FlatConvoConversation>{
 
@@ -1638,6 +1642,11 @@ export class Conversation
             }
         }
 
+        const lastMsg=messages[messages.length-1];
+        const toolTag=lastMsg?.tags?.[convoTags.call]||(
+            lastMsg?.tags?(convoTags.call in lastMsg.tags)?'required':undefined:undefined
+        );
+
         const flat:FlatConvoConversation={
             exe,
             vars:exe.getUserSharedVars(),
@@ -1649,7 +1658,8 @@ export class Conversation
             debug,
             capabilities,
             markdownVars:mdVarCtx.vars,
-            ragMode
+            ragMode,
+            toolChoice:toolTag?baseConvoToolChoice.includes(toolTag as any)?toolTag as any:{name:toolTag}:toolChoice,
         }
 
         for(let i=0;i<messages.length;i++){

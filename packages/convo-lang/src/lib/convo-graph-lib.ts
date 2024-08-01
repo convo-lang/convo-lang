@@ -13,40 +13,44 @@ export const getConvoNodeMetadataAsync=async (convo:Conversation|null):Promise<C
         return {metadata,typeMap};
     }
 
-    const flat=await convo.getLastAutoFlatAsync();
+    try{
+        const flat=await convo.getLastAutoFlatAsync();
 
-    if(!flat){
-        return {metadata,typeMap}
-    }
+        if(!flat){
+            return {metadata,typeMap}
+        }
 
-    const inputVar=flat.exe.getVarAsType('Input');
+        const inputVar=flat.exe.getVarAsType('Input');
 
-    if(inputVar){
-        metadata.inputType={name:'Input'}
-        typeMap['Input']=inputVar;
-    }
+        if(inputVar){
+            metadata.inputType={name:'Input'}
+            typeMap['Input']=inputVar;
+        }
 
 
-    for(const msg of flat.messages){
-        if( msg.tags &&
-            (convoTags.output in msg.tags) &&
-            msg.fn?.returnType
-        ){
-            const outputVar=flat.exe.getVarAsType(msg.fn.returnType);
-            if(outputVar){
-                const output:ConvoNodeOutput={
-                    name:msg.fn.returnType,
-                    fnName:msg.fn.name,
+        for(const msg of flat.messages){
+            if( msg.tags &&
+                (convoTags.output in msg.tags) &&
+                msg.fn?.returnType
+            ){
+                const outputVar=flat.exe.getVarAsType(msg.fn.returnType);
+                if(outputVar){
+                    const output:ConvoNodeOutput={
+                        name:msg.fn.returnType,
+                        fnName:msg.fn.name,
+                    }
+                    outputTypes.push(output);
                 }
-                outputTypes.push(output);
             }
         }
-    }
 
-    if(!outputTypes.length && inputVar){
-        outputTypes.push({
-            name:'Input'
-        })
+        if(!outputTypes.length && inputVar){
+            outputTypes.push({
+                name:'Input'
+            })
+        }
+    }catch(ex){
+        console.warn('Creating ConvoMetadataAndTypeMap failed. This could be due to undefined vars in the last step of a node',ex)
     }
 
     return {metadata,typeMap}
@@ -58,36 +62,41 @@ export const createConvoNodeExecCtxAsync=async (node:ConvoNode,convoOptions?:Con
         ...convoOptions?.defaultVars
     }
 
-    const last=(node.sharedConvo || node.steps.length)?new Conversation({
+    const metadataAndMap=await getConvoNodeMetadataAsync((node.sharedConvo || node.steps.length)?
+        createConvoNodeExecCtxConvo(node,defaultVars,convoOptions,(node.steps[node.steps.length-1]?.convo??'')):
+        null
+    );
+
+    return {
+        ...metadataAndMap,
+        node,
+        defaultVars,
+        convo:createConvoNodeExecCtxConvo(node,defaultVars,convoOptions),
+        steps:node.steps.map((step,i)=>({
+            nodeStep:step,
+        }))
+    }
+}
+
+export const resetConvoNodeExecCtxConvo=(ctx:ConvoNodeExecCtx)=>{
+    ctx.convo=createConvoNodeExecCtxConvo(ctx.node,ctx.defaultVars,ctx.convoOptions)
+}
+
+export const createConvoNodeExecCtxConvo=(
+    node:ConvoNode,
+    defaultVars:Record<string,any>,
+    convoOptions?:ConversationOptions,
+    appendConvo:string=''
+):Conversation=>{
+    return new Conversation({
         ...convoOptions,
         defaultVars,
         initConvo:(
             (convoOptions?.initConvo?convoOptions?.initConvo+'\n\n':'')+
             (node.sharedConvo?node.sharedConvo+'\n\n':'')+
-            (node.steps[node.steps.length-1]?.convo??'')
+            appendConvo
         )
-    }):null;
-
-
-
-    const metadataAndMap=await getConvoNodeMetadataAsync(last);
-
-    return {
-        ...metadataAndMap,
-        defaultVars,
-        steps:node.steps.map((step,i)=>({
-            nodeStep:step,
-            convo:(i===node.steps.length-1 && last)?last:new Conversation({
-                ...convoOptions,
-                defaultVars,
-                initConvo:(
-                    (convoOptions?.initConvo?convoOptions?.initConvo+'\n\n':'')+
-                    (node.sharedConvo?node.sharedConvo+'\n\n':'')+
-                    step.convo
-                )
-            })
-        }))
-    }
+    })
 }
 
 export const hasConvoGraphDb=(obj:any):obj is IHasConvoGraphDb=>{

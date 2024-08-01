@@ -125,6 +125,9 @@ export interface ConvoMessage
     tid?:string;
 }
 
+export const baseConvoToolChoice=['none','auto','required'] as const;
+export type ConvoToolChoice=(typeof baseConvoToolChoice[number])|{name:string};
+
 export interface ConvoMessagePart
 {
     id?:string;
@@ -736,6 +739,8 @@ export interface FlatConvoConversation
     ragMode?:ConvoRagMode;
     ragPrefix?:string;
     ragSuffix?:string;
+
+    toolChoice?:ConvoToolChoice;
 }
 
 export interface ConvoExecuteResult
@@ -876,6 +881,8 @@ export interface FlattenConvoOptions
     discardTemplates?:boolean;
 
     threadFilter?:ConvoThreadFilter;
+
+    toolChoice?:ConvoToolChoice;
 }
 
 export interface ConvoSubTask
@@ -908,6 +915,8 @@ export interface ConvoCompletionOptions
     usage?:ConvoTokenUsage;
 
     debug?:boolean;
+
+    toolChoice?:ConvoToolChoice;
 }
 
 export interface ConvoMessageTemplate

@@ -204,6 +204,10 @@ export const AiCompletionRequestScheme=z.object({
 
     ragPrefix:z.string().optional(),
     ragSuffix:z.string().optional(),
+
+    toolChoice:z.literal('none').or(z.literal(('auto'))).or(z.literal('required')).or(z.object({
+        name:z.string()
+    })).optional()
 })
 export type AiCompletionRequest=z.infer<typeof AiCompletionRequestScheme> & {
     debug?:(...args:any[])=>void;

@@ -366,12 +366,12 @@ export class AiCompletionService implements ConvoCompletionService
                 });
             }
         }
-
         const request:AiCompletionRequest={
             messages,
             functions,
             debug:flat.debug,
             capabilities:[],
+            toolChoice:flat.toolChoice,
             apiKey:flat.conversation.getDefaultApiKey()??undefined,
             ragPrefix:flat.ragPrefix,
             ragSuffix:flat.ragSuffix,

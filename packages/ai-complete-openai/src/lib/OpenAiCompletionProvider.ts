@@ -222,6 +222,10 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
             messages:oMsgs,
             tools:oFns?.length?oFns:undefined,
             user:lastContentMessage?.userId,
+            tool_choice:request.toolChoice?(
+                (typeof request.toolChoice === 'string')?
+                request.toolChoice:{type:"function","function":request.toolChoice}
+            ):undefined
         };
         if(useVision){
             // todo - review if this is needed. Current used as workaround for issue with

@@ -1,10 +1,10 @@
-import { CancelToken, DisposeContainer, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
+import { CancelToken, DisposeContainer, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { createConvoNodeExecCtxAsync } from "./convo-graph-lib";
+import { createConvoNodeExecCtxAsync, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
-import { convoTags } from "./convo-lib";
+import { convoTags, getConvoFnByTag } from "./convo-lib";
 import { convoScript } from "./convo-template";
 import { ConvoFnCallInfo } from "./convo-types";
 import { convoGraphStore } from "./convo.deps";
@@ -112,7 +112,13 @@ export class ConvoGraphCtrl
             edges=[];
         }
 
-        const traversers=await Promise.all(edges.map((edge)=>this.createTvAsync(edge,createTvOptions,payload,state,saveToStore)));
+        const traversersArrays=await Promise.all(edges.map((edge)=>
+            this.createTvAsync(edge,createTvOptions,payload,state,saveToStore)));
+
+        const traversers:ConvoTraverser[]=[];
+        for(const ta of traversersArrays){
+            traversers.push(...ta);
+        }
 
         return {
             traversers:new BehaviorSubject(traversers),
@@ -129,7 +135,39 @@ export class ConvoGraphCtrl
         state:Record<string,any>|undefined,
         saveToStore:boolean,
         addTo?:BehaviorSubject<ConvoTraverser[]>
-    ){
+    ):Promise<ConvoTraverser[]>{
+        if(edge.selectPath){
+            payload=getValueByPath(payload,edge.selectPath);
+        }
+        if(edge.loop && Array.isArray(payload)){
+            return await Promise.all(payload.map(p=>this._createTvAsync(
+                edge,
+                options,
+                edge.loopSelectPath?getValueByPath(p,edge.loopSelectPath):p,
+                state,
+                saveToStore,
+                addTo
+            )))
+        }else{
+            return [await this._createTvAsync(
+                edge,
+                options,
+                payload,
+                state,
+                saveToStore,
+                addTo
+            )]
+        }
+    }
+
+    private async _createTvAsync(
+        edge:ConvoEdge,
+        options:CreateConvoTraverserOptions|undefined,
+        payload:any,
+        state:Record<string,any>|undefined,
+        saveToStore:boolean,
+        addTo?:BehaviorSubject<ConvoTraverser[]>
+    ):Promise<ConvoTraverser>{
         const defaults=options?.defaults;
         const tv:ConvoTraverser={
             ...defaults,
@@ -282,7 +320,6 @@ export class ConvoGraphCtrl
             const newState=await this._nextAsync(tv,group);
             if(newState==='failed'){
                 if(this.hasListeners){
-                    console.log('hio 👋 👋 👋 new state',newState);
                     this.triggerEvent({
                         type:'traversal-failed',
                         text:tv.errorMessage??'Traversal failed',
@@ -294,7 +331,6 @@ export class ConvoGraphCtrl
         }catch(ex){
             tv.currentStepIndex=0;
             //throw errors can be retired
-            console.log('hio 👋 👋 👋 error caught',ex);
             if(this.hasListeners){
                 this.triggerEvent({
                     type:'traversal-failed',
@@ -346,7 +382,7 @@ export class ConvoGraphCtrl
             }
         }
 
-        let invokeCall:ConvoFnCallInfo|undefined;
+        let invokeCall:CallTargetResult|undefined;
         tv.exeState='invoking';
         for(let i=transformStep?-1:0;i<exeCtx.steps.length;i++){
             const step=i===-1?transformStep:exeCtx.steps[i];
@@ -366,8 +402,8 @@ export class ConvoGraphCtrl
 
         const edges=await this.getEdgesAsync({
             from:node.id,
-            fromFn:invokeCall?.name,
-            fromType:invokeCall?.fn.returnType,
+            fromFn:invokeCall?.call?.fn.name,
+            fromType:invokeCall?.type,
             input:tv.payload
         });
 
@@ -447,7 +483,6 @@ export class ConvoGraphCtrl
     private async getSharedSourceAsync():Promise<string>
     {
         const nodes=(await this.store.getSourceNodesAsync()).filter(s=>s.shared);
-        console.log('hio 👋 👋 👋 SOURCE nodes',nodes);
         if(!nodes.length){
             return '';
         }
@@ -480,6 +515,7 @@ export class ConvoGraphCtrl
 
                     const transformStep:ConvoNodeStep={
                         name:'Auto transform',
+                        resetConvo:true,
                         convo:convoScript`
 
                             @output
@@ -516,15 +552,15 @@ export class ConvoGraphCtrl
                     }
                     return {
                         nodeStep:transformStep,
-                        convo:new Conversation({
-                            ...this.getConvoOptionsAsync(tv),
-                            defaultVars:exeCtx.defaultVars,
-                            initConvo:(
-                                (await this.getSharedSourceAsync())+
-                                (node.sharedConvo?node.sharedConvo+'\n\n':'')+
-                                transformStep.convo
-                            )
-                        })
+                        // convo:new Conversation({
+                        //     ...this.getConvoOptionsAsync(tv),
+                        //     defaultVars:exeCtx.defaultVars,
+                        //     initConvo:(
+                        //         (await this.getSharedSourceAsync())+
+                        //         (node.sharedConvo?node.sharedConvo+'\n\n':'')+
+                        //         transformStep.convo
+                        //     )
+                        // })
                     };
                 }
 
@@ -543,7 +579,7 @@ export class ConvoGraphCtrl
         step:ConvoNodeExecCtxStep,
         stepIndex:number,
         exeCtx:ConvoNodeExecCtx
-    ):Promise<ConvoFnCallInfo|undefined>{
+    ):Promise<CallTargetResult|undefined>{
 
         if(this.hasListeners){
             this.triggerEvent({
@@ -556,19 +592,31 @@ export class ConvoGraphCtrl
             });
         }
 
-        const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,step.convo);
+        if(step.nodeStep.resetConvo){
+            resetConvoNodeExecCtxConvo(exeCtx);
+        }
+        const msgCount=exeCtx.convo.messages.length;
+        exeCtx.convo.append(step.nodeStep.convo);
+        const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,exeCtx.convo,msgCount,stepIndex===exeCtx.steps.length-1);
         if(call){
-            tv.payload=call.returnValue;
+            tv.payload=call.value;
             exeCtx.defaultVars['input']=tv.payload;
             const stepKey=stepIndex===-1?'stepAuto':`step${stepIndex}`;
             exeCtx.defaultVars[stepKey]=tv.payload;
+            if(step.nodeStep.name){
+                exeCtx.defaultVars[step.nodeStep.name]=tv.payload;
+            }
         }
         return call;
     }
 
-    private async callTargetAsync(name:string,tv:ConvoTraverser,convo:Conversation):Promise<ConvoFnCallInfo|undefined>
+    private async callTargetAsync(name:string,tv:ConvoTraverser,convo:Conversation,msgStartIndex:number,isLast:boolean):Promise<CallTargetResult|undefined>
     {
-        const call=(await convo.completeAsync({returnOnCalled:true})).lastFnCall;
+        const outputFn=getConvoFnByTag(convoTags.output,convo.messages,msgStartIndex);
+        const errFn=getConvoFnByTag(convoTags.errorCallback,convo.messages,msgStartIndex);
+
+        const result=await convo.completeAsync({returnOnCalled:isLast,toolChoice:outputFn?{name:outputFn.name}:undefined});
+        const call=result.lastFnCall;
 
         if(this.hasListeners){
             this.triggerEvent({
@@ -577,7 +625,9 @@ export class ConvoGraphCtrl
                 traverser:tv,
             });
         }
-        if(!call){
+
+
+        if(!call && (outputFn || errFn)){
             tv.exeState='failed';
             tv.errorMessage=`${name} function not called`;
             return undefined;
@@ -595,7 +645,20 @@ export class ConvoGraphCtrl
                 );
                 return undefined;
             }
-            return call;
+            return {
+                call,
+                value:call.returnValue,
+                type:call.fn.returnType,
+            };
+        }else if(!outputFn){
+            return call?{
+                call,
+                value:call.returnValue,
+                type:call.fn.returnType,
+            }:{
+                value:result.message?.content,
+                type:'string'
+            }
         }else{
             tv.exeState='failed';
             tv.errorMessage=`${name} failed. function not called`;
@@ -604,4 +667,11 @@ export class ConvoGraphCtrl
     }
 
 
+}
+
+interface CallTargetResult
+{
+    call?:ConvoFnCallInfo;
+    value:any;
+    type?:string;
 }

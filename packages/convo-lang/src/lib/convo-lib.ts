@@ -2,7 +2,7 @@ import { UnsupportedError } from "@iyio/common";
 import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoDocumentReference, ConvoFlowController, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles } from "./convo-types";
+import { ConvoBaseType, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -363,6 +363,15 @@ export const convoTags={
      */
     concat:'concat',
 
+    /**
+     * Instructs the LLM to call the specified function. The values "none", "required", "auto" have
+     * a special meaning. If no name is given the special "required" value is used.
+     * - none: tells the LLM to not call any functions
+     * - required: tells the LLM it must call a function, any function.
+     * - auto: tells the LLM it can call a function respond with a text response. This is the default behaviour.
+     */
+    call:'call'
+
 } as const;
 
 export const convoTaskTriggers={
@@ -506,6 +515,28 @@ export const getConvoTag=(tags:ConvoTag[]|null|undefined,tagName:string):ConvoTa
         }
     }
     return undefined;
+}
+
+export const getConvoFnMessageByTag=(tag:string,messages:ConvoMessage[]|null|undefined,startIndex=0):ConvoMessage|undefined=>{
+    if(!messages){
+        return undefined;
+    }
+    for(let i=startIndex;i<messages.length;i++){
+        const msg=messages[i];
+        if(!msg || !msg.tags || !msg.fn || msg.fn.call){
+            continue;
+        }
+        for(const t of msg.tags){
+            if(t.name===tag){
+                return msg;
+            }
+        }
+    }
+    return undefined;
+}
+
+export const getConvoFnByTag=(tag:string,messages:ConvoMessage[]|null|undefined,startIndex=0):ConvoFunction|undefined=>{
+    return getConvoFnMessageByTag(tag,messages,startIndex)?.fn;
 }
 
 export const convoTagsToMap=(tags:ConvoTag[]):Record<string,string|undefined>=>{
