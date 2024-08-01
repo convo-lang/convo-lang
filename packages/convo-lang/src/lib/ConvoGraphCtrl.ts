@@ -1,8 +1,8 @@
-import { CancelToken, DisposeContainer, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
+import { CancelToken, DisposeContainer, Lock, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { createConvoNodeExecCtxAsync, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { createConvoNodeExecCtxAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { convoTags, getConvoFnByTag } from "./convo-lib";
 import { convoScript } from "./convo-template";
@@ -13,6 +13,7 @@ export interface ConvoGraphCtrlOptions
 {
     store?:ConvoGraphStore;
     convoOptions?:ConversationOptions;
+    maxConcurrentStepExe?:number;
 }
 
 export class ConvoGraphCtrl
@@ -57,12 +58,19 @@ export class ConvoGraphCtrl
         }
     }
 
+    public readonly maxConcurrentStepExe:number;
+
+    private readonly stepLock:Lock;
+
     public constructor({
         store=convoGraphStore(),
-        convoOptions={}
+        convoOptions={},
+        maxConcurrentStepExe=maxConvoGraphConcurrentStepExe,
     }:ConvoGraphCtrlOptions){
         this.store=store;
         this.defaultConvoOptions=convoOptions;
+        this.maxConcurrentStepExe=Math.max(1,maxConcurrentStepExe);
+        this.stepLock=new Lock(this.maxConcurrentStepExe)
     }
 
     private readonly disposables=new DisposeContainer();
@@ -581,33 +589,42 @@ export class ConvoGraphCtrl
         exeCtx:ConvoNodeExecCtx
     ):Promise<CallTargetResult|undefined>{
 
-        if(this.hasListeners){
-            this.triggerEvent({
-                type:'execute-step',
-                text:`Executing step ${stepIndex}`,
-                traverser:tv,
-                step:step.nodeStep,
-                stepIndex,
-                node,
-            });
-        }
+        console.log('hio 👋 👋 👋 input',exeCtx.defaultVars['input']);
 
-        if(step.nodeStep.resetConvo){
-            resetConvoNodeExecCtxConvo(exeCtx);
-        }
-        const msgCount=exeCtx.convo.messages.length;
-        exeCtx.convo.append(step.nodeStep.convo);
-        const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,exeCtx.convo,msgCount,stepIndex===exeCtx.steps.length-1);
-        if(call){
-            tv.payload=call.value;
-            exeCtx.defaultVars['input']=tv.payload;
-            const stepKey=stepIndex===-1?'stepAuto':`step${stepIndex}`;
-            exeCtx.defaultVars[stepKey]=tv.payload;
-            if(step.nodeStep.name){
-                exeCtx.defaultVars[step.nodeStep.name]=tv.payload;
+        // lock here
+        const release=await this.stepLock.waitAsync();
+
+        try{
+            if(this.hasListeners){
+                this.triggerEvent({
+                    type:'execute-step',
+                    text:`Executing step ${stepIndex}`,
+                    traverser:tv,
+                    step:step.nodeStep,
+                    stepIndex,
+                    node,
+                });
             }
+
+            if(step.nodeStep.resetConvo){
+                resetConvoNodeExecCtxConvo(exeCtx);
+            }
+            const msgCount=exeCtx.convo.messages.length;
+            exeCtx.convo.append(step.nodeStep.convo);
+            const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,exeCtx.convo,msgCount,stepIndex===exeCtx.steps.length-1);
+            if(call){
+                tv.payload=call.value;
+                exeCtx.defaultVars['input']=tv.payload;
+                const stepKey=stepIndex===-1?'stepAuto':`step${stepIndex}`;
+                exeCtx.defaultVars[stepKey]=tv.payload;
+                if(step.nodeStep.name){
+                    exeCtx.defaultVars[step.nodeStep.name]=tv.payload;
+                }
+            }
+            return call;
+        }finally{
+            release();
         }
-        return call;
     }
 
     private async callTargetAsync(name:string,tv:ConvoTraverser,convo:Conversation,msgStartIndex:number,isLast:boolean):Promise<CallTargetResult|undefined>

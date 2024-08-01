@@ -3,6 +3,8 @@ import { Conversation, ConversationOptions } from "./Conversation";
 import { ConvoGraphDb, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
 import { convoTags } from "./convo-lib";
 
+export const maxConvoGraphConcurrentStepExe=5;
+
 export const getConvoNodeMetadataAsync=async (convo:Conversation|null):Promise<ConvoMetadataAndTypeMap>=>{
 
     const outputTypes:ConvoNodeOutput[]=[];
