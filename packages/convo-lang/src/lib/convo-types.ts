@@ -1,4 +1,5 @@
-import { CodeParsingResult, JsonScheme, MarkdownLine } from '@iyio/common';
+import { CodeParsingResult, JsonScheme, MarkdownLine, XmlNode } from '@iyio/common';
+import { BehaviorSubject } from 'rxjs';
 import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
 import type { ConvoExecutionContext } from './ConvoExecutionContext';
@@ -66,6 +67,11 @@ export const allConvoCapabilityAry=['vision'] as const;
 export type ConvoCapability=typeof allConvoCapabilityAry[number];
 export const isConvoCapability=(value:any):value is ConvoCapability=>allConvoCapabilityAry.includes(value);
 
+export const allConvoComponentModeAry=['render','input'] as const;
+export type ConvoComponentMode=typeof allConvoComponentModeAry[number];
+export const isConvoComponentMode=(value:any):value is ConvoComponentMode=>allConvoComponentModeAry.includes(value);
+
+
 /**
  * Can be a text message or function definition
  */
@@ -95,11 +101,11 @@ export interface ConvoMessage
     jsonValue?:any;
 
     /**
-     * If the message has the `@component` tag the message will be marked as a component. If component
-     * equals true then the component is an unnamed component. Components are by default cause the
-     * message to be renderOnly
+     * When defined the message is handled as a component and is rendered as a custom ui element.
+     * A component message can either render an custom UI without effecting the current conversation
+     * or a component message can collect and submit data into the current conversation.
      */
-    component?:string|boolean;
+    component?:ConvoComponentMode;
 
     /**
      * If true the message should be rendered but not sent to LLMs
@@ -632,10 +638,16 @@ export interface FlatConvoMessage
     task?:string;
 
     /**
-     * If the message has the `@component` tag the message will be marked as a component. If component
-     * equals true then the component is an unnamed component.
+     * When defined the message is handled as a component and is rendered as a custom ui element.
+     * A component message can either render an custom UI without effecting the current conversation
+     * or a component message can collect and submit data into the current conversation.
      */
-    component?:string|boolean;
+    component?:ConvoComponentMode;
+
+    /**
+     * An ordered index given to flat component messages
+     */
+    componentIndex?:number;
 
     /**
      * If true the message should be rendered but not sent to LLMs
@@ -986,26 +998,33 @@ export type ConvoImportHandler=(_import:ConvoImport)=>ConvoImportResult|null|und
 
 export interface ConvoComponentMessageState
 {
-    last:FlatConvoMessage;
+    last?:FlatConvoMessage;
     all:FlatConvoMessage[];
     flat:FlatConvoConversation;
     convo:Conversation;
 }
 
-export type ConvoComponentMessagesCallback=(state:ConvoComponentMessageState)=>void;
+export type ConvoComponentMessagesCallback=((state:ConvoComponentMessageState)=>void)|BehaviorSubject<ConvoComponentMessageState|null>;
 
 export interface ConvoComponentCompletionCtx
 {
     message:FlatConvoMessage;
     flat:FlatConvoConversation;
     convo:Conversation;
+    component:ConvoComponent;
+    submit:(submission:ConvoComponentSubmission)=>void;
 }
-export type ConvoComponentCompletionHandler=(ctx:ConvoComponentCompletionCtx)=>Promise<ConvoCompletionMessage[]>|ConvoCompletionMessage[];
+export type ConvoComponentCompletionHandler=(ctx:ConvoComponentCompletionCtx)=>void;
 
 export interface ConvoComponentSubmission
 {
-    flat:FlatConvoConversation;
-    convo:Conversation;
     data?:any;
     messages?:ConvoCompletionMessage[];
 }
+
+export interface ConvoComponentSubmissionWithIndex extends ConvoComponentSubmission
+{
+    componentIndex:number;
+}
+
+export type ConvoComponent=XmlNode;

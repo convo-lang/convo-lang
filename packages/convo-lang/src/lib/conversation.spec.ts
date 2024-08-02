@@ -4,7 +4,7 @@ import { CallbackConvoCompletionService } from './CallbackConvoCompletionService
 import { Conversation } from "./Conversation";
 import { ConvoError } from './ConvoError';
 import { getConvoMetadata } from './convo-lib';
-import { ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
+import { ConvoComponent, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
 
 describe('convo',()=>{
 
@@ -1029,6 +1029,49 @@ describe('convo',()=>{
         expect(msgs[0]?.includes('msg 1')).toBe(true);
         expect(msgs[0]?.includes('msg 2')).toBe(false);
         expect(msgs[0]?.includes('msg 3')).toBe(true);
+
+    });
+
+
+    it('Should create component using code block',async ()=>{
+        let comp:ConvoComponent|undefined;
+        const convo=new Conversation({
+            disableAutoFlatten:true,
+            componentCompletionCallback:({component,submit})=>{
+                comp=component;
+                submit({
+                    messages:[
+                        {
+                            role:'user',
+                            content:'a-ok'
+                        }
+                    ]
+                })
+            }
+        });
+
+        convo.append(/*convo*/`
+            > user
+            ${'```'} input
+            <Example name="Jeff" age="{21}" />
+            ${'```'}
+        `);
+
+        const flat=await convo.flattenAsync();
+        expect(flat.messages.length).toBe(1);
+
+        expect(flat.messages[0]?.component).toBe('input');
+
+
+        const r=await convo.completeAsync();
+
+        expect(comp).not.toBeUndefined();
+        expect(comp?.name).toBe('Example');
+        expect(comp?.atts).toEqual({
+            name:'Jeff',
+            age:21
+        });
+
 
     });
 

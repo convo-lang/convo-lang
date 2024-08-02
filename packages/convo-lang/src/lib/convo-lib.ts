@@ -1,8 +1,9 @@
-import { UnsupportedError } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, parseXml } from "@iyio/common";
 import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
+import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles } from "./convo-types";
+import { ConvoBaseType, ConvoComponent, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -251,8 +252,8 @@ export const convoTags={
     sourceTemplate:'sourceTemplate',
 
     /**
-     * Used to mark a message as a component. The value of the tag is used as the component name.
-     * If no value is provided then the component will be unnamed.
+     * Used to mark a message as a component. The value can be "render" or "input". The default
+     * value is "render" if no value is given
      */
     component:'component',
 
@@ -986,4 +987,69 @@ export const isConvoThreadFilterMatch=(filter:ConvoThreadFilter,tid:string|undef
     }else{
         return true;
     }
+}
+
+const convoComponentCacheKey=Symbol('convoComponentCacheKey')
+export const parseConvoComponent=(content:string|null|undefined):ConvoComponent|undefined=>{
+
+    if(!content){
+        return undefined;
+    }
+
+    const codeBlockMatch=/^\s*```[^\n]*(.*)```\s*$/s.exec(content);
+    if(codeBlockMatch?.[1]){
+        content=codeBlockMatch[1];
+    }
+
+    const xml=parseXml(content,{parseJsonAtts:true,stopOnFirstNode:true});
+
+    if(xml.error){
+        console.error('convo component parsing failed',xml.error);
+    }
+
+    return xml.result?.[0];
+
+
+
+}
+export const getConvoMessageComponent=(msg:FlatConvoMessage|null|undefined):ConvoComponent|undefined=>{
+    if(!msg?.content){
+        return undefined;
+    }
+    const cached=(msg as any)[convoComponentCacheKey];
+    if(cached){
+        return cached;
+    }
+
+    const comp=parseConvoComponent(msg.content);
+    if(comp){
+        (msg as any)[convoComponentCacheKey]=comp;
+    }
+    return comp;
+}
+
+export const mergeConvoOptions=(source:ConversationOptions,override:ConversationOptions|null|undefined):ConversationOptions=>{
+    if(!override){
+        return source;
+    }
+    const merge={
+        ...source,
+        ...dupDeleteUndefined(override),
+    }
+
+    if(source.onComponentMessages && override.onComponentMessages){
+        merge.onComponentMessages=[
+            ...asArray(source.onComponentMessages),
+            ...asArray(override.onComponentMessages)
+        ]
+    }
+
+    if(source.define && override.define){
+        merge.define=[
+            ...source.define,
+            ...override.define,
+        ]
+    }
+
+    return merge;
 }

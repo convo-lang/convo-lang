@@ -1,11 +1,11 @@
-import { ReadonlySubject, aryRemoveItem, asArray, delayAsync, parseMarkdown, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
-import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionHandler, ConvoComponentMessagesCallback, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -299,20 +299,24 @@ export class Conversation
         onConstructed?.(this);
     }
 
-    public watchComponentMessages(callback:ConvoComponentMessagesCallback){
+    public watchComponentMessages(callback:ConvoComponentMessagesCallback):Subscription{
         return this._flat.subscribe(flat=>{
             if(!flat){
                 return;
             }
             const all=flat.messages.filter(m=>m.component);
-            if(all.length){
-                callback({
-                    last:all[all.length-1] as FlatConvoMessage,
-                    all,
-                    flat,
-                    convo:this
-            });
+            const state:ConvoComponentMessageState={
+                last:all[all.length-1],
+                all,
+                flat,
+                convo:this
             }
+            if(typeof callback === 'function'){
+                    callback(state);
+            }else{
+                callback.next(state);
+            }
+
         })
     }
 
@@ -976,12 +980,8 @@ export class Conversation
                     callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
                     tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
                 }]
-            :(lastFlatMsg?.component && this.componentCompletionCallback)?
-                await this.componentCompletionCallback({
-                    message:lastFlatMsg,
-                    flat,
-                    convo:this,
-                })
+            :lastFlatMsg?.component==='input'?
+                await this.completeUsingComponentInputAsync(lastFlatMsg,flat)
             :
                 await getCompletion(flat)
             );
@@ -1427,6 +1427,7 @@ export class Conversation
         let maxTaskMsgCount=-1;
         let taskTriggers:Record<string,string[]>|undefined;
         let templates:ConvoMessageTemplate[]|undefined;
+        let componentIndex=0;
 
         for(let i=0;i<this._messages.length;i++){
             const msg=this._messages[i];
@@ -1465,6 +1466,9 @@ export class Conversation
             }
 
             const flat=this.flattenMsg(msg,false);
+            if(flat.component){
+                flat.componentIndex=componentIndex++;
+            }
 
             const setMdVars=(
                 this.defaultOptions.setMarkdownVars ||
@@ -2307,8 +2311,73 @@ export class Conversation
         }
         return usage;
     }
-}
 
+    private readonly onComponentSubmission=new Subject<ConvoComponentSubmissionWithIndex>();
+    public submitComponentData(submission:ConvoComponentSubmissionWithIndex)
+    {
+        this.onComponentSubmission.next(submission);
+    }
+
+    private async completeUsingComponentInputAsync(message:FlatConvoMessage,flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
+    {
+
+        const component=getConvoMessageComponent(message);
+        if(!component){
+            return [];
+        }
+
+        return new Promise<ConvoCompletionMessage[]>((resolve,reject)=>{
+            let sub:Subscription|undefined;
+            let submitted=false;
+            const ctx:ConvoComponentCompletionCtx={
+                message,
+                flat,
+                component,
+                convo:this,
+                submit:(submission)=>{
+                    submitted=true;
+                    sub?.unsubscribe();
+                    if(submission.data!==undefined){
+                        try{
+                            const dataMsgs:ConvoCompletionMessage[]=[{
+                                role:'user',
+                                content:JSON.stringify(submission.data,createJsonRefReplacer()),
+                                format:'json'
+                            }]
+                            if(submission.messages){
+                                dataMsgs.unshift(...submission.messages);
+                            }
+                            resolve(dataMsgs);
+                        }catch(ex){
+                            reject(ex);
+                        }
+                    }else if(submission.messages){
+                        resolve(submission.messages)
+                    }else {
+                        resolve([]);
+                    }
+                }
+            };
+
+            sub=this.onComponentSubmission.subscribe(s=>{
+                if(s.componentIndex===message.componentIndex){
+                    ctx.submit(s);
+                }
+            })
+
+            try{
+                this.componentCompletionCallback?.(ctx);
+            }catch(ex){
+                reject(ex);
+            }finally{
+                if(submitted){
+                    sub.unsubscribe();
+                }
+            }
+
+        })
+    }
+}
 
 const flattenMsgAsync=async (
     exe:ConvoExecutionContext,

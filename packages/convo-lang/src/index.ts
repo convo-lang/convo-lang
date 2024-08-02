@@ -1,6 +1,7 @@
 export * from './lib/CallbackConvoCompletionService';
 export * from './lib/Conversation';
 export * from './lib/ConversationUiCtrl';
+export * from './lib/ConvoComponentRenderCache';
 export * from './lib/ConvoError';
 export * from './lib/ConvoExecutionContext';
 export * from './lib/ConvoGraphCtrl';
@@ -13,7 +14,6 @@ export * from './lib/convo-graph-lib';
 export * from './lib/convo-graph-types';
 export * from './lib/convo-helpers';
 export * from './lib/convo-lang-ui-lib';
-export * from './lib/convo-lang-ui-types';
 export * from './lib/convo-lib';
 export * from './lib/convo-markdown';
 export * from './lib/convo-markdown-types';
@@ -21,7 +21,6 @@ export * from './lib/convo-parser';
 export * from './lib/convo-template';
 export * from './lib/convo-template-types';
 export * from './lib/convo-types';
-export * from './lib/convo-ui-lib';
 export * from './lib/convo-zod';
 export * from './lib/convo.deps';
 

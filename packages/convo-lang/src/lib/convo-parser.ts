@@ -1,7 +1,7 @@
 import { CodeParser, CodeParsingOptions, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parse as parseJson5 } from "json5";
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants } from "./convo-types";
+import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
 
@@ -924,6 +924,14 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
             setMsgMarkdown(msg);
         }
 
+        const compMode=(msg.content?/^\s*```([^\n]*).*```\s*$/s.exec(msg.content):null)?.[1]?.trim();
+        if(isConvoComponentMode(compMode)){
+            msg.component=compMode;
+            if(msg.renderOnly===undefined){
+                msg.renderOnly=true;
+            }
+        }
+
         if(msg.tags){
 
             for(let t=0;t<msg.tags.length;t++){
@@ -947,7 +955,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
                         break;
 
                     case convoTags.component:
-                        msg.component=tag.value||true;
+                        msg.component=isConvoComponentMode(tag.value)?tag.value:'render';
                         if(msg.renderOnly===undefined){
                             msg.renderOnly=true;
                         }
