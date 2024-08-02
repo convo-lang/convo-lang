@@ -5,7 +5,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentMessagesCallback, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionHandler, ConvoComponentMessagesCallback, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -93,6 +93,11 @@ export interface ConversationOptions
     importHandler?:ConvoImportHandler;
 
     onComponentMessages?:ConvoComponentMessagesCallback|ConvoComponentMessagesCallback[];
+
+    /**
+     * Used to complete conversations ending with a component
+     */
+    componentCompletionCallback?:ConvoComponentCompletionHandler;
 }
 
 export class Conversation
@@ -209,10 +214,13 @@ export class Conversation
 
     public dynamicFunctionCallback:ConvoScopeFunction|undefined;
 
+    private readonly componentCompletionCallback?:ConvoComponentCompletionHandler;
+
     /**
      * A callback used to implement rag retrieval.
      */
     private readonly ragCallback?:ConvoRagCallback;
+
 
 
     /**
@@ -249,6 +257,7 @@ export class Conversation
             onConstructed,
             define,
             onComponentMessages,
+            componentCompletionCallback,
         }=options;
         this.defaultOptions=options;
         this.defaultVars=defaultVars?defaultVars:{};
@@ -264,6 +273,7 @@ export class Conversation
         this._trackModel=new BehaviorSubject<boolean>(trackModel);
         this.disableAutoFlatten=disableAutoFlatten;
         this.autoFlattenDelayMs=autoFlattenDelayMs;
+        this.componentCompletionCallback=componentCompletionCallback;
         this.ragCallback=ragCallback;
         this.debug=debug;
         if(debugMode){
@@ -965,7 +975,14 @@ export class Conversation
                     callFn:lastMsg.fn.name,
                     callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
                     tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
-                }]:
+                }]
+            :(lastFlatMsg?.component && this.componentCompletionCallback)?
+                await this.componentCompletionCallback({
+                    message:lastFlatMsg,
+                    flat,
+                    convo:this,
+                })
+            :
                 await getCompletion(flat)
             );
 

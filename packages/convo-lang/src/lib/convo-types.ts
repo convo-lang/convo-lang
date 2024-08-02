@@ -993,3 +993,19 @@ export interface ConvoComponentMessageState
 }
 
 export type ConvoComponentMessagesCallback=(state:ConvoComponentMessageState)=>void;
+
+export interface ConvoComponentCompletionCtx
+{
+    message:FlatConvoMessage;
+    flat:FlatConvoConversation;
+    convo:Conversation;
+}
+export type ConvoComponentCompletionHandler=(ctx:ConvoComponentCompletionCtx)=>Promise<ConvoCompletionMessage[]>|ConvoCompletionMessage[];
+
+export interface ConvoComponentSubmission
+{
+    flat:FlatConvoConversation;
+    convo:Conversation;
+    data?:any;
+    messages?:ConvoCompletionMessage[];
+}
