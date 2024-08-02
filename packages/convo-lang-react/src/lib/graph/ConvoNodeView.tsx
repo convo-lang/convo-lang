@@ -19,6 +19,8 @@ export function ConvoNodeView({
     const steps=useWProp(node,'steps');
     useWatchDeep(steps);
 
+    const key=useWProp(node,'key');
+
     const [,render]=useState(0);
 
     return (

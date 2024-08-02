@@ -5,7 +5,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentMessagesCallback, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -87,7 +87,12 @@ export interface ConversationOptions
      */
     define?:ConvoDefItem[];
 
+    /**
+     * Handles import requests
+     */
     importHandler?:ConvoImportHandler;
+
+    onComponentMessages?:ConvoComponentMessagesCallback|ConvoComponentMessagesCallback[];
 }
 
 export class Conversation
@@ -243,6 +248,7 @@ export class Conversation
             defaultVars,
             onConstructed,
             define,
+            onComponentMessages,
         }=options;
         this.defaultOptions=options;
         this.defaultVars=defaultVars?defaultVars:{};
@@ -269,7 +275,35 @@ export class Conversation
         if(define){
             this.define(define);
         }
+
+        if(onComponentMessages){
+            if(Array.isArray(onComponentMessages)){
+                for(const cb of onComponentMessages){
+                    this.watchComponentMessages(cb);
+                }
+            }else{
+                this.watchComponentMessages(onComponentMessages);
+            }
+        }
+
         onConstructed?.(this);
+    }
+
+    public watchComponentMessages(callback:ConvoComponentMessagesCallback){
+        return this._flat.subscribe(flat=>{
+            if(!flat){
+                return;
+            }
+            const all=flat.messages.filter(m=>m.component);
+            if(all.length){
+                callback({
+                    last:all[all.length-1] as FlatConvoMessage,
+                    all,
+                    flat,
+                    convo:this
+            });
+            }
+        })
     }
 
     private getMessageListCapabilities(msgs:FlatConvoMessage[]):ConvoCapability[]{

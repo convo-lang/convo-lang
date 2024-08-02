@@ -983,3 +983,13 @@ export interface ConvoImportResult
 }
 
 export type ConvoImportHandler=(_import:ConvoImport)=>ConvoImportResult|null|undefined|Promise<ConvoImportResult|null|undefined>;
+
+export interface ConvoComponentMessageState
+{
+    last:FlatConvoMessage;
+    all:FlatConvoMessage[];
+    flat:FlatConvoConversation;
+    convo:Conversation;
+}
+
+export type ConvoComponentMessagesCallback=(state:ConvoComponentMessageState)=>void;

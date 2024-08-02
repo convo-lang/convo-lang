@@ -1,7 +1,7 @@
 import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { stopWatchingObj, wSetProp, watchObj } from "@iyio/common";
-import { Text, useSubject } from "@iyio/react-common";
+import { stopWatchingObj, wSetProp, wSetPropOrDeleteFalsy, watchObj } from "@iyio/common";
+import { SlimButton, Text, View, useSubject, useWProp } from "@iyio/react-common";
 import { useEffect, useState } from "react";
 import { BehaviorSubject } from "rxjs";
 import { ConvoEdgeView } from "./ConvoEdgeView";
@@ -20,6 +20,7 @@ export interface ConvoGraphEntityViewProps
     traverser?:ConvoTraverser;
     sourceNode?:ConvoSourceNode;
     input?:ConvoInputTemplate;
+    getNodeLink?:(node:ConvoNode)=>string|null|undefined;
 }
 
 export function ConvoGraphEntityView({
@@ -28,6 +29,7 @@ export function ConvoGraphEntityView({
     input,
     traverser,
     sourceNode,
+    getNodeLink,
     ctrl,
 }:ConvoGraphEntityViewProps){
 
@@ -38,6 +40,8 @@ export function ConvoGraphEntityView({
     const [layoutCtrl,setLayoutCtrl]=useState<ConvoEntityLayoutCtrl|null>(null);
 
     const allowDrag=useSubject(layoutCtrl?.allowDrag);
+
+    const key=useWProp(node??input,'key');
 
     useEffect(()=>{
         if(!elem || !pos || (!input && !node && !edge && !traverser && !sourceNode)){
@@ -123,6 +127,11 @@ export function ConvoGraphEntityView({
 
     },[elem,pos,node,input,traverser,edge,sourceNode,ctrl]);
 
+    const link=node && getNodeLink?.(node);
+    const idComp=(
+        !!pos?.id && <Text opacity025 xs text={`ID: ${pos.id}`} className={link?convoGraphEntityStyle.link():undefined}/>
+    )
+
     return (
         <div className={convoGraphEntityStyle.root({edge,smooth:allowDrag===false})} ref={setElem}>
 
@@ -140,9 +149,28 @@ export function ConvoGraphEntityView({
                 null
             } ({Math.round(pos?.x??0)},{Math.round(pos?.y??0)})</div>
 
-            {(node || input || sourceNode) && <input type="text" value={pos?.name??''} onChange={e=>wSetProp(pos,'name',e.target.value)} placeholder="Name"/>}
+            <View row alignCenter g050>
 
-            {!!pos?.id && <Text opacity025 xs text={`ID: ${pos.id}`}/>}
+                {(node || input || sourceNode) && <input
+                    className={convoGraphEntityStyle.nameInput()}
+                    type="text"
+                    value={pos?.name??''}
+                    onChange={e=>wSetProp(pos,'name',e.target.value)} placeholder="Name"
+                />}
+
+                {(node || input) &&  <input
+                    type="text"
+                    value={key??''}
+                    placeholder="key"
+                    onChange={e=>wSetPropOrDeleteFalsy(node??input,'key',e.target.value)}
+                />}
+
+            </View>
+            {link?
+                <SlimButton to={link} openLinkInNewWindow>{idComp}</SlimButton>
+            :
+                idComp
+            }
 
 
             {node && <ConvoNodeView node={node}/>}
@@ -203,5 +231,11 @@ export const convoGraphEntityStyle=atDotCss({name:'ConvoGraphEntityView',css:`
         background:#ffffff22;
         border-radius:4px;
         padding:0.5rem;
+    }
+    @.nameInput{
+        flex:1;
+    }
+    @.link{
+        text-decoration:underline;
     }
 `});

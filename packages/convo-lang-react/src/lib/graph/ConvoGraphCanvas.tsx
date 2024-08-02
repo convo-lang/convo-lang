@@ -1,3 +1,4 @@
+import { ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { useWatchPath } from "@iyio/react-common";
 import { useEffect, useState } from "react";
@@ -8,10 +9,12 @@ const svgSpan=6000;
 export interface ConvoGraphCanvasProps
 {
     ctrl:ConvoGraphViewCtrl;
+    getNodeLink?:(node:ConvoNode)=>string|null|undefined;
 }
 
 export function ConvoGraphCanvas({
-    ctrl
+    ctrl,
+    getNodeLink,
 }:ConvoGraphCanvasProps){
 
     useWatchPath(ctrl.graph,'edges');
@@ -32,7 +35,7 @@ export function ConvoGraphCanvas({
             </svg>
 
             {ctrl.graph.nodes.map((n)=>(
-                <ConvoGraphEntityView key={n.id} node={n} ctrl={ctrl}/>
+                <ConvoGraphEntityView key={n.id} node={n} ctrl={ctrl} getNodeLink={getNodeLink}/>
             ))}
 
             {ctrl.graph.edges.map((n)=>(

@@ -45,9 +45,9 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
         return Promise.resolve();
     }
 
-    public getNodeAsync(id:string):Promise<ConvoNode|undefined>
+    public getNodeAsync(idOrKey:string):Promise<ConvoNode|undefined>
     {
-        return Promise.resolve(this.db.nodes.find(g=>g.id===id));
+        return Promise.resolve(this.db.nodes.find(g=>g.id===idOrKey || g.key===idOrKey));
 
     }
 

@@ -1,4 +1,4 @@
-import { ConvoGraphCtrl } from "@convo-lang/convo-lang";
+import { ConvoGraphCtrl, ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { escapeHtml, shortUuid, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
@@ -12,11 +12,13 @@ export interface ConvoGraphViewProps
 {
     ctrl?:ConvoGraphCtrl;
     setViewCtrl?:(ctrl:ConvoGraphViewCtrl)=>void;
+    getNodeLink?:(node:ConvoNode)=>string|null|undefined;
 }
 
 export function ConvoGraphView({
     ctrl:ctrlProp,
     setViewCtrl,
+    getNodeLink,
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -196,7 +198,7 @@ export function ConvoGraphView({
                     dragTargets={dragTargets}
                 >
 
-                    {ctrl && <ConvoGraphCanvas ctrl={ctrl} />}
+                    {ctrl && <ConvoGraphCanvas ctrl={ctrl} getNodeLink={getNodeLink} />}
                 </PanZoomView>
 
                 <div className={style.outputContainer({

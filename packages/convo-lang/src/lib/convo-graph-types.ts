@@ -36,6 +36,11 @@ export interface ConvoNode
     id:string;
 
     /**
+     * A key to reference the node by
+     */
+    key?:string;
+
+    /**
      * A display name for the node
      */
     name?:string;
@@ -167,7 +172,7 @@ export interface ConvoEdge
     id:string;
 
     /**
-     * The node id that the from side of the edge connects to.
+     * The node id or key that the from side of the edge connects to.
      */
     from:string;
 
@@ -184,7 +189,7 @@ export interface ConvoEdge
     fromType?:string;
 
     /**
-     * The node id that the "to" side of the edge connects to.
+     * The node id or key that the "to" side of the edge connects to.
      */
     to:string;
 
@@ -490,7 +495,7 @@ export interface ConvoGraphStore
      */
     saveChangesAsync():Promise<void>;
 
-    getNodeAsync(id:string):Promise<ConvoNode|undefined>;
+    getNodeAsync(idOrKey:string):Promise<ConvoNode|undefined>;
 
     putNodeAsync(graph:ConvoNode):Promise<void>;
 
@@ -528,6 +533,11 @@ export interface ConvoGraphStore
 
 export interface ConvoInputTemplate{
     id:string;
+
+    /**
+     * A key to reference the input node by
+     */
+    key?:string;
     name?:string;
     value:string;
     isJson?:boolean;
