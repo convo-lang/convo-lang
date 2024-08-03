@@ -4,7 +4,7 @@ import { CallbackConvoCompletionService } from './CallbackConvoCompletionService
 import { Conversation } from "./Conversation";
 import { ConvoError } from './ConvoError';
 import { getConvoMetadata } from './convo-lib';
-import { ConvoComponent, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
+import { ConvoComponent, ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
 
 describe('convo',()=>{
 
@@ -1034,43 +1034,63 @@ describe('convo',()=>{
 
 
     it('Should create component using code block',async ()=>{
-        let comp:ConvoComponent|undefined;
-        const convo=new Conversation({
-            disableAutoFlatten:true,
-            componentCompletionCallback:({component,submit})=>{
-                comp=component;
-                submit({
-                    messages:[
-                        {
-                            role:'user',
-                            content:'a-ok'
-                        }
-                    ]
-                })
+        const test=async (blockType:string,mode:ConvoComponentMode|null)=>{
+            let comp:ConvoComponent|undefined;
+            const convo=new Conversation({
+                disableAutoFlatten:true,
+                componentCompletionCallback:({component,submit})=>{
+                    comp=component;
+                    submit({
+                        messages:[
+                            {
+                                role:'user',
+                                content:'a-ok'
+                            }
+                        ]
+                    })
+                }
+            });
+
+            convo.append(/*convo*/`
+                > user
+                ${'```'}${blockType}
+                <Example name="Jeff" age="{21}" />
+                ${'```'}
+            `);
+
+            const flat=await convo.flattenAsync();
+            expect(flat.messages.length).toBe(1);
+
+            expect(flat.messages[0]?.component).toBe(mode??undefined);
+
+
+            await convo.completeAsync();
+
+            if(mode==='input'){
+                expect(comp).not.toBeUndefined();
+                expect(comp?.name).toBe('Example');
+                expect(comp?.atts).toEqual({
+                    name:'Jeff',
+                    age:21
+                });
+            }else{
+                expect(comp).toBeUndefined();
             }
-        });
+        }
 
-        convo.append(/*convo*/`
-            > user
-            ${'```'} input
-            <Example name="Jeff" age="{21}" />
-            ${'```'}
-        `);
+        await test(' input','input');
 
-        const flat=await convo.flattenAsync();
-        expect(flat.messages.length).toBe(1);
+        await test(' xml input','input');
 
-        expect(flat.messages[0]?.component).toBe('input');
+        await test(' mdx input','input');
 
+        await test(' render','render');
 
-        const r=await convo.completeAsync();
+        await test(' xml render','render');
 
-        expect(comp).not.toBeUndefined();
-        expect(comp?.name).toBe('Example');
-        expect(comp?.atts).toEqual({
-            name:'Jeff',
-            age:21
-        });
+        await test(' xml',null);
+
+        await test('',null);
 
 
     });

@@ -1,6 +1,6 @@
 import { CodeParser, CodeParsingOptions, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parse as parseJson5 } from "json5";
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
@@ -924,8 +924,8 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
             setMsgMarkdown(msg);
         }
 
-        const compMode=(msg.content?/^\s*```([^\n]*).*```\s*$/s.exec(msg.content):null)?.[1]?.trim();
-        if(isConvoComponentMode(compMode)){
+        const compMode=getConvoMessageComponentMode(msg.content);
+        if(compMode){
             msg.component=compMode;
             if(msg.renderOnly===undefined){
                 msg.renderOnly=true;

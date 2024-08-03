@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoComponent, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles } from "./convo-types";
+import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -989,7 +989,24 @@ export const isConvoThreadFilterMatch=(filter:ConvoThreadFilter,tid:string|undef
     }
 }
 
-const convoComponentCacheKey=Symbol('convoComponentCacheKey')
+/**
+ * Finds the component type of a message.
+ */
+export const getConvoMessageComponentMode=(content:string|null|undefined):ConvoComponentMode|undefined=>{
+    const types=(content?/^\s*```([^\n]*).*```\s*$/s.exec(content):null)?.[1]?.trim().split(' ');
+    if(!types){
+        return undefined;
+    }
+    const last=types[types.length-1];
+    return isConvoComponentMode(last)?last:undefined;
+}
+
+const convoComponentCacheKey=Symbol('convoComponentCacheKey');
+
+/**
+ * Parses message content as a convo component. Components are written in xml.
+ * @param content string content to parse
+ */
 export const parseConvoComponent=(content:string|null|undefined):ConvoComponent|undefined=>{
 
     if(!content){
@@ -1012,6 +1029,11 @@ export const parseConvoComponent=(content:string|null|undefined):ConvoComponent|
 
 
 }
+/**
+ * Parses message content as a convo component. Components are written in xml. The parsed component
+ * is cached and stored on the message using a private symbol.
+ * @param msg The message to parse
+ */
 export const getConvoMessageComponent=(msg:FlatConvoMessage|null|undefined):ConvoComponent|undefined=>{
     if(!msg?.content){
         return undefined;
