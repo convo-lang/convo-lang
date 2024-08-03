@@ -14,6 +14,7 @@ export * from './lib/convo-graph-lib';
 export * from './lib/convo-graph-types';
 export * from './lib/convo-helpers';
 export * from './lib/convo-lang-ui-lib';
+export * from './lib/convo-lang-ui-types';
 export * from './lib/convo-lib';
 export * from './lib/convo-markdown';
 export * from './lib/convo-markdown-types';

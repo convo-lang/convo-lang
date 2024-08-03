@@ -41,7 +41,7 @@ const renderMessage=(
 
     const className=style.msg({user:m.role==='user',agent:m.role!=='user',suggestion:m.isSuggestion});
 
-    if(m.component!==undefined && m.component!==false){
+    if(m.component!==undefined){
         return (
             <MessageComponentRenderer
                 key={i+'comp'}
