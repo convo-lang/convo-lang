@@ -404,9 +404,9 @@ export class ConvoGraphCtrl
             }
         }
         tv.currentStepIndex=0;
-
-
         tv.exeState='invoked';
+
+        await exeCtx.convo.flattenAsync();
 
         const edges=await this.getEdgesAsync({
             from:node.id,

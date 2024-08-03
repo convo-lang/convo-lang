@@ -312,7 +312,7 @@ export class Conversation
                 convo:this
             }
             if(typeof callback === 'function'){
-                    callback(state);
+                callback(state);
             }else{
                 callback.next(state);
             }
@@ -968,23 +968,28 @@ export class Conversation
                 this.appendMessageObject(ragMsg,{disableAutoFlatten:true,appendCode:true});
             }
 
-            if(isDefaultTask){
-                this.setFlat(flat);
-            }
-
             const lastMsg=this.messages[this.messages.length-1];
             const lastMsgIsFnCall=lastMsg?.fn?.call?true:false;
-            const completion:ConvoCompletionMessage[]=(lastMsg?.fn?.call?
-                [{
-                    callFn:lastMsg.fn.name,
-                    callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
-                    tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
-                }]
-            :lastFlatMsg?.component==='input'?
-                await this.completeUsingComponentInputAsync(lastFlatMsg,flat)
-            :
-                await getCompletion(flat)
-            );
+            const completion:ConvoCompletionMessage[]=await (async ()=>{
+
+                if(lastMsg?.fn?.call){
+                    if(isDefaultTask){
+                        this.setFlat(flat);
+                    }
+                    return [{
+                        callFn:lastMsg.fn.name,
+                        callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
+                        tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
+                    }]
+                }else if(lastFlatMsg?.component==='input'){
+                    return await this.completeUsingComponentInputAsync(lastFlatMsg,flat,isDefaultTask)
+                }else{
+                    if(isDefaultTask){
+                        this.setFlat(flat);
+                    }
+                    return await getCompletion(flat)
+                }
+            })()
 
             if(this._isDisposed){
                 return {messages:[],status:'disposed',task};
@@ -2318,12 +2323,23 @@ export class Conversation
         this.onComponentSubmission.next(submission);
     }
 
-    private async completeUsingComponentInputAsync(message:FlatConvoMessage,flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
-    {
+    private async completeUsingComponentInputAsync(
+        message:FlatConvoMessage,
+        flat:FlatConvoConversation,
+        isDefaultTask:boolean,
+    ):Promise<ConvoCompletionMessage[]>{
 
         const component=getConvoMessageComponent(message);
         if(!component){
+            if(isDefaultTask){
+                this.setFlat(flat);
+            }
             return [];
+        }
+
+        message.componentActive=true;
+        if(isDefaultTask){
+            this.setFlat(flat);
         }
 
         return new Promise<ConvoCompletionMessage[]>((resolve,reject)=>{
@@ -2337,6 +2353,10 @@ export class Conversation
                 submit:(submission)=>{
                     submitted=true;
                     sub?.unsubscribe();
+                    message.componentActive=false;
+                    if(isDefaultTask){
+                        this.setFlat(flat);
+                    }
                     if(submission.data!==undefined){
                         try{
                             const dataMsgs:ConvoCompletionMessage[]=[{

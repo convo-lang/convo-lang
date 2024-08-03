@@ -650,6 +650,11 @@ export interface FlatConvoMessage
     componentIndex?:number;
 
     /**
+     * If true the component message is actively being waited on.
+     */
+    componentActive?:boolean;
+
+    /**
      * If true the message should be rendered but not sent to LLMs
      */
     renderOnly?:boolean;
