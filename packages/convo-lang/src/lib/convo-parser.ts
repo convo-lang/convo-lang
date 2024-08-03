@@ -1,7 +1,7 @@
-import { CodeParser, CodeParsingOptions, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
+import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parse as parseJson5 } from "json5";
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
 
@@ -35,7 +35,7 @@ const tagReg=/(\w+)\s*=?(.*)/
 const space=/\s/;
 const allSpace=/^\s$/;
 
-const tagOrCommentReg=/[\n\r][ \t]*[#@]/;
+const tagOrCommentReg=/(\n|\r|^)[ \t]*[#@]/;
 
 const paramTrimPlaceHolder='{{**PLACE_HOLDER**}}';
 
@@ -78,7 +78,7 @@ const trimLeft=(value:string,count:number):string=>{
 
 }
 
-export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:CodeParsingOptions):ConvoParsingResult=>{
+export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:ConvoParsingOptions):ConvoParsingResult=>{
 
     const debug=options?.debug;
 
@@ -98,12 +98,18 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
     let inString:StringType|null=null;
     let lastComment='';
     let tags:ConvoTag[]=[];
+    const includeLineNumbers=options?.includeLineNumbers;
     let index=options?.startIndex??0;
     let currentMessage:ConvoMessage|null=null;
     let currentFn:ConvoFunction|null=null;
     let error:string|undefined=undefined;
     const stack:ConvoStatement[]=[];
     const len=code.length;
+
+    const setLineNumber=(msg:ConvoMessage)=>{
+        msg.sourceCharIndex=index;
+        msg.sourceLineNumber=getLineNumber(code,index);
+    }
 
     const setStringEndReg=(type:StringType)=>{
         switch(type){
@@ -216,14 +222,20 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
             currentMessage?.statement?.params?.[(currentMessage?.statement?.params?.length??0)-1]?.value
         )
 
+        // Remove tags and comments for next message and move index back
         if(currentMessage && typeof end === 'string' && tagOrCommentReg.test(end)){
 
             let e=index-1;
+            const hasNewline=end.includes('\n');
             while(true){
-                const s=code.lastIndexOf('\n',e);
+                let s=code.lastIndexOf('\n',e);
                 if(s<startIndex){
-                    error='Start of captured tags and comments not found at end of text message';
-                    return false;
+                    if(!hasNewline){
+                        s=startIndex;
+                    }else{
+                        error='Start of captured tags and comments not found at end of text message';
+                        return false;
+                    }
                 }
                 if(s===-1){
                     break;
@@ -241,7 +253,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
 
             e=end.length-1;
             while(e>=0){
-                const s=end.lastIndexOf('\n',e);
+                const s=hasNewline?end.lastIndexOf('\n',e):0;
                 if(s===-1){
                     break;
                 }
@@ -790,6 +802,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
                         fn:currentFn,
                         description:lastComment||undefined,
                     }
+                    if(includeLineNumbers){
+                        setLineNumber(currentMessage);
+                    }
                     messages.push(currentMessage);
                     lastComment='';
                     if(tags.length){
@@ -824,6 +839,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
                         fn:currentFn,
                         description:lastComment||undefined,
                     }
+                    if(includeLineNumbers){
+                        setLineNumber(currentMessage);
+                    }
                     messages.push(currentMessage);
                     lastComment='';
                     if(tags.length){
@@ -850,6 +868,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Cod
                     currentMessage={
                         role:msgName,
                         description:lastComment||undefined,
+                    }
+                    if(includeLineNumbers){
+                        setLineNumber(currentMessage);
                     }
                     messages.push(currentMessage);
                     lastComment='';

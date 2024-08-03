@@ -1,4 +1,4 @@
-import { CodeParsingResult, JsonScheme, MarkdownLine, XmlNode } from '@iyio/common';
+import { CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, XmlNode } from '@iyio/common';
 import { BehaviorSubject } from 'rxjs';
 import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
@@ -129,6 +129,15 @@ export interface ConvoMessage
      * used to control which messages are included.
      */
     tid?:string;
+
+    /**
+     * The line number the message started on in source code.
+     */
+    sourceLineNumber?:number;
+    /**
+     * The character index the message started on
+     */
+    sourceCharIndex?:number;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -1033,3 +1042,8 @@ export interface ConvoComponentSubmissionWithIndex extends ConvoComponentSubmiss
 }
 
 export type ConvoComponent=XmlNode;
+
+export interface ConvoParsingOptions extends CodeParsingOptions
+{
+    includeLineNumbers?:boolean;
+}
