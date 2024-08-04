@@ -476,11 +476,16 @@ export class ConvoGraphCtrl
             try{
                 const conversation=new Conversation({
                     disableAutoFlatten:true,
-                    initConvo:(await this.getSharedSourceAsync())+edge.conditionConvo,
+                    initConvo:(
+                        (await this.getSharedSourceAsync())+
+                        `\n> edgeConditionEvalFunction() -> ( ${edge.conditionConvo} )\n`+
+                        `> do`+
+                        `edgeConditionResult=edgeConditionEvalFunction()`
+                    ),
                     defaultVars:{input},
                 })
                 const flat=await conversation.flattenAsync();
-                const accept=flat.exe.getVar('accept');
+                const accept=flat.exe.getVar('edgeConditionResult');
                 if(!accept){
                     edges.splice(i,1);
                     i--;

@@ -36,10 +36,11 @@ export function ConvoComponentRenderer({
             if(m && !m.isUser && !m.fn && !m.component){
                 if(m.called){
                     lastMsgContent=m.calledReturn===undefined?'(empty)':m.calledReturn;
-                }else{
-                    lastMsgContent=m.content??'(empty)';
+                    break;
+                }else if(m.content!==undefined){
+                    lastMsgContent=m.content||'(empty)';
+                    break;
                 }
-                break;
             }
 
         }

@@ -1,6 +1,6 @@
 import { ConvoGraphCtrl, ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { escapeHtml, shortUuid, wAryPush, wSetProp } from "@iyio/common";
+import { escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoGraphCanvas } from "./ConvoGraphCanvas";
@@ -107,25 +107,23 @@ export function ConvoGraphView({
         const pt=panZoom.transformClientPointToPlane({x:e.clientX,y:e.clientY});
 
         if(e.metaKey){
-
             wAryPush(ctrl.graph.sourceNodes,{
-                id:shortUuid(),
+                id:ctrl.ctrl.store.getNextSourceNodeId(),
                 x:pt.x,
                 y:pt.y,
                 shared:true,
                 source:'> define\n'
             });
         }else if(e.altKey){
-
             wAryPush(ctrl.graph.inputs,{
-                id:shortUuid(),
+                id:ctrl.ctrl.store.getNextInputId(),
                 x:pt.x,
                 y:pt.y,
                 value:'{\n\n}'
             });
         }else if(e.shiftKey){
             wAryPush(ctrl.graph.edges,{
-                id:shortUuid(),
+                id:ctrl.ctrl.store.getNextEdgeId(),
                 to:'_',
                 from:'_',
                 x:pt.x,
@@ -133,11 +131,10 @@ export function ConvoGraphView({
             });
         }else{
             wAryPush(ctrl.graph.nodes,{
-                id:shortUuid(),
+                id:ctrl.ctrl.store.getNextNodeId(),
                 steps:[{convo:'> user\nEnter user prompt'}],
                 x:pt.x,
                 y:pt.y,
-
             });
         }
 

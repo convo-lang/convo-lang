@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, convoFlowControllerKey, convoObjFlag, convoReservedRoles, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -821,6 +821,44 @@ export const resetConvoUsageTokens=(usage:ConvoTokenUsage)=>{
     usage.tokenPrice=0;
 }
 
+const jsonContentReg=/^\s*```\s*json.*?\n(.*)```\s*$/s;
+export const isConvoJsonMessage=(content:string|null|undefined):boolean=>{
+    if(!content){
+        return false;
+    }
+    return jsonContentReg.test(content);
+}
+
+/**
+ * Parses message content as json if the content is in a json markdown code block
+ */
+export const parseConvoJsonOrStringMessage=(content:string|null|undefined,returnJsonAsString=false):ParsedContentJsonOrString=>{
+    if(!content){
+        return {
+            isJson:false,
+            value:content,
+        };
+    }
+    const jsonMatch=jsonContentReg.exec(content);
+    if(jsonMatch){
+        if(returnJsonAsString){
+            return {
+                isJson:true,
+                value:(jsonMatch[1]??'').trim(),
+            }
+        }else{
+            return {
+                isJson:true,
+                value:parseJson5(jsonMatch[1]??''),
+            }
+        }
+    }else{
+        return {
+            isJson:false,
+            value:content.trim(),
+        }
+    }
+}
 
 export const parseConvoJsonMessage=(json:string):any=>{
     return parseJson5(json

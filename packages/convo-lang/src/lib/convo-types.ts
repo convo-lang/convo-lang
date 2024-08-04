@@ -1047,3 +1047,9 @@ export interface ConvoParsingOptions extends CodeParsingOptions
 {
     includeLineNumbers?:boolean;
 }
+
+export interface ParsedContentJsonOrString
+{
+    value:any;
+    isJson:boolean;
+}

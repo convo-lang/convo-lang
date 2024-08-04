@@ -1,4 +1,4 @@
-import { wAryPush, wArySplice } from "@iyio/common";
+import { shortUuid, wAryPush, wArySplice } from "@iyio/common";
 import { Observable, Subject } from "rxjs";
 import { ConvoEdge, ConvoEdgeSide, ConvoGraphDb, ConvoGraphStore, ConvoGraphStoreEvt, ConvoNode, ConvoSourceNode, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
 
@@ -175,4 +175,32 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
         this._onDbChange.next({traverserId:id});
         return Promise.resolve();
     }
+
+        public getNextNodeId():string{
+            let i=0;
+            while(this.db.nodes.some(n=>n.id==='n'+i)){
+                i++;
+            }
+            return 'n'+i;
+        }
+        public getNextEdgeId():string{
+            let i=0;
+            while(this.db.edges.some(n=>n.id==='e'+i)){
+                i++;
+            }
+            return 'e'+i;
+        }
+        public getNextTraverserId():string{
+            return shortUuid();
+        }
+        public getNextSourceNodeId():string{
+            return shortUuid();
+        }
+        public getNextInputId():string{
+            let i=0;
+            while(this.db.inputs.some(n=>n.id==='i'+i)){
+                i++;
+            }
+            return 'i'+i;
+        }
 }

@@ -135,3 +135,13 @@ export const fixConvoGraphDb=(db:ConvoGraphDb):boolean=>{
     }
     return changes;
 }
+
+export const createEmptyConvoGraphDb=():ConvoGraphDb=>{
+    return {
+        nodes:[],
+        edges:[],
+        traversers:[],
+        inputs:[],
+        sourceNodes:[],
+    }
+}

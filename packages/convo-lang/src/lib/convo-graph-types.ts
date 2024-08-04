@@ -1,7 +1,8 @@
-import { CancelToken } from "@iyio/common";
+import { CancelToken, CodeParsingResult } from "@iyio/common";
 import { BehaviorSubject, Observable } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
+import { ConvoMessage } from "./convo-types";
 
 export interface ConvoGraph
 {
@@ -18,6 +19,7 @@ export interface ConvoGraphDb
     traversers:ConvoTraverser[];
     inputs:ConvoInputTemplate[];
     sourceNodes:ConvoSourceNode[];
+    metadata?:Record<string,any>;
 }
 
 export interface ConvoNodeTypeMetadata
@@ -501,6 +503,8 @@ export interface ConvoGraphStore
 
     deleteNodeAsync(id:string):Promise<void>;
 
+    getNextNodeId():string;
+
 
     getNodeEdgesAsync(nodeId:string,side:ConvoEdgeSide):Promise<ConvoEdge[]>;
 
@@ -511,12 +515,16 @@ export interface ConvoGraphStore
 
     deleteEdgeAsync(id:string):Promise<void>;
 
+    getNextEdgeId():string;
+
 
     getTraverserAsync(id:string):Promise<ConvoTraverser|undefined>;
 
     putTraverserAsync(traverser:ConvoTraverser):Promise<void>;
 
     deleteTraverserAsync(id:string):Promise<void>;
+
+    getNextTraverserId():string;
 
 
     getSourceNodesAsync():Promise<ConvoSourceNode[]>;
@@ -526,6 +534,10 @@ export interface ConvoGraphStore
     putSourceNodeAsync(SourceNode:ConvoSourceNode):Promise<void>;
 
     deleteSourceNodeAsync(id:string):Promise<void>;
+
+    getNextSourceNodeId():string;
+
+    getNextInputId():string;
 }
 
 
@@ -576,3 +588,15 @@ export interface ConvoSourceNode
     x?:number;
     y?:number;
 }
+
+export interface ConvoGraphParsingData
+{
+    db:ConvoGraphDb;
+    messages:ConvoMessage[];
+}
+
+export type ConvoGraphParsingResult=CodeParsingResult<ConvoGraphParsingData>
+
+export const allConvoGraphMsgTypeAry=['node','step','edge','input','source','graph'] as const;
+export type ConvoGraphMsgType=typeof allConvoGraphMsgTypeAry[number];
+export const isConvoGraphMsgType=(value:any):value is ConvoGraphMsgType=>(allConvoGraphMsgTypeAry.includes(value))

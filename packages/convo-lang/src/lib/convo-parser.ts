@@ -78,7 +78,7 @@ const trimLeft=(value:string,count:number):string=>{
 
 }
 
-export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:ConvoParsingOptions):ConvoParsingResult=>{
+export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code:string,options?:ConvoParsingOptions):ConvoParsingResult=>{
 
     const debug=options?.debug;
 
@@ -107,8 +107,34 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Con
     const len=code.length;
 
     const setLineNumber=(msg:ConvoMessage)=>{
-        msg.sourceCharIndex=index;
+        let ci=index;
+
+        let e=ci-1;
+        while(true){
+            let s=code.lastIndexOf('\n',e);
+            if(s===-1){
+                break;
+            }
+
+            const line=code.substring(s,e+1).trim();
+            const isMeta=line.startsWith('#') || line.startsWith('@');
+
+            if(line && !isMeta){
+                break;
+            }
+            e=s-1;
+            if(isMeta){
+                ci=s;
+            }
+            if(e<0){
+                break;
+            }
+
+        }
+
+        msg.sourceCharIndex=ci;
         msg.sourceLineNumber=getLineNumber(code,index);
+        (msg as any).__=code.substring(msg.sourceCharIndex,msg.sourceCharIndex+50);
     }
 
     const setStringEndReg=(type:StringType)=>{
@@ -207,7 +233,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Con
         return s;
     }
 
-    const endMsg=()=>{
+    /**
+     * Ends a text content message
+     */
+    const endStrMsg=()=>{
 
         const startIndex=currentMessage?.statement?.s??0;
 
@@ -249,6 +278,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Con
                 e=s-1;
                 index=s;
 
+                if(e<0){
+                    break;
+                }
+
             }
 
             e=end.length-1;
@@ -264,6 +297,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Con
                     break;
                 }
                 e=s-1;
+
+                if(e<0){
+                    break;
+                }
 
             }
 
@@ -437,7 +474,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[]>=(code:string,options?:Con
                 if(!closeString()){
                     break parsingLoop;
                 }
-                if(isMsgString && !endMsg()){
+                if(isMsgString && !endStrMsg()){
                     break parsingLoop;
                 }
                 debug?.('AFTER STRING','|'+code.substring(index,index+30)+'|');
