@@ -63,6 +63,8 @@ export function ConvoEdgeView({
                     parser={parseConvoCode}
                     logParsed
                     bottomPadding={10}
+                    highlightPrefix={"> conditionFn() -> (\n"}
+                    highlightSuffix={"\n)"}
                 />
             </View>
 
