@@ -5,6 +5,7 @@
         {"dir":"../iyio-common/packages/media-common"},
         {"dir":"../iyio-common/packages/node-common"},
         {"dir":"../iyio-common/packages/react-common"},
-        {"dir":"../iyio-common/packages/syn-taxi"}
+        {"dir":"../iyio-common/packages/syn-taxi"},
+        {"dir":"../iyio-common/packages/tmpl-gen","disableTsConfigPath":true}
     ]
 }

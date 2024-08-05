@@ -77,3 +77,4 @@ venv
 /packages/node-common
 /packages/react-common
 /packages/syn-taxi
+/packages/tmpl-gen
