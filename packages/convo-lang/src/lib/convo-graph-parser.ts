@@ -213,7 +213,6 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
 
                 case 'graph':{
                     const value=parseConvoJsonOrStringMessage(msg.content);
-                    console.log('hio 👋 👋 👋 GRAPH VALUE',value);
                     if((typeof value.value === 'object') && value.value){
                         metadata={...metadata,...value.value};
                     }

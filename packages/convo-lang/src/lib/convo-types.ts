@@ -138,6 +138,11 @@ export interface ConvoMessage
      * The character index the message started on
      */
     sourceCharIndex?:number;
+
+    /**
+     * If true the message should be evaluated as code
+     */
+    eval?:boolean;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -687,6 +692,11 @@ export interface FlatConvoMessage
      * used to control which messages are included.
      */
     tid?:string;
+
+    /**
+     * If true the message should be evaluated as code
+     */
+    eval?:boolean;
 
 }
 

@@ -371,7 +371,12 @@ export const convoTags={
      * - required: tells the LLM it must call a function, any function.
      * - auto: tells the LLM it can call a function respond with a text response. This is the default behaviour.
      */
-    call:'call'
+    call:'call',
+
+    /**
+     * Causes the message to be evaluated as code. The code should be contained in a markdown code block.
+     */
+    eval:'eval',
 
 } as const;
 

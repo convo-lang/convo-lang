@@ -1095,4 +1095,34 @@ describe('convo',()=>{
 
     });
 
+
+    it('Should create component using code block',async ()=>{
+
+        const convo=new Conversation({
+            disableAutoFlatten:true,
+            allowEvalCode:true
+        });
+
+        convo.append(/*convo*/`
+            @eval
+            > user
+            ${'```'} js
+            result=77
+            ${'```'}
+        `);
+
+        const flat=await convo.flattenAsync();
+        expect(flat.messages.length).toBe(1);
+
+        expect(flat.messages[0]?.eval).toBe(true);
+
+
+        await convo.completeAsync();
+
+        await convo.flattenAsync();
+
+
+
+    });
+
 });

@@ -3,12 +3,14 @@ import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
+import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
+import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
 
 export interface ConversationOptions
 {
@@ -98,6 +100,11 @@ export interface ConversationOptions
      * Used to complete conversations ending with a component
      */
     componentCompletionCallback?:ConvoComponentCompletionHandler;
+
+    /**
+     * If true arbitrary code will be allowed to be executed.
+     */
+    allowEvalCode?:boolean;
 }
 
 export class Conversation
@@ -981,6 +988,11 @@ export class Conversation
                         callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
                         tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
                     }]
+                }else if(lastFlatMsg?.eval){
+                    if(isDefaultTask){
+                        this.setFlat(flat);
+                    }
+                    return await this.completeUsingEvalAsync(lastFlatMsg,flat);
                 }else if(lastFlatMsg?.component==='input'){
                     return await this.completeUsingComponentInputAsync(lastFlatMsg,flat,isDefaultTask)
                 }else{
@@ -1289,6 +1301,9 @@ export class Conversation
             }
         })
         flatExe.print=this.print;
+        if(this.defaultOptions.allowEvalCode){
+            flatExe.setVar(true,convoScopeFunctionEvalJavascript,'evalJavascript');
+        }
         for(const e in this.defaultVars){
             flatExe.setVar(true,this.defaultVars[e],e);
         }
@@ -1334,6 +1349,9 @@ export class Conversation
         }
         if(msg.tid){
             flat.tid=msg.tid;
+        }
+        if(msg.eval){
+            flat.eval=msg.eval;
         }
         return flat;
     }
@@ -2396,6 +2414,23 @@ export class Conversation
             }
 
         })
+    }
+
+    private async completeUsingEvalAsync(
+        message:FlatConvoMessage,
+        flat:FlatConvoConversation,
+    ):Promise<ConvoCompletionMessage[]>{
+        if(!this.defaultOptions.allowEvalCode){
+            return []
+        }
+        const result=await evalConvoMessageAsCodeAsync(message,flat);
+
+        const isObj=result && (typeof result === 'object');
+        return [{
+            role:message.role,
+            content:isObj?JSON.stringify(result??null,createJsonRefReplacer()):(result?.toString()??''),
+            format:isObj?'json':undefined
+        }]
     }
 }
 
