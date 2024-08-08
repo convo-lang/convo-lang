@@ -145,3 +145,25 @@ export const createEmptyConvoGraphDb=():ConvoGraphDb=>{
         sourceNodes:[],
     }
 }
+
+export const roundConvoGraphLayoutProps=(db:Partial<ConvoGraphDb>)=>{
+    roundLayoutItems(db.nodes);
+    roundLayoutItems(db.edges);
+    roundLayoutItems(db.inputs);
+    roundLayoutItems(db.sourceNodes);
+    roundLayoutItems(db.traversers);
+}
+
+const roundLayoutItems=(items:{x?:number,y?:number}[]|null|undefined)=>{
+    if(!items){
+        return;
+    }
+    for(const i of items){
+        if(i.x!==undefined){
+            i.x=Math.round(i.x);
+        }
+        if(i.y!==undefined){
+            i.y=Math.round(i.y);
+        }
+    }
+}
