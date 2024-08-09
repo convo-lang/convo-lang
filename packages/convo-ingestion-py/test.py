@@ -1,5 +1,5 @@
-from src.convo_embeddings.embed_documents import generate_document_embeddings
-from src.convo_embeddings.types import DocumentEmbeddingRequest
+from src.convo_ingestion.embed_documents import generate_document_embeddings
+from src.convo_ingestion.types import DocumentEmbeddingRequest
 from dotenv import load_dotenv
 
 load_dotenv('/Users/scott/docs/liirn-space/.env.local')

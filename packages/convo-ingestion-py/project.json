@@ -1,13 +1,13 @@
 {
-    "name": "convo-embeddings-py",
+    "name": "convo-ingestion-py",
     "$schema": "../../node_modules/nx/schemas/project-schema.json",
-    "sourceRoot": "packages/convo-embeddings-py/src",
+    "sourceRoot": "packages/convo-ingestion-py/src",
     "projectType": "library",
     "targets": {
         "build-image": {
             "executor": "nx:run-commands",
             "options": {
-                "command": "packages/convo-embeddings-py/build-image.sh"
+                "command": "packages/convo-ingestion-py/build-image.sh"
             }
         }
 

@@ -1,8 +1,8 @@
 from iyio_common import start_rest_server
 from typing import Dict
-from convo_embeddings.embed_documents import generate_document_embeddings
-from convo_embeddings.types import DocumentEmbeddingRequest
-from convo_embeddings.embed import encode_text
+from convo_ingestion.embed_documents import generate_document_embeddings
+from convo_ingestion.types import DocumentEmbeddingRequest
+from convo_ingestion.embed import encode_text
 import os
 
 

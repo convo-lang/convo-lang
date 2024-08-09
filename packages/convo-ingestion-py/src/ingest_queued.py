@@ -1,7 +1,7 @@
 from typing import Any, List
 from iyio_common import run_sqs, SqsEventRecord, getEnvVar
-from convo_embeddings.embed_documents import generate_document_embeddings
-from convo_embeddings.types import DocumentEmbeddingRequest
+from convo_ingestion.embed_documents import generate_document_embeddings
+from convo_ingestion.types import DocumentEmbeddingRequest
 
 
 queueUrl=getEnvVar('CONNECTED_QUEUE_URL')

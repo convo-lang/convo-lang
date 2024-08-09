@@ -1,8 +1,8 @@
 *
 !packages/ai-models/all-mpnet-base-v2/**
 !packages/iyio-common-py/src/**
-!packages/convo-embeddings-py/src/**
-!packages/convo-embeddings-py/requirements.txt
+!packages/convo-ingestion-py/src/**
+!packages/convo-ingestion-py/requirements.txt
 **/.git
 **/.DS_Store
 **/venv

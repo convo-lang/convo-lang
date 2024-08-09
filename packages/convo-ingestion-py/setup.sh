@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 
-python3 -m venv venv
+python3.11 -m venv venv
 
 source venv/bin/activate
 
@@ -16,3 +16,5 @@ python ../../scripts/set-py-paths.py
 
 echo 'Setup complete'
 echo 'You may need to restart your code editor for changes to take effect'
+
+echo 'run "source venv/bin/activate" to activate new virtual environment'

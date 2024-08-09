@@ -78,3 +78,4 @@ venv
 /packages/react-common
 /packages/syn-taxi
 /packages/tmpl-gen
+/packages/iyio-common-py
