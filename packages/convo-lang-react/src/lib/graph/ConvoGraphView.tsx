@@ -263,5 +263,6 @@ const style=atDotCss({name:'ConvoGraphView',css:`
         padding:0.5rem;
         border-radius:4px;
         background:#ffffff22;
+        color:#fff;
     }
 `});
