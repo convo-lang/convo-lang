@@ -50,5 +50,6 @@ def onMessage(messages:List[SqsEventRecord]):
 
 scaleTo0=getEnvVar('TASK_INFO_MIN_INSTANCE_COUNT')=='0'
 
-# receive first message from queue then exit
-run_sqs(queueUrl,onMessage,exitOnFailure=scaleTo0,exitOnTimeout=scaleTo0)
+if __name__ == '__main__':
+    # receive first message from queue then exit
+    run_sqs(queueUrl,onMessage,exitOnFailure=scaleTo0,exitOnTimeout=scaleTo0)

@@ -34,6 +34,11 @@ def request_handler(path,data:Dict[str,str],method):
     elif method == "GET":
         return encode_text([data['text'] if 'text' in data else ""])
     else:
+        print('Data type',type(data))
         return encode_text(data)
 
-start_rest_server(serverPort,request_handler)
+def start_rest_api():
+    start_rest_server(serverPort,request_handler)
+
+if __name__ == '__main__':
+    start_rest_api()
