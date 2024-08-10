@@ -1,7 +1,7 @@
 *
 !packages/iyio-common-py/src/**
-!packages/convo-ingestion-py/src/**
-!packages/convo-ingestion-py/requirements.txt
+!packages/convo-api-py/src/**
+!packages/convo-api-py/requirements.txt
 **/.git
 **/.DS_Store
 **/venv

@@ -10,7 +10,7 @@ RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr
 
 RUN python3 -m pip install --upgrade pip
 
-COPY packages/convo-ingestion-py/requirements.txt requirements.txt
+COPY packages/convo-api-py/requirements.txt requirements.txt
 
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
@@ -19,7 +19,7 @@ COPY packages/ai-models/all-mpnet-base-v2/ packages/ai-models/all-mpnet-base-v2
 
 # Copy source directories . Remember to add to .gitignore as well
 COPY packages/iyio-common-py/src/ packages/iyio-common-py/src
-COPY packages/convo-ingestion-py/src/ packages/convo-ingestion-py/src
+COPY packages/convo-api-py/src/ packages/convo-api-py/src
 
 # The command below can be used to verify copied files
 #RUN find . -type f
@@ -32,6 +32,6 @@ ENV REST_PORT=8080
 
 EXPOSE 8080
 
-WORKDIR /app/packages/convo-ingestion-py
+WORKDIR /app/packages/convo-api-py
 
 CMD [ "python3", "src/rest_api.py" ]

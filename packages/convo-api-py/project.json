@@ -1,13 +1,13 @@
 {
-    "name": "convo-ingestion-py",
+    "name": "convo-api-py",
     "$schema": "../../node_modules/nx/schemas/project-schema.json",
-    "sourceRoot": "packages/convo-ingestion-py/src",
+    "sourceRoot": "packages/convo-api-py/src",
     "projectType": "library",
     "targets": {
         "build-image": {
             "executor": "nx:run-commands",
             "options": {
-                "command": "packages/convo-ingestion-py/build-image.sh"
+                "command": "packages/convo-api-py/build-image.sh"
             }
         }
 
