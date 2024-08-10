@@ -14,9 +14,6 @@ COPY packages/convo-api-py/requirements.txt requirements.txt
 
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-# Copy models. Remember to add to .gitignore as well
-COPY packages/ai-models/all-mpnet-base-v2/ packages/ai-models/all-mpnet-base-v2
-
 # Copy source directories . Remember to add to .gitignore as well
 COPY packages/iyio-common-py/src/ packages/iyio-common-py/src
 COPY packages/convo-api-py/src/ packages/convo-api-py/src
@@ -34,4 +31,4 @@ EXPOSE 8080
 
 WORKDIR /app/packages/convo-api-py
 
-CMD [ "python3", "src/rest_api.py" ]
+CMD [ "./start-rest-server.sh" ]

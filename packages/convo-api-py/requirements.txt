@@ -77,6 +77,8 @@ protobuf==4.25.2
 psycopg==3.1.18
 psycopg-binary==3.1.18
 psycopg-pool==3.2.1
+psycopg2-binary==2.9.9
+py-hot-reload==1.0.6
 pycocotools==2.0.7
 pycparser==2.21
 pydantic==2.6.1
@@ -123,5 +125,6 @@ unstructured-client==0.17.0
 unstructured-inference==0.7.23
 unstructured.pytesseract==0.3.12
 urllib3==2.0.7
+watchdog==4.0.1
 wrapt==1.16.0
 yarl==1.9.4

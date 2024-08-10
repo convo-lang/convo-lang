@@ -1,17 +1,16 @@
 from langchain_community.document_loaders import S3FileLoader, TextLoader , UnstructuredURLLoader, UnstructuredFileLoader, UnstructuredHTMLLoader, UnstructuredPDFLoader, UnstructuredMarkdownLoader, DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema.document import Document
-from psycopg import sql, connect
+from psycopg import sql
 from typing import Any, Dict
 from .s3_loader import S3FileLoaderEx
 from .types import DocumentEmbeddingRequest
 from .embed import encode_text
-from iyio_common import exec_sql, escape_sql_identifier, parse_s3_path
+from iyio_common import exec_sql, escape_sql_identifier, parse_s3_path, getEnvVar
 import json
 import magic
 
 
-embeddings_table='VectorIndex'
 max_sql_len=65536
 
 def get_text_chunks_langchain(text:str):
@@ -28,9 +27,16 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
     mode='single'
 
     document_path=request.location
+    docPrefix=getEnvVar('DOCUMENT_PREFIX_PATH')
+    if docPrefix:
+        if not document_path.startswith('/'):
+            document_path='/'+document_path
+        document_path=docPrefix+document_path
+
     content_type=request.contentType
     mime_path = document_path
     direct_docs = None
+    embeddings_table=request.embeddingsTable
 
     if document_path == 'inline':
         direct_docs=get_text_chunks_langchain(request.inlineContent)
@@ -74,10 +80,10 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
     firstDoc=docs[0]
     if direct_docs:
         content_type=request.contentType
-    elif firstDoc and firstDoc.metadata and firstDoc.metadata['content_type']:
+    elif firstDoc and firstDoc.metadata and ('content_type' in firstDoc.metadata):
         content_type=firstDoc.metadata['content_type']
     else:
-        if firstDoc and firstDoc.metadata and firstDoc.metadata['filename']:
+        if firstDoc and firstDoc.metadata and ('filename' in firstDoc.metadata):
             print('first doc filename',firstDoc)
             mime_path=firstDoc.metadata['filename']
 
@@ -118,7 +124,7 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
     all=[]
     print('Generating embeddings')
 
-    cols=request.cols.copy()
+    cols=request.cols.copy() if request.cols else {}
 
     if request.contentCategoryCol:
         cols[request.contentCategoryCol]=content_category
@@ -138,6 +144,20 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
             #print(all[0])
 
 
+    if request.cols and request.clearMatching:
+        clearSql=f'DELETE FROM {escape_sql_identifier(embeddings_table)} where'
+        cf=True
+        for cc in request.clearMatching:
+            if cf:
+                cf=False
+            else:
+                clearSql+=' AND'
+            clearSql+=f' {escape_sql_identifier(cc)} = {sql.SQL("{value}").format(value=cols[cc]).as_string(None)}'
+            cf=False
+
+        if not cf:
+            exec_sql(clearSql,request.dryRun)
+
     colNamesEscaped=[]
     colNames=[]
     if cols:
@@ -151,7 +171,7 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
 
     inserted=0
     total_inserted=0
-    head=f'INSERT INTO {escape_sql_identifier(embeddings_table)} ("text","vector"{colNameSql}) VALUES '
+    head=f'INSERT INTO {escape_sql_identifier(embeddings_table)} ({escape_sql_identifier(request.textCol)},{escape_sql_identifier(request.embeddingCol)}{colNameSql}) VALUES '
 
     sql_chucks=[head]
     sql_len=len(head)
