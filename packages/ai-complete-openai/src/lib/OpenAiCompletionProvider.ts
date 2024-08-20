@@ -425,6 +425,9 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
         }
 
         switch(model){
+            case 'gpt-4o-mini':
+            case 'gpt-4o-mini-2024-07-18': return 128000;
+            case 'gpt-4o': return 128000;
             case 'gpt-4o': return 128000;
             case 'gpt-4o-2024-05-13': return 128000;
             case 'gpt-4-1106-preview': return 128000;
@@ -474,6 +477,9 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
         switch(model){
             case 'gpt-4o':
             case 'gpt-4o-2024-05-13': return (isIn?5:15)/1000000;
+            case 'gpt-4o-2024-08-06':return (isIn?2.5:10)/1000000;
+            case 'gpt-4o-mini':
+            case 'gpt-4o-mini-2024-07-18': return (isIn?0.15:0.6)/1000000;
             case 'gpt-4-0125-preview':
             case 'gpt-4-1106-preview':
             case 'gpt-4-vision-preview': return (isIn?0.01:0.03)/1000;
