@@ -5,7 +5,7 @@ import { FlatConvoConversation, FlatConvoMessage } from "./convo-types";
 
 export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
 
-export type ConvoEditorMode='code'|'vars'|'flat'|'tree';
+export type ConvoEditorMode='code'|'vars'|'flat'|'tree'|'model';
 
 export type ConvoPromptMediaPurpose='preview'|'prompt';
 

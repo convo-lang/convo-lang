@@ -1,9 +1,9 @@
-import { AiCompletionFunctionCallError, AiCompletionMessage, AiCompletionMessageType, AiCompletionOption, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, getLastNonCallAiCompleteMessage } from '@iyio/ai-complete';
+import { AiCompletionFunctionCallError, AiCompletionMessage, AiCompletionMessageType, AiCompletionOption, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, CompletionOptions, getLastNonCallAiCompleteMessage } from '@iyio/ai-complete';
 import { FileBlob, Lock, Scope, SecretManager, asType, delayAsync, deleteUndefined, httpClient, parseMarkdownImages, secretManager, shortUuid, unused } from '@iyio/common';
 import { parse } from 'json5';
 import OpenAIApi, { toFile } from 'openai';
 import { ImagesResponse } from 'openai/resources';
-import { ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParams, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
+import { ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
 import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from './_types.ai-complete-openai';
 import { OpenAiSecrets } from './ai-complete-openai-type';
 
@@ -133,13 +133,13 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
         }
     }
 
-    private async completeChatAsync(lastMessage:AiCompletionMessage,request:AiCompletionRequest):Promise<AiCompletionResult>
+    public toModelFormat(lastMessage:AiCompletionMessage,request:AiCompletionRequest,options?:CompletionOptions):any
     {
+        return this.getChatParams(lastMessage,request).cParams;
+    }
+
+    private getChatParams(lastMessage:AiCompletionMessage,request:AiCompletionRequest){
         const visionCapable=request.capabilities?.includes('vision') || lastMessage.model?.includes('vision');
-
-        const endpoint=lastMessage.endpoint;
-
-        const api=await this.getApiAsync(request.apiKey,endpoint);
 
         const lastContentMessage=getLastNonCallAiCompleteMessage(request.messages);
 
@@ -215,7 +215,7 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
 
         const jsonMode=lastContentMessage?.responseFormat==='json';
 
-        const cParams:ChatCompletionCreateParams={
+        const cParams:ChatCompletionCreateParamsNonStreaming={
             model,
             response_format:jsonMode?{type:'json_object'}:undefined,
             stream:false,
@@ -227,12 +227,30 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
                 request.toolChoice:{type:"function","function":request.toolChoice}
             ):undefined
         };
-        if(useVision){
-            // todo - review if this is needed. Current used as workaround for issue with
-            //        preview version of vision model
-            cParams.max_tokens=4096;
-        }
+
+        return {
+            cParams,
+            model,
+            jsonMode,
+            lastContentMessage,
+        };
+    }
+
+    private async completeChatAsync(lastMessage:AiCompletionMessage,request:AiCompletionRequest):Promise<AiCompletionResult>
+    {
+
+        const {
+            cParams,
+            model,
+            jsonMode,
+            lastContentMessage,
+        }=this.getChatParams(lastMessage,request);
+
+        const endpoint=lastMessage.endpoint;
+
         request.debug?.('snd > OpenAi.ChatCompletionCreateParams',cParams);
+
+        const api=await this.getApiAsync(request.apiKey,endpoint);
 
         const r=await api.chat.completions.create(cParams);
 

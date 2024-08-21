@@ -20,6 +20,8 @@ export interface AiCompletionProvider
     getMaxTokensForMessageType?(messageType:AiCompletionMessageType,model?:string):number|undefined;
 
     getTokenEstimateForMessage?(message:string,model?:string):number|undefined;
+
+    toModelFormat(lastMessage:AiCompletionMessage,request:AiCompletionRequest,options?:CompletionOptions):any;
 }
 
 // export const AiCompletionFunctionParamScheme=z.object({

@@ -2432,6 +2432,25 @@ export class Conversation
             format:isObj?'json':undefined
         }]
     }
+
+    public toModelFormat(flat:FlatConvoConversation):any
+    {
+        return this.completionService?.toModelFormat(flat);
+    }
+
+    public toModelFormatStr(flat:FlatConvoConversation):string
+    {
+        const value=this.toModelFormat(flat);
+        if(!value){
+            return '';
+        }
+
+        if(typeof value === 'string'){
+            return value;
+        }
+
+        return JSON.stringify(value,createJsonRefReplacer(),4);
+    }
 }
 
 const flattenMsgAsync=async (

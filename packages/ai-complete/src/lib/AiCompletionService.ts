@@ -301,7 +301,7 @@ export class AiCompletionService implements ConvoCompletionService
         })??(message.length/2)
     }
 
-    public async completeConvoAsync(flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
+    public flatConvoToRequest(flat:FlatConvoConversation):AiCompletionRequest
     {
         const messages:AiCompletionMessage[]=[];
         const functions:AiCompletionFunction[]=[];
@@ -384,6 +384,15 @@ export class AiCompletionService implements ConvoCompletionService
             }
         }
 
+        return request;
+
+    }
+
+    public async completeConvoAsync(flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
+    {
+
+        const request=this.flatConvoToRequest(flat);
+
         const result=await this.completeAsync(request,{allowAllModels:true});
 
         const resultMessage=result.options[0];
@@ -418,6 +427,23 @@ export class AiCompletionService implements ConvoCompletionService
                 endpoint:result.endpoint,
             }]
         }
+    }
+
+    public toModelFormat(flat:FlatConvoConversation):any
+    {
+
+        const request=this.flatConvoToRequest(flat);
+        const last=request.messages[request.messages.length-1];
+        if(!last){
+            return undefined;
+        }
+
+        const provider=this.getProvider(last,request);
+        if(!provider){
+            return undefined;
+        }
+
+        return provider.toModelFormat(last,request,{allowAllModels:true});
     }
 
 }

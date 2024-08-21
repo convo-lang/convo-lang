@@ -718,6 +718,8 @@ export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
 export interface ConvoCompletionService
 {
     completeConvoAsync(flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>;
+
+    toModelFormat(flat:FlatConvoConversation):any;
 }
 
 export type ConvoCompletionStatus='complete'|'busy'|'error'|'disposed';

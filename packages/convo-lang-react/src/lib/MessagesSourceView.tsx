@@ -24,7 +24,7 @@ export function MessagesSourceView({
 
     const convo=useConversation(_ctrl);
 
-    const flatConvo=useSubject((mode==='vars' || mode==='flat')?convo?.flatSubject:undefined);
+    const flatConvo=useSubject((mode==='vars' || mode==='flat' || mode==='model')?convo?.flatSubject:undefined);
 
     const theme=useConversationTheme(_ctrl);
 
@@ -78,6 +78,8 @@ export function MessagesSourceView({
                             JSON.stringify(flatConvo?.messages??[],null,4)
                         :mode==='tree'?
                             JSON.stringify(convo?.messages??[],null,4)
+                        :mode==='model'?
+                            (flatConvo?(convo?.toModelFormatStr(flatConvo)??''):'')
                         :
                             code
                     }

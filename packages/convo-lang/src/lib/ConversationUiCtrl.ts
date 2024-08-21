@@ -413,8 +413,17 @@ export class ConversationUiCtrl
                     this.showFunctions=!this.showFunctions;
                     break;
 
+                case '/model':
+                    this.showSource=this.editorMode==='model'?!this.showSource:true;
+                    this.editorMode='model';
+                    break;
+
                 case '/clear':
                     this.clear();
+                    break;
+
+                case '/help':
+                    this.printHelp();
                     break;
             }
             return 'command';
@@ -446,6 +455,21 @@ export class ConversationUiCtrl
             this.queueAutoSave();
         }
         return true;
+    }
+
+    public printHelp()
+    {
+        this.convo?.appendAssistantMessage(/*convo*/`
+/source     - Display convo script source
+/flat       - Display the convo as flat messages
+/vars       - Display all defined user variables
+/tree       - Displays the syntax tree
+/system     - Display system messages
+/function   - Display function messages
+/model      - Display messages in the format of the current model
+/clear      - Clears all messages
+/help       - Prints this help message
+        `)
     }
 
     public queueMedia(media:string|ConvoPromptMedia){
