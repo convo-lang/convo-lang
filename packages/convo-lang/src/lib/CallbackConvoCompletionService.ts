@@ -16,4 +16,9 @@ export class CallbackConvoCompletionService implements ConvoCompletionService
     {
         return this.completeAsync(flat);
     }
+
+    public toModelFormat(flat:FlatConvoConversation):any
+    {
+        return undefined;
+    }
 }
