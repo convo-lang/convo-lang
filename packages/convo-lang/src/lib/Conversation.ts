@@ -105,6 +105,11 @@ export interface ConversationOptions
      * If true arbitrary code will be allowed to be executed.
      */
     allowEvalCode?:boolean;
+
+
+    ragPrefix?:string;
+
+    ragSuffix?:string;
 }
 
 export class Conversation
@@ -947,7 +952,7 @@ export class Conversation
                 flat.exe.setVar(false,this.unregisteredVars[e],e);
             }
 
-            let ragDoc:ConvoDocumentReference|null|undefined;
+            let ragDoc:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[];
             let ragMsg:ConvoMessage|undefined;
 
             const lastFlatMsg=getLastCompletionMessage(flat.messages);
@@ -970,9 +975,11 @@ export class Conversation
 
             if(ragDoc){
                 ragMsg=convoRagDocRefToMessage(ragDoc,convoRoles.rag);
-                flat.messages.push(this.flattenMsg(ragMsg,true));
-                this.applyRagMode(flat.messages,flat.ragMode);
-                this.appendMessageObject(ragMsg,{disableAutoFlatten:true,appendCode:true});
+                if(ragMsg){
+                    flat.messages.push(this.flattenMsg(ragMsg,true));
+                    this.applyRagMode(flat.messages,flat.ragMode);
+                    this.appendMessageObject(ragMsg,{disableAutoFlatten:true,appendCode:true});
+                }
             }
 
             const lastMsg=this.messages[this.messages.length-1];
@@ -995,10 +1002,17 @@ export class Conversation
                     return await this.completeUsingEvalAsync(lastFlatMsg,flat);
                 }else if(lastFlatMsg?.component==='input'){
                     return await this.completeUsingComponentInputAsync(lastFlatMsg,flat,isDefaultTask)
-                }else{
+                }else if(lastMsg?.fn && !lastFlatMsg?.fn?.call && lastFlatMsg?.fn?.params.length===0){
                     if(isDefaultTask){
                         this.setFlat(flat);
                     }
+                    return [{
+                        role:'assistant',
+                        callFn:lastMsg.fn.name,
+                        callParams:[],
+                        tags:{[convoTags.toolId]:shortUuid()}
+                    }]
+                }else{
                     return await getCompletion(flat)
                 }
             })()
@@ -1738,6 +1752,8 @@ export class Conversation
             markdownVars:mdVarCtx.vars,
             ragMode,
             toolChoice:toolTag?baseConvoToolChoice.includes(toolTag as any)?toolTag as any:{name:toolTag}:toolChoice,
+            ragPrefix:this.defaultOptions.ragPrefix,
+            ragSuffix:this.defaultOptions.ragSuffix,
         }
 
         for(let i=0;i<messages.length;i++){
@@ -2125,11 +2141,11 @@ export class Conversation
 
             validateConvoTypeName(type.name);
 
-            const str=schemeToConvoTypeString(type.type,type.name);
+            const str=schemeToConvoTypeString(type.type);
             if(!str){
                 continue;
             }
-            push(str,item);
+            push(type.name+'='+str,item);
             push('\n',item);
             this.definitionItems.push({type});
         }

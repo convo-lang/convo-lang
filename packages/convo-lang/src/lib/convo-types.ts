@@ -992,7 +992,7 @@ export interface ConvoRagContext
 
 export type ConvoRagCallback=(
     ragContext:ConvoRagContext
-)=>ConvoDocumentReference|null|Promise<ConvoDocumentReference|null>;
+)=>ConvoDocumentReference|null|(ConvoDocumentReference|null)[]|Promise<ConvoDocumentReference|null|(ConvoDocumentReference|null)[]>;
 
 export interface AppendConvoMessageObjOptions
 {

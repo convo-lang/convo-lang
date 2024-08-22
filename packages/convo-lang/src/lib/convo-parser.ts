@@ -5,7 +5,7 @@ import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, 
 
 type StringType='"'|"'"|'---'|'>';
 
-const fnMessageReg=/(>)\s*(\w+)?\s+(\w+)\s*([*?!]*)\s*(\()/gs;
+const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
 const topLevelMessageReg=/(>)\s*(do|result|define|debug|end)/gs;
 const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
 

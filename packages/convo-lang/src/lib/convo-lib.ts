@@ -48,6 +48,12 @@ export const convoRoles={
 export const convoFunctions={
     queryImage:'queryImage',
     getState:'getState',
+    /**
+     * When called __rag with be set to true and and params passed will be added the the __ragParams
+     * array. If __ragParams is not an array it will be set to an array first. Duplicated values
+     * will not be added to __ragParams.
+     */
+    enableRag:'enableRag',
 } as const;
 
 /**
@@ -413,6 +419,7 @@ export const allowedConvoDefinitionFunctions=[
     convoJsonMapFnName,
     convoJsonArrayFnName,
     convoFunctions.getState,
+    convoFunctions.enableRag,
 ] as const;
 
 export const createOptionalConvoValue=(value:any):OptionalConvoValue=>{
@@ -951,26 +958,45 @@ export const shouldDisableConvoAutoScroll=(messages:FlatConvoMessage[]):boolean=
     return false;
 }
 
-export const convoRagDocRefToMessage=(doc:ConvoDocumentReference,role:string):ConvoMessage=>{
+export const convoRagDocRefToMessage=(docs:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[],role:string):ConvoMessage|undefined=>{
+    const ary=asArray(docs);
+    if(!ary){
+        return undefined;
+    }
     const msg:ConvoMessage={
         role,
-        content:doc.content,
+        content:ary.map(d=>d?.content??'').join('\n'),
         tags:[]
     }
 
-    if(doc.sourceId){
-        msg.sourceId=doc.sourceId;
-        msg.tags?.push({name:convoTags.sourceId,value:doc.sourceId})
+    if(!msg.content){
+        return undefined;
     }
 
-    if(doc.sourceName){
-        msg.sourceName=doc.sourceName;
-        msg.tags?.push({name:convoTags.sourceName,value:doc.sourceName})
-    }
+    for(const doc of ary){
+        if(!doc){
+            continue;
+        }
+        if(doc.sourceId){
+            if(!msg.sourceId){
+                msg.sourceId=doc.sourceId;
+            }
+            msg.tags?.push({name:convoTags.sourceId,value:doc.sourceId})
+        }
 
-    if(doc.sourceUrl){
-        msg.sourceUrl=doc.sourceUrl;
-        msg.tags?.push({name:convoTags.sourceUrl,value:doc.sourceUrl})
+        if(doc.sourceName){
+            if(!msg.sourceName){
+                msg.sourceName=doc.sourceName;
+            }
+            msg.tags?.push({name:convoTags.sourceName,value:doc.sourceName})
+        }
+
+        if(doc.sourceUrl){
+            if(!msg.sourceUrl){
+                msg.sourceUrl=doc.sourceUrl;
+            }
+            msg.tags?.push({name:convoTags.sourceUrl,value:doc.sourceUrl})
+        }
     }
 
     if(!msg.tags?.length){

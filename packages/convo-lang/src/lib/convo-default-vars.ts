@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod";
@@ -946,6 +946,27 @@ export const defaultConvoVars={
         }
         globalThis.window?.open(url,target);
         return true;
+    }),
+
+    [convoFunctions.enableRag]:createConvoScopeFunction((scope,ctx)=>{
+        ctx.setVar(true,true,convoVars.__rag);
+        let ragParams=ctx.getVar(convoVars.__ragParams);
+        if(!ragParams || (typeof ragParams!=='object')){
+            ragParams={};
+            ctx.setVar(true,ragParams,convoVars.__ragParams);
+        }
+        if(!ragParams.values){
+            ragParams.values=[];
+        }
+        const ary=ragParams.values as any[];
+        if(scope.paramValues){
+            for(const v of scope.paramValues){
+                if(!ary.includes(v)){
+                    ary.push(v);
+                }
+            }
+        }
+        return ary;
     }),
 
 } as const;
