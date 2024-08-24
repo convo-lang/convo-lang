@@ -95,7 +95,7 @@
         "react-dom": "18.2.0",
         "regenerator-runtime": "0.13.7",
         "rxjs": "^7.8.0",
-        "shiki": "^0.14.5",
+        "shiki": "^1.14.1",
         "styled-jsx": "5.0.7",
         "tslib": "^2.3.0",
         "uuid": "^9.0.0",
