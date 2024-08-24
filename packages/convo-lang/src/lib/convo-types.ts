@@ -288,11 +288,19 @@ export interface ConvoFunction
      * If true the function is a local statement that should only be called by other functions in the
      * current convo script
      */
-    local:boolean;
+    local?:boolean;
+
     /**
      * If true it has been requested that the function be called.
      */
-    call:boolean;
+    call?:boolean;
+
+    /**
+     * If true the function should be directly invoked when it is the last message of the conversation.
+     * The function should not define any parameters. invoke will be true if the function is named
+     * invoke or has the invoke modifier.
+     */
+    invoke?:boolean;
 
     /**
      * If true the function is a collection of top level statements

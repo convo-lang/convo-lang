@@ -984,6 +984,7 @@ export class Conversation
 
             const lastMsg=this.messages[this.messages.length-1];
             const lastMsgIsFnCall=lastMsg?.fn?.call?true:false;
+            let directInvoke=false;
             const completion:ConvoCompletionMessage[]=await (async ()=>{
 
                 if(lastMsg?.fn?.call){
@@ -1002,10 +1003,11 @@ export class Conversation
                     return await this.completeUsingEvalAsync(lastFlatMsg,flat);
                 }else if(lastFlatMsg?.component==='input'){
                     return await this.completeUsingComponentInputAsync(lastFlatMsg,flat,isDefaultTask)
-                }else if(lastMsg?.fn && !lastFlatMsg?.fn?.call && lastFlatMsg?.fn?.params.length===0){
+                }else if(lastMsg?.fn && lastMsg.fn.invoke && !lastMsg?.fn?.call){
                     if(isDefaultTask){
                         this.setFlat(flat);
                     }
+                    directInvoke=true;
                     return [{
                         role:'assistant',
                         callFn:lastMsg.fn.name,
@@ -1164,7 +1166,7 @@ export class Conversation
                         this.append(a);
                     }
                 }
-            }else if(lastResultValue!==undefined && autoCompleteDepth<this.maxAutoCompleteDepth && !additionalOptions?.returnOnCalled){
+            }else if(lastResultValue!==undefined && autoCompleteDepth<this.maxAutoCompleteDepth && !(additionalOptions?.returnOnCalled || directInvoke)){
                 return await this._completeAsync(false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth+1,completion,returnValues,templates,undefined,lastFnCall);
             }
 
