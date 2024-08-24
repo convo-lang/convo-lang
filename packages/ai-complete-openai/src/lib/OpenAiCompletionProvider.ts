@@ -446,7 +446,6 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
             case 'gpt-4o-mini':
             case 'gpt-4o-mini-2024-07-18': return 128000;
             case 'gpt-4o': return 128000;
-            case 'gpt-4o': return 128000;
             case 'gpt-4o-2024-05-13': return 128000;
             case 'gpt-4-1106-preview': return 128000;
             case 'gpt-4-vision-preview': return 128000;
