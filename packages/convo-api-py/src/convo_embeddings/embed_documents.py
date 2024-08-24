@@ -152,7 +152,10 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
                 cf=False
             else:
                 clearSql+=' AND'
-            clearSql+=f' {escape_sql_identifier(cc)} = {sql.SQL("{value}").format(value=cols[cc]).as_string(None)}'
+            if cols[cc] is None:
+                clearSql+=f' {escape_sql_identifier(cc)} is NULL'
+            else:
+                clearSql+=f' {escape_sql_identifier(cc)} = {sql.SQL("{value}").format(value=cols[cc]).as_string(None)}'
             cf=False
 
         if not cf:
