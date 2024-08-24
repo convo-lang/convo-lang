@@ -611,7 +611,7 @@ export class ConvoGraphCtrl
             if(this.hasListeners){
                 this.triggerEvent({
                     type:'execute-step',
-                    text:`Executing step ${stepIndex}`,
+                    text:`Executing step ${stepIndex} ${node.key??node.id}`,
                     traverser:tv,
                     step:step.nodeStep,
                     stepIndex,
@@ -681,13 +681,18 @@ export class ConvoGraphCtrl
                 type:call.fn.returnType,
             };
         }else if(!outputFn){
-            return call?{
-                call,
-                value:call.returnValue,
-                type:call.fn.returnType,
-            }:{
-                value:result.message?.content,
-                type:'string'
+            if(call){
+                return {
+                    call,
+                    value:call.returnValue,
+                    type:call.fn.returnType,
+                }
+            }else{
+                const value=(result.message?.format==='json')?JSON.parse(result.message.content?.trim()||'null'):result.message?.content;
+                return {
+                    value,
+                    type:typeof value,
+                }
             }
         }else{
             tv.exeState='failed';
