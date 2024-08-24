@@ -63,7 +63,9 @@ const evalJsAsync=async (js:string,flat:FlatConvoConversation)=>{
         addVar(e,flat.exe.sharedVars[e]);
     }
 
-    const fn=eval(`async (${argNames.join(',')})=>{
+    // disable esbuild eval warning
+    const ev=(globalThis as any)['eval'];
+    const fn=ev(`async (${argNames.join(',')})=>{
         let result=undefined;
         ${js}
         return result;

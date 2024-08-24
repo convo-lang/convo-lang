@@ -36,7 +36,10 @@ export const convoScopeFunctionEvalJavascript=createConvoScopeFunction(async (sc
         addVar(e,ctx.sharedVars[e]);
     }
 
-    const fn=eval(`async (${argNames.join(',')})=>{
+    // The line below is used to disable esbuild warnings. I know what I'm doing 👍
+    const ev=(globalThis as any)['eval'];
+
+    const fn=ev(`async (${argNames.join(',')})=>{
         let result=undefined;
         ${js}
         return result;
