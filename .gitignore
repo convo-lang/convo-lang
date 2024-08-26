@@ -79,3 +79,4 @@ venv
 /packages/syn-taxi
 /packages/tmpl-gen
 /packages/iyio-common-py
+/packages/vfs

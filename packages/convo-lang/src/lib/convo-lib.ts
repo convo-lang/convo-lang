@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -463,6 +463,7 @@ export const createConvoScopeFunction:CreateConvoScopeFunctionOverloads=(
     fn?:ConvoScopeFunction
 ):ConvoScopeFunction=>{
     if(typeof fnOrCtrl === 'function'){
+        (fnOrCtrl as any)[convoScopeFunctionMarker]=true;
         return fnOrCtrl;
     }
     if(!fn){
@@ -471,7 +472,12 @@ export const createConvoScopeFunction:CreateConvoScopeFunctionOverloads=(
     if(fnOrCtrl){
         (fn as any)[convoFlowControllerKey]=fnOrCtrl;
     }
+    (fn as any)[convoScopeFunctionMarker]=true;
     return fn;
+}
+
+export const isConvoScopeFunction=(value:any):value is ConvoScopeFunction=>{
+    return (value && value[convoScopeFunctionMarker])?true:false;
 }
 
 export const setConvoScopeError=(scope:ConvoScope|null|undefined,error:ConvoScopeError|string)=>{

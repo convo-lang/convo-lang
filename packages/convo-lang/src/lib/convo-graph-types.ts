@@ -335,9 +335,9 @@ export interface ConvoTraverser
     address?:string;
 
     /**
-     * The path the traverser has traveled.
+     * Ids of the edges the traverser has traveled
      */
-    path?:ConvoEdge[];
+    path?:string[];
 
     /**
      * Id of the current node the traverser is on.
@@ -364,13 +364,29 @@ export interface ConvoTraverser
      */
     userGroupId?:string;
 
+    /**
+     * Metadata attached to the traverser.
+     */
+    metadata?:Record<string,any>;
+
+    /**
+     * If true the traverser should be saved after changes
+     */
+    saveToStore?:boolean;
+
     x?:number;
     y?:number;
 }
 
 export interface CreateConvoTraverserOptions
 {
-    defaults?:Partial<ConvoTraverser>;
+    defaults?:Partial<ConvoTraverser>|((
+        edge:ConvoEdge,
+        options:CreateConvoTraverserOptions|undefined,
+        payload:any,
+        state:Record<string,any>|undefined,
+        saveToStore:boolean
+    )=>Partial<ConvoTraverser>);
 }
 
 export interface StartConvoTraversalOptions

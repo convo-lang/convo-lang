@@ -194,7 +194,11 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
             return shortUuid();
         }
         public getNextSourceNodeId():string{
-            return shortUuid();
+            let i=0;
+            while(this.db.sourceNodes.some(n=>n.id==='s'+i)){
+                i++;
+            }
+            return 's'+i;
         }
         public getNextInputId():string{
             let i=0;

@@ -30,7 +30,7 @@ export class ConvoGraphCtrl
     }
 
     private readonly defaultConvoOptions:ConversationOptions;
-    private async getConvoOptionsAsync(tv:ConvoTraverser|undefined,initConvo?:string):Promise<ConversationOptions>{
+    private async getConvoOptionsAsync(tv:ConvoTraverser|undefined,initConvo?:string,defaultVarsOverride?:Record<string,any>):Promise<ConversationOptions>{
 
         return {
             ...this.defaultConvoOptions,
@@ -48,7 +48,7 @@ export class ConvoGraphCtrl
                         this.defaultConvoOptions.initConvo
                 )||''
             ))||undefined,
-            defaultVars:{
+            defaultVars:defaultVarsOverride??{
                 ...this.defaultConvoOptions.defaultVars,
                 input:tv?.payload,
                 sourceInput:tv?.payload,
@@ -176,13 +176,17 @@ export class ConvoGraphCtrl
         saveToStore:boolean,
         addTo?:BehaviorSubject<ConvoTraverser[]>
     ):Promise<ConvoTraverser>{
-        const defaults=options?.defaults;
+        let defaults=options?.defaults;
+        if(typeof defaults === 'function'){
+            defaults=defaults(edge,options,payload,state,saveToStore);
+        }
         const tv:ConvoTraverser={
             ...defaults,
             id:defaults?.id??shortUuid(),
             exeState:'invoked',
             state:defaults?.state??{},
             currentStepIndex:0,
+            saveToStore
         }
 
         tv.payload=payload;
@@ -190,10 +194,6 @@ export class ConvoGraphCtrl
             for(const e in state){
                 tv.state[e]=state[e];
             }
-        }
-
-        if(saveToStore){
-            await this.store.putTraverserAsync(tv);
         }
 
         if(this.hasListeners){
@@ -237,6 +237,9 @@ export class ConvoGraphCtrl
                     edge
                 })
             }
+            if(tv.saveToStore){
+                this.store.putTraverserAsync(tv);
+            }
             return undefined;
         }
 
@@ -259,7 +262,7 @@ export class ConvoGraphCtrl
         if(!tv.path){
             tv.path=[];
         }
-        tv.path.push(edge);
+        tv.path.push(edge.id);
 
         if(this.hasListeners){
             this.triggerEvent({
@@ -270,6 +273,10 @@ export class ConvoGraphCtrl
                 edge,
                 node:targetNode
             })
+        }
+
+        if(tv.saveToStore){
+            this.store.putTraverserAsync(tv);
         }
 
         return targetNode;
@@ -427,6 +434,9 @@ export class ConvoGraphCtrl
                             node,
                         })
                     }else{
+                        if(edge.selectPath){
+                            tv.payload=getValueByPath(tv.payload,edge.selectPath);
+                        }
                         return this.traverseEdgeAsync(tv,edge);
                     }
                 }
@@ -474,16 +484,14 @@ export class ConvoGraphCtrl
             const edge=edges[i];
             if(!edge?.conditionConvo){continue}
             try{
-                const conversation=new Conversation({
-                    disableAutoFlatten:true,
-                    initConvo:(
-                        (await this.getSharedSourceAsync())+
+                const conversation=new Conversation(
+                    await this.getConvoOptionsAsync(undefined,
                         `\n> edgeConditionEvalFunction() -> ( ${edge.conditionConvo} )\n`+
-                        `> do`+
-                        `edgeConditionResult=edgeConditionEvalFunction()`
-                    ),
-                    defaultVars:{input},
-                })
+                         `> do`+
+                         `edgeConditionResult=edgeConditionEvalFunction()`,
+                         {input}
+                    )
+                )
                 const flat=await conversation.flattenAsync();
                 const accept=flat.exe.getVar('edgeConditionResult');
                 if(!accept){

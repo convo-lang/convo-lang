@@ -379,7 +379,8 @@ export interface ConvoFlowControllerDataRef
     childCtrlData?:Record<string,ConvoFlowControllerDataRef>;
 }
 
-export const convoFlowControllerKey=Symbol('convoFlowControllerKey')
+export const convoFlowControllerKey=Symbol('convoFlowControllerKey');
+export const convoScopeFunctionMarker=Symbol('convoScopeFunctionMarker');
 export interface ConvoFlowController
 {
 

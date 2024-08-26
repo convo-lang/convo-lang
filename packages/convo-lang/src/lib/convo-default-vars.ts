@@ -779,6 +779,10 @@ export const defaultConvoVars={
         }
     }),
 
+    today:createConvoScopeFunction(()=>{
+        return format(new Date(),'yyyy-MM-dd');
+    }),
+
     md:createConvoScopeFunction((scope)=>{
         if(!scope.paramValues?.length){
             return '';
