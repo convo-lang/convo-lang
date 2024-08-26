@@ -533,7 +533,12 @@ export class ConvoExecutionContext
                     }
                 }
                 if(!scope.r){
-                    value=fn(scope,this);
+                    if(statement.fnPath){
+                        value=getValueByAryPath(this.sharedVars,statement.fnPath)?.[statement.fn]?.(...(scope.paramValues??emptyAry))
+                    }else{
+                        value=fn(scope,this);
+                    }
+
                 }
             }
             if(scope.r){
@@ -747,3 +752,5 @@ export class ConvoExecutionContext
     }
 
 }
+
+const emptyAry:any[]=[];
