@@ -779,7 +779,7 @@ export const defaultConvoVars={
         }
     }),
 
-    today:createConvoScopeFunction(()=>{
+    [convoFunctions.today]:createConvoScopeFunction(()=>{
         return format(new Date(),'yyyy-MM-dd');
     }),
 

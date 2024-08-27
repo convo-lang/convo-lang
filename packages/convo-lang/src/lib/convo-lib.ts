@@ -49,13 +49,17 @@ export const convoRoles={
 
 export const convoFunctions={
     queryImage:'queryImage',
+
     getState:'getState',
+
     /**
      * When called __rag with be set to true and and params passed will be added the the __ragParams
      * array. If __ragParams is not an array it will be set to an array first. Duplicated values
      * will not be added to __ragParams.
      */
     enableRag:'enableRag',
+
+    today:'today',
 } as const;
 
 /**
