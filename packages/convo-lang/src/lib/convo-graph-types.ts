@@ -340,6 +340,11 @@ export interface ConvoTraverser
     path?:string[];
 
     /**
+     * The id of the node the traverser started at
+     */
+    startingNodeId?:string;
+
+    /**
      * Id of the current node the traverser is on.
      */
     currentNodeId?:string;

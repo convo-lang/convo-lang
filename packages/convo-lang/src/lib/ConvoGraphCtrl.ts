@@ -244,6 +244,9 @@ export class ConvoGraphCtrl
         }
 
         tv.currentNodeId=targetNode.id;
+        if(!tv.startingNodeId){
+            tv.startingNodeId=targetNode.id;
+        }
 
         if(edge.pause){
             tv.exeState='paused';
