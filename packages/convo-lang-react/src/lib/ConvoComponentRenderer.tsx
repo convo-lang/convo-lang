@@ -8,11 +8,13 @@ export interface ConvoComponentRendererProps
 {
     state?:ConvoComponentMessageState;
     renderComponent?:(comp:ConvoComponent,compProps:Record<string,any>,index:number)=>any;
+    renderTextMessages?:boolean;
 }
 
 export function ConvoComponentRenderer({
     state,
     renderComponent,
+    renderTextMessages,
 }:ConvoComponentRendererProps){
 
     const renderCache=useMemo(()=>new ConvoComponentRenderCache(),[]);
@@ -57,15 +59,19 @@ export function ConvoComponentRenderer({
                 ...comp.atts
             },i)??null)}
 
-            {!comps?.length && <View flex1 centerBoth>
-                {lastMsgContent===undefined?
-                    <LoadingDots/>
-                :(typeof lastMsgContent === 'string')?
-                    <MarkdownViewer markdown={lastMsgContent}/>
-                :
-                    <JsonView value={lastMsgContent} />
-                }
-            </View>}
+            {!comps?.length && (renderTextMessages?
+                <View flex1 centerBoth>
+                    {lastMsgContent===undefined?
+                        <LoadingDots/>
+                    :(typeof lastMsgContent === 'string')?
+                        <MarkdownViewer markdown={lastMsgContent}/>
+                    :
+                        <JsonView value={lastMsgContent} />
+                    }
+                </View>
+            :
+                <LoadingDots/>
+            )}
 
         </div>
     )
