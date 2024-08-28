@@ -72,6 +72,7 @@ export const defaultConvoVars={
     void:createConvoBaseTypeDef('void'),
     boolean:createConvoBaseTypeDef('boolean'),
     any:createConvoBaseTypeDef('any'),
+    object:createConvoBaseTypeDef('object'),
 
     ['true']:true,
     ['false']:false,

@@ -126,6 +126,7 @@ export const convoBaseTypeToZodType=(type:ConvoBaseType):ZodType<any>=>{
         case 'int': return z.number().int();
         case 'array': return z.any().array();
         case 'map': return z.record(z.string());
+        case 'object': return z.record(z.any());
         case 'any': return z.any();
         default:
             throw new ConvoError(

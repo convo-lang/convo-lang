@@ -577,7 +577,7 @@ export interface ConvoKeyValuePair
     value:any;
 }
 
-export const convoBaseTypes=['string','number','int','boolean','time','void','any','map','array'] as const;
+export const convoBaseTypes=['string','number','int','boolean','time','void','any','map','array','object'] as const;
 export type ConvoBaseType=(typeof convoBaseTypes)[number];
 export const isConvoBaseType=(value:any):value is ConvoBaseType=>convoBaseTypes.includes(value);
 
