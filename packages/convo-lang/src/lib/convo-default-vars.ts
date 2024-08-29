@@ -1,4 +1,4 @@
-import { createJsonRefReplacer, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, toCsvLines } from "@iyio/common";
+import { createJsonRefReplacer, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
@@ -972,6 +972,14 @@ export const defaultConvoVars={
             }
         }
         return ary;
+    }),
+
+    [convoFunctions.shortUuid]:createConvoScopeFunction(()=>{
+        return shortUuid();
+    }),
+
+    [convoFunctions.uuid]:createConvoScopeFunction(()=>{
+        return uuid();
     }),
 
 } as const;

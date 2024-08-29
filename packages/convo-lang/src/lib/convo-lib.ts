@@ -60,6 +60,9 @@ export const convoFunctions={
     enableRag:'enableRag',
 
     today:'today',
+
+    uuid:'uuid',
+    shortUuid:'shortUuid',
 } as const;
 
 /**
