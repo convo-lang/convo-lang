@@ -41,7 +41,7 @@ export class ConvoLineCtrl
         this.parent=parent;
     }
 
-    private getLine(excludeUpdateId:number,fromAddress:string,toAddress:string){
+    private getLine(excludeUpdateId:number,fromAddress:string,toAddress:string):ConvoUiLine|null{
         for(const line of this.lines){
             if( line.updateId!==excludeUpdateId &&
                 line.fromAddress===fromAddress &&
@@ -76,6 +76,9 @@ export class ConvoLineCtrl
         //     (protoGetNodeCtrl(node) as NodeCtrl|undefined)?.updateLayout(50);
         // }
 
+        const overlaps:Record<string,LinePt[]>={};
+        const lines:ConvoUiLine[]=[];
+
         for(let i=0,l=this.parent.graph.edges.length*2;i<l;i++){
             const index=Math.floor(i/2);
             const toSide=(i%2)?true:false;
@@ -109,6 +112,9 @@ export class ConvoLineCtrl
                     p1:{x:0,y:0},
                     p2:{x:0,y:0},
                     color:lineColor,
+                    dir:0,
+                    dir1:1,
+                    dir2:1,
                 }
                 line.elem.setAttribute('stroke',lineColor);
                 line.elem.setAttribute('fill','none');
@@ -192,24 +198,75 @@ export class ConvoLineCtrl
                 dir2=1;
             }
 
+            const keyRes=3;
+            let key=`${Math.floor(line.p1.x/keyRes)}:${Math.floor(line.p1.y/keyRes)}`;
+            let ary=overlaps[key]??(overlaps[key]=[]);
+            ary.push({from:{...line.p2},target:line.p1});
+            key=`${Math.floor(line.p2.x/keyRes)}:${Math.floor(line.p2.y/keyRes)}`;
+            ary=overlaps[key]??(overlaps[key]=[]);
+            ary.push({from:{...line.p1},target:line.p2});
+
+
+
             const distOpacity=getDistanceOpacity(dist,this.lineDistances);
             line.elem.setAttribute('opacity',distOpacity.toString());
             line.elem2.setAttribute('opacity',distOpacity.toString());
 
             line.updateId=updateId;
-
-
             const dir=(
                 start.entity &&
                 end.entity &&
                 toId===fromId?
                 30:Math.min(dist/2,Math.min(300,Math.max(60,Math.abs(line.p1.x-line.p2.x)*0.7)))
             );
+            line.dir=dir;
+            line.dir1=dir1;
+            line.dir2=dir2;
+            lines.push(line);
+        }
+
+        for(const key in overlaps){
+
+            const group=overlaps[key];
+            if(!group || group.length<2){
+                continue;
+            }
+
+            group.sort((a,b)=>a.from.y-b.from.y);
+
+            const gap=20;
+            const offset=group.length*gap/2;
+            let y=(group[0] as LinePt).target.y-offset;
+            for(let i=0;i<group.length;i++){
+                const line=group[i];
+                if(!line){continue}
+
+                line.target.y=y;
+                y+=gap;
+
+            }
+
+
+        }
+
+        for(let i=0;i<lines.length;i++){
+            const line=lines[i];
+            if(!line){continue}
+
+            const toLeft=line.dir2===-1;
+            const lineColor=getLinkColor(line??undefined);
+
+
+            const aSize=7;
+            const aOffset=3*(toLeft?-1:1);
             const d=(
                 `M ${Math.round(line.p1.x)} ${Math.round(line.p1.y)
-                } C ${Math.round(line.p1.x+(dir*dir1))} ${Math.round(line.p1.y)
-                } ${Math.round(line.p2.x+(dir*dir2))} ${Math.round(line.p2.y)
-                }  ${Math.round(line.p2.x)} ${Math.round(line.p2.y)}`
+                } C ${Math.round(line.p1.x+(line.dir*line.dir1))} ${Math.round(line.p1.y)
+                } ${Math.round(line.p2.x+(line.dir*line.dir2))} ${Math.round(line.p2.y)
+                }  ${Math.round(line.p2.x)} ${Math.round(line.p2.y)
+                } M ${Math.round(line.p2.x+(toLeft?-aSize:aSize)+aOffset)} ${Math.round(line.p2.y+aSize)
+                } L ${Math.round(line.p2.x+aOffset)} ${Math.round(line.p2.y)
+                } L ${Math.round(line.p2.x+(toLeft?-aSize:aSize)+aOffset)} ${Math.round(line.p2.y-aSize)}`
             )
             line.elem.setAttribute('d',d);
             line.elem2.setAttribute('d',d);
@@ -217,9 +274,6 @@ export class ConvoLineCtrl
                 line.color=lineColor;
                 line.elem.setAttribute('stroke',lineColor);
             }
-
-
-
         }
 
         for(let i=0;i<this.lines.length;i++){
@@ -249,6 +303,11 @@ export interface ProtoUiLengthStyle
     min:number;
     max:number;
     minOpacity:number;
+}
+
+interface LinePt{
+    from:Point;
+    target:Point;
 }
 
 const getDistanceOpacity=(length:number,style:ProtoUiLengthStyle):number=>{
