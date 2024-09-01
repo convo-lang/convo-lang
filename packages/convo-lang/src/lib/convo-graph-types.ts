@@ -1,4 +1,4 @@
-import { CancelToken, CodeParsingResult } from "@iyio/common";
+import { CancelToken, CodeParsingResult, Point } from "@iyio/common";
 import { BehaviorSubject, Observable } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
@@ -224,6 +224,16 @@ export interface ConvoEdge
 
     x?:number;
     y?:number;
+
+    /**
+     * Extra points to be drawn between the edge and its from node.
+     */
+    fromPoints?:Point[];
+
+    /**
+     * Extra points to be drawn between the edge and its to node.
+     */
+    toPoints?:Point[];
 }
 
 export interface ConvoEdgePattern

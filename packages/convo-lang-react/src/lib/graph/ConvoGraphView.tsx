@@ -3,10 +3,12 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConvoGraphCanvas } from "./ConvoGraphCanvas";
+import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
 import { convoGraphEntityStyle } from "./ConvoGraphEntityView";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
+import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl";
 import { ConvoGraphReactCtx } from "./convo-graph-react-lib";
+import { ConvoUiLine } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewProps
 {
@@ -33,8 +35,9 @@ export function ConvoGraphView({
     const [rootElem,setRootElem]=useState<HTMLElement|null>(null);
 
     const [outputElem,setOutputElem]=useState<HTMLElement|null>(null);
-    const refs=useRef({outptutElem: outputElem});
-    refs.current.outptutElem=outputElem;
+    const refs=useRef({outputElem,rootElem,lastRemoveTime:0});
+    refs.current.outputElem=outputElem;
+    refs.current.rootElem=rootElem;
 
     const [outputSize,setOutputSize]=useState<'min'|'default'|'full'>('min');
 
@@ -56,7 +59,6 @@ export function ConvoGraphView({
                 top:outputElem.scrollHeight,
                 behavior:'smooth'
             })
-            //console.info(line);
         });
 
         setCtrl(ctrl);
@@ -70,35 +72,49 @@ export function ConvoGraphView({
         }
     },[ctrlProp,outputElem]);
 
-    const dragTargets=useMemo<DragTarget[]>(()=>[{
-        className:convoGraphEntityStyle.bar(),
-        targetParentClass:convoGraphEntityStyle.root(),
-        skipSetTransform:true,
-        onMove:(pt,elem)=>{
-            // const entity=ctrl?.getNodeByElem(elem);
-            // if(entity){
-            //     entity.moveTo(pt);
-            // }
+    const dragTargets=useMemo<DragTarget[]>(()=>[
+        {
+            className:convoGraphEntityStyle.bar(),
+            targetParentClass:convoGraphEntityStyle.root(),
+            skipSetTransform:true,
+            onMove:(pt,elem)=>{
+                const l=ctrl?.getLayoutForElem(elem);
+                if(l){
+                    wSetProp(l.entity,'x',pt.x);
+                    wSetProp(l.entity,'y',pt.y);
+                }
 
-            const l=ctrl?.getLayoutForElem(elem);
-            if(l){
-                wSetProp(l.entity,'x',pt.x);
-                wSetProp(l.entity,'y',pt.y);
-            }
-
+            },
         },
-        // onEnd:(pt,elem)=>{
-        //     // const entity=ctrl?.getNodeByElem(elem);
-        //     // if(entity){
-        //     //     entity.updateCodeLayout(pt);
-        //     // }
-        // },
-    }],[ctrl]);
+        {
+            className:convoLineCtrlStyle.midPt(),
+            skipSetTransform:true,
+            onElementMove:(pt,elem)=>{
+                const line:ConvoUiLine=(elem as any)[convoElemLineRef];
+                const root=refs.current.rootElem;
+                if(line?.ptIndex===undefined || !root || !ctrl){
+                    return;
+                }
+
+                const edge=line.edge;
+                const ept=(line.isTo?edge.toPoints:edge.fromPoints)?.[line.ptIndex];
+                if(!ept){
+                    return;
+                }
+                const bounds=root.getBoundingClientRect();
+
+                wSetProp(ept,'x',pt.x-bounds.x/ctrl.scale-ctrl.offset.x/ctrl.scale);
+                wSetProp(ept,'y',pt.y-bounds.y/ctrl.scale-ctrl.offset.y/ctrl.scale);
+                ctrl?.lineCtrl.updateLines();
+
+            },
+            getAnchorPt:()=>null,
+        },
+    ],[ctrl]);
 
     const onContextMenu=useCallback((e:MouseEvent)=>{
 
-
-        if(!panZoom || !ctrl || !(e.target as Element).classList?.contains('PanZoomView')){
+        if(!ctrl || !panZoom || !(e.target as Element).classList?.contains(convoGraphCanvasStyle.bg())){
             return;
         }
 
@@ -147,15 +163,25 @@ export function ConvoGraphView({
         if(!ctrl){
             return;
         }
-            ctrl.lineCtrl.updateLines();
 
-        const iv=setInterval(()=>{
-            ctrl.ctrl.store.saveChangesAsync();
+        ctrl.lineCtrl.updateLines();
+
+        const iv=setTimeout(()=>{
+            ctrl.lineCtrl.updateLines();
+        },15);
+
+        const iv2=setTimeout(()=>{
+            ctrl.lineCtrl.updateLines();
+        },200);
+
+        const iv3=setTimeout(()=>{
             ctrl.lineCtrl.updateLines();
         },2000);
 
         return ()=>{
-            clearInterval(iv);
+            clearTimeout(iv);
+            clearTimeout(iv2);
+            clearTimeout(iv3);
         }
 
     },[ctrl]);

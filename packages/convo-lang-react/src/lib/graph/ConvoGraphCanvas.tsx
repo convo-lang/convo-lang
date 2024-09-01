@@ -28,9 +28,10 @@ export function ConvoGraphCanvas({
     },[lineGroup,ctrl]);
 
     return (
-        <div className={style.root()}>
+        <div className={convoGraphCanvasStyle.root()}>
 
-            <svg viewBox={`-${svgSpan} -${svgSpan} ${svgSpan*2} ${svgSpan*2}`} width={svgSpan*2} height={svgSpan*2}>
+            <svg className={convoGraphCanvasStyle.svg()} viewBox={`-${svgSpan} -${svgSpan} ${svgSpan*2} ${svgSpan*2}`} width={svgSpan*2} height={svgSpan*2}>
+                <rect className={convoGraphCanvasStyle.bg()} fill="transparent" x={-svgSpan} y={-svgSpan} width={svgSpan*2} height={svgSpan*2} />
                 <g ref={setLineGroup}/>
             </svg>
 
@@ -59,21 +60,23 @@ export function ConvoGraphCanvas({
 
 }
 
-const style=atDotCss({name:'ConvoGraphCanvas',css:`
+export const convoGraphCanvasStyle=atDotCss({name:'ConvoGraphCanvas',css:`
     @.root{
         display:flex;
         flex-direction:column;
         flex:1;
         position:relative;
     }
-    @.root > svg{
+    @.svg{
         position:absolute;
         left:-${svgSpan}px;
         top:-${svgSpan}px;
         height:${svgSpan*2}px;
         width:${svgSpan*2}px;
-        pointer-events:none;
         overflow:visible;
         shape-rendering:optimizespeed;
+    }
+    @.bg{
+
     }
 `});
