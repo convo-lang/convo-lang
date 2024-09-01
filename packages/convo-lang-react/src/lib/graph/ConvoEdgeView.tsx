@@ -26,17 +26,23 @@ export function ConvoEdgeView({
 
     const setCode=useCallback((v:string)=>{
         wSetPropOrDeleteFalsy(edge,'conditionConvo',v);
-    },[edge])
+    },[edge]);
 
     return (
         <div className={style.root()}>
 
             <View gridLeftAuto2 g050 alignCenter>
                 From
-                <ConvoNodeSelector flex1 value={from} onChange={v=>wSetProp(edge,'from',v??'')} />
+                <ConvoNodeSelector flex1 value={from} onChange={v=>{
+                    wSetProp(edge,'from',v??'');
+                    ctrl.lineCtrl.updateLines(edge.id);
+                }} />
 
                 To
-                <ConvoNodeSelector flex1 value={to} onChange={v=>wSetProp(edge,'to',v??'')} />
+                <ConvoNodeSelector flex1 value={to} onChange={v=>{
+                    wSetProp(edge,'to',v??'');
+                    ctrl.lineCtrl.updateLines(edge.id);
+                }} />
 
                 Select
                 <input type="text" placeholder="Select path" value={selectPath??''} onChange={e=>wSetPropOrDeleteFalsy(edge,'selectPath',e.target.value)}/>

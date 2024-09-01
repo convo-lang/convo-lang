@@ -76,22 +76,12 @@ export class ConvoLineCtrl
 
     public updateLines(onlyForAddress?:string)
     {
-        // const group=this._lineGroup;
-        // const groupLow=this._lineGroupLow;
-
-        // if(!group || !groupLow){
-        //     return;
-        // }
         const updateId=++this.lineUpdateId;
-
-        //const addressMap=this.parent.addressMap;
-
-        // const updateNodeLayout=(node:ProtoNode)=>{
-        //     (protoGetNodeCtrl(node) as NodeCtrl|undefined)?.updateLayout(50);
-        // }
 
         const overlaps:Record<string,LinePt[]>={};
         const lines:ConvoUiLine[]=[];
+
+        const updateEdge=onlyForAddress?this.getEdge(onlyForAddress):undefined;
 
 
         const drawLine=(edge:ConvoEdge,isTo:boolean,ptIndex?:number)=>{
@@ -197,10 +187,7 @@ export class ConvoLineCtrl
             //     this.insertLineElements(line);
             // }
 
-            if( onlyForAddress!==undefined &&
-                line.fromAddress!==onlyForAddress &&
-                line.toAddress!==onlyForAddress
-            ){
+            if(onlyForAddress!==undefined && !this.isConnectedTo(line,onlyForAddress,updateEdge)){
                 line.updateId=updateId;
                 return;
             }
@@ -349,6 +336,8 @@ export class ConvoLineCtrl
             }
         }
 
+        //console.info('line update count',lines.length);
+
         for(const key in overlaps){
 
             const group=overlaps[key];
@@ -394,8 +383,8 @@ export class ConvoLineCtrl
                 } L ${Math.round(line.p2.x+aOffset)} ${Math.round(line.p2.y)
                 } L ${Math.round(line.p2.x+(toLeft?-aSize:aSize)+aOffset)} ${Math.round(line.p2.y-aSize)}`
             )
-            line.elem.setAttribute('d',d+arrow);
-            line.elem2.setAttribute('d',d+arrow);
+            line.elem.setAttribute('d',d+(line.toMid?'':arrow));
+            line.elem2.setAttribute('d',d+(line.toMid?'':arrow));
             line.hoverElem.setAttribute('d',d);
             if(line.color!==lineColor){
                 line.color=lineColor;
@@ -440,10 +429,43 @@ export class ConvoLineCtrl
             }
         }
     }
+
+    private isConnectedTo(target:ConvoUiLine,address:string,targetEdge?:ConvoEdge)
+    {
+        if(target.fromAddress===address || target.toAddress===address){
+            return true;
+        }
+
+        if(!targetEdge){
+            targetEdge=this.getEdge(address);
+        }
+
+        if(!targetEdge){
+            return false;
+        }
+
+        return (
+            target.fromAddress==targetEdge.from || target.fromAddress==targetEdge.to ||
+            target.toAddress==targetEdge.from || target.toAddress==targetEdge.to
+        )
+    }
+
+    private getEdge(address:string){
+        const edges=this.parent.graph.edges;
+        for(let i=0;i<edges.length;i++){
+            const edge=edges[i];
+            if(edge?.id===address){
+                return edge;
+            }
+        }
+        return undefined;
+    }
+
     private readonly onLineOver=(e:MouseEvent)=>{
         const line:ConvoUiLine=(e.target as any)[convoElemLineRef];
         line.centerElem.classList.add('hover');
     }
+
     private readonly onLineOut=(e:MouseEvent)=>{
         const line:ConvoUiLine=(e.target as any)[convoElemLineRef];
         line.centerElem.classList.remove('hover');
@@ -465,7 +487,7 @@ export class ConvoLineCtrl
             }
             wArySplice(edge.fromPoints,line.ptIndex===undefined?0:line.ptIndex+1,0,{...line.center});
         }
-        this.updateLines();
+        this.updateLines(edge.id);
     }
 
     private readonly onMidContextMenu=(e:MouseEvent)=>{
@@ -473,7 +495,7 @@ export class ConvoLineCtrl
         const line:ConvoUiLine=(e.target as any)[convoElemLineRef];
         const edge=line.edge;
         wAryRemoveAt(line.isTo?edge.toPoints:edge.fromPoints,line.ptIndex??0);
-        this.updateLines();
+        this.updateLines(edge.id);
     }
 
 }

@@ -105,7 +105,7 @@ export function ConvoGraphView({
 
                 wSetProp(ept,'x',pt.x-bounds.x/ctrl.scale-ctrl.offset.x/ctrl.scale);
                 wSetProp(ept,'y',pt.y-bounds.y/ctrl.scale-ctrl.offset.y/ctrl.scale);
-                ctrl?.lineCtrl.updateLines();
+                ctrl?.lineCtrl.updateLines(line.edge.id);
 
             },
             getAnchorPt:()=>null,

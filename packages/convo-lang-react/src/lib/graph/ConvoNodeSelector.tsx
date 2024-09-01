@@ -18,7 +18,7 @@ export interface ConvoNodeSelectorProps
 export function ConvoNodeSelector({
     value,
     onChange,
-    emptyLabel,
+    emptyLabel='(none)',
     ...props
 }:ConvoNodeSelectorProps & BaseLayoutOuterProps){
 
@@ -34,7 +34,7 @@ export function ConvoNodeSelector({
     return (
         <select className={style.root(null,null,props)} value={value??''} onChange={e=>onChange?.(e.target.value||undefined)}>
 
-            {!!emptyLabel && <option value="">{emptyLabel}</option>}
+            <option value="">{emptyLabel}</option>
 
             {nodes.map(n=>(
                 <option key={n.id} value={n.id}>{n.name} ({n.id})</option>
