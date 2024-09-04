@@ -1,4 +1,4 @@
-import { createJsonRefReplacer, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, toCsvLines, uuid } from "@iyio/common";
+import { createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
@@ -400,6 +400,85 @@ export const defaultConvoVars={
         }
         return true;
     }),
+
+    isIn:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        const value=scope.paramValues[0];
+        const condValue=scope.paramValues[1];
+
+        if((typeof value === 'string') && (typeof condValue === 'string')){
+            return value.includes(condValue);
+        }else if(Array.isArray(value)){
+            return value.includes(condValue);
+        }else{
+            return false;
+        }
+    }),
+
+    contains:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        const value=scope.paramValues[0];
+        const condValue=scope.paramValues[1];
+
+        if((typeof value === 'string') && (typeof condValue === 'string')){
+            return condValue.includes(value);
+        }else if(Array.isArray(condValue)){
+            return condValue.includes(value);
+        }else{
+            return false;
+        }
+    }),
+
+    regexMatch:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        const value=scope.paramValues[0];
+        const condValue=scope.paramValues[1];
+
+        try{
+            if(typeof condValue === 'string'){
+                const reg=new RegExp(condValue);
+                return reg.test(value);
+            }else if (condValue instanceof RegExp){
+                return condValue.test(value);
+            }else{
+                return false;
+            }
+        }catch{
+            return false;
+        }
+    }),
+
+    starMatch:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        const value=scope.paramValues[0];
+        const condValue=scope.paramValues[1];
+
+        if((typeof value !== 'string') || (typeof condValue !== 'string')){
+            return false;
+        }else{
+            return starStringTest(condValue,value);
+        }
+    }),
+
+    deepCompare:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        const value=scope.paramValues[0];
+        const condValue=scope.paramValues[1];
+
+        return deepCompare(value,condValue,scope.paramValues[2]);
+    }),
+
+
 
     add:createConvoScopeFunction(scope=>{
         if(!scope.paramValues?.length){
