@@ -30,8 +30,30 @@ export function ConvoGraphCanvas({
     return (
         <div className={convoGraphCanvasStyle.root()}>
 
-            <svg className={convoGraphCanvasStyle.svg()} viewBox={`-${svgSpan} -${svgSpan} ${svgSpan*2} ${svgSpan*2}`} width={svgSpan*2} height={svgSpan*2}>
-                <rect className={convoGraphCanvasStyle.bg()} fill="transparent" x={-svgSpan} y={-svgSpan} width={svgSpan*2} height={svgSpan*2} />
+            <svg
+                className={convoGraphCanvasStyle.svg()}
+                viewBox={`-${svgSpan} -${svgSpan} ${svgSpan*2} ${svgSpan*2}`}
+                width={svgSpan*2}
+                height={svgSpan*2}
+                onDragOver={e=>{
+                    if(!ctrl.dragNodeFrom){
+                        e.preventDefault()
+                    }
+                }}
+                onDrop={e=>{
+                    if(!ctrl.dragNodeFrom){
+                        ctrl.triggerOnDrop(e);
+                    }
+                }}
+            >
+                <rect
+                    className={convoGraphCanvasStyle.bg()}
+                    fill="transparent"
+                    x={-svgSpan}
+                    y={-svgSpan}
+                    width={svgSpan*2}
+                    height={svgSpan*2}
+                />
                 <g ref={setLineGroup}/>
             </svg>
 

@@ -1,26 +1,31 @@
 import { ConvoGraphCtrl, ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { escapeHtml, wAryPush, wSetProp } from "@iyio/common";
+import { Point, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
-import { convoGraphEntityStyle } from "./ConvoGraphEntityView";
-import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
+import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";
 import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl";
-import { ConvoGraphReactCtx } from "./convo-graph-react-lib";
+import { ConvoGraphReactCtx, convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
 import { ConvoUiLine } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewProps
 {
     ctrl?:ConvoGraphCtrl;
+    createViewCtrl?:(options:ConvoGraphViewCtrlOptions)=>ConvoGraphViewCtrl
     setViewCtrl?:(ctrl:ConvoGraphViewCtrl)=>void;
     getNodeLink?:(node:ConvoNode)=>string|null|undefined;
+    hideOutput?:boolean;
+    onDrop?:(pt:Point)=>void;
 }
 
 export function ConvoGraphView({
     ctrl:ctrlProp,
     setViewCtrl,
     getNodeLink,
+    hideOutput,
+    createViewCtrl,
+    onDrop,
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -35,9 +40,11 @@ export function ConvoGraphView({
     const [rootElem,setRootElem]=useState<HTMLElement|null>(null);
 
     const [outputElem,setOutputElem]=useState<HTMLElement|null>(null);
-    const refs=useRef({outputElem,rootElem,lastRemoveTime:0});
+    const refs=useRef({outputElem,rootElem,lastRemoveTime:0,createViewCtrl,onDrop});
     refs.current.outputElem=outputElem;
     refs.current.rootElem=rootElem;
+    refs.current.createViewCtrl=createViewCtrl;
+    refs.current.onDrop=onDrop;
 
     const [outputSize,setOutputSize]=useState<'min'|'default'|'full'>('min');
 
@@ -45,9 +52,11 @@ export function ConvoGraphView({
 
         const c=ctrlProp??new ConvoGraphCtrl({});
 
-        const ctrl=new ConvoGraphViewCtrl({
+        const options:ConvoGraphViewCtrlOptions={
             ctrl:c
-        });
+        }
+
+        const ctrl=refs.current.createViewCtrl?.(options)??new ConvoGraphViewCtrl(options);
 
         const sub=ctrl.ctrl.onMonitorEvent.subscribe(e=>{
             if(!outputElem){
@@ -74,8 +83,8 @@ export function ConvoGraphView({
 
     const dragTargets=useMemo<DragTarget[]>(()=>[
         {
-            className:convoGraphEntityStyle.bar(),
-            targetParentClass:convoGraphEntityStyle.root(),
+            className:convoGraphEntityDragClass,
+            targetParentClass:convoGraphEntityClass,
             skipSetTransform:true,
             onMove:(pt,elem)=>{
                 const l=ctrl?.getLayoutForElem(elem);
@@ -195,10 +204,15 @@ export function ConvoGraphView({
         const sub=panZoom.state.subscribe(v=>{
             ctrl.scale=v.scale;
             ctrl.offset={x:v.x,y:v.y}
-        })
+        });
+
+        ctrl.panZoom=panZoom;
 
         return ()=>{
             sub.unsubscribe();
+            if(ctrl.panZoom===panZoom){
+                ctrl.panZoom=null;
+            }
         }
 
     },[ctrl,panZoom]);
@@ -208,6 +222,19 @@ export function ConvoGraphView({
             ctrl.rootElem=rootElem;
         }
     },[ctrl,rootElem]);
+
+    useEffect(()=>{
+        if(!ctrl){
+            return;
+        }
+        const sub=ctrl.onDrop.subscribe(pt=>{
+            refs.current.onDrop?.(pt);
+        })
+
+        return ()=>{
+            sub.unsubscribe();
+        }
+    },[ctrl]);
 
     return (
         <ConvoGraphReactCtx.Provider value={ctrl}>
@@ -224,7 +251,7 @@ export function ConvoGraphView({
                     {ctrl && <ConvoGraphCanvas ctrl={ctrl} getNodeLink={getNodeLink} />}
                 </PanZoomView>
 
-                <div className={style.outputContainer({
+                {!hideOutput && <div className={style.outputContainer({
                     full:outputSize==='full',
                     min:outputSize==='min',
                 })}>
@@ -238,7 +265,7 @@ export function ConvoGraphView({
                             resize
                         </SlimButton>
                     </View>
-                </div>
+                </div>}
 
             </div>
         </ConvoGraphReactCtx.Provider>

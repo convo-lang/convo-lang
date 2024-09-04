@@ -4,6 +4,45 @@ import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { ConvoMessage } from "./convo-types";
 
+export const allConvoGraphEntityTypeAry=['node','edge','input','source','traverser'] as const;
+export type ConvoGraphEntityType=typeof allConvoGraphEntityTypeAry[number];
+export const isConvoGraphEntityType=(value:any):value is ConvoGraphEntityType=>(allConvoGraphEntityTypeAry.includes(value));
+
+export interface ConvoGraphEntities
+{
+    node?:ConvoNode;
+    edge?:ConvoEdge;
+    input?:ConvoInputTemplate;
+    source?:ConvoSourceNode;
+    traverser?:ConvoTraverser;
+}
+
+export type ConvoGraphEntityRef=ConvoGraphEntities & {
+    id:string;
+} & ({
+    type:"node";
+    entity:ConvoNode;
+}|{
+    type:"edge";
+    entity:ConvoEdge;
+}|{
+    type:"input";
+    entity:ConvoInputTemplate;
+}|{
+    type:"source";
+    entity:ConvoSourceNode;
+}|{
+    type:"traverser";
+    entity:ConvoTraverser;
+})
+
+export type ConvoGraphSelection=ConvoGraphEntityRef & {
+    multi:ConvoGraphEntityRef[];
+}
+
+export type ConvoGraphEntityAny=ConvoNode|ConvoEdge|ConvoInputTemplate|ConvoSourceNode|ConvoTraverser;
+
+
 export interface ConvoGraph
 {
     id:string;
@@ -75,6 +114,11 @@ export interface ConvoNode
      * Compiled metadata based on the convo scripts of the node
      */
     metadata?:ConvoNodeMetadata;
+
+    /**
+     * User data that can be used for any purpose.
+     */
+    userData?:Record<string,any>;
 
     x?:number;
     y?:number;
@@ -234,6 +278,11 @@ export interface ConvoEdge
      * Extra points to be drawn between the edge and its to node.
      */
     toPoints?:Point[];
+
+    /**
+     * User data that can be used for any purpose.
+     */
+    userData?:Record<string,any>;
 }
 
 export interface ConvoEdgePattern
@@ -380,9 +429,9 @@ export interface ConvoTraverser
     userGroupId?:string;
 
     /**
-     * Metadata attached to the traverser.
+     * User data that can be used for any purpose.
      */
-    metadata?:Record<string,any>;
+    userData?:Record<string,any>;
 
     /**
      * If true the traverser should be saved after changes
@@ -587,6 +636,11 @@ export interface ConvoInputTemplate{
     x?:number;
     y?:number;
     to?:string;
+
+    /**
+     * User data that can be used for any purpose.
+     */
+    userData?:Record<string,any>;
 }
 
 export interface ConvoTraverserGroup
@@ -618,6 +672,11 @@ export interface ConvoSourceNode
 
     x?:number;
     y?:number;
+
+    /**
+     * User data that can be used for any purpose.
+     */
+    userData?:Record<string,any>;
 }
 
 export interface ConvoGraphParsingData
@@ -626,8 +685,8 @@ export interface ConvoGraphParsingData
     messages:ConvoMessage[];
 }
 
-export type ConvoGraphParsingResult=CodeParsingResult<ConvoGraphParsingData>
+export type ConvoGraphParsingResult=CodeParsingResult<ConvoGraphParsingData>;
 
 export const allConvoGraphMsgTypeAry=['node','step','edge','input','source','graph'] as const;
 export type ConvoGraphMsgType=typeof allConvoGraphMsgTypeAry[number];
-export const isConvoGraphMsgType=(value:any):value is ConvoGraphMsgType=>(allConvoGraphMsgTypeAry.includes(value))
+export const isConvoGraphMsgType=(value:any):value is ConvoGraphMsgType=>(allConvoGraphMsgTypeAry.includes(value));

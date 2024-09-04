@@ -1,4 +1,4 @@
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
+import { ConvoEdge, ConvoGraphEntityRef, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
 import { Point, Rect } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 
@@ -58,3 +58,23 @@ export interface ConvoInputSource
     value?:any;
     getValue?:(id:string)=>any|Promise<any>
 }
+
+export interface ConvoGraphEntityRenderResult
+{
+    view:any;
+
+    /**
+     * If null no drag bar will be rendered
+     */
+    bar?:any;
+
+    rootClassName?:string;
+
+    rootSelectedClassName?:string;
+}
+
+/**
+ * Renders an a view of a convo graph entity.
+ */
+export type ConvoGraphEntityRenderer=(entity:ConvoGraphEntityRef)=>ConvoGraphEntityRenderResult|null;
+

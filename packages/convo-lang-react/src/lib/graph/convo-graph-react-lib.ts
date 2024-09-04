@@ -20,4 +20,7 @@ export const useOptionalConvoGraphViewCtrl=():ConvoGraphViewCtrl|undefined=>{
 
 }
 
-export const nodeElemKey=Symbol('nodeElemKey')
+export const nodeElemKey=Symbol('nodeElemKey');
+
+export const convoGraphEntityDragClass='convo-entity-drag';
+export const convoGraphEntityClass='convo-entity';

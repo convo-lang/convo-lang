@@ -1,8 +1,10 @@
-import { ConvoGraphCtrl, ConvoGraphDb, hasConvoGraphDb } from "@convo-lang/convo-lang";
-import { Point, ReadonlySubject } from "@iyio/common";
-import { BehaviorSubject } from "rxjs";
+import { ConvoEdge, ConvoGraphCtrl, ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityAny, ConvoGraphEntityRef, ConvoGraphSelection, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser, compareConvoGraphSelections, createConvoGraphEntity, hasConvoGraphDb } from "@convo-lang/convo-lang";
+import { Point, ReadonlySubject, removeBehaviorSubjectAryValue, wAryPush } from "@iyio/common";
+import { PanZoomCtrl } from "@iyio/react-common";
+import { DragEvent } from "react";
+import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ConvoLineCtrl } from "./ConvoLineCtrl";
-import { ConvoEntityLayoutCtrl, ConvoInputSource } from "./convo-graph-react-type";
+import { ConvoEntityLayoutCtrl, ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer, ConvoInputSource } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewCtrlOptions
 {
@@ -20,6 +22,20 @@ export class ConvoGraphViewCtrl
     public readonly ctrl:ConvoGraphCtrl;
 
     public readonly lineCtrl:ConvoLineCtrl;
+
+    private readonly _selected:BehaviorSubject<ConvoGraphSelection|null>=new BehaviorSubject<ConvoGraphSelection|null>(null);
+    public get selectedSubject():ReadonlySubject<ConvoGraphSelection|null>{return this._selected}
+    public get selected(){return this._selected.value}
+
+    private readonly _entityRenderers:BehaviorSubject<ConvoGraphEntityRenderer[]>=new BehaviorSubject<ConvoGraphEntityRenderer[]>([]);
+    public get entityRenderersSubject():ReadonlySubject<ConvoGraphEntityRenderer[]>{return this._entityRenderers}
+    public get entityRenderers(){return this._entityRenderers.value}
+    public set entityRenderers(value:ConvoGraphEntityRenderer[]){
+        if(value==this._entityRenderers.value){
+            return;
+        }
+        this._entityRenderers.next(value);
+    }
 
     private readonly _scale:BehaviorSubject<number>=new BehaviorSubject<number>(1);
     public get scaleSubject():ReadonlySubject<number>{return this._scale}
@@ -60,6 +76,29 @@ export class ConvoGraphViewCtrl
         }
         this._rootElem.next(value);
     }
+    private readonly _panZoom:BehaviorSubject<PanZoomCtrl|null>=new BehaviorSubject<PanZoomCtrl|null>(null);
+    public get panZoomSubject():ReadonlySubject<PanZoomCtrl|null>{return this._panZoom}
+    public get panZoom(){return this._panZoom.value}
+    public set panZoom(value:PanZoomCtrl|null){
+        if(value==this._panZoom.value){
+            return;
+        }
+        this._panZoom.next(value);
+    }
+
+    private readonly _dragNodeFrom:BehaviorSubject<ConvoNode|null>=new BehaviorSubject<ConvoNode|null>(null);
+    public get dragNodeFromSubject():ReadonlySubject<ConvoNode|null>{return this._dragNodeFrom}
+    public get dragNodeFrom(){return this._dragNodeFrom.value}
+    public set dragNodeFrom(value:ConvoNode|null){
+        if(value==this._dragNodeFrom.value){
+            return;
+        }
+        this._dragNodeFrom.next(value);
+    }
+
+
+    private readonly _onDrop=new Subject<Point>();
+    public get onDrop():Observable<Point>{return this._onDrop}
 
     public constructor({
         ctrl
@@ -89,7 +128,7 @@ export class ConvoGraphViewCtrl
         this._isDisposed=true;
     }
 
-    public getLayoutForElem(elem:HTMLElement){
+    public getLayoutForElem(elem:HTMLElement):ConvoEntityLayoutCtrl|undefined{
         for(const e in this.entityCtrls){
             const l=this.entityCtrls[e];
             if(l?.elem===elem){
@@ -99,6 +138,135 @@ export class ConvoGraphViewCtrl
         return undefined;
     }
 
+    public getLayoutForEntity(entity:ConvoNode|ConvoEdge|ConvoTraverser|ConvoInputTemplate|ConvoSourceNode):ConvoEntityLayoutCtrl|undefined{
+        for(const e in this.entityCtrls){
+            const l=this.entityCtrls[e];
+            if(l?.entity===entity){
+                return l;
+            }
+        }
+        return undefined;
+    }
 
+    public addRenderer(renderer:ConvoGraphEntityRenderer){
+        this._entityRenderers.next([...this._entityRenderers.value,renderer]);
+    }
+
+    public removeRenderer(renderer:ConvoGraphEntityRenderer){
+        removeBehaviorSubjectAryValue(this._entityRenderers,renderer);
+    }
+
+    public renderEntity(entity:ConvoGraphEntityRef|null|undefined):ConvoGraphEntityRenderResult|null{
+        if(!entity){
+            return null;
+        }
+        for(const renderer of this._entityRenderers.value){
+            const result=renderer(entity);
+            if(result){
+                return result;
+            }
+        }
+        return null;
+    }
+
+    public select(entity:ConvoGraphEntities|ConvoGraphEntities[]):ConvoGraphSelection|null{
+        if(Array.isArray(entity)){
+            const first=entity[0];
+            if(!first){
+                return null;
+            }
+            const e=createConvoGraphEntity(first);
+            if(!e){
+                return null;
+            }
+            const selected:ConvoGraphSelection={
+                ...e,
+                multi:entity.map(e=>createConvoGraphEntity(e)).filter(e=>e) as ConvoGraphEntityRef[]
+            }
+            if(compareConvoGraphSelections(this.selected,selected)){
+                return this.selected;
+            }
+            this._selected.next(selected);
+            return selected;
+
+        }else{
+            const e=createConvoGraphEntity(entity);
+            if(!e){
+                return null;
+            }
+            const selected:ConvoGraphSelection={
+                ...e,
+                multi:[e]
+            }
+            if(compareConvoGraphSelections(this.selected,selected)){
+                return this.selected;
+            }
+            this._selected.next(selected);
+            return selected;
+        }
+    }
+
+    public isSelected(entity:ConvoGraphEntityAny|null|undefined):boolean{
+        const s=this.selected;
+        if(!s || !entity){
+            return false;
+        }
+        return s.id===entity.id || s.multi.some(e=>e.id===entity.id);
+    }
+
+    public triggerOnDrop(e:DragEvent){
+        if(!this.panZoom){
+            return;
+        }
+        const pt=this.panZoom.transformClientPointToPlane({x:e.clientX,y:e.clientY});
+        this._onDrop.next(pt);
+    }
+
+    protected beforeConnect(from:ConvoNode,to:ConvoNode,edge:ConvoEdge){
+        //do nothing
+    }
+    public connect(from:ConvoNode,to:ConvoNode){
+
+        const fl=this.getLayoutForEntity(from)?.getElementBounds({type:'shell'});
+        const tl=this.getLayoutForEntity(to)?.getElementBounds({type:'shell'});
+
+        if(!fl || !tl){
+            return undefined;
+        }
+
+        const edge:ConvoEdge={
+            id:this.ctrl.store.getNextEdgeId(),
+            from:from.id,
+            to:to.id,
+        }
+        let left:number;
+        let right:number;
+        if(fl.x<tl.x){
+            left=fl.x+fl.width;
+            right=tl.x;
+        }else{
+            left=tl.x+tl.width;
+            right=fl.x;
+        }
+
+        let top:number;
+        let bottom:number;
+        if(fl.y<tl.y){
+            top=fl.y;
+            bottom=tl.y;
+        }else{
+            top=tl.y;
+            bottom=fl.y;
+        }
+
+        edge.x=left+(right-left-200)/2;
+        edge.y=top+(bottom-top)/2;
+
+
+        this.beforeConnect(from,to,edge);
+        wAryPush(this.graph.edges,edge);
+        this.select({edge});
+        return edge;
+    }
 
 }

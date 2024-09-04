@@ -24,6 +24,7 @@ export * from './lib/convo-parser';
 export * from './lib/convo-template';
 export * from './lib/convo-template-types';
 export * from './lib/convo-types';
+export * from './lib/convo-value-conditions';
 export * from './lib/convo-zod';
 export * from './lib/convo.deps';
 

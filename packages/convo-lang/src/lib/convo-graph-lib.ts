@@ -1,6 +1,6 @@
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { ConvoGraphDb, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
+import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
 import { convoTags } from "./convo-lib";
 
 export const maxConvoGraphConcurrentStepExe=5;
@@ -166,4 +166,68 @@ const roundLayoutItems=(items:{x?:number,y?:number}[]|null|undefined)=>{
             i.y=Math.round(i.y);
         }
     }
+}
+
+export const createConvoGraphEntity=(entities:ConvoGraphEntities):ConvoGraphEntityRef|undefined=>{
+    if(entities.node){
+        return {
+            type:'node',
+            id:entities.node.id,
+            entity:entities.node,
+            ...entities
+        }
+    }else if(entities.edge){
+        return {
+            type:'edge',
+            id:entities.edge.id,
+            entity:entities.edge,
+            ...entities
+        }
+    }else if(entities.input){
+        return {
+            type:'input',
+            id:entities.input.id,
+            entity:entities.input,
+            ...entities
+        }
+    }else if(entities.source){
+        return {
+            type:'source',
+            id:entities.source.id,
+            entity:entities.source,
+            ...entities
+        }
+    }else if(entities.traverser){
+        return {
+            type:'traverser',
+            id:entities.traverser.id,
+            entity:entities.traverser,
+            ...entities
+        }
+    }else{
+        return undefined;
+    }
+}
+
+export const compareConvoGraphSelections=(a:ConvoGraphSelection|null|undefined,b:ConvoGraphSelection|null|undefined)=>{
+    if(a===b){
+        return true;
+    }
+    if(!a || !b){
+        return false;
+    }
+
+    if(a.id!==b.id || a.multi.length!==b.multi.length){
+        return false;
+    }
+
+    for(let i=0;i<a.multi.length;i++){
+        const sa=a.multi[i];
+        const sb=b.multi[i];
+        if(sa?.id!==sb?.id){
+            return false;
+        }
+    }
+
+    return true;
 }

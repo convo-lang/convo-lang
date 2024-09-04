@@ -1,15 +1,17 @@
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
+import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser, createConvoGraphEntity } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { stopWatchingObj, wSetProp, wSetPropOrDeleteFalsy, watchObj } from "@iyio/common";
-import { SlimButton, Text, View, useSubject, useWProp } from "@iyio/react-common";
-import { useEffect, useState } from "react";
+import { SlimButton, Text, View, useElementSize, useSubject, useWProp } from "@iyio/react-common";
+import { useEffect, useMemo, useState } from "react";
 import { BehaviorSubject } from "rxjs";
+import { convoLangReactIcons } from "../convo-lang-react-icons";
 import { ConvoEdgeView } from "./ConvoEdgeView";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
 import { ConvoInputView } from "./ConvoInputView";
 import { ConvoNodeView } from "./ConvoNodeView";
 import { ConvoSourceNodeView } from "./ConvoSourceNodeView";
 import { ConvoTraverserView } from "./ConvoTraverserView";
+import { convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
 import { ConvoEntityLayoutCtrl, ConvoUiTarget } from "./convo-graph-react-type";
 
 export interface ConvoGraphEntityViewProps
@@ -42,6 +44,17 @@ export function ConvoGraphEntityView({
     const allowDrag=useSubject(layoutCtrl?.allowDrag);
 
     const key=useWProp(node??input,'key');
+
+    const [isSelected,setIsSelected]=useState(false);
+
+    useEffect(()=>{
+        const sub=ctrl.selectedSubject.subscribe(()=>{
+            setIsSelected(ctrl.isSelected(pos));
+        })
+        return ()=>{
+            sub.unsubscribe();
+        }
+    },[ctrl,pos]);
 
     useEffect(()=>{
         if(!elem || !pos || (!input && !node && !edge && !traverser && !sourceNode)){
@@ -129,66 +142,138 @@ export function ConvoGraphEntityView({
 
     const link=node && getNodeLink?.(node);
     const idComp=(
-        !!pos?.id && <Text opacity025 xs text={`ID: ${pos.id}`} className={link?convoGraphEntityStyle.link():undefined}/>
+        !!pos?.id && <Text opacity025 xs text={`ID: ${pos.id}`} className={link?style.link():undefined}/>
     )
 
+    const renderers=useSubject(ctrl.entityRenderersSubject);
+    const rendered=useMemo(()=>{
+        return ctrl.renderEntity(createConvoGraphEntity({node,edge,input,traverser,source:sourceNode}));
+    },[ctrl,node,edge,input,sourceNode,traverser,renderers]);
+
+    const [size]=useElementSize(elem);
+
+    useEffect(()=>{
+        if(!pos){
+            return;
+        }
+        ctrl.lineCtrl.updateLines(pos.id);
+    },[size.width,size.height,ctrl,pos]);
+
+    const dragFrom=useSubject(ctrl.dragNodeFromSubject);
+
+
     return (
-        <div className={convoGraphEntityStyle.root({edge,smooth:allowDrag===false})} ref={setElem}>
+        <div
+            ref={setElem}
+            className={style.root(
+                {edge,smooth:allowDrag===false,default:!rendered?.rootClassName},
+                [convoGraphEntityClass,rendered?.rootClassName,isSelected?rendered?.rootSelectedClassName:null]
+            )}
+            onMouseDown={()=>{
+                if(!pos || pos.id!==ctrl.selected?.id){
+                    ctrl.select({node,edge,input,traverser,source:sourceNode});
+                }
+            }}
+        >
 
-            <div className={convoGraphEntityStyle.bar({disabled:allowDrag===false})}>{node?
-                'node'
-            :edge?
-                'edge'
-            :traverser?
-                'traverser'
-            :input?
-                'input'
-            :sourceNode?
-                'source'
+            {rendered?.bar===undefined?
+                <div className={style.bar({disabled:allowDrag===false},convoGraphEntityDragClass)}>{node?
+                    'node'
+                :edge?
+                    'edge'
+                :traverser?
+                    'traverser'
+                :input?
+                    'input'
+                :sourceNode?
+                    'source'
+                :
+                    null
+                } ({Math.round(pos?.x??0)},{Math.round(pos?.y??0)})</div>
             :
-                null
-            } ({Math.round(pos?.x??0)},{Math.round(pos?.y??0)})</div>
-
-            <View row alignCenter g050>
-
-                {(node || input || sourceNode) && <input
-                    className={convoGraphEntityStyle.nameInput()}
-                    type="text"
-                    value={pos?.name??''}
-                    onChange={e=>wSetProp(pos,'name',e.target.value)} placeholder="Name"
-                />}
-
-                {(node || input) &&  <input
-                    type="text"
-                    value={key??''}
-                    placeholder="key"
-                    onChange={e=>wSetPropOrDeleteFalsy(node??input,'key',e.target.value)}
-                />}
-
-            </View>
-            {link?
-                <SlimButton to={link} openLinkInNewWindow>{idComp}</SlimButton>
-            :
-                idComp
+                rendered.bar
             }
 
+            {rendered?
+                rendered.view
+            :
+                <div className={style.content()}>
+                    <View row alignCenter g050>
 
-            {node && <ConvoNodeView node={node}/>}
+                        {(node || input || sourceNode) && <input
+                            className={style.nameInput()}
+                            type="text"
+                            value={pos?.name??''}
+                            onChange={e=>wSetProp(pos,'name',e.target.value)} placeholder="Name"
+                        />}
 
-            {edge && <ConvoEdgeView edge={edge}/>}
+                        {(node || input) &&  <input
+                            type="text"
+                            value={key??''}
+                            placeholder="key"
+                            onChange={e=>wSetPropOrDeleteFalsy(node??input,'key',e.target.value)}
+                        />}
 
-            {input && <ConvoInputView input={input}/>}
+                    </View>
+                    {link?
+                        <SlimButton to={link} openLinkInNewWindow>{idComp}</SlimButton>
+                    :
+                        idComp
+                    }
 
-            {sourceNode && <ConvoSourceNodeView src={sourceNode}/>}
 
-            {traverser && <ConvoTraverserView traverser={traverser}/>}
+                    {node && <ConvoNodeView node={node}/>}
+
+                    {edge && <ConvoEdgeView edge={edge}/>}
+
+                    {input && <ConvoInputView input={input}/>}
+
+                    {sourceNode && <ConvoSourceNodeView src={sourceNode}/>}
+
+                    {traverser && <ConvoTraverserView traverser={traverser}/>}
+                </div>
+            }
+
+            {node && <>
+                <div className={style.handelRightContainer()}>
+                    <button
+                        className={style.handelRight()}
+                        draggable
+                        onDragStart={()=>ctrl.dragNodeFrom=node}
+                        onDragEnd={()=>ctrl.dragNodeFrom=null}
+                    >
+                        {convoLangReactIcons["chevron-right"]({size:16,color:'#fff'})}
+                    </button>
+                </div>
+
+                <div className={style.handelLeftContainer()}>
+                    <button
+                        className={style.handelLeft()}
+                        draggable
+                        onDragStart={()=>ctrl.dragNodeFrom=node}
+                        onDragEnd={()=>ctrl.dragNodeFrom=null}
+                    >
+                        {convoLangReactIcons["chevron-left"]({size:16,color:'#fff'})}
+                    </button>
+                </div>
+                {dragFrom && dragFrom!==node && <div
+                    className={style.dropTarget()}
+                    onDragOver={e=>{
+                        e.preventDefault();
+                    }}
+                    onDrop={e=>{
+                        e.preventDefault();
+                        ctrl.connect(dragFrom,node);
+                    }}
+                />}
+            </>}
 
         </div>
     )
 
 }
 
-export const convoGraphEntityStyle=atDotCss({name:'ConvoGraphEntityView',css:`
+const style=atDotCss({name:'ConvoGraphEntityView',css:`
     @.root{
         display:flex;
         flex-direction:column;
@@ -196,10 +281,10 @@ export const convoGraphEntityStyle=atDotCss({name:'ConvoGraphEntityView',css:`
         min-width:400px;
         max-width:600px;
         min-height:80px;
+    }
+    @.root.default{
         background:#2C2C2C;
         border-radius:4px;
-        padding:0.5rem;
-        gap:0.5rem;
         box-shadow:0 0 8px #000000;
     }
     @.root.edge{
@@ -213,7 +298,6 @@ export const convoGraphEntityStyle=atDotCss({name:'ConvoGraphEntityView',css:`
         background:#ffffff22;
         border-top-right-radius:4px;
         border-top-left-radius:4px;
-        margin:-0.5rem -0.5rem 0 -0.5rem;
         cursor:move;
         font-size:0.6rem;
         color:#ffffff44;
@@ -232,10 +316,77 @@ export const convoGraphEntityStyle=atDotCss({name:'ConvoGraphEntityView',css:`
         border-radius:4px;
         padding:0.5rem;
     }
+    @.content{
+        display:flex;
+        flex-direction:column;
+        padding:0.5rem;
+    }
     @.nameInput{
         flex:1;
     }
     @.link{
         text-decoration:underline;
+    }
+    @.handelRightContainer{
+        position:absolute;
+        right:-1rem;
+        width:1.5rem;
+        top:0;
+        bottom:0;
+        background:transparent;
+
+    }
+    @.handelLeft, @.handelRight{
+        position:absolute;
+        width:25px;
+        height:25px;
+        border-radius:50%;
+        border:solid 2px #637477;
+        pointer-events:none;
+        opacity:0;
+        background:#2C2C2C;
+        box-shadow:0 0 8px #000000;
+        transition:opacity 0.2s ease-in-out;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    @.handelRight{
+        right:0;
+        top:50%;
+        transform:translate(0.4rem,-50%);
+    }
+    @.handelRightContainer:hover @.handelRight{
+        opacity:1;
+        pointer-events:initial;
+    }
+
+    @.handelLeftContainer{
+        position:absolute;
+        left:-1rem;
+        width:1.5rem;
+        top:0;
+        bottom:0;
+        background:transparent;
+
+    }
+    @.handelLeft{
+        left:0;
+        top:50%;
+        transform:translate(-0.4rem,-50%);
+    }
+    @.handelLeftContainer:hover @.handelLeft{
+        opacity:1;
+        pointer-events:initial;
+    }
+    @.dropTarget{
+        position:absolute;
+        left:0;
+        right:0;
+        top:0;
+        bottom:0;
+        border-radius:4px;
+        border:2px solid #457BEF99;
+        background-color:#457BEF44;
     }
 `});
