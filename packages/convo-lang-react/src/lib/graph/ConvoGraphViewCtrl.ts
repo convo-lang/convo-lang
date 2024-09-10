@@ -1,5 +1,5 @@
 import { ConvoEdge, ConvoGraphCtrl, ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityAny, ConvoGraphEntityRef, ConvoGraphSelection, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser, compareConvoGraphSelections, createConvoGraphEntity, hasConvoGraphDb } from "@convo-lang/convo-lang";
-import { Point, ReadonlySubject, removeBehaviorSubjectAryValue, wAryPush } from "@iyio/common";
+import { DisposeContainer, Point, ReadonlySubject, removeBehaviorSubjectAryValue, wAryPush } from "@iyio/common";
 import { PanZoomCtrl } from "@iyio/react-common";
 import { DragEvent } from "react";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -118,6 +118,7 @@ export class ConvoGraphViewCtrl
         }
     }
 
+    protected readonly disposeContainer=new DisposeContainer();
     private _isDisposed=false;
     public get isDisposed(){return this._isDisposed}
     public dispose()
@@ -126,6 +127,7 @@ export class ConvoGraphViewCtrl
             return;
         }
         this._isDisposed=true;
+        this.disposeContainer.dispose();
     }
 
     public getLayoutForElem(elem:HTMLElement):ConvoEntityLayoutCtrl|undefined{
