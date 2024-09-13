@@ -1,7 +1,8 @@
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
-import { convoTags } from "./convo-lib";
+import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
+import { convoTags, convoUsageTokensToString } from "./convo-lib";
+import { ConvoTokenUsage } from "./convo-types";
 
 export const maxConvoGraphConcurrentStepExe=5;
 
@@ -230,4 +231,14 @@ export const compareConvoGraphSelections=(a:ConvoGraphSelection|null|undefined,b
     }
 
     return true;
+}
+
+export const getConvoGraphEventString=(e:ConvoGraphMonitorEvent,usage?:ConvoTokenUsage):string=>{
+    return (
+        `${e.type} / ${e.traverser?.exeState} - ${e.text} - \npayload:${
+            JSON.stringify(e.traverser?.payload??null)
+        }${
+            usage?`\nusage: ${convoUsageTokensToString(usage)}`:''
+        }`
+    )
 }

@@ -817,6 +817,14 @@ export const convoUsageTokensToString=(usage:Partial<ConvoTokenUsage>):string=>{
     return `${usage.inputTokens??0} / ${usage.outputTokens??0}${usage.tokenPrice?' / $'+usage.tokenPrice:''}`;
 }
 
+export const convoPartialUsageTokensToUsage=(usage:Partial<ConvoTokenUsage>):ConvoTokenUsage=>{
+    return {
+        inputTokens:usage.inputTokens??0,
+        outputTokens:usage.outputTokens??0,
+        tokenPrice:usage.tokenPrice??0
+    }
+}
+
 export const parseConvoUsageTokens=(str:string):ConvoTokenUsage=>{
     const parts=str.split('/');
     return {
@@ -846,6 +854,13 @@ export const resetConvoUsageTokens=(usage:ConvoTokenUsage)=>{
     usage.inputTokens=0;
     usage.outputTokens=0;
     usage.tokenPrice=0;
+}
+export const isConvoTokenUsageEmpty=(usage:ConvoTokenUsage):boolean=>{
+    return (
+        usage.inputTokens===0 &&
+        usage.outputTokens===0 &&
+        usage.tokenPrice===0
+    );
 }
 
 const jsonContentReg=/^\s*```\s*json.*?\n(.*)```\s*$/s;

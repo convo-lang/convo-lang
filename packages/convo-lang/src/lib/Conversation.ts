@@ -4,7 +4,7 @@ import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
-import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, containsConvoTag, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getLastCompletionMessage, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
@@ -30,6 +30,11 @@ export interface ConversationOptions
      * If true tokenUsage tags will be added to completed messages
      */
     trackTokens?:boolean;
+
+    /**
+     * Called whenever tokens usage occurs
+     */
+    onTokenUsage?:(usage:ConvoTokenUsage)=>void;
 
 
     /**
@@ -150,6 +155,8 @@ export class Conversation
         this._trackTokens.next(value);
     }
 
+    private readonly _onTokenUsage?:(usage:ConvoTokenUsage)=>void;
+
     private readonly _trackModel:BehaviorSubject<boolean>;
     public get trackModelSubject():ReadonlySubject<boolean>{return this._trackModel}
     public get trackModel(){return this._trackModel.value}
@@ -258,6 +265,7 @@ export class Conversation
             trackTime=false,
             trackTokens=false,
             trackModel=false,
+            onTokenUsage,
             disableAutoFlatten=false,
             autoFlattenDelayMs=30,
             ragCallback,
@@ -283,6 +291,7 @@ export class Conversation
         this._trackTime=new BehaviorSubject<boolean>(trackTime);
         this._trackTokens=new BehaviorSubject<boolean>(trackTokens);
         this._trackModel=new BehaviorSubject<boolean>(trackModel);
+        this._onTokenUsage=onTokenUsage;
         this.disableAutoFlatten=disableAutoFlatten;
         this.autoFlattenDelayMs=autoFlattenDelayMs;
         this.componentCompletionCallback=componentCompletionCallback;
@@ -1032,6 +1041,10 @@ export class Conversation
             for(const msg of completion){
 
                 let includeTokenUsage=(msg.inputTokens || msg.outputTokens)?true:false;
+
+                if(includeTokenUsage && this._onTokenUsage){
+                    this._onTokenUsage(convoPartialUsageTokensToUsage(msg));
+                }
 
                 const tagsCode=msg.tags?convoTagMapToCode(msg.tags,'\n'):'';
 

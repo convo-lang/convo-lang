@@ -1,12 +1,12 @@
-import { CancelToken, DisposeContainer, Lock, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
+import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { createConvoNodeExecCtxAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
-import { convoTags, getConvoFnByTag } from "./convo-lib";
+import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
-import { ConvoFnCallInfo } from "./convo-types";
+import { ConvoFnCallInfo, ConvoTokenUsage } from "./convo-types";
 import { convoGraphStore } from "./convo.deps";
 
 export interface ConvoGraphCtrlOptions
@@ -14,20 +14,29 @@ export interface ConvoGraphCtrlOptions
     store?:ConvoGraphStore;
     convoOptions?:ConversationOptions;
     maxConcurrentStepExe?:number;
+    logEventsToConsole?:boolean;
 }
 
 export class ConvoGraphCtrl
 {
     public readonly store:ConvoGraphStore;
 
+    private readonly _tokenUsage:BehaviorSubject<ConvoTokenUsage>=new BehaviorSubject<ConvoTokenUsage>(createEmptyConvoTokenUsage());
+    public get tokenUsageSubject():ReadonlySubject<ConvoTokenUsage>{return this._tokenUsage}
+    public get tokenUsage(){return this._tokenUsage.value}
+
     private readonly _onMonitorEvent=new Subject<ConvoGraphMonitorEvent>();
     public get onMonitorEvent():Observable<ConvoGraphMonitorEvent>{return this._onMonitorEvent}
-    private get hasListeners(){return this._onMonitorEvent.observed}
+    private get hasListeners(){return this._onMonitorEvent.observed || this.logEventsToConsole}
     private triggerEvent(evt:Omit<ConvoGraphMonitorEvent,'time'>)
     {
         (evt as ConvoGraphMonitorEvent).time=Date.now();
         this._onMonitorEvent.next((evt as ConvoGraphMonitorEvent));
+        if(this.logEventsToConsole){
+            console.info(getConvoGraphEventString(evt as ConvoGraphMonitorEvent,this._tokenUsage.value));
+        }
     }
+    private readonly logEventsToConsole:boolean;
 
     private readonly defaultConvoOptions:ConversationOptions;
     private async getConvoOptionsAsync(tv:ConvoTraverser|undefined,initConvo?:string,defaultVarsOverride?:Record<string,any>):Promise<ConversationOptions>{
@@ -35,6 +44,7 @@ export class ConvoGraphCtrl
         return {
             ...this.defaultConvoOptions,
             disableAutoFlatten:true,
+            onTokenUsage:usage=>this.addTokenUsage(usage),
             initConvo:((await this.getSharedSourceAsync())+(
                 (
                     initConvo?
@@ -58,6 +68,15 @@ export class ConvoGraphCtrl
         }
     }
 
+    public addTokenUsage(usage:ConvoTokenUsage){
+        if(isConvoTokenUsageEmpty(usage)){
+            return;
+        }
+        const u={...this._tokenUsage.value};
+        addConvoUsageTokens(u,usage);
+        this._tokenUsage.next(u);
+    }
+
     public readonly maxConcurrentStepExe:number;
 
     private readonly stepLock:Lock;
@@ -66,11 +85,13 @@ export class ConvoGraphCtrl
         store=convoGraphStore(),
         convoOptions={},
         maxConcurrentStepExe=maxConvoGraphConcurrentStepExe,
+        logEventsToConsole=false,
     }:ConvoGraphCtrlOptions){
         this.store=store;
         this.defaultConvoOptions=convoOptions;
         this.maxConcurrentStepExe=Math.max(1,maxConcurrentStepExe);
-        this.stepLock=new Lock(this.maxConcurrentStepExe)
+        this.stepLock=new Lock(this.maxConcurrentStepExe);
+        this.logEventsToConsole=logEventsToConsole;
     }
 
     private readonly disposables=new DisposeContainer();

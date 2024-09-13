@@ -1,4 +1,4 @@
-import { ConvoGraphCtrl, ConvoNode } from "@convo-lang/convo-lang";
+import { ConvoGraphCtrl, ConvoNode, getConvoGraphEventString } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Point, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
@@ -50,7 +50,7 @@ export function ConvoGraphView({
 
     useEffect(()=>{
 
-        const c=ctrlProp??new ConvoGraphCtrl({});
+        const c=ctrlProp??new ConvoGraphCtrl({logEventsToConsole:true});
 
         const options:ConvoGraphViewCtrlOptions={
             ctrl:c
@@ -62,7 +62,7 @@ export function ConvoGraphView({
             if(!outputElem){
                 return;
             }
-            const line=`${e.type} / ${e.traverser?.exeState} - ${e.text} - \npayload:`+JSON.stringify(e.traverser?.payload??null)+'\n';
+            const line=getConvoGraphEventString(e,c.tokenUsage);
             outputElem.innerHTML+=escapeHtml(line);
             outputElem.scrollTo({
                 top:outputElem.scrollHeight,
