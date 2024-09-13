@@ -1,4 +1,4 @@
-import { createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
+import { aryRandomize, createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
@@ -476,6 +476,14 @@ export const defaultConvoVars={
         const condValue=scope.paramValues[1];
 
         return deepCompare(value,condValue,scope.paramValues[2]);
+    }),
+
+    aryRandomize:createConvoScopeFunction(scope=>{
+        const ary=scope.paramValues?.[0];
+        if(Array.isArray(ary)){
+            return aryRandomize(ary);
+        }
+        return ary;
     }),
 
 
