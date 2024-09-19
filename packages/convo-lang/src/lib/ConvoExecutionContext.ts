@@ -724,7 +724,11 @@ export class ConvoExecutionContext
             return value;
         }
 
-        const vars=(shared || !scope)?this.sharedVars:scope.vars;
+        const vars=(
+            shared ||
+            !scope ||
+            (scope && scope.vars[name]===undefined && this.sharedVars[name]!==undefined)
+        )?this.sharedVars:scope.vars;
 
         if(shared!==false && vars===this.sharedVars && (typeof value !== 'function') && !this.sharedSetters.includes(name)){
             this.sharedSetters.push(name);

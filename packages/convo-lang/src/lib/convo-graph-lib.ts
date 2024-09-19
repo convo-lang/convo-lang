@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@iyio/common";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
@@ -234,11 +235,23 @@ export const compareConvoGraphSelections=(a:ConvoGraphSelection|null|undefined,b
 }
 
 export const getConvoGraphEventString=(e:ConvoGraphMonitorEvent,usage?:ConvoTokenUsage):string=>{
-    return (
-        `${e.type} / ${e.traverser?.exeState} - ${e.text} - \npayload:${
-            JSON.stringify(e.traverser?.payload??null)
-        }${
-            usage?`\nusage: ${convoUsageTokensToString(usage)}`:''
-        }`
-    )
+    try{
+        return (
+            `${e.type} / ${e.traverser?.exeState} - ${e.text} - \npayload:${
+                JSON.stringify(e.traverser?.payload??null,null,4)
+            }\nstate:${
+                JSON.stringify(e.traverser?.state??null,null,4)
+            }${
+                usage?`\nusage: ${convoUsageTokensToString(usage)}`:''
+            }`
+        )
+    }catch(ex){
+        return (
+            `${e.type} / ${e.traverser?.exeState} - ${e.text} - \njsonStringifyError:${
+                getErrorMessage(ex)
+            }${
+                usage?`\nusage: ${convoUsageTokensToString(usage)}`:''
+            }`
+        )
+    }
 }

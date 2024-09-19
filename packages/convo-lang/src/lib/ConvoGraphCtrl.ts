@@ -58,12 +58,13 @@ export class ConvoGraphCtrl
                         this.defaultConvoOptions.initConvo
                 )||''
             ))||undefined,
-            defaultVars:defaultVarsOverride??{
+            defaultVars:{
                 ...this.defaultConvoOptions.defaultVars,
                 input:tv?.payload,
                 sourceInput:tv?.payload,
-                tState:tv?.state,
+                workflow:tv?.state,
                 graphCtrl:this,
+                ...defaultVarsOverride
             }
         }
     }
