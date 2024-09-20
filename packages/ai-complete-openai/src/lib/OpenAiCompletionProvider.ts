@@ -139,8 +139,7 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
     }
 
     private getChatParams(lastMessage:AiCompletionMessage,request:AiCompletionRequest){
-        const visionCapable=request.capabilities?.includes('vision') || lastMessage.model?.includes('vision');
-
+        const visionCapable=request.capabilities?.includes('vision');
         const lastContentMessage=getLastNonCallAiCompleteMessage(request.messages);
 
         const model=lastContentMessage?.model??(visionCapable?this._visionModel:this._chatModel);
@@ -148,28 +147,23 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
             throw new Error('Chat AI model not defined');
         }
 
-        const useVision=visionCapable || visionModels.some(v=>model.startsWith(v));
-
         const oMsgs:ChatCompletionMessageParam[]=[];
         for(const m of request.messages){
             if(m.type==='text'){
                 let content:string|Array<ChatCompletionContentPart>;
-                if(useVision){
+                const vc=(visionCapable || m.vision) && m.vision!==false;
+                if(vc){
                     const items=parseMarkdownImages(m.content??'');
-                    if(visionCapable || items.length==1){
-                        if(items.length===1 && (typeof items[0]?.text === 'string')){
-                            content=items[0]?.text??'';
-                        }else{
-                            content=items.map<ChatCompletionContentPart>(i=>i.image?{
-                                type:'image_url',
-                                image_url:{url:i.image.url}
-                            }:{
-                                type:'text',
-                                text:i.text??''
-                            })
-                        }
+                    if(items.length===1 && (typeof items[0]?.text === 'string')){
+                        content=items[0]?.text??'';
                     }else{
-                        content=m.content??'';
+                        content=items.map<ChatCompletionContentPart>(i=>i.image?{
+                            type:'image_url',
+                            image_url:{url:i.image.url}
+                        }:{
+                            type:'text',
+                            text:i.text??''
+                        })
                     }
                 }else{
                     content=m.content??'';
@@ -525,4 +519,11 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
         return message.length/defaultTokenCharLength;
     }
 
+}
+
+const isVisionModel=(model:string|null|undefined)=>{
+    if(!model){
+        return false;
+    }
+    return visionModels.some(v=>model.startsWith(v)) || model?.includes('vision');
 }

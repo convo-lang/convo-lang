@@ -1,4 +1,4 @@
-import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation } from '@convo-lang/convo-lang';
+import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, convoTags } from '@convo-lang/convo-lang';
 import { ProviderTypeDef, Scope, TypeDef, UnauthorizedError, aryUnique, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { AiCompletionProviders, aiCompletionMaxAudioLengthParam, aiCompletionMaxImageLengthParam, aiCompletionMaxTextLengthParam } from "./_type.ai-complete";
@@ -363,6 +363,7 @@ export class AiCompletionService implements ConvoCompletionService
                     responseAssignTo:msg.responseAssignTo,
                     model:msg.responseModel,
                     endpoint:msg.responseEndpoint,
+                    vision:msg.tags?.[convoTags.vision]==='false'?false:(msg.tags && (convoTags.vision in msg.tags))?true:undefined,
                 });
             }
         }

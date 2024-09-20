@@ -238,8 +238,21 @@ export const convoTags={
 
     /**
      * Shorthand for `@capability vision`
+     * Enables vision for all messages in a conversation
      */
     enableVision:'enableVision',
+
+    /**
+     * Shorthand for `@capability visionFunction`
+     * The visionFunction capability adds vision support by passing vision messages to a vision model
+     * and exposing vision capabilities as a function.
+     */
+    enabledVisionFunction:'enabledVisionFunction',
+
+    /**
+     * Enables vision for the message the tag is applied to
+     */
+    vision:'vision',
 
     /**
      * Sets the task a message is part of. By default messages are part of the "default" task

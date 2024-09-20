@@ -411,6 +411,16 @@ export class Conversation
                         }
                         capList.push('vision');
                     }
+                    break;
+
+                case convoTags.enabledVisionFunction:
+                    if(!capList?.includes('visionFunction')){
+                        if(!capList){
+                            capList=[]
+                        }
+                        capList.push('visionFunction');
+                    }
+                    break;
 
             }
         }
@@ -458,11 +468,16 @@ export class Conversation
         }
         this.enabledCapabilities.push(cap);
         switch(cap){
-            case 'vision':
+            case 'visionFunction':
                 this.define({
                     hidden:true,
                     fn:createConvoVisionFunction()
                 },true)
+                break;
+            case 'vision':
+                if(!this.serviceCapabilities.includes("vision")){
+                    this.serviceCapabilities.push('vision');
+                }
                 break;
         }
     }
@@ -1641,12 +1656,13 @@ export class Conversation
 
         this.applyRagMode(messages,ragMode);
 
-        let capabilities=[...this.serviceCapabilities,...this.getMessageListCapabilities(messages)];
+        const msgCaps=this.getMessageListCapabilities(messages);
+        let capabilities=[...this.serviceCapabilities,...msgCaps];
         if(!isDefaultTask){
-            capabilities=capabilities.filter(c=>c!=='vision');
+            capabilities=capabilities.filter(c=>c!=='visionFunction');
         }
 
-        if(capabilities.includes('vision') && isDefaultTask){
+        if(capabilities.includes('visionFunction') && isDefaultTask){
             const systemMessage=messages.find(m=>m.role==='system');
             const content=exe.getVar(convoVars.__visionServiceSystemMessage,null,defaultConvoVisionSystemMessage);
             if(systemMessage){

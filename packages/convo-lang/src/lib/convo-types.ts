@@ -63,7 +63,7 @@ export interface ConvoErrorReferences
     baseType?:ConvoBaseType;
 }
 
-export const allConvoCapabilityAry=['vision'] as const;
+export const allConvoCapabilityAry=['vision','visionFunction'] as const;
 export type ConvoCapability=typeof allConvoCapabilityAry[number];
 export const isConvoCapability=(value:any):value is ConvoCapability=>allConvoCapabilityAry.includes(value);
 
