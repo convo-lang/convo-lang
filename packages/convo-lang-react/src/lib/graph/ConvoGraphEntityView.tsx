@@ -25,6 +25,9 @@ export interface ConvoGraphEntityViewProps
     getNodeLink?:(node:ConvoNode)=>string|null|undefined;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoGraphEntityView({
     node,
     edge,

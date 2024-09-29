@@ -15,6 +15,9 @@ export interface ConvoNodeSelectorProps
     emptyLabel?:string;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoNodeSelector({
     value,
     onChange,

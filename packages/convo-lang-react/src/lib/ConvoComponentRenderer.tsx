@@ -11,6 +11,9 @@ export interface ConvoComponentRendererProps
     renderTextMessages?:boolean;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoComponentRenderer({
     state,
     renderComponent,
@@ -53,7 +56,7 @@ export function ConvoComponentRenderer({
 
             {comps?.map((comp,i)=>renderComponent?.(comp,{
                 next,
-                comp,
+                compNode:comp,
                 ...state,
                 ...state?.flat.vars,
                 ...comp.atts

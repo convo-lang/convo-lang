@@ -10,6 +10,9 @@ export interface ConvoTraverserViewProps
     traverser:ConvoTraverser
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoTraverserView({
     traverser
 }:ConvoTraverserViewProps){

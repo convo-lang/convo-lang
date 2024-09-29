@@ -15,6 +15,9 @@ export interface MessagesSourceViewProps
 
 }
 
+/**
+ * @acIgnore
+ */
 export function MessagesSourceView({
     ctrl:_ctrl,
     mode='code'

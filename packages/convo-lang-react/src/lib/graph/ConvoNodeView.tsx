@@ -11,6 +11,9 @@ export interface ConvoNodeViewProps
     node:ConvoNode;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoNodeView({
     node
 }:ConvoNodeViewProps){

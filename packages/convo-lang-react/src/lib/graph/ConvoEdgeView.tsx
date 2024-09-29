@@ -12,6 +12,9 @@ export interface ConvoEdgeViewProps
     edge:ConvoEdge;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoEdgeView({
     edge
 }:ConvoEdgeViewProps){

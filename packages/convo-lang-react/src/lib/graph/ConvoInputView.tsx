@@ -13,6 +13,9 @@ export interface ConvoInputViewProps
     input:ConvoInputTemplate;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoInputView({
     input
 }:ConvoInputViewProps){

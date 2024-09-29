@@ -12,6 +12,9 @@ export interface ConvoGraphCanvasProps
     getNodeLink?:(node:ConvoNode)=>string|null|undefined;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoGraphCanvas({
     ctrl,
     getNodeLink,

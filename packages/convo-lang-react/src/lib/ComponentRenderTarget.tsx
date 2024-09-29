@@ -10,6 +10,9 @@ export interface ComponentRenderTargetProps
     maxRenderCount?:number;
 }
 
+/**
+ * @acIgnore
+ */
 export function ComponentRenderTarget({
     renderTarget,
     ctrl,

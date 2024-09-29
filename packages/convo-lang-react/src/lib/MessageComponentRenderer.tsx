@@ -11,6 +11,9 @@ export interface MessageComponentRendererProps
     doNotRenderInRow?:boolean;
 }
 
+/**
+ * @acIgnore
+ */
 export function MessageComponentRenderer({
     message,
     ctrl,

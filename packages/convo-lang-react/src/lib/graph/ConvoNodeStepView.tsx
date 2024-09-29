@@ -12,6 +12,9 @@ export interface ConvoNodeStepViewProps
     index:number;
 }
 
+/**
+ * @acIgnore
+ */
 export function ConvoNodeStepView({
     node,
     step,
