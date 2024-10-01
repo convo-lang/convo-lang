@@ -13,6 +13,7 @@ export interface ConversationInputProps
     inputClassName?:string;
     placeholder?:string;
     submitTrigger?:any;
+    min?:boolean;
 }
 
 export function ConversationInput({
@@ -23,6 +24,7 @@ export function ConversationInput({
     inputClassName,
     placeholder='Enter message',
     submitTrigger,
+    min,
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -54,7 +56,7 @@ export function ConversationInput({
         >
 
             <input
-                className={style.input(null,inputClassName)}
+                className={style.input({min},inputClassName)}
                 placeholder={placeholder}
                 name={inputName}
                 type={inputType}
@@ -83,5 +85,8 @@ const style=atDotCss({name:'ConversationInput',order:'framework',namespace:'iyio
         box-shadow:@@inputShadow;
         border:@@inputBorder;
         background-clip:padding-box;
+    }
+    @.input.min{
+        margin:0;
     }
 `});

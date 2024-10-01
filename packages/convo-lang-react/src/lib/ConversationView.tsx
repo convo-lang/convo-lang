@@ -24,6 +24,8 @@ export interface ConversationViewProps
     sourceMode?:ConvoEditorMode;
     showInputWithSource?:boolean;
     renderTarget?:string;
+    redirectMessagesView?:(view:any)=>void;
+    min?:boolean;
 }
 
 export function ConversationView({
@@ -41,6 +43,8 @@ export function ConversationView({
     showInputWithSource,
     ragRenderer,
     renderTarget=defaultConvoRenderTarget,
+    redirectMessagesView,
+    min,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -81,22 +85,28 @@ export function ConversationView({
     const sourceModeCtrl=useSubject(ctrl.editorModeSubject);
     const sourceMode=_sourceMode??sourceModeCtrl;
 
+    const messagesView=(showSource?
+        <MessagesSourceView mode={sourceMode} ctrl={ctrl} />
+    :
+        <MessagesView renderTarget={renderTarget} ctrl={ctrl} ragRenderer={ragRenderer} />
+    )
+
+    useEffect(()=>{
+        redirectMessagesView?.(messagesView);
+    },[redirectMessagesView,messagesView]);
+
     return (
 
         <ConversationUiContext.Provider value={ctrl}>
 
             <div className={style.root(null,className)} style={style.vars(theme)}>
 
-                {showSource?
-                    <MessagesSourceView mode={sourceMode} ctrl={ctrl} />
-                :
-                    <MessagesView renderTarget={renderTarget} ctrl={ctrl} ragRenderer={ragRenderer} />
-                }
+                {redirectMessagesView?null:messagesView}
 
                 {
                     (!showSource || showInputWithSource) &&
                     !noInput &&
-                    (renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} {...inputProps} />)
+                    (renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} {...inputProps} />)
                 }
 
             </div>
