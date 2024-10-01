@@ -955,6 +955,36 @@ export const defaultConvoVars={
         return value;
     }),
 
+    setObjDefaults:createConvoScopeFunction((scope,ctx)=>{
+        let target=scope.paramValues?.[0];
+        const source=scope.paramValues?.[1];
+
+        if(typeof target === 'string'){
+            let t=ctx.getVar(target,scope);
+            if(t===undefined){
+                const parts=target.split('.')
+                target=parts.pop()??'_';
+                t={}
+                ctx.setVar(true,t,target,parts.length?parts:undefined);
+            }
+            target=t;
+        }
+
+        if(!target || !source || (typeof target !== 'object') || (typeof source !=='object')){
+            return target;
+        }
+
+        for(const e in source){
+            const v=source[e];
+            if(v===undefined || target[e]!==undefined){
+                continue;
+            }
+            target[e]=v;
+        }
+
+        return target;
+    }),
+
     ['new']:createConvoScopeFunction(scope=>{
         const type=convoValueToZodType(scope.paramValues?.[0]);
         if(!(type instanceof ZodObject)){
@@ -1067,6 +1097,15 @@ export const defaultConvoVars={
 
     [convoFunctions.uuid]:createConvoScopeFunction(()=>{
         return uuid();
+    }),
+
+    [convoFunctions.getVar]:createConvoScopeFunction((scope,ctx)=>{
+        const name=scope.paramValues?.[0];
+        if(typeof name !=='string'){
+            return undefined
+        }
+        const v=ctx.getVar(name,scope);
+        return v===undefined?scope.paramValues?.[1]:v;
     }),
 
 } as const;

@@ -1,11 +1,32 @@
-import { getErrorMessage } from "@iyio/common";
+import { getErrorMessage, joinPaths } from "@iyio/common";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, IHasConvoGraphDb } from "./convo-graph-types";
+import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
 import { convoTags, convoUsageTokensToString } from "./convo-lib";
 import { ConvoTokenUsage } from "./convo-types";
 
 export const maxConvoGraphConcurrentStepExe=5;
+
+export const convoTraverserStateStoreSuffix='_suffix';
+
+export const applyConvoTraverserControlPath=(tv:ConvoTraverser)=>{
+    if(tv.controlPath){
+        const suffix=tv.state[convoTraverserStateStoreSuffix];
+        globalThis.history?.replaceState(null,'',suffix?joinPaths(tv.controlPath,suffix):tv.controlPath);
+    }
+}
+
+export const getConvoTraverserStoreId=(tv:ConvoTraverser,ext?:string):string=>{
+    const suffix=tv.state?.[convoTraverserStateStoreSuffix];
+    return getConvoTraverserStoreIdById(tv.id,suffix,ext);
+}
+export const getConvoTraverserStoreIdById=(id:string,storeSuffix?:string,ext?:string):string=>{
+    id=storeSuffix?id+'-'+storeSuffix:id;
+    if(ext && !id.endsWith(ext)){
+        id+=ext;
+    }
+    return id;
+}
 
 export const getConvoNodeMetadataAsync=async (convo:Conversation|null):Promise<ConvoMetadataAndTypeMap>=>{
 

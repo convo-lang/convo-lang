@@ -63,6 +63,8 @@ export const convoFunctions={
 
     uuid:'uuid',
     shortUuid:'shortUuid',
+
+    getVar:'getVar'
 } as const;
 
 /**
@@ -442,6 +444,37 @@ export const allowedConvoDefinitionFunctions=[
     convoJsonArrayFnName,
     convoFunctions.getState,
     convoFunctions.enableRag,
+    convoFunctions.uuid,
+    convoFunctions.shortUuid,
+    convoFunctions.getVar,
+    'setObjDefaults',
+    'is',
+    'and',
+    'or',
+    'not',
+    'eq',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'isIn',
+    'contains',
+    'regexMatch',
+    'starMatch',
+    'deepCompare',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'mod',
+    'pow',
+    'inc',
+    'dec',
+    'rand',
+    'now',
+    'dateTime',
+    'encodeURI',
+    'encodeURIComponent',
 ] as const;
 
 export const createOptionalConvoValue=(value:any):OptionalConvoValue=>{

@@ -1,4 +1,4 @@
-import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions, ConvoTraverser } from "@convo-lang/convo-lang";
+import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions, ConvoTraverser, getConvoTraverserStoreId, getConvoTraverserStoreIdById } from "@convo-lang/convo-lang";
 import { isVfsFilePath, vfs } from "@iyio/vfs";
 
 export type ConvoVfsProxyType='all'|'none'|'traverser'|'node'|'edge';
@@ -26,8 +26,12 @@ export class ConvoVfsGraphStore extends ConvoMemoryGraphStore
         return (typeof this.proxyType === 'string')?(type===this.proxyType):this.proxyType.includes(type);
     }
 
-    public override async getTraverserAsync(id:string):Promise<ConvoTraverser|undefined>
+    public override async getTraverserAsync(id:string,storeSuffix?:string):Promise<ConvoTraverser|undefined>
     {
+        id=getConvoTraverserStoreIdById(id,storeSuffix,'.json');
+        if(!id.endsWith('.json')){
+            id+='.json'
+        }
         if(this.shouldProxy('traverser')){
             if(isVfsFilePath(id)){
                 return await vfs().readObjectAsync(id);
@@ -41,7 +45,7 @@ export class ConvoVfsGraphStore extends ConvoMemoryGraphStore
 
     public override async putTraverserAsync(traverser:ConvoTraverser):Promise<void>
     {
-        const id=traverser.id;
+        const id=getConvoTraverserStoreId(traverser,'.json');
         if(this.shouldProxy('traverser')){
             if(isVfsFilePath(id)){
                 await vfs().writeObjectAsync(id,traverser);
@@ -50,8 +54,9 @@ export class ConvoVfsGraphStore extends ConvoMemoryGraphStore
             await super.putTraverserAsync(traverser);
         }
     }
-    public override async deleteTraverserAsync(id:string):Promise<void>
+    public override async deleteTraverserAsync(id:string,storeSuffix?:string):Promise<void>
     {
+        id=getConvoTraverserStoreIdById(id,storeSuffix,'.json');
         if(this.shouldProxy('traverser')){
             if(isVfsFilePath(id)){
                 await vfs().removeAsync(id);

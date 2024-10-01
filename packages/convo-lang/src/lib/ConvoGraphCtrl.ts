@@ -2,7 +2,7 @@ import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, cr
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { applyConvoTraverserControlPath, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
@@ -150,6 +150,11 @@ export class ConvoGraphCtrl
             traversers.push(...ta);
         }
 
+        const first=traversers.find(t=>t.controlPath);
+        if(first){
+            applyConvoTraverserControlPath(first);
+        }
+
         return {
             traversers:new BehaviorSubject(traversers),
             saveToStore,
@@ -260,7 +265,7 @@ export class ConvoGraphCtrl
                 })
             }
             if(tv.saveToStore){
-                this.store.putTraverserAsync(tv);
+                this.saveTraverserAsync(tv);
             }
             return undefined;
         }
@@ -301,10 +306,15 @@ export class ConvoGraphCtrl
         }
 
         if(tv.saveToStore){
-            this.store.putTraverserAsync(tv);
+            this.saveTraverserAsync(tv);
         }
 
         return targetNode;
+    }
+
+    private async saveTraverserAsync(tv:ConvoTraverser){
+        applyConvoTraverserControlPath(tv);
+        await this.store.putTraverserAsync(tv);
     }
 
     public async runGroupAsync(group:ConvoTraverserGroup):Promise<void>
@@ -403,6 +413,8 @@ export class ConvoGraphCtrl
             })
         }
 
+        const startSuffix=tv.state[convoTraverserStateStoreSuffix];
+
         const exeCtx=await createConvoNodeExecCtxAsync(node,await this.getConvoOptionsAsync(tv));
 
         // transform input
@@ -437,6 +449,19 @@ export class ConvoGraphCtrl
         }
         tv.currentStepIndex=0;
         tv.exeState='invoked';
+
+        const newSuffix=tv.state[convoTraverserStateStoreSuffix];
+        if(newSuffix && startSuffix!==newSuffix){
+            const stateTv=await this.store.getTraverserAsync(tv.id,newSuffix);
+            if(stateTv){
+                for(const e in stateTv.state){
+                    if(e===convoTraverserStateStoreSuffix){
+                        continue;
+                    }
+                    tv.state[e]=stateTv.state[e];
+                }
+            }
+        }
 
         await exeCtx.convo.flattenAsync();
 

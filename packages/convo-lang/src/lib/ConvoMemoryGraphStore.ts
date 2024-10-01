@@ -1,5 +1,6 @@
 import { shortUuid, wAryPush, wArySplice } from "@iyio/common";
 import { Observable, Subject } from "rxjs";
+import { convoTraverserStateStoreSuffix } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgeSide, ConvoGraphDb, ConvoGraphStore, ConvoGraphStoreEvt, ConvoNode, ConvoSourceNode, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
 
 
@@ -112,15 +113,18 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
 
 
 
-    public getTraverserAsync(id:string):Promise<ConvoTraverser|undefined>
+    public getTraverserAsync(id:string,storeSuffix?:string):Promise<ConvoTraverser|undefined>
     {
-        return Promise.resolve(this.db.traversers.find(g=>g.id===id));
+        return Promise.resolve(this.db.traversers.find(g=>g.id===id && g.state[convoTraverserStateStoreSuffix]===storeSuffix));
 
     }
 
     public putTraverserAsync(traverser:ConvoTraverser):Promise<void>
     {
-        const index=this.db.traversers.findIndex(g=>g.id===traverser.id);
+        const index=this.db.traversers.findIndex(g=>
+            g.id===traverser.id &&
+            g.state[convoTraverserStateStoreSuffix]===traverser.state[convoTraverserStateStoreSuffix]
+        );
         if(index===-1){
             wAryPush(this.db.traversers,traverser);
         }else{
@@ -130,9 +134,9 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
         return Promise.resolve();
     }
 
-    public deleteTraverserAsync(id:string):Promise<void>
+    public deleteTraverserAsync(id:string,storeSuffix?:string):Promise<void>
     {
-        const index=this.db.traversers.findIndex(g=>g.id===id);
+        const index=this.db.traversers.findIndex(g=>g.id===id && g.state[convoTraverserStateStoreSuffix]===storeSuffix);
         if(index!==-1){
             wArySplice(this.db.traversers,index,1);
         }

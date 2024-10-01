@@ -438,6 +438,11 @@ export interface ConvoTraverser
      */
     saveToStore?:boolean;
 
+    /**
+     * If defined the traverser will control the browser path
+     */
+    controlPath?:string;
+
     x?:number;
     y?:number;
 }
@@ -598,11 +603,11 @@ export interface ConvoGraphStore
     getNextEdgeId():string;
 
 
-    getTraverserAsync(id:string):Promise<ConvoTraverser|undefined>;
+    getTraverserAsync(id:string,storeSuffix?:string):Promise<ConvoTraverser|undefined>;
 
     putTraverserAsync(traverser:ConvoTraverser):Promise<void>;
 
-    deleteTraverserAsync(id:string):Promise<void>;
+    deleteTraverserAsync(id:string,storeSuffix?:string):Promise<void>;
 
     getNextTraverserId():string;
 
