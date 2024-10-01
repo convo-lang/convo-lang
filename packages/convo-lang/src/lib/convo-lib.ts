@@ -683,8 +683,12 @@ export interface EscapeConvoMessageContentOptions
     removeNewLines?:boolean;
 }
 
-export const escapeConvoMessageContent=(content:string,isStartOfMessage=true,options?:EscapeConvoMessageContentOptions):string=>{
+export const escapeConvoMessageContent=(content:string|null|undefined,isStartOfMessage=true,options?:EscapeConvoMessageContentOptions):string=>{
     // todo escape tags at end of message
+
+    if(!content){
+        return '';
+    }
 
     if(content.includes('{{')){
         content=content.replace(/\{\{/g,'\\{{');
