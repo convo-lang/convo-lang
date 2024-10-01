@@ -3,7 +3,7 @@ import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
-import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia } from "./convo-lang-ui-types";
+import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
 import { removeDanglingConvoUserMessage } from "./convo-lib";
 import { FlatConvoMessage } from "./convo-types";
 
@@ -168,6 +168,19 @@ export class ConversationUiCtrl
 
     private readonly _onClear=new Subject<void>();
     public get onClear():Observable<void>{return this._onClear}
+
+    private readonly _onAppendUiMessage=new Subject<ConvoUiMessageAppendEvt>();
+    public get onAppendUiMessage():Observable<ConvoUiMessageAppendEvt>{return this._onAppendUiMessage}
+
+    private readonly _expandOnUiMessage:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get expandOnUiMessageSubject():ReadonlySubject<boolean>{return this._expandOnUiMessage}
+    public get expandOnUiMessage(){return this._expandOnUiMessage.value}
+    public set expandOnUiMessage(value:boolean){
+        if(value==this._expandOnUiMessage.value){
+            return;
+        }
+        this._expandOnUiMessage.next(value);
+    }
 
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
 
@@ -426,6 +439,7 @@ export class ConversationUiCtrl
                     this.printHelp();
                     break;
             }
+            this.triggerAppendUiMessageEvt(message,true);
             return 'command';
         }
 
@@ -448,6 +462,7 @@ export class ConversationUiCtrl
 
         if(message.trim()){
             convo.appendUserMessage(message);
+            this.triggerAppendUiMessageEvt(message);
         }
         await convo.completeAsync();
         this._lastCompletion.next(convo.convo??null);
@@ -455,6 +470,18 @@ export class ConversationUiCtrl
             this.queueAutoSave();
         }
         return true;
+    }
+
+    private triggerAppendUiMessageEvt(message:string,isCommand=false){
+        if(this._onAppendUiMessage.observed){
+            this._onAppendUiMessage.next({
+                isCommand,
+                message,
+            })
+        }
+        if(this.expandOnUiMessage){
+            this.collapsed=false;
+        }
     }
 
     public printHelp()
