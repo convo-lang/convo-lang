@@ -1,4 +1,4 @@
-import { getErrorMessage, joinPaths } from "@iyio/common";
+import { getErrorMessage, joinPaths, uiRouterService } from "@iyio/common";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
@@ -12,7 +12,7 @@ export const convoTraverserStateStoreSuffix='_suffix';
 export const applyConvoTraverserControlPath=(tv:ConvoTraverser)=>{
     if(tv.controlPath){
         const suffix=tv.state[convoTraverserStateStoreSuffix];
-        globalThis.history?.replaceState(null,'',suffix?joinPaths(tv.controlPath,suffix):tv.controlPath);
+        uiRouterService().replace(suffix?joinPaths(tv.controlPath,suffix):tv.controlPath);
     }
 }
 
