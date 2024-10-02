@@ -22,6 +22,7 @@ export const convoDefaultFnName='default';
 export const convoTestFnName='test';
 export const convoPipeFnName='pipe';
 export const convoLocalFunctionModifier='local';
+export const convoExternFunctionModifier='extern';
 export const convoCallFunctionModifier='call';
 export const convoInvokeFunctionModifier='invoke';
 export const convoInvokeFunctionName='invoke';
@@ -64,7 +65,9 @@ export const convoFunctions={
     uuid:'uuid',
     shortUuid:'shortUuid',
 
-    getVar:'getVar'
+    getVar:'getVar',
+
+    describeScene:'describeScene'
 } as const;
 
 /**
@@ -155,7 +158,17 @@ export const convoVars={
      * Sets the current thread filter. Can either be a string or a ConvoThreadFilter. If __threadFilter
      * is a string it will be converted into a filter that looks like `{includeThreads:[__threadId]}`.
      */
-    __threadFilter:'__threadFilter'
+    __threadFilter:'__threadFilter',
+
+    /**
+     * A reference to a SceneCtrl that is capable of describing the current scene the user is viewing.
+     */
+    __sceneCtrl:'__sceneCtrl',
+
+    /**
+     * The last described scene added to the conversation
+     */
+    __lastDescribedScene:'__lastDescribedScene',
 
 } as const;
 

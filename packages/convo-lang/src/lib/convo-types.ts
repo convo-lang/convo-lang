@@ -291,6 +291,11 @@ export interface ConvoFunction
     local?:boolean;
 
     /**
+     * If true the implementation of the function is external from the conversation.
+     */
+    extern?:boolean;
+
+    /**
      * If true it has been requested that the function be called.
      */
     call?:boolean;

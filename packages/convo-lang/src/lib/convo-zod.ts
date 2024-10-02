@@ -235,7 +235,7 @@ const _jsonSchemeToConvoTypeString=(
 
         }
     }else{
-        throw new ConvoError('unknown-json-scheme-type',undefined,`json scheme type did not define a type or enum values`);
+        out.push(open,'any');
     }
 }
 

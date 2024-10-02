@@ -1,10 +1,11 @@
-import { ReadonlySubject, aryDuplicateRemoveItem, shortUuid } from "@iyio/common";
+import { ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
+import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
 import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
-import { removeDanglingConvoUserMessage } from "./convo-lib";
+import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
 import { FlatConvoMessage } from "./convo-types";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
@@ -29,6 +30,7 @@ export interface ConversationUiCtrlOptions
     store?:null|'localStorage'|ConvoDataStore;
     removeDanglingUserMessages?:boolean;
     enableSlashCommand?:boolean;
+    sceneCtrl?:SceneCtrl;
 }
 
 export class ConversationUiCtrl
@@ -182,6 +184,8 @@ export class ConversationUiCtrl
         this._expandOnUiMessage.next(value);
     }
 
+    public readonly sceneCtrl?:SceneCtrl;
+
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
 
     public constructor({
@@ -195,9 +199,12 @@ export class ConversationUiCtrl
         removeDanglingUserMessages=false,
         store='localStorage',
         enableSlashCommand=false,
+        sceneCtrl,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
+
+        this.sceneCtrl=sceneCtrl;
 
         this._removeDanglingUserMessages=new BehaviorSubject<boolean>(removeDanglingUserMessages);
         this._enabledSlashCommands=new BehaviorSubject(enableSlashCommand);
@@ -241,6 +248,53 @@ export class ConversationUiCtrl
     protected initConvo(convo:Conversation,options:InitConversationUiCtrlConvoOptions){
         if(this.initConvoCallback){
             this.initConvoCallback(convo);
+        }
+        if(this.sceneCtrl){
+            convo.defaultVars[convoVars.__sceneCtrl]=this.sceneCtrl;
+            convo.define({
+                fns:{
+                    executeSceneAction:{
+                        description:'Used to execute actions defined in the scenes',
+                        paramsType:z.object({
+                            id:z.string().describe('Id of the action to execute'),
+                            data:z.any().optional().describe(
+                                'Data to pass to the action. If the action defines a dataScheme the passed '+
+                                'data should conform to the scheme.'
+                            )
+                        }),
+                        scopeCallback:(scope,ctx)=>{
+                            const scene=ctx.getVar(convoVars.__lastDescribedScene) as Scene|undefined;
+                            if(!scene){
+                                return 'Unable to executed action. Last described scene not found';
+                            }
+                            const id=scope.paramValues?.[0];
+                            if(typeof id !== 'string'){
+                                return 'Invalid scene action id'
+                            }
+
+
+                            const action=findSceneAction(id,scene);
+                            if(!action){
+                                return `No action found by id ${id}`
+                            }
+                            let data=scope.paramValues?.[1];
+                            if(action.dataScheme){
+                                const parsed=action.dataScheme.safeParse(data);
+                                if(!parsed.success){
+                                    return `Invalid action data received. The action's data should conform to the JSON scheme of <JSON_SCHEME>${
+                                        zodTypeToJsonScheme(action.dataScheme)
+                                    }</JSON_SCHEME>`
+                                }else{
+                                    data=parsed.data;
+                                }
+                            }
+
+                            return action.callback?.(data)??'action completed';
+
+                        },
+                    }
+                }
+            })
         }
         if(options.appendTemplate && this.template){
             convo.append(this.template);

@@ -21,6 +21,7 @@ export * from './lib/convo-lib';
 export * from './lib/convo-markdown';
 export * from './lib/convo-markdown-types';
 export * from './lib/convo-parser';
+export * from './lib/convo-scene-lib';
 export * from './lib/convo-template';
 export * from './lib/convo-template-types';
 export * from './lib/convo-types';

@@ -1,6 +1,6 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parse as parseJson5 } from "json5";
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
@@ -841,6 +841,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     if(currentFn.modifiers.includes(convoCallFunctionModifier)){
                         currentFn.call=true;
                     }
+                    if(currentFn.modifiers.includes(convoExternFunctionModifier)){
+                        currentFn.extern=true;
+                    }
                     currentMessage={
                         role:currentFn.call?'function-call':'function',
                         fn:currentFn,
@@ -999,7 +1002,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
         if(msg.fn){
 
-            if(!msg.fn.body && !msg.fn.call && !msg.fn.topLevel && (msg.fn.invoke || !msg.fn.local)){
+            if(!msg.fn.body && !msg.fn.call && !msg.fn.extern && !msg.fn.topLevel && (msg.fn.invoke || !msg.fn.local)){
                 msg.fn.body=[
                     {
                         s:0,e:0,

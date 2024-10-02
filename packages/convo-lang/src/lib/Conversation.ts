@@ -2273,7 +2273,7 @@ export class Conversation
         const fnSig=(
             (fnDef.disableAutoComplete?`@${convoTags.disableAutoComplete}\n`:'')+
             (fnDef.description?convoDescriptionToComment(fnDef.description)+'\n':'')+
-            (params?schemeToConvoTypeString(params,`>${fnDef.local?' local':''} `+fnDef.name):`>${fnDef.local?' local':''} ${fnDef.name}()`)
+            (params?schemeToConvoTypeString(params,`>${fnDef.local?' local':(fnDef.callback || fnDef.scopeCallback)?' extern':''} `+fnDef.name):`>${fnDef.local?' local':''} ${fnDef.name}()`)
         );
 
         if(fnDef.returnScheme && !this.definitionItems.some(t=>t.type===fnDef.returnScheme)){

@@ -1,10 +1,11 @@
-import { aryRandomize, createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
+import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
+import { createConvoSceneDescription } from "./convo-scene-lib";
 import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod";
 
@@ -1107,6 +1108,19 @@ export const defaultConvoVars={
         const v=ctx.getVar(name,scope);
         return v===undefined?scope.paramValues?.[1]:v;
     }),
+
+    [convoFunctions.describeScene]:createConvoScopeFunction((scope,ctx)=>{
+        const ctrl=ctx.getVar(convoVars.__sceneCtrl);
+        if(ctrl instanceof SceneCtrl){
+            const scene=ctrl.buildScene();
+            ctx.setVar(true,scene,convoVars.__lastDescribedScene);
+            return createConvoSceneDescription(scene);
+        }else{
+            return 'Unable to see scene';
+        }
+    }),
+
+
 
 } as const;
 
