@@ -170,6 +170,11 @@ export const convoVars={
      */
     __lastDescribedScene:'__lastDescribedScene',
 
+    /**
+     * Used by agents to define the voice they use
+     */
+    __voice:'__voice',
+
 } as const;
 
 export const defaultConvoRagTol=1.2;
