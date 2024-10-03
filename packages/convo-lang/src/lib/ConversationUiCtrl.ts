@@ -1,12 +1,12 @@
-import { ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
-import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
+import { DisposeCallback, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
+import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
 import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
 import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
-import { FlatConvoMessage } from "./convo-types";
+import { ConvoAppend, FlatConvoMessage } from "./convo-types";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -48,6 +48,9 @@ export class ConversationUiCtrl
     private readonly _lastCompletion:BehaviorSubject<string|null>=new BehaviorSubject<string|null>(null);
     public get lastCompletionSubject():ReadonlySubject<string|null>{return this._lastCompletion}
     public get lastCompletion(){return this._lastCompletion.value}
+
+    private readonly _onAppend=new Subject<ConvoAppend>();
+    public get onAppend():Observable<ConvoAppend>{return this._onAppend}
 
     private readonly tasks:ConversationUiCtrlTask[]=[];
     private readonly _currentTask:BehaviorSubject<ConversationUiCtrlTask|null>=new BehaviorSubject<ConversationUiCtrlTask|null>(null);
@@ -239,10 +242,9 @@ export class ConversationUiCtrl
         }
         this._isDisposed=true;
         this._currentTask.next('disposed');
-        if(this.convoTaskSub){
-            this.convoTaskSub.unsubscribe();
-            this.convoTaskSub=null;
-        }
+        const cleanup=this.convoCleanup;
+        this.convoCleanup=null;
+        cleanup?.();
     }
 
     protected initConvo(convo:Conversation,options:InitConversationUiCtrlConvoOptions){
@@ -366,17 +368,17 @@ export class ConversationUiCtrl
     }
 
     private convoTaskCount=0;
-    private convoTaskSub:Subscription|null=null;
+    private convoCleanup:DisposeCallback|null=null;
     private setConvo(convo:Conversation)
     {
-        if(this.convoTaskSub){
-            this.convoTaskSub.unsubscribe();
-            this.convoTaskSub=null;
-        }
+        const prevCleanup=this.convoCleanup;
+        this.convoCleanup=null;
+        prevCleanup?.();
+
         while(this.tasks.includes('completing')){
             this.popTask('completing');
         }
-        this.convoTaskSub=convo.activeTaskCountSubject.subscribe(n=>{
+        const sub=convo.activeTaskCountSubject.subscribe(n=>{
             if(n===1){
                 if(!this.tasks.includes('completing')){
                     this.pushTask('completing');
@@ -387,6 +389,13 @@ export class ConversationUiCtrl
                 }
             }
         })
+        const sub2=convo.onAppend.subscribe(v=>{
+            this._onAppend.next(v);
+        })
+        this.convoCleanup=()=>{
+            sub.unsubscribe();
+            sub2.unsubscribe();
+        }
         this._convo.next(convo);
     }
 
