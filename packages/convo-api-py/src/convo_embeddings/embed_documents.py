@@ -1,11 +1,11 @@
 from langchain_community.document_loaders import S3FileLoader, TextLoader , UnstructuredURLLoader, UnstructuredFileLoader, UnstructuredHTMLLoader, UnstructuredPDFLoader, UnstructuredMarkdownLoader, DirectoryLoader
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema.document import Document
 from psycopg import sql
 from typing import Any, Dict
 from .s3_loader import S3FileLoaderEx
 from .types import DocumentEmbeddingRequest
 from .embed import encode_text
+from .ConvoTextSpliter import ConvoTextSplitter
 from iyio_common import exec_sql, escape_sql_identifier, parse_s3_path, getEnvVar
 import json
 import magic
@@ -14,7 +14,7 @@ import magic
 max_sql_len=65536
 
 def get_text_chunks_langchain(text:str):
-    text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=20)
+    text_splitter = ConvoTextSplitter(chunk_size=300, chunk_overlap=20)
     docs = [Document(page_content=x) for x in text_splitter.split_text(text)]
     return docs
 
@@ -70,7 +70,7 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
 
     docs=direct_docs if direct_docs else file_loader.load()
 
-    text_splitter=CharacterTextSplitter(chunk_size=300, chunk_overlap=20)
+    text_splitter=ConvoTextSplitter(chunk_size=300, chunk_overlap=20)
     docs=text_splitter.split_documents(docs)
 
     if len(docs) == 0:
