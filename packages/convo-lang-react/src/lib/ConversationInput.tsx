@@ -14,6 +14,7 @@ export interface ConversationInputProps
     placeholder?:string;
     submitTrigger?:any;
     min?:boolean;
+    children?:any;
 }
 
 export function ConversationInput({
@@ -25,6 +26,7 @@ export function ConversationInput({
     placeholder='Enter message',
     submitTrigger,
     min,
+    children,
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -64,6 +66,8 @@ export function ConversationInput({
                 onChange={e=>setValue(e.target.value)}
             />
 
+            {children}
+
         </Form>
     )
 
@@ -73,6 +77,8 @@ const style=atDotCss({name:'ConversationInput',order:'framework',namespace:'iyio
     @.root{
         display:flex;
         flex-direction:row;
+        position:relative;
+        margin:@@inputMargin;
     }
     @.input{
         all:unset;
@@ -81,7 +87,6 @@ const style=atDotCss({name:'ConversationInput',order:'framework',namespace:'iyio
         background:@@inputBackground;
         padding:@@inputPadding;
         border-radius:@@borderRadius;
-        margin:@@inputMargin;
         box-shadow:@@inputShadow;
         border:@@inputBorder;
         background-clip:padding-box;

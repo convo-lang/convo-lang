@@ -1,7 +1,7 @@
 import { ConversationUiCtrl, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
-import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
+import { BasicIcon, LoadingDots, ScrollView, SlimButton, View, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
@@ -154,11 +154,15 @@ const renderMessage=(
     }else if(m.isSuggestion){
         return (
             <div className={rowClassName} key={i+'d'}>
-                <SlimButton className={className} onClick={()=>{
-                    ctrl.appendUiMessageAsync(m.content??'')
-                }}>
-                    {m.tags?.[convoTags.suggestion]??m.content}
-                </SlimButton>
+
+                <View row alignCenter>
+                    <BasicIcon className={style.suggestIcon()} icon="chevron-right" />
+                    <SlimButton className={className} onClick={()=>{
+                        ctrl.appendUiMessageAsync(m.content??'')
+                    }}>
+                        {m.tags?.[convoTags.suggestion]??m.content}
+                    </SlimButton>
+                </View>
             </div>
         )
     }else{
@@ -357,5 +361,8 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
     }
     @.msg.user.suggestion{
         margin-right:0.5rem;
+    }
+    @.suggestIcon{
+        fill:@@agentColor;
     }
 `});
