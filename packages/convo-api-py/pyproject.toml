@@ -6,7 +6,7 @@ authors = []
 packages = [{include = "convo", from = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.11,<3.13"
 pydantic = "^2.9.2"
 python-magic = "^0.4.27"
 langchain-community = "^0.3.1"
@@ -19,6 +19,7 @@ iyio_common = { git = "https://github.com/iyioio/common.git", subdirectory = "pa
 boto3 = "^1.35.36"
 psycopg2-binary = "^2.9.9"
 pdfminer-six = "^20240706"
+unstructured = "^0.15.13"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"

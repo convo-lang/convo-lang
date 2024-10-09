@@ -1,7 +1,8 @@
 # flake8: noqa
-from .ConvoTextSpliter import ConvoTextSplitter
+from convo.convo_embeddings.convo_text_splitter import ConvoTextSplitter
 
-if __name__ == "__main__":
+
+def test_text_splitter():
     sp = ConvoTextSplitter(chunk_size=300, chunk_overlap=20, overlapSep="::")
     txt = sp.split_text(
         """so anyway let me show you how I make every model from a financial acquisition

@@ -18,7 +18,7 @@ from langchain_community.document_loaders import (
 )
 from psycopg import sql
 
-from .ConvoTextSpliter import ConvoTextSplitter
+from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
 from .s3_loader import S3FileLoaderEx
 from .types import DocumentEmbeddingRequest

@@ -16,7 +16,7 @@ client = OpenAI()
 
 
 def encode_text(value: Union[List[str], str]):
-    isList = type(value) is list
+    isList = isinstance(value, list)
 
     response = client.embeddings.create(
         input=value if isList else [value], model="text-embedding-3-small"
@@ -25,8 +25,6 @@ def encode_text(value: Union[List[str], str]):
     if not isList:
         return response.data[0].embedding
 
-    all = []
-    for em in response.data:
-        all.append(em.embedding)
+    all = [em.embedding for em in response.data]
 
     return all

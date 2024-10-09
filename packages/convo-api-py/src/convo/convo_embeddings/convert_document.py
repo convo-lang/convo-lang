@@ -28,6 +28,5 @@ def convert_document(request: DocumentConversionRequest):
 def pdf_to_text(srcPath: str, destPath: str):
     text = pdfminer.highlevel.extract_text(srcPath)
 
-    f = open(destPath, "w")
-    f.write(text)
-    f.close()
+    with open(destPath, "w") as f:
+        f.write(text)
