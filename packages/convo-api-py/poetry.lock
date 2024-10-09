@@ -148,6 +148,17 @@ files = [
 ]
 
 [[package]]
+name = "antlr4-python3-runtime"
+version = "4.11.1"
+description = "ANTLR 4.11.1 runtime for Python 3"
+optional = false
+python-versions = "*"
+files = [
+    {file = "antlr4-python3-runtime-4.11.1.tar.gz", hash = "sha256:a53de701312f9bdacc5258a6872cd6c62b90d3a90ae25e494026f76267333b60"},
+    {file = "antlr4_python3_runtime-4.11.1-py3-none-any.whl", hash = "sha256:ff1954eda1ca9072c02bf500387d0c86cb549bef4dbb3b64f39468b547ec5f6b"},
+]
+
+[[package]]
 name = "anyio"
 version = "4.6.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
@@ -166,6 +177,26 @@ sniffio = ">=1.1"
 doc = ["Sphinx (>=7.4,<8.0)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
 test = ["anyio[trio]", "coverage[toml] (>=7)", "exceptiongroup (>=1.2.0)", "hypothesis (>=4.0)", "psutil (>=5.9)", "pytest (>=7.0)", "pytest-mock (>=3.6.1)", "trustme", "uvloop (>=0.21.0b1)"]
 trio = ["trio (>=0.26.1)"]
+
+[[package]]
+name = "apache-age-python"
+version = "0.0.7"
+description = "Python driver support for Apache AGE"
+optional = false
+python-versions = ">=3.9"
+files = []
+develop = false
+
+[package.dependencies]
+antlr4-python3-runtime = "4.11.1"
+psycopg = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/zombie-einstein/age.git"
+reference = "HEAD"
+resolved_reference = "b478df37a36d839c47b64e78771de3ed70495350"
+subdirectory = "drivers/python"
 
 [[package]]
 name = "attrs"
@@ -3144,4 +3175,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "5a8ac1e258f6dc3e2cbac0a0ac0638a571c141c3644a5a60686f51a86bbf2f8f"
+content-hash = "887611a482d268a96633177c91ebb826a324d09f48540c1a14c58744ea4276d2"
