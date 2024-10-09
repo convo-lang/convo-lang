@@ -22,6 +22,7 @@ pdfminer-six = "^20240706"
 unstructured = "^0.15.13"
 # Need to use this fork until build issues are resolved with the main age Python package
 apache-age-python = { git = "https://github.com/zombie-einstein/age.git", subdirectory = "drivers/python" }
+nano-graphrag = "^0.0.8"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"
