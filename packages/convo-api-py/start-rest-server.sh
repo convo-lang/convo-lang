@@ -23,7 +23,7 @@ fi
 set +o allexport
 
 if [ "$CONVO_API_PY_HOT_RELOAD" == "true" ]; then
-    py-hot-reload src/rest_api.py
+    py-hot-reload src/convo/rest_api.py
 else
-    python src/rest_api.py
+    python src/convo/rest_api.py
 fi

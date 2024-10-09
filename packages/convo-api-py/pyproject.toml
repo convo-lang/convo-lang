@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "convo-api-py"
+version = "0.1.0"
+description = ""
+authors = []
+packages = [{include = "convo", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+pydantic = "^2.9.2"
+python-magic = "^0.4.27"
+langchain-community = "^0.3.1"
+openai = "^1.51.2"
+langchain = "^0.3.2"
+pdfminer = "^20191125"
+psycopg = "^3.2.3"
+botocore = "^1.35.36"
+convo_lang = { git = "git@github.com:iyioio/common.git", subdirectory = "packages/convo-lang-py" }
+iyio_common = { git = "git@github.com:iyioio/common.git", subdirectory = "packages/iyio-common-py" }
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.0.1"
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

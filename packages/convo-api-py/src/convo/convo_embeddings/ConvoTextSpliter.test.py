@@ -1,8 +1,10 @@
+# flake8: noqa
 from .ConvoTextSpliter import ConvoTextSplitter
 
-if __name__ == '__main__':
-    sp=ConvoTextSplitter(chunk_size=300, chunk_overlap=20, overlapSep='::')
-    txt=sp.split_text("""so anyway let me show you how I make every model from a financial acquisition
+if __name__ == "__main__":
+    sp = ConvoTextSplitter(chunk_size=300, chunk_overlap=20, overlapSep="::")
+    txt = sp.split_text(
+        """so anyway let me show you how I make every model from a financial acquisition
 to uh just how I like look to buy a stock as well you know what's amazing
 about this method is you really don't need anything other than Microsoft Excel if you don't have Microsoft Excel you
 could always use Google spreadsheets which I believe is free so in any event um we're going to do Tesla and again the
@@ -628,11 +630,11 @@ capacity constrained and there's no capacity constraints that they would sell 20
 and I think we can go through that but this is you know again the goal isn't to actually have a number if you could if you could solve a stock price number in
 an hour you would be um a really rich person uh you you you go through hundreds of stocks and find
 the one that was really undervalued and buy it and find the one that's really overvalued and short of and that's why
-this this isn't a one-hour process it's like a hundred hour process or longer but this is sort of how I would get""")
+this this isn't a one-hour process it's like a hundred hour process or longer but this is sort of how I would get"""
+    )
 
-    print("len",len(txt))
+    print("len", len(txt))
 
-    i=0
+    i = 0
     for p in txt:
-        print(p+'||\n')
-
+        print(p + "||\n")
