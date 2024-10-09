@@ -1,5 +1,5 @@
+import pdfminer
 from iyio_common import getEnvVar
-from pdfminer.high_level import extract_text
 
 from .types import DocumentConversionRequest
 
@@ -26,7 +26,7 @@ def convert_document(request: DocumentConversionRequest):
 
 
 def pdf_to_text(srcPath: str, destPath: str):
-    text = extract_text(srcPath)
+    text = pdfminer.highlevel.extract_text(srcPath)
 
     f = open(destPath, "w")
     f.write(text)

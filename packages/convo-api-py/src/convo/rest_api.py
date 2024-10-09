@@ -1,15 +1,14 @@
 import os
 from typing import Any
 
-from iyio_common import start_rest_server
-
-from .convo_embeddings.convert_document import convert_document
-from .convo_embeddings.embed import encode_text
-from .convo_embeddings.embed_documents import generate_document_embeddings
-from .convo_embeddings.types import (
+from convo.convo_embeddings.convert_document import convert_document
+from convo.convo_embeddings.embed import encode_text
+from convo.convo_embeddings.embed_documents import generate_document_embeddings
+from convo.convo_embeddings.types import (
     DocumentConversionRequest,
     DocumentEmbeddingRequest,
 )
+from iyio_common import start_rest_server
 
 serverPort = int(os.getenv("REST_PORT") or os.getenv("PORT") or "8080")
 

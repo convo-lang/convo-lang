@@ -3,32 +3,44 @@
 
 FROM python:3.11
 
+ENV PYTHONUNBUFFERED=1 \
+    # prevents python creating .pyc files
+    PYTHONDONTWRITEBYTECODE=1 \
+    \
+    # pip
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    \
+    # poetry
+    # https://python-poetry.org/docs/configuration/#using-environment-variables
+    POETRY_VERSION=1.8.3 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_CACHE_DIR='/var/cache/pypoetry' \
+    POETRY_HOME='/usr/local'
+
+# prepend poetry and venv to path
+ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+
 WORKDIR /app
 
 RUN apt-get update
-RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr
+RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr curl build-essential
 
-RUN python3 -m pip install --upgrade pip
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
-COPY packages/convo-api-py/requirements.txt requirements.txt
+COPY packages/convo-api-py/pyproject.toml pyproject.toml
+COPY packages/convo-api-py/poetry.lock poetry.lock
+COPY packages/convo-api-py/src/ src
+COPY packages/convo-api-py/start-rest-server.sh start-rest-server.sh
 
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
-
-# Copy source directories . Remember to add to .gitignore as well
-COPY packages/iyio-common-py/src/ packages/iyio-common-py/src
-COPY packages/convo-api-py/src/ packages/convo-api-py/src
-
-# The command below can be used to verify copied files
-#RUN find . -type f
-
-
-# Add paths to copied libraries here
-ENV PYTHONPATH=/app/packages/iyio-common-py/src
+RUN poetry install --only=main --no-interaction --no-ansi
 
 ENV REST_PORT=8080
 
 EXPOSE 8080
 
-WORKDIR /app/packages/convo-api-py
+# WORKDIR /app/packages/convo-api-py
 
 CMD [ "./start-rest-server.sh" ]
