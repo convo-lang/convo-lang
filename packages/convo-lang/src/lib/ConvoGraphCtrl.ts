@@ -469,7 +469,8 @@ export class ConvoGraphCtrl
             from:node.id,
             fromFn:invokeCall?.call?.fn.name,
             fromType:invokeCall?.type,
-            input:tv.payload
+            input:tv.payload,
+            defaultVars:exeCtx.defaultVars
         });
 
         if(edges.length){
@@ -521,7 +522,8 @@ export class ConvoGraphCtrl
         from,
         fromType,
         fromFn,
-        input
+        input,
+        defaultVars,
     }:ConvoEdgePattern):Promise<ConvoEdge[]>{
         let edges=await this.store.getNodeEdgesAsync(from,'from');
         if(fromType || fromFn){
@@ -539,7 +541,7 @@ export class ConvoGraphCtrl
                         `\n> edgeConditionEvalFunction() -> ( ${edge.conditionConvo} )\n`+
                          `> do`+
                          `edgeConditionResult=edgeConditionEvalFunction()`,
-                         {input}
+                         {input,...defaultVars}
                     )
                 )
                 const flat=await conversation.flattenAsync();

@@ -306,6 +306,11 @@ export interface ConvoEdgePattern
      * Input value that for dynamic condition checking
      */
     input?:any;
+
+    /**
+     * additional variables to insert into the condition checking
+     */
+    defaultVars?:Record<string,any>;
 }
 
 /**
