@@ -1,29 +1,36 @@
 import os
 from typing import Any
 
-from convo.convo_embeddings.convert_document import convert_document
-from convo.convo_embeddings.embed import encode_text
-from convo.convo_embeddings.embed_documents import generate_document_embeddings
-from convo.convo_embeddings.types import (
+from iyio_common import start_rest_server
+from openai import OpenAI
+
+from .convo_embeddings.convert_document import convert_document
+from .convo_embeddings.embed import encode_text
+from .convo_embeddings.embed_documents import generate_document_embeddings
+from .convo_embeddings.types import (
     DocumentConversionRequest,
     DocumentEmbeddingRequest,
 )
-from iyio_common import start_rest_server
 
 serverPort = int(os.getenv("REST_PORT") or os.getenv("PORT") or "8080")
 
 
 def request_handler(path, data: Any, method):
-    """Handles an http request. data is either the request body or query params for a GET request"""
+    """
+    Handles an http request. data is either the request body or
+    query params for a GET request
+    """
+
+    open_ai_client = OpenAI()
 
     print(path)
 
     match method + ":" + path:
         case "POST:/embeddings/text":
-            return encode_text(data)
+            return encode_text(open_ai_client, data)
 
         case "GET:/embeddings/text":
-            return encode_text([data["text"] if "text" in data else ""])
+            return encode_text(open_ai_client, [data["text"] if "text" in data else ""])
 
         case "POST:/embeddings/document":
             return generate_document_embeddings(DocumentEmbeddingRequest(**data))

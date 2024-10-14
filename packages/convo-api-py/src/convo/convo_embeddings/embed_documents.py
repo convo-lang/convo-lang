@@ -1,4 +1,5 @@
 import json
+from typing import Optional, Tuple
 
 import magic
 from iyio_common import (
@@ -16,6 +17,7 @@ from langchain_community.document_loaders import (
     UnstructuredPDFLoader,
     UnstructuredURLLoader,
 )
+from openai import Client
 from psycopg import sql
 
 from .convo_text_splitter import ConvoTextSplitter
@@ -32,38 +34,22 @@ def get_text_chunks_langchain(text: str):
     return docs
 
 
-def generate_document_embeddings(  # Noqa: C901
-    request: DocumentEmbeddingRequest,
-) -> int:
-    print("generate_document_embeddings", request)
-
-    file_loader = None
-
-    mode = "single"
-
-    document_path = request.location
-    docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
-    if docPrefix:
-        if not document_path.startswith("/"):
-            document_path = "/" + document_path
-        document_path = docPrefix + document_path
-
+def get_doc_loader(
+    request: DocumentEmbeddingRequest, document_path: str, mode: str
+) -> Tuple:
     content_type = request.contentType
-    mime_path = document_path
-    direct_docs = None
-    embeddings_table = request.embeddingsTable
 
     if document_path == "inline":
         direct_docs = get_text_chunks_langchain(request.inlineContent)
+        file_loader = None
     if document_path.startswith("s3://"):
         s3Path = parse_s3_path(document_path)
-        file_loader = S3FileLoaderEx(
-            s3Path["bucket"],
-            s3Path["key"],
-        )
+        file_loader = S3FileLoaderEx(s3Path["bucket"], s3Path["key"])
         file_loader.mode = mode
+        direct_docs = None
     elif document_path.startswith("https://") or document_path.startswith("http://"):
         file_loader = UnstructuredURLLoader([document_path], mode=mode)
+        direct_docs = None
     elif document_path.endswith("/*"):
         file_loader = DirectoryLoader(
             document_path,
@@ -71,25 +57,30 @@ def generate_document_embeddings(  # Noqa: C901
             loader_cls=UnstructuredFileLoader,
             loader_kwargs={"mode": mode},
         )
+        direct_docs = None
     elif content_type and content_type.endswith("/pdf"):
         file_loader = UnstructuredPDFLoader(document_path, mode=mode)
+        direct_docs = None
     elif content_type and content_type.endswith("/html"):
         file_loader = UnstructuredHTMLLoader(document_path, mode=mode)
+        direct_docs = None
     elif content_type and content_type.endswith("/markdown"):
         file_loader = UnstructuredMarkdownLoader(document_path, mode=mode)
+        direct_docs = None
     else:
         file_loader = UnstructuredFileLoader(document_path, mode=mode)
+        direct_docs = None
 
-    docs = direct_docs if direct_docs else file_loader.load()
+    return direct_docs, file_loader
 
-    text_splitter = ConvoTextSplitter(chunk_size=300, chunk_overlap=20)
-    docs = text_splitter.split_documents(docs)
 
-    if len(docs) == 0:
-        print(f"No embedding documents found for {document_path} ")
-        return 0
-
+def get_content_category(
+    request: DocumentEmbeddingRequest, document_path: str, docs, direct_docs
+) -> Tuple[Optional[str], Optional[str]]:
+    content_type = request.contentType
+    mime_path = document_path
     firstDoc = docs[0]
+
     if direct_docs:
         content_type = request.contentType
     elif firstDoc and firstDoc.metadata and ("content_type" in firstDoc.metadata):
@@ -106,17 +97,52 @@ def generate_document_embeddings(  # Noqa: C901
                 content_type = type
                 print("content type set to ", type)
 
-    content_category: str | None = None
-
-    match content_type:
-        case "application/pdf":
-            content_category = "document"
-        case _:
-            if content_type:
-                content_category = content_type.split("/")[0]
+    if content_type == "application/pdf":
+        content_category = "document"
+    elif content_type is not None:
+        content_category = content_type.split("/")[0]
+    else:
+        content_category = None
 
     if content_category:
         content_category = content_category.lower()
+
+    return content_type, content_category
+
+
+def generate_document_embeddings(  # Noqa: C901
+    open_ai_client: Client,
+    request: DocumentEmbeddingRequest,
+    chunk_size: int = 300,
+    chunk_overlap: int = 20,
+) -> int:
+    print("generate_document_embeddings", request)
+
+    document_path = request.location
+    docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
+
+    if docPrefix:
+        if not document_path.startswith("/"):
+            document_path = "/" + document_path
+        document_path = docPrefix + document_path
+
+    embeddings_table = request.embeddingsTable
+
+    direct_docs, file_loader = get_doc_loader(request, document_path, "single")
+    docs = direct_docs if direct_docs else file_loader.load()
+
+    text_splitter = ConvoTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
+    docs = text_splitter.split_documents(docs)
+
+    if len(docs) == 0:
+        print(f"No embedding documents found for {document_path} ")
+        return 0
+
+    content_type, content_category = get_content_category(
+        request, document_path, docs, direct_docs
+    )
 
     print("Content category", content_category)
 
@@ -134,11 +160,10 @@ def generate_document_embeddings(  # Noqa: C901
         print(f"content_category filtered out - {content_category}")
         return 0
 
-    first = True
-    all = []
+    all = list()
     print("Generating embeddings")
 
-    cols = request.cols.copy() if request.cols else {}
+    cols = request.cols.copy() if request.cols else dict()
 
     if request.contentCategoryCol:
         cols[request.contentCategoryCol] = content_category
@@ -147,11 +172,8 @@ def generate_document_embeddings(  # Noqa: C901
         cols[request.contentTypeCol] = content_type
 
     for doc in docs:
-        vec = encode_text(doc.page_content)
+        vec = encode_text(open_ai_client, doc.page_content)
         all.append({**cols, "vector": vec, "text": doc.page_content})
-        if first:
-            first = False
-            # print(all[0])
 
     if request.cols and request.clearMatching:
         clearSql = f"DELETE FROM {escape_sql_identifier(embeddings_table)} where"

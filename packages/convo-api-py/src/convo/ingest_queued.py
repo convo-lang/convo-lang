@@ -1,10 +1,12 @@
 from typing import List
 
-from convo_embeddings.embed_documents import generate_document_embeddings
-from convo_embeddings.types import DocumentEmbeddingRequest
 from iyio_common import SqsEventRecord, getEnvVar, run_sqs
 
+from .convo_embeddings.embed_documents import generate_document_embeddings
+from .convo_embeddings.types import DocumentEmbeddingRequest
+
 queueUrl = getEnvVar("CONNECTED_QUEUE_URL")
+
 if not queueUrl:
     print("CONNECTED_QUEUE_URL env var required")
     raise

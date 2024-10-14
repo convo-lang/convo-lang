@@ -12,13 +12,11 @@ from typing import List, Union
 
 from openai import OpenAI
 
-client = OpenAI()
 
-
-def encode_text(value: Union[List[str], str]):
+def encode_text(open_ai_client: OpenAI, value: Union[List[str], str]):
     isList = isinstance(value, list)
 
-    response = client.embeddings.create(
+    response = open_ai_client.embeddings.create(
         input=value if isList else [value], model="text-embedding-3-small"
     )
 
