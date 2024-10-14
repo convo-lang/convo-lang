@@ -110,6 +110,70 @@ def get_content_category(
     return content_type, content_category
 
 
+def insert_vectors(
+    request: DocumentEmbeddingRequest,
+    colNameSql,
+    colNames,
+    cols,
+) -> int:
+    embeddings_table = request.embeddingsTable
+
+    inserted = 0
+    total_inserted = 0
+    head = (
+        f"INSERT INTO {escape_sql_identifier(embeddings_table)} "
+        f"({escape_sql_identifier(request.textCol)},"
+        f"{escape_sql_identifier(request.embeddingCol)}{colNameSql}) VALUES "
+    )
+
+    sql_chucks = [head]
+    sql_len = len(head)
+
+    for index in all:
+        chunk = (
+            sql.SQL("({text},{vector}")
+            .format(text=index["text"], vector=json.dumps(index["vector"]))
+            .as_string(None)
+        )
+
+        if len(colNames) and cols:
+            colData = []
+            for colName in colNames:
+                colData.append(
+                    sql.SQL("{value}")
+                    .format(
+                        value=cols[colName],
+                    )
+                    .as_string(None)
+                )
+            chunk = chunk + "," + (",".join(colData))
+
+        chunk = chunk + "),"
+
+        chunk_len = len(chunk)
+
+        if chunk_len + sql_len >= max_sql_len:
+            print(f"Inserting {inserted} embeddings into {embeddings_table}")
+            exec_sql("".join(sql_chucks)[:-1], request.dryRun)
+            inserted = 0
+            sql_chucks = [head]
+            sql_len = len(head)
+
+        sql_len = sql_len + chunk_len
+        sql_chucks.append(chunk)
+
+        inserted = inserted + 1
+        total_inserted = total_inserted + 1
+
+    if inserted > 0:
+        print(f"Inserting {inserted} embeddings into {embeddings_table}")
+        exec_sql("".join(sql_chucks)[:-1], request.dryRun)
+
+    print(f"Inserted {total_inserted} embeddings into {embeddings_table}")
+
+    return total_inserted
+
+
 def generate_document_embeddings(  # Noqa: C901
     open_ai_client: Client,
     request: DocumentEmbeddingRequest,
@@ -192,68 +256,19 @@ def generate_document_embeddings(  # Noqa: C901
         if not cf:
             exec_sql(clearSql, request.dryRun)
 
-    colNamesEscaped = []
-    colNames = []
+    col_names_escaped = list()
+    col_names = list()
+
     if cols:
         for colName in cols:
-            colNames.append(colName)
-            colNamesEscaped.append(escape_sql_identifier(colName))
+            col_names.append(colName)
+            col_names_escaped.append(escape_sql_identifier(colName))
 
-    colNameSql = ""
-    if len(colNamesEscaped):
-        colNameSql = "," + (",".join(colNamesEscaped))
+    col_name_sql = ""
 
-    inserted = 0
-    total_inserted = 0
-    head = (
-        f"INSERT INTO {escape_sql_identifier(embeddings_table)} "
-        f"({escape_sql_identifier(request.textCol)},"
-        f"{escape_sql_identifier(request.embeddingCol)}{colNameSql}) VALUES "
-    )
+    if len(col_names_escaped):
+        col_name_sql = "," + (",".join(col_names_escaped))
 
-    sql_chucks = [head]
-    sql_len = len(head)
-
-    for index in all:
-        chunk = (
-            sql.SQL("({text},{vector}")
-            .format(text=index["text"], vector=json.dumps(index["vector"]))
-            .as_string(None)
-        )
-
-        if len(colNames) and cols:
-            colData = []
-            for colName in colNames:
-                colData.append(
-                    sql.SQL("{value}")
-                    .format(
-                        value=cols[colName],
-                    )
-                    .as_string(None)
-                )
-            chunk = chunk + "," + (",".join(colData))
-
-        chunk = chunk + "),"
-
-        chunk_len = len(chunk)
-
-        if chunk_len + sql_len >= max_sql_len:
-            print(f"Inserting {inserted} embeddings into {embeddings_table}")
-            exec_sql("".join(sql_chucks)[:-1], request.dryRun)
-            inserted = 0
-            sql_chucks = [head]
-            sql_len = len(head)
-
-        sql_len = sql_len + chunk_len
-        sql_chucks.append(chunk)
-
-        inserted = inserted + 1
-        total_inserted = total_inserted + 1
-
-    if inserted > 0:
-        print(f"Inserting {inserted} embeddings into {embeddings_table}")
-        exec_sql("".join(sql_chucks)[:-1], request.dryRun)
-
-    print(f"Inserted {total_inserted} embeddings into {embeddings_table}")
+    total_inserted = insert_vectors(request, col_name_sql, col_names, cols)
 
     return total_inserted
