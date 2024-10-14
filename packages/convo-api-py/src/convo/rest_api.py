@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Optional
 
 from iyio_common import start_rest_server
 from openai import OpenAI
@@ -15,13 +15,13 @@ from .convo_embeddings.types import (
 serverPort = int(os.getenv("REST_PORT") or os.getenv("PORT") or "8080")
 
 
-def request_handler(path, data: Any, method):
+def request_handler(path, data: Any, method, open_ai_client: Optional[OpenAI] = None):
     """
     Handles an http request. data is either the request body or
     query params for a GET request
     """
 
-    open_ai_client = OpenAI()
+    open_ai_client = OpenAI() if open_ai_client is None else open_ai_client
 
     print(path)
 
