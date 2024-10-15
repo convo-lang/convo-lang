@@ -22,6 +22,7 @@ from psycopg import sql
 
 from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
+from .graph_embedding import AgeGraphStorage, graph_embed_docs
 from .s3_loader import S3FileLoaderEx
 from .types import DocumentEmbeddingRequest
 
@@ -179,6 +180,7 @@ def generate_document_embeddings(  # Noqa: C901
     request: DocumentEmbeddingRequest,
     chunk_size: int = 300,
     chunk_overlap: int = 20,
+    embed_graph: bool = False,
 ) -> int:
     print("generate_document_embeddings", request)
 
@@ -270,5 +272,17 @@ def generate_document_embeddings(  # Noqa: C901
         col_name_sql = "," + (",".join(col_names_escaped))
 
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols)
+
+    if embed_graph:
+        age_graph = AgeGraphStorage(
+            namespace="Foo",
+            host="127.0.0.1",
+            port="62691",
+            dbname=getEnvVar("POSTGRES_DB"),
+            user=getEnvVar("POSTGRES_USER"),
+            password=getEnvVar("POSTGRES_PASSWORD"),
+            graph="TestGraph",
+        )
+        _ = graph_embed_docs(docs, age_graph)
 
     return total_inserted
