@@ -43,7 +43,7 @@ def get_doc_loader(
     if document_path == "inline":
         direct_docs = get_text_chunks_langchain(request.inlineContent)
         file_loader = None
-    if document_path.startswith("s3://"):
+    elif document_path.startswith("s3://"):
         s3Path = parse_s3_path(document_path)
         file_loader = S3FileLoaderEx(s3Path["bucket"], s3Path["key"])
         file_loader.mode = mode
@@ -116,6 +116,7 @@ def insert_vectors(
     colNameSql,
     colNames,
     cols,
+    all_docs,
 ) -> int:
     embeddings_table = request.embeddingsTable
 
@@ -130,7 +131,7 @@ def insert_vectors(
     sql_chucks = [head]
     sql_len = len(head)
 
-    for index in all:
+    for index in all_docs:
         chunk = (
             sql.SQL("({text},{vector}")
             .format(text=index["text"], vector=json.dumps(index["vector"]))
@@ -187,7 +188,7 @@ def generate_document_embeddings(  # Noqa: C901
     document_path = request.location
     docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
 
-    if docPrefix:
+    if document_path != "inline" and docPrefix:
         if not document_path.startswith("/"):
             document_path = "/" + document_path
         document_path = docPrefix + document_path
@@ -226,7 +227,7 @@ def generate_document_embeddings(  # Noqa: C901
         print(f"content_category filtered out - {content_category}")
         return 0
 
-    all = list()
+    all_docs = list()
     print("Generating embeddings")
 
     cols = request.cols.copy() if request.cols else dict()
@@ -239,7 +240,7 @@ def generate_document_embeddings(  # Noqa: C901
 
     for doc in docs:
         vec = encode_text(open_ai_client, doc.page_content)
-        all.append({**cols, "vector": vec, "text": doc.page_content})
+        all_docs.append({**cols, "vector": vec, "text": doc.page_content})
 
     if request.cols and request.clearMatching:
         clearSql = f"DELETE FROM {escape_sql_identifier(embeddings_table)} where"
@@ -271,7 +272,7 @@ def generate_document_embeddings(  # Noqa: C901
     if len(col_names_escaped):
         col_name_sql = "," + (",".join(col_names_escaped))
 
-    total_inserted = insert_vectors(request, col_name_sql, col_names, cols)
+    total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
     if embed_graph:
         age_graph = AgeGraphStorage(
@@ -281,8 +282,10 @@ def generate_document_embeddings(  # Noqa: C901
             dbname=getEnvVar("POSTGRES_DB"),
             user=getEnvVar("POSTGRES_USER"),
             password=getEnvVar("POSTGRES_PASSWORD"),
-            graph="TestGraph",
+            graph="test_graph",
+            global_config=dict(),
         )
+
         _ = graph_embed_docs(docs, age_graph)
 
     return total_inserted
