@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -12,6 +13,8 @@ from nano_graphrag.base import (
     BaseVectorStorage,
     TextChunkSchema,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _format_data(x: Dict[str, str]):
@@ -51,6 +54,7 @@ class AgeGraphStorage(BaseGraphStorage):
 
     async def has_node(self, node_id: str) -> bool:
         query = f"MATCH (n) WHERE n.id = {node_id} RETURN COUNT(n) > 0"
+        logger.info("has-node query %s", query)
         cursor = self.ag.execCypher(query)
         return list(cursor)[0][0]
 
@@ -60,12 +64,13 @@ class AgeGraphStorage(BaseGraphStorage):
             f"WHERE s.id = {source_node_id} AND t.id = {target_node_id} "
             "RETURN COUNT(r) > 0"
         )
+        logger.info("has-edge query %s", query)
         cursor = self.ag.execCypher(query)
         return list(cursor)[0][0]
 
     async def get_node(self, node_id: str) -> Optional[Dict]:
         query = f"MATCH (n) WHERE n.id = {node_id} RETURN properties(n)"
-        print("Get node ", query)
+        logger.info("get-node query %s", query)
         records = self.ag.execCypher(query)
         records = list(records)
 
@@ -95,7 +100,7 @@ class AgeGraphStorage(BaseGraphStorage):
             f"WHERE s.id = {source_node_id} AND t.id = {target_node_id} "
             "RETURN properties(r)"
         )
-        print("Get edge ", query)
+        logger.info("get-edge query %s", query)
         records = self.ag.execCypher(query)
         records = list(records)
         return records[0][0] if records else None
@@ -104,7 +109,7 @@ class AgeGraphStorage(BaseGraphStorage):
         node_type = node_data.get("entity_type", "UNKNOWN").strip('"')
         params = _format_data(node_data)
         query = f"MERGE (n:{node_type} {{id: {node_id}}}) SET n += {params}"
-        print("Upsert node ", query)
+        logger.info("upsert-node query %s", query)
         self.ag.execCypher(query)
         self.ag.commit()
 
@@ -119,7 +124,7 @@ class AgeGraphStorage(BaseGraphStorage):
             "MERGE (s)-[r:RELATED]->(t) "
             f"SET r += {params}"
         )
-        print("Upsert edge ", query)
+        logger.info("upsert-edge query %s", query)
         self.ag.execCypher(query)
         self.ag.commit()
 

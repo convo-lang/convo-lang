@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional, Tuple
 
 import magic
@@ -27,6 +28,8 @@ from .s3_loader import S3FileLoaderEx
 from .types import DocumentEmbeddingRequest
 
 max_sql_len = 65536
+
+logger = logging.getLogger(__name__)
 
 
 def get_text_chunks_langchain(text: str):
@@ -88,7 +91,7 @@ def get_content_category(
         content_type = firstDoc.metadata["content_type"]
     else:
         if firstDoc and firstDoc.metadata and ("filename" in firstDoc.metadata):
-            print("first doc filename", firstDoc)
+            logger.info("first doc filename %s", firstDoc)
             mime_path = firstDoc.metadata["filename"]
 
         if mime_path:
@@ -96,7 +99,7 @@ def get_content_category(
             type = mime.from_file(mime_path)
             if type:
                 content_type = type
-                print("content type set to ", type)
+                logger.info("content type set to %s", type)
 
     if content_type == "application/pdf":
         content_category = "document"
@@ -155,7 +158,7 @@ def insert_vectors(
         chunk_len = len(chunk)
 
         if chunk_len + sql_len >= max_sql_len:
-            print(f"Inserting {inserted} embeddings into {embeddings_table}")
+            logger.info("Inserting %s embeddings into %s", inserted, embeddings_table)
             exec_sql("".join(sql_chucks)[:-1], request.dryRun)
             inserted = 0
             sql_chucks = [head]
@@ -168,10 +171,10 @@ def insert_vectors(
         total_inserted = total_inserted + 1
 
     if inserted > 0:
-        print(f"Inserting {inserted} embeddings into {embeddings_table}")
+        logger.info("Inserting %s embeddings into %s", inserted, embeddings_table)
         exec_sql("".join(sql_chucks)[:-1], request.dryRun)
 
-    print(f"Inserted {total_inserted} embeddings into {embeddings_table}")
+    logger.info("Inserted %s embeddings into %s", total_inserted, embeddings_table)
 
     return total_inserted
 
@@ -183,7 +186,7 @@ def generate_document_embeddings(  # Noqa: C901
     chunk_overlap: int = 20,
     embed_graph: bool = False,
 ) -> int:
-    print("generate_document_embeddings", request)
+    logger.info("generate_document_embeddings %s", request)
 
     document_path = request.location
     docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
@@ -204,31 +207,31 @@ def generate_document_embeddings(  # Noqa: C901
     docs = text_splitter.split_documents(docs)
 
     if len(docs) == 0:
-        print(f"No embedding documents found for {document_path} ")
+        logger.info("No embedding documents found for %s", document_path)
         return 0
 
     content_type, content_category = get_content_category(
         request, document_path, docs, direct_docs
     )
 
-    print("Content category", content_category)
+    logger.info("Content category %s", content_category)
 
     if not content_category and request.contentCategoryCol:
-        print("Unable to determine content category.")
+        logger.info("Unable to determine content category.")
         return 0
 
     if not content_type and request.contentTypeCol:
-        print("Unable to determine content type.")
+        logger.info("Unable to determine content type.")
         return 0
 
     if request.contentCategoryFilter and not (
         content_category in request.contentCategoryFilter
     ):
-        print(f"content_category filtered out - {content_category}")
+        logger.info("content_category filtered out - %s", content_category)
         return 0
 
     all_docs = list()
-    print("Generating embeddings")
+    logger.info("Generating embeddings")
 
     cols = request.cols.copy() if request.cols else dict()
 

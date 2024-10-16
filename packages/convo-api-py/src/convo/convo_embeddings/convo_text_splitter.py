@@ -1,6 +1,9 @@
+import logging
 from typing import Any, List
 
 from langchain.text_splitter import TextSplitter
+
+logger = logging.getLogger(__name__)
 
 spaceChars = [" ", "\n", "\r", "\t"]
 
@@ -38,7 +41,7 @@ class ConvoTextSplitter(TextSplitter):
             part = parts[i]
 
             if len(part) > size:
-                print("to large ", i)
+                logger.info("to large %s", i)
                 start = i
                 lines = splitOn(part, ["\n"], size)
 
@@ -160,7 +163,7 @@ def splitOn(text: str, sepList: List[str], size: int) -> List[str]:
         return parts
 
     else:
-        print("Split by size")
+        logger.info("Split by size")
         parts: List[str] = []
         i = 0
         strLen = len(text)

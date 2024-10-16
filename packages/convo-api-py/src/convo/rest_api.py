@@ -1,4 +1,6 @@
+import logging
 import os
+from datetime import datetime
 from typing import Any, Optional
 
 from convo.convo_embeddings.convert_document import convert_document
@@ -11,6 +13,8 @@ from convo.convo_embeddings.types import (
 from iyio_common import start_rest_server
 from openai import OpenAI
 
+logger = logging.getLogger(__name__)
+
 serverPort = int(os.getenv("REST_PORT") or os.getenv("PORT") or "8080")
 
 
@@ -22,7 +26,7 @@ def request_handler(path, data: Any, method, open_ai_client: Optional[OpenAI] = 
 
     open_ai_client = OpenAI() if open_ai_client is None else open_ai_client
 
-    print(path)
+    logging.info(path)
 
     match method + ":" + path:
         case "POST:/embeddings/text":
@@ -43,4 +47,7 @@ def start_rest_api():
 
 
 if __name__ == "__main__":
+    log_file = f"embedding_api_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.log"
+    logging.basicConfig(filename=log_file, level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler())
     start_rest_api()
