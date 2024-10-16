@@ -15,12 +15,12 @@ load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-openai")
 
 graph_rag_config = GraphRagConfig()
 graph_db_config = GraphDBConfig(
-    host=getEnvVar("POSTGRES_HOST"),
-    port=getEnvVar("POSTGRES_PORT"),
-    dbname=getEnvVar("POSTGRES_DB"),
-    user=getEnvVar("POSTGRES_USER"),
-    password=getEnvVar("POSTGRES_PASSWORD"),
-    graph=getEnvVar("POSTGRES_GRAPH"),
+    host=getEnvVar("PGHOST"),
+    port=getEnvVar("PGPORT"),
+    dbname=getEnvVar("PGDATABASE"),
+    user=getEnvVar("PGUSER"),
+    password=getEnvVar("PGPASSWORD"),
+    graph=getEnvVar("PGGRAPH"),
 )
 # generate_document_embeddings('/Users/scott/docs/convo-lang-mgr/Documents/Convo-2024-01-24-(1).pdf','application/pdf',docTemplate)
 

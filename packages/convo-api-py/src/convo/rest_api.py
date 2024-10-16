@@ -44,13 +44,14 @@ def request_handler(
 
         case "POST:/embeddings/document":
             graph_rag_config = GraphRagConfig()
+
             graph_db_config = GraphDBConfig(
-                host=getEnvVar("POSTGRES_HOST"),
-                port=getEnvVar("POSTGRES_PORT"),
-                dbname=getEnvVar("POSTGRES_DB"),
-                user=getEnvVar("POSTGRES_USER"),
-                password=getEnvVar("POSTGRES_PASSWORD"),
-                graph=getEnvVar("POSTGRES_GRAPH"),
+                host=getEnvVar("PGHOST"),
+                port=getEnvVar("PGPORT"),
+                dbname=getEnvVar("PGDATABASE"),
+                user=getEnvVar("PGUSER"),
+                password=getEnvVar("PGPASSWORD"),
+                graph=getEnvVar("PGGRAPH"),
             )
             return generate_document_embeddings(
                 open_ai_client,
