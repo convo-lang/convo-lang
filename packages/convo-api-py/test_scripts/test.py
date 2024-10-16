@@ -1,11 +1,12 @@
+from convo.convo_embeddings.embed_documents import generate_document_embeddings
+from convo.convo_embeddings.types import DocumentEmbeddingRequest
 from dotenv import load_dotenv
+from openai import OpenAI
 
-from .convo_embeddings.embed_documents import generate_document_embeddings
-from .convo_embeddings.types import DocumentEmbeddingRequest
-
-load_dotenv("/Users/scott/docs/liirn-space/.env.local")
-load_dotenv("/Users/scott/docs/liirn-space/.env")
-load_dotenv("/Users/scott/docs/liirn-space/.env.cdk")
+load_dotenv("/home/liirn/Projects/convo-studio/.env.local")
+load_dotenv("/home/liirn/Projects/convo-studio/.env")
+load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-db")
+load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-openai")
 
 
 # generate_document_embeddings('/Users/scott/docs/convo-lang-mgr/Documents/Convo-2024-01-24-(1).pdf','application/pdf',docTemplate)
@@ -16,7 +17,7 @@ load_dotenv("/Users/scott/docs/liirn-space/.env.cdk")
 
 # generate_document_embeddings('https://en.wikipedia.org/wiki/Magna_Lykseth-Skogman','text/html',docTemplate)
 
-s3Key = "bn3Pk99FQrKYNduH8zj4Rw8FeFjurMSkeA4Xp1nhCbXg"
+# s3Key = "bn3Pk99FQrKYNduH8zj4Rw8FeFjurMSkeA4Xp1nhCbXg"
 # generate_document_embeddings(DocumentEmbeddingRequest(
 #     dryRun=True,
 #     #location='/Users/scott/docs/convo-lang-mgr/Documents/Convo-2024-01-24-(1).pdf',
@@ -34,6 +35,7 @@ s3Key = "bn3Pk99FQrKYNduH8zj4Rw8FeFjurMSkeA4Xp1nhCbXg"
 
 
 generate_document_embeddings(
+    OpenAI(),
     DocumentEmbeddingRequest(
         dryRun=True,
         location="inline",
@@ -48,5 +50,6 @@ generate_document_embeddings(
         ),
         contentType="text/markdown",
         cols={"sourceId": "abc-stuff"},
-    )
+    ),
+    embed_graph=True,
 )
