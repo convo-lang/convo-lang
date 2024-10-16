@@ -1,18 +1,19 @@
 import asyncio
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
 import age
 from langchain_core.documents import Document
-from nano_graphrag._llm import gpt_4o_complete, gpt_4o_mini_complete
 from nano_graphrag._op import extract_entities
 from nano_graphrag.base import (
     BaseGraphStorage,
     BaseVectorStorage,
     TextChunkSchema,
 )
+
+from .types import GraphDBConfig, GraphRagConfig
 
 logger = logging.getLogger(__name__)
 
@@ -130,43 +131,32 @@ class AgeGraphStorage(BaseGraphStorage):
 
 
 def graph_embed_docs(
-    docs: List[Document],  # Chunk key and chunk data
-    knowledge_graph_inst: AgeGraphStorage,
+    docs: List[Document],
+    graph_db_config: GraphDBConfig,
+    graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
-) -> AgeGraphStorage:
+):
+    age_graph = AgeGraphStorage(
+        namespace="NA",
+        global_config=asdict(graph_rag_config),
+        **asdict(graph_db_config),
+    )
+
     chunks = {
         f"{i:#0{6}x}": TextChunkSchema(
-            tokens=0,
+            tokens=0,  # Unused by graph-rag
             content=doc.page_content,
             full_doc_id=f"{i:#0{6}x}",
-            chunk_order_index=0,
+            chunk_order_index=0,  # Unused by graph-rag
         )
         for i, doc in enumerate(docs)
     }
 
-    global_config = dict(
-        best_model_func=gpt_4o_complete,
-        best_model_max_token_size=32768,
-        best_model_max_async=16,
-        cheap_model_func=gpt_4o_mini_complete,
-        cheap_model_max_token_size=32768,
-        cheap_model_max_async=16,
-        tiktoken_model_name="gpt-4o",
-        entity_summary_to_max_tokens=500,
-        entity_extract_max_gleaning=1,
-    )
-
-    knowledge_graph_inst.global_config = global_config
-
-    updated_graph = asyncio.run(
+    _ = asyncio.run(
         extract_entities(
             chunks,
-            knowledge_graph_inst,
+            age_graph,
             entity_vdb,
-            global_config,
+            asdict(graph_rag_config),
         )
     )
-
-    knowledge_graph_inst.ag.commit()
-
-    return updated_graph

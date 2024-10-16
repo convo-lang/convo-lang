@@ -1,5 +1,7 @@
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
+from nano_graphrag._llm import gpt_4o_complete, gpt_4o_mini_complete
 from pydantic import BaseModel
 
 
@@ -41,3 +43,26 @@ class DocumentEmbeddingRequest(BaseModel):
 class DocumentConversionRequest(BaseModel):
     srcPath: str
     destPath: str
+
+
+@dataclass
+class GraphRagConfig:
+    best_model_func: Callable = gpt_4o_complete
+    best_model_max_token_size: int = 32768
+    best_model_max_async: int = 16
+    cheap_model_func: callable = gpt_4o_mini_complete
+    cheap_model_max_token_size: int = 32768
+    cheap_model_max_async: int = 16
+    tiktoken_model_name: str = "gpt-4o"
+    entity_summary_to_max_tokens: int = 500
+    entity_extract_max_gleaning: int = 1
+
+
+@dataclass
+class GraphDBConfig:
+    host: str
+    port: str
+    dbname: str
+    user: str
+    password: str
+    graph: str

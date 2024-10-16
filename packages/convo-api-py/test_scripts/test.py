@@ -1,6 +1,11 @@
 from convo.convo_embeddings.embed_documents import generate_document_embeddings
-from convo.convo_embeddings.types import DocumentEmbeddingRequest
+from convo.convo_embeddings.types import (
+    DocumentEmbeddingRequest,
+    GraphDBConfig,
+    GraphRagConfig,
+)
 from dotenv import load_dotenv
+from iyio_common import getEnvVar
 from openai import OpenAI
 
 load_dotenv("/home/liirn/Projects/convo-studio/.env.local")
@@ -8,7 +13,15 @@ load_dotenv("/home/liirn/Projects/convo-studio/.env")
 load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-db")
 load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-openai")
 
-
+graph_rag_config = GraphRagConfig()
+graph_db_config = GraphDBConfig(
+    host=getEnvVar("POSTGRES_HOST"),
+    port=getEnvVar("POSTGRES_PORT"),
+    dbname=getEnvVar("POSTGRES_DB"),
+    user=getEnvVar("POSTGRES_USER"),
+    password=getEnvVar("POSTGRES_PASSWORD"),
+    graph=getEnvVar("POSTGRES_GRAPH"),
+)
 # generate_document_embeddings('/Users/scott/docs/convo-lang-mgr/Documents/Convo-2024-01-24-(1).pdf','application/pdf',docTemplate)
 
 # generate_document_embeddings('s3://liirnspace-bucksmediabucket70ce2cea-11rljmkq8tolk/bn3Pk99FQrKYNduH8zj4Rw8FeFjurMSkeA4Xp1nhCbXg','application/pdf',docTemplate)
@@ -33,6 +46,8 @@ load_dotenv("/home/liirn/Projects/convo-studio/secrets/.env-openai")
 # ))
 # https://liirnspace-bucksmediabucket70ce2cea-11rljmkq8tolk.s3.amazonaws.com/aGBfKn60TaCreg-EwLI46AIe23r9QdStqEUyYqGpyA0w
 
+print(graph_db_config)
+print(graph_rag_config)
 
 generate_document_embeddings(
     OpenAI(),
@@ -51,5 +66,7 @@ generate_document_embeddings(
         contentType="text/markdown",
         cols={"sourceId": "abc-stuff"},
     ),
+    graph_db_config,
+    graph_rag_config,
     embed_graph=True,
 )

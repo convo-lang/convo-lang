@@ -23,9 +23,9 @@ from psycopg import sql
 
 from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
-from .graph_embedding import AgeGraphStorage, graph_embed_docs
+from .graph_embedding import graph_embed_docs
 from .s3_loader import S3FileLoaderEx
-from .types import DocumentEmbeddingRequest
+from .types import DocumentEmbeddingRequest, GraphDBConfig, GraphRagConfig
 
 max_sql_len = 65536
 
@@ -182,6 +182,8 @@ def insert_vectors(
 def generate_document_embeddings(  # Noqa: C901
     open_ai_client: Client,
     request: DocumentEmbeddingRequest,
+    graph_db_config: GraphDBConfig,
+    graph_rag_config: GraphRagConfig,
     chunk_size: int = 300,
     chunk_overlap: int = 20,
     embed_graph: bool = False,
@@ -278,17 +280,6 @@ def generate_document_embeddings(  # Noqa: C901
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
     if embed_graph:
-        age_graph = AgeGraphStorage(
-            namespace="Foo",
-            host="127.0.0.1",
-            port="62691",
-            dbname=getEnvVar("POSTGRES_DB"),
-            user=getEnvVar("POSTGRES_USER"),
-            password=getEnvVar("POSTGRES_PASSWORD"),
-            graph="test_graph",
-            global_config=dict(),
-        )
-
-        _ = graph_embed_docs(docs, age_graph)
+        _ = graph_embed_docs(docs, graph_db_config, graph_rag_config)
 
     return total_inserted

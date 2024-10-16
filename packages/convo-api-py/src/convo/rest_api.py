@@ -9,8 +9,10 @@ from convo.convo_embeddings.embed_documents import generate_document_embeddings
 from convo.convo_embeddings.types import (
     DocumentConversionRequest,
     DocumentEmbeddingRequest,
+    GraphDBConfig,
+    GraphRagConfig,
 )
-from iyio_common import start_rest_server
+from iyio_common import getEnvVar, start_rest_server
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -18,15 +20,20 @@ logger = logging.getLogger(__name__)
 serverPort = int(os.getenv("REST_PORT") or os.getenv("PORT") or "8080")
 
 
-def request_handler(path, data: Any, method, open_ai_client: Optional[OpenAI] = None):
+def request_handler(
+    path,
+    data: Any,
+    method,
+    open_ai_client: Optional[OpenAI] = None,
+):
     """
-    Handles an http request. data is either the request body or
+    Handles a http request. Data is either the request body or
     query params for a GET request
     """
 
-    open_ai_client = OpenAI() if open_ai_client is None else open_ai_client
+    logging.info("Recived request to %s", path)
 
-    logging.info(path)
+    open_ai_client = OpenAI() if open_ai_client is None else open_ai_client
 
     match method + ":" + path:
         case "POST:/embeddings/text":
@@ -36,7 +43,21 @@ def request_handler(path, data: Any, method, open_ai_client: Optional[OpenAI] = 
             return encode_text(open_ai_client, [data["text"] if "text" in data else ""])
 
         case "POST:/embeddings/document":
-            return generate_document_embeddings(DocumentEmbeddingRequest(**data))
+            graph_rag_config = GraphRagConfig()
+            graph_db_config = GraphDBConfig(
+                host=getEnvVar("POSTGRES_HOST"),
+                port=getEnvVar("POSTGRES_PORT"),
+                dbname=getEnvVar("POSTGRES_DB"),
+                user=getEnvVar("POSTGRES_USER"),
+                password=getEnvVar("POSTGRES_PASSWORD"),
+                graph=getEnvVar("POSTGRES_GRAPH"),
+            )
+            return generate_document_embeddings(
+                open_ai_client,
+                DocumentEmbeddingRequest(**data),
+                graph_db_config,
+                graph_rag_config,
+            )
 
         case "POST:/document-conversion":
             return convert_document(DocumentConversionRequest(**data))
