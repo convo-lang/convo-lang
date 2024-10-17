@@ -308,9 +308,9 @@ export interface ConvoEdgePattern
     input?:any;
 
     /**
-     * additional variables to insert into the condition checking
+     * A Workflow object to insert into the condition checking
      */
-    defaultVars?:Record<string,any>;
+    workflow?:Record<string,any>;
 }
 
 /**
