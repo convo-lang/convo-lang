@@ -384,6 +384,11 @@ export const convoTags={
     suggestion:'suggestion',
 
     /**
+     * A title display above a group of suggestions
+     */
+    suggestionTitle:'suggestionTitle',
+
+    /**
      * Sets the threadId of the current message and all following messages. Using the `@thread` tag
      * without a value will clear the current thread id.
      */

@@ -1,7 +1,7 @@
 import { ConversationUiCtrl, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
-import { BasicIcon, LoadingDots, ScrollView, SlimButton, View, useSubject } from "@iyio/react-common";
+import { LoadingDots, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
@@ -152,17 +152,42 @@ const renderMessage=(
     }</Fragment>)
 
     }else if(m.isSuggestion){
+        const isFirst=!flat.messages[i-1]?.isSuggestion;
+        if(!isFirst){
+            return null;
+        }
+        const titles:string[]=[];
+        const group:FlatConvoMessage[]=[];
+        for(let x=i;x<flat.messages.length;x++){
+            const segMsg=flat.messages[x];
+            if(!segMsg?.isSuggestion){
+                break;
+            }
+            group.push(segMsg);
+            const t=segMsg.tags?.[convoTags.suggestionTitle];
+            if(t){
+                titles.push(t);
+            }
+        }
         return (
             <div className={rowClassName} key={i+'d'}>
 
-                <View row alignCenter>
-                    <BasicIcon className={style.suggestIcon()} icon="chevron-right" />
-                    <SlimButton className={className} onClick={()=>{
-                        ctrl.appendUiMessageAsync(m.content??'')
-                    }}>
-                        {m.tags?.[convoTags.suggestion]??m.content}
-                    </SlimButton>
-                </View>
+                {!!titles.length && <div className={style.suggestTitles()}>
+                    {titles.map((t,i)=>(
+                        <Text text={t} />
+                    ))}
+                </div>}
+
+                <div className={className}>
+                    {group.map((msg,gi)=>(
+                        <SlimButton className={style.suggestBtn()} key={gi} onClick={()=>{
+                            ctrl.appendUiMessageAsync(msg.content??'')
+                        }}>
+                            {msg.tags?.[convoTags.suggestion]??msg.content}
+                        </SlimButton>
+                    ))}
+
+                </div>
             </div>
         )
     }else{
@@ -353,16 +378,44 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
     }
     @.msg.suggestion{
         background-color:#000000;
-        box-shadow:0 0 8px #00000099;
-        border:1px solid #ffffff22;
+        border:1px solid color-mix( in srgb, @@agentColor , transparent 50% );
+        padding:0;
+        display:flex;
+        flex-direction:column;
+        border-radius:calc( @@messageBorderRadius / 2 );
     }
     @.msg.agent.suggestion{
-        margin-left:0.5rem;
     }
     @.msg.user.suggestion{
-        margin-right:0.5rem;
     }
     @.suggestIcon{
         fill:@@agentColor;
+    }
+    @.suggestBtn{
+        border-top:1px solid color-mix( in srgb, @@agentColor , transparent 50% );
+        padding:@@messagePadding;
+        transition:background-color 0.2s ease-in-out;
+        text-align:center;
+        justify-content:center;
+    }
+    @.suggestBtn:hover{
+        background-color:color-mix( in srgb, @@userBackground , transparent 50% );
+    }
+    @.suggestBtn:first-child{
+        border-top:none;
+        border-top-right-radius:calc( @@messageBorderRadius / 2 );
+        border-top-left-radius:calc( @@messageBorderRadius / 2 );
+    }
+    @.suggestBtn:last-child{
+        border-bottom-right-radius:calc( @@messageBorderRadius / 2 );
+        border-bottom-left-radius:calc( @@messageBorderRadius / 2 );
+    }
+    @.suggestTitles{
+        display:flex;
+        flex-direction:column;
+        margin-top:0.5rem;
+        margin-bottom:-0.5rem;
+        margin:0.5rem 0.5rem -0.5rem 0.5rem;
+        opacity:0.7;
     }
 `});
