@@ -1,7 +1,7 @@
 import { getErrorMessage, joinPaths, uiRouterService } from "@iyio/common";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
+import { ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityRef, ConvoGraphMonitorEvent, ConvoGraphSelection, ConvoMetadataAndTypeMap, ConvoNode, ConvoNodeExecCtx, ConvoNodeMetadata, ConvoNodeOutput, ConvoStateVarProxyMap, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
 import { convoTags, convoUsageTokensToString } from "./convo-lib";
 import { ConvoTokenUsage } from "./convo-types";
 
@@ -9,11 +9,26 @@ export const maxConvoGraphConcurrentStepExe=5;
 
 export const convoTraverserStateStoreSuffix='_suffix';
 
+export const convoTraverserProxyVar='_proxy'
+
 export const applyConvoTraverserControlPath=(tv:ConvoTraverser)=>{
     if(tv.controlPath){
         const suffix=tv.state[convoTraverserStateStoreSuffix];
         uiRouterService().replace(suffix?joinPaths(tv.controlPath,suffix):tv.controlPath);
     }
+}
+
+export const getConvoTraverserForSaving=(tv:ConvoTraverser):ConvoTraverser=>{
+    const map=tv.state[convoTraverserProxyVar] as ConvoStateVarProxyMap|undefined;
+    if(!map || (typeof map !=='object')){
+        return tv;
+    }
+    tv={...tv};
+    tv.state={...tv.state};
+    for(const e in map){
+        delete tv.state[e];
+    }
+    return tv;
 }
 
 export const getConvoTraverserStoreId=(tv:ConvoTraverser,ext?:string):string=>{

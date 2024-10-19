@@ -1,4 +1,4 @@
-import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions, ConvoTraverser, getConvoTraverserStoreId, getConvoTraverserStoreIdById } from "@convo-lang/convo-lang";
+import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions, ConvoStateVarProxyMap, ConvoTraverser, convoTraverserProxyVar, getConvoTraverserForSaving, getConvoTraverserStoreId, getConvoTraverserStoreIdById } from "@convo-lang/convo-lang";
 import { isVfsFilePath, vfs } from "@iyio/vfs";
 
 export type ConvoVfsProxyType='all'|'none'|'traverser'|'node'|'edge';
@@ -48,7 +48,7 @@ export class ConvoVfsGraphStore extends ConvoMemoryGraphStore
         const id=getConvoTraverserStoreId(traverser,'.json');
         if(this.shouldProxy('traverser')){
             if(isVfsFilePath(id)){
-                await vfs().writeObjectAsync(id,traverser);
+                await vfs().writeObjectAsync(id,getConvoTraverserForSaving(traverser));
             }
         }else{
             await super.putTraverserAsync(traverser);
@@ -64,6 +64,68 @@ export class ConvoVfsGraphStore extends ConvoMemoryGraphStore
         }else{
             await super.deleteTraverserAsync(id);
         }
+
+    }
+
+    public async loadTraverserProxiesAsync?(tv:ConvoTraverser,loadKeys?:string[]):Promise<void>
+    {
+        const map=tv.state[convoTraverserProxyVar] as ConvoStateVarProxyMap|undefined;
+        if(!map || (typeof map !=='object')){
+            return;
+        }
+        const keys=Object.keys(map);
+        await Promise.all(keys.map(async e=>{
+            const p=map[e];
+            if(!p || (loadKeys && !loadKeys.includes(e))){
+                return;
+            }
+            let path:string;
+            if(typeof p === 'string'){
+                path=p;
+            }else{
+                path=p?.path;
+            }
+            if(!path){
+                return;
+            }
+            const value=await vfs().readObjectAsync(path);
+            if(value!==undefined){
+                tv.state[e]=value;
+            }
+        }));
+    }
+
+    public async putTraverserProxiesAsync?(tv:ConvoTraverser):Promise<void>
+    {
+        const map=tv.state[convoTraverserProxyVar] as ConvoStateVarProxyMap|undefined;
+        if(!map || (typeof map !=='object')){
+            return;
+        }
+        const keys=Object.keys(map);
+        await Promise.all(keys.map(async e=>{
+            const p=map[e];
+            if(!p){
+                return;
+            }
+            let path:string;
+            if(typeof p === 'string'){
+                path=p;
+            }else{
+                if(p.readonly){
+                    return;
+                }
+                path=p?.path;
+            }
+            if(!path){
+                return;
+            }
+            const value=tv.state[e];
+            if(value===undefined){
+                await vfs().removeAsync(path);
+            }else{
+                await vfs().writeObjectAsync(path,value);
+            }
+        }));
 
     }
 

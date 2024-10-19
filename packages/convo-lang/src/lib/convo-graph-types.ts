@@ -616,6 +616,10 @@ export interface ConvoGraphStore
 
     getNextTraverserId():string;
 
+    loadTraverserProxiesAsync?(traverser:ConvoTraverser,loadKeys?:string[]):Promise<void>;
+
+    putTraverserProxiesAsync?(traverser:ConvoTraverser):Promise<void>;
+
 
     getSourceNodesAsync():Promise<ConvoSourceNode[]>;
 
@@ -629,8 +633,6 @@ export interface ConvoGraphStore
 
     getNextInputId():string;
 }
-
-
 
 
 export interface ConvoInputTemplate{
@@ -700,3 +702,13 @@ export type ConvoGraphParsingResult=CodeParsingResult<ConvoGraphParsingData>;
 export const allConvoGraphMsgTypeAry=['node','step','edge','input','source','graph'] as const;
 export type ConvoGraphMsgType=typeof allConvoGraphMsgTypeAry[number];
 export const isConvoGraphMsgType=(value:any):value is ConvoGraphMsgType=>(allConvoGraphMsgTypeAry.includes(value));
+
+
+
+export interface ConvoStateVarProxy
+{
+    path:string;
+    readonly?:boolean;
+}
+
+export type ConvoStateVarProxyMap=Record<string,ConvoStateVarProxy|string>;

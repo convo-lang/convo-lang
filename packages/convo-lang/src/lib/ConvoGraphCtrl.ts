@@ -2,8 +2,8 @@ import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, cr
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { applyConvoTraverserControlPath, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
-import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
+import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
 import { ConvoFnCallInfo, ConvoTokenUsage } from "./convo-types";
@@ -314,7 +314,13 @@ export class ConvoGraphCtrl
 
     private async saveTraverserAsync(tv:ConvoTraverser){
         applyConvoTraverserControlPath(tv);
-        await this.store.putTraverserAsync(tv);
+        const putP=this.store.putTraverserAsync(tv);
+        if(this.store.putTraverserProxiesAsync){
+            await Promise.all([putP,this.store.putTraverserProxiesAsync(tv)]);
+        }else{
+            await putP;
+        }
+
     }
 
     public async runGroupAsync(group:ConvoTraverserGroup):Promise<void>
@@ -346,6 +352,9 @@ export class ConvoGraphCtrl
     }
 
     public async runAsync(tv:ConvoTraverser,group?:ConvoTraverserGroup):Promise<ConvoNodeExeState>{
+
+        await this.store.loadTraverserProxiesAsync?.(tv);
+
         while((await this.nextAsync(tv,group))==='ready' && !group?.cancel.isCanceled){
             // do nothing
         }
@@ -414,8 +423,48 @@ export class ConvoGraphCtrl
         }
 
         const startSuffix=tv.state[convoTraverserStateStoreSuffix];
+        const startProxyPaths:Record<string,string>={};
+        let map=tv.state[convoTraverserProxyVar] as ConvoStateVarProxyMap|undefined;
+        if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
+            for(const e in map){
+                const p=map[e];
+                if(!p){
+                    continue;
+                }
+                if(typeof p === 'string'){
+                    startProxyPaths[e]=p;
+                }else{
+                    startProxyPaths[e]=p.path;
+                }
+            }
+        }
+
 
         const exeCtx=await createConvoNodeExecCtxAsync(node,await this.getConvoOptionsAsync(tv));
+
+        map=tv.state[convoTraverserProxyVar]
+
+        if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
+            const changes:string[]=[];
+            for(const e in map){
+                const p=map[e];
+                if(!p){
+                    continue;
+                }
+                let path:string;
+                if(typeof p === 'string'){
+                    path=p;
+                }else{
+                    path=p.path;
+                }
+                if(path!==startProxyPaths[e]){
+                    changes.push(e);
+                }
+            }
+            if(changes.length){
+                this.store.loadTraverserProxiesAsync(tv,changes);
+            }
+        }
 
         // transform input
         let transformStep:ConvoNodeExecCtxStep|null=null;
