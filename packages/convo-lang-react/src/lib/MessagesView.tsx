@@ -135,7 +135,7 @@ const renderMessage=(
 
         return (<Fragment key={i+'f'}>{
             parts.map((p,pi)=>p.image?(
-                <div className={rowClassName} key={i}>
+                <div className={rowClassName} key={pi}>
                     <img
                         className={style.img({user:m.role==='user',agent:m.role!=='user'})}
                         alt={p.image.description}
@@ -174,7 +174,7 @@ const renderMessage=(
 
                 {!!titles.length && <div className={style.suggestTitles()}>
                     {titles.map((t,i)=>(
-                        <Text text={t} />
+                        <Text text={t} key={i} />
                     ))}
                 </div>}
 
