@@ -439,7 +439,34 @@ export class ConvoGraphCtrl
             }
         }
 
+        const checkProxyAsync=async (suffixChanged:boolean)=>{
+            map=tv.state[convoTraverserProxyVar];
+            if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
+                const changes:string[]=[];
+                for(const e in map){
+                    const p=map[e];
+                    if(!p){
+                        continue;
+                    }
+                    let path:string;
+                    if(typeof p === 'string'){
+                        path=p;
+                    }else{
+                        path=p.path;
+                    }
+                    if(path!==startProxyPaths[e]){
+                        changes.push(e);
+                    }
+                }
+                if(changes.length || suffixChanged){
+                    await this.store.loadTraverserProxiesAsync(tv,changes);
+                }
+            }
+        }
+
         const exeCtx=await createConvoNodeExecCtxAsync(node,await this.getConvoOptionsAsync(tv));
+
+        await checkProxyAsync(false);
 
         // transform input
         let transformStep:ConvoNodeExecCtxStep|null=null;
@@ -470,6 +497,8 @@ export class ConvoGraphCtrl
                 tv.currentStepIndex=0;
                 return 'failed';
             }
+
+            await checkProxyAsync(false);
         }
         tv.currentStepIndex=0;
         tv.exeState='invoked';
@@ -488,28 +517,7 @@ export class ConvoGraphCtrl
             }
         }
 
-        map=tv.state[convoTraverserProxyVar];
-        if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
-            const changes:string[]=[];
-            for(const e in map){
-                const p=map[e];
-                if(!p){
-                    continue;
-                }
-                let path:string;
-                if(typeof p === 'string'){
-                    path=p;
-                }else{
-                    path=p.path;
-                }
-                if(path!==startProxyPaths[e]){
-                    changes.push(e);
-                }
-            }
-            if(changes.length || suffixChanged){
-                await this.store.loadTraverserProxiesAsync(tv,changes);
-            }
-        }
+        await checkProxyAsync(suffixChanged);
 
         await exeCtx.convo.flattenAsync();
 
