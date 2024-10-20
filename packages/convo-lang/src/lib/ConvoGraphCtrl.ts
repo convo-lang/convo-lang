@@ -439,32 +439,7 @@ export class ConvoGraphCtrl
             }
         }
 
-
         const exeCtx=await createConvoNodeExecCtxAsync(node,await this.getConvoOptionsAsync(tv));
-
-        map=tv.state[convoTraverserProxyVar]
-
-        if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
-            const changes:string[]=[];
-            for(const e in map){
-                const p=map[e];
-                if(!p){
-                    continue;
-                }
-                let path:string;
-                if(typeof p === 'string'){
-                    path=p;
-                }else{
-                    path=p.path;
-                }
-                if(path!==startProxyPaths[e]){
-                    changes.push(e);
-                }
-            }
-            if(changes.length){
-                this.store.loadTraverserProxiesAsync(tv,changes);
-            }
-        }
 
         // transform input
         let transformStep:ConvoNodeExecCtxStep|null=null;
@@ -500,7 +475,8 @@ export class ConvoGraphCtrl
         tv.exeState='invoked';
 
         const newSuffix=tv.state[convoTraverserStateStoreSuffix];
-        if(newSuffix && startSuffix!==newSuffix){
+        const suffixChanged=(newSuffix && startSuffix!==newSuffix)?true:false;
+        if(suffixChanged){
             const stateTv=await this.store.getTraverserAsync(tv.id,newSuffix);
             if(stateTv){
                 for(const e in stateTv.state){
@@ -509,6 +485,29 @@ export class ConvoGraphCtrl
                     }
                     tv.state[e]=stateTv.state[e];
                 }
+            }
+        }
+
+        map=tv.state[convoTraverserProxyVar];
+        if(this.store.loadTraverserProxiesAsync && map && (typeof map ==='object')){
+            const changes:string[]=[];
+            for(const e in map){
+                const p=map[e];
+                if(!p){
+                    continue;
+                }
+                let path:string;
+                if(typeof p === 'string'){
+                    path=p;
+                }else{
+                    path=p.path;
+                }
+                if(path!==startProxyPaths[e]){
+                    changes.push(e);
+                }
+            }
+            if(changes.length || suffixChanged){
+                await this.store.loadTraverserProxiesAsync(tv,changes);
             }
         }
 
