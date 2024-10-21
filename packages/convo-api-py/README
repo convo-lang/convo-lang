@@ -13,3 +13,10 @@ The service can then be started using uvicorn and
 ```bash
 uvicorn convo.main:app
 ```
+
+environment parameters can be passed as a file using the `--env-file`
+argument, i.e.
+
+```bash
+uvicorn convo.main:app --env-file <PATH-TO-FILE>
+```
