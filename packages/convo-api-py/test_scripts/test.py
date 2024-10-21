@@ -1,3 +1,5 @@
+import asyncio
+
 from convo.convo_embeddings.embed_documents import generate_document_embeddings
 from convo.convo_embeddings.types import (
     DocumentEmbeddingRequest,
@@ -49,24 +51,26 @@ graph_db_config = GraphDBConfig(
 print(graph_db_config)
 print(graph_rag_config)
 
-generate_document_embeddings(
-    OpenAI(),
-    DocumentEmbeddingRequest(
-        dryRun=True,
-        location="inline",
-        inlineContent=(
-            "The speaker asserts that regardless of experience, there is always potential to "
-            "learn from others in the same field, as different individuals may have access to "
-            "unique knowledge and teaching. They relate this to their own experience in "
-            "woodworking, where they began with significant initial knowledge from family "
-            "teachings but were not taken seriously early in their apprenticeship. Despite "
-            "this, they were fortunate to find mentors among other tradesmen who supported "
-            "and further educated them, boosting their confidence and enhancing their skills."
+asyncio.run(
+    generate_document_embeddings(
+        OpenAI(),
+        DocumentEmbeddingRequest(
+            dryRun=True,
+            location="inline",
+            inlineContent=(
+                "The speaker asserts that regardless of experience, there is always potential to "
+                "learn from others in the same field, as different individuals may have access to "
+                "unique knowledge and teaching. They relate this to their own experience in "
+                "woodworking, where they began with significant initial knowledge from family "
+                "teachings but were not taken seriously early in their apprenticeship. Despite "
+                "this, they were fortunate to find mentors among other tradesmen who supported "
+                "and further educated them, boosting their confidence and enhancing their skills."
+            ),
+            contentType="text/markdown",
+            cols={"sourceId": "abc-stuff"},
+            graphEmbedding=True,
         ),
-        contentType="text/markdown",
-        cols={"sourceId": "abc-stuff"},
-        graphEmbedding=True,
-    ),
-    graph_db_config,
-    graph_rag_config,
+        graph_db_config,
+        graph_rag_config,
+    )
 )

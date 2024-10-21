@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import List
 
@@ -38,14 +39,16 @@ def onMessage(messages: List[SqsEventRecord]):
                 print("S3 bucket not found")
                 continue
 
-            generate_document_embeddings(
-                DocumentEmbeddingRequest(
-                    dryRun=False,
-                    contentCategoryFilter=["document"],
-                    location=f"s3://{bucket}/{key}",
-                    contentCategoryCol="contentCategory",
-                    contentTypeCol="contentType",
-                    cols={"sourceId": key},
+            asyncio.run(
+                generate_document_embeddings(
+                    DocumentEmbeddingRequest(
+                        dryRun=False,
+                        contentCategoryFilter=["document"],
+                        location=f"s3://{bucket}/{key}",
+                        contentCategoryCol="contentCategory",
+                        contentTypeCol="contentType",
+                        cols={"sourceId": key},
+                    )
                 )
             )
 
