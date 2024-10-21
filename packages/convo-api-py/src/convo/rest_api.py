@@ -33,7 +33,7 @@ async def embed_documents(request: DocumentEmbeddingRequest):
     open_ai_client = OpenAI()
     graph_rag_config = GraphRagConfig()
     graph_db_config = GraphDBConfig()
-    return generate_document_embeddings(
+    return await generate_document_embeddings(
         open_ai_client,
         request,
         graph_db_config,

@@ -151,7 +151,7 @@ async def graph_embed_docs(
         for i, doc in enumerate(docs)
     }
 
-    _ = extract_entities(
+    _ = await extract_entities(
         chunks,
         age_graph,
         entity_vdb,

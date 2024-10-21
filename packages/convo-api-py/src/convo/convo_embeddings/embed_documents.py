@@ -180,7 +180,7 @@ def insert_vectors(
     return total_inserted
 
 
-def generate_document_embeddings(  # Noqa: C901
+async def generate_document_embeddings(  # Noqa: C901
     open_ai_client: Client,
     request: DocumentEmbeddingRequest,
     graph_db_config: GraphDBConfig,
@@ -278,6 +278,6 @@ def generate_document_embeddings(  # Noqa: C901
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
     if request.graphEmbedding:
-        _ = graph_embed_docs(docs, graph_db_config, graph_rag_config)
+        _ = await graph_embed_docs(docs, graph_db_config, graph_rag_config)
 
     return total_inserted
