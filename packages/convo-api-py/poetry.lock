@@ -708,19 +708,6 @@ test = ["Pillow", "contourpy[test-no-images]", "matplotlib"]
 test-no-images = ["pytest", "pytest-cov", "pytest-rerunfailures", "pytest-xdist", "wurlitzer"]
 
 [[package]]
-name = "convo_lang"
-version = "0.5.11"
-description = "A conversational prompting and programming language"
-optional = false
-python-versions = ">=3.8"
-files = []
-develop = true
-
-[package.source]
-type = "directory"
-url = "../convo-lang-py"
-
-[[package]]
 name = "cryptography"
 version = "43.0.3"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
@@ -5500,4 +5487,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "5668aa4f38d5b3fcc2f0010d3fbd499e06e12f1f81379c7be97b0ff7fed92977"
+content-hash = "c111dc34901c569b55a9a568825a86e78f91c13a8f0fa34c7f5628fd8e236686"
