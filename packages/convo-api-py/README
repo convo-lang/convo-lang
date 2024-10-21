@@ -1,0 +1,15 @@
+# Text Embedding API
+
+Dependencies can be installed using [poetry](https://python-poetry.org/docs/)
+
+```bash
+pip install .
+```
+
+will create a virtual environment in `.venv`.
+
+The service can then be started using uvicorn and
+
+```bash
+uvicorn convo.main:app
+```
