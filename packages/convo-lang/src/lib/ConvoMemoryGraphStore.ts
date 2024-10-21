@@ -1,6 +1,6 @@
 import { shortUuid, wAryPush, wArySplice } from "@iyio/common";
 import { Observable, Subject } from "rxjs";
-import { convoTraverserStateStoreSuffix } from "./convo-graph-lib";
+import { convoTraverserStateStoreSuffix, getConvoTraverserForSaving } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgeSide, ConvoGraphDb, ConvoGraphStore, ConvoGraphStoreEvt, ConvoNode, ConvoSourceNode, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
 
 
@@ -121,6 +121,7 @@ export class ConvoMemoryGraphStore implements ConvoGraphStore, IHasConvoGraphDb
 
     public putTraverserAsync(traverser:ConvoTraverser):Promise<void>
     {
+        traverser=getConvoTraverserForSaving(traverser);
         const index=this.db.traversers.findIndex(g=>
             g.id===traverser.id &&
             g.state[convoTraverserStateStoreSuffix]===traverser.state[convoTraverserStateStoreSuffix]

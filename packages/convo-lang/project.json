@@ -30,17 +30,9 @@
         },
         "test": {
             "executor": "@nrwl/jest:jest",
-            "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
             "options": {
                 "jestConfig": "packages/convo-lang/jest.config.ts",
-                "passWithNoTests": true,
-                "bail":1
-            },
-            "configurations": {
-                "ci": {
-                    "ci": true,
-                    "codeCoverage": true
-                }
+                "passWithNoTests": true
             }
         }
     },
