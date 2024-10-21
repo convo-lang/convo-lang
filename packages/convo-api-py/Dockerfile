@@ -30,6 +30,9 @@ RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr curl build
 
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
+WORKDIR /app/convo-lang-py
+COPY packages/convo-lang-py/ .
+WORKDIR /app/convo-api-py
 COPY packages/convo-api-py/pyproject.toml pyproject.toml
 COPY packages/convo-api-py/poetry.lock poetry.lock
 COPY packages/convo-api-py/src/ src

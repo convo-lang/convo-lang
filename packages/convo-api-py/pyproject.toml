@@ -14,7 +14,8 @@ openai = "^1.51.2"
 langchain = "^0.3.2"
 psycopg = "^3.2.3"
 botocore = "^1.35.36"
-convo_lang = { git = "https://github.com/convo-lang/convo-lang.git", subdirectory = "packages/convo-lang-py" }
+# Use this as file dependency, editable?
+convo_lang = { path = "../convo-lang-py", develop = true }
 iyio_common = { git = "https://github.com/iyioio/common.git", subdirectory = "packages/iyio-common-py" }
 boto3 = "^1.35.36"
 psycopg2-binary = "^2.9.9"
