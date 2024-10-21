@@ -1,8 +1,9 @@
 import json
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import magic
+from fastapi import HTTPException
 from iyio_common import (
     escape_sql_identifier,
     exec_sql,
@@ -185,7 +186,7 @@ async def generate_document_embeddings(  # Noqa: C901
     request: DocumentEmbeddingRequest,
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
-) -> int:
+) -> Union[int, HTTPException]:
     logger.info("generate_document_embeddings %s", request)
 
     document_path = request.location
@@ -207,8 +208,9 @@ async def generate_document_embeddings(  # Noqa: C901
     docs = text_splitter.split_documents(docs)
 
     if len(docs) == 0:
-        logger.info("No embedding documents found for %s", document_path)
-        return 0
+        msg = "No embedding documents found for {document_path}"
+        logger.info(msg)
+        return HTTPException(status_code=400, detail=msg)
 
     content_type, content_category = get_content_category(
         request, document_path, docs, direct_docs
@@ -217,18 +219,21 @@ async def generate_document_embeddings(  # Noqa: C901
     logger.info("Content category %s", content_category)
 
     if not content_category and request.contentCategoryCol:
-        logger.info("Unable to determine content category.")
-        return 0
+        msg = "Unable to determine content category."
+        logger.info(msg)
+        return HTTPException(status_code=400, detail=msg)
 
     if not content_type and request.contentTypeCol:
-        logger.info("Unable to determine content type.")
-        return 0
+        msg = "Unable to determine content type."
+        logger.info(msg)
+        return HTTPException(status_code=400, detail=msg)
 
     if request.contentCategoryFilter and not (
         content_category in request.contentCategoryFilter
     ):
-        logger.info("content_category filtered out - %s", content_category)
-        return 0
+        msg = "content_category filtered out - {content_category}"
+        logger.info(msg)
+        return HTTPException(status_code=400, detail=msg)
 
     all_docs = list()
     logger.info("Generating embeddings")

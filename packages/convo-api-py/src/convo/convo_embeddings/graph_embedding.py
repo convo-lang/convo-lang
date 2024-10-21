@@ -135,6 +135,7 @@ async def graph_embed_docs(
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
 ):
+    logger.info("Graph embedding documents")
     age_graph = AgeGraphStorage(
         namespace="NA",
         global_config=asdict(graph_rag_config),
