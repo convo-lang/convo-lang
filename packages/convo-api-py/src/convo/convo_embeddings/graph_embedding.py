@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -130,7 +129,7 @@ class AgeGraphStorage(BaseGraphStorage):
         self.ag.commit()
 
 
-def graph_embed_docs(
+async def graph_embed_docs(
     docs: List[Document],
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
@@ -152,11 +151,9 @@ def graph_embed_docs(
         for i, doc in enumerate(docs)
     }
 
-    _ = asyncio.run(
-        extract_entities(
-            chunks,
-            age_graph,
-            entity_vdb,
-            asdict(graph_rag_config),
-        )
+    _ = extract_entities(
+        chunks,
+        age_graph,
+        entity_vdb,
+        asdict(graph_rag_config),
     )

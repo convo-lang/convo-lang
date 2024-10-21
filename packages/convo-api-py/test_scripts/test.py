@@ -65,8 +65,8 @@ generate_document_embeddings(
         ),
         contentType="text/markdown",
         cols={"sourceId": "abc-stuff"},
+        graphEmbedding=True,
     ),
     graph_db_config,
     graph_rag_config,
-    embed_graph=True,
 )
