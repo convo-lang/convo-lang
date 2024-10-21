@@ -42,6 +42,10 @@ class DocumentEmbeddingRequest(BaseModel):
 
     graphEmbedding: bool = False
 
+    chunk_size: int = 300
+
+    chunk_overlap: int = 20
+
 
 class DocumentConversionRequest(BaseModel):
     srcPath: str

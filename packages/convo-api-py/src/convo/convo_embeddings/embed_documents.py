@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import magic
 from iyio_common import (
@@ -18,6 +18,7 @@ from langchain_community.document_loaders import (
     UnstructuredPDFLoader,
     UnstructuredURLLoader,
 )
+from langchain_community.document_loaders.base import BaseLoader
 from openai import Client
 from psycopg import sql
 
@@ -32,7 +33,7 @@ max_sql_len = 65536
 logger = logging.getLogger(__name__)
 
 
-def get_text_chunks_langchain(text: str):
+def get_text_chunks_langchain(text: str) -> List[Document]:
     text_splitter = ConvoTextSplitter(chunk_size=300, chunk_overlap=20)
     docs = [Document(page_content=x) for x in text_splitter.split_text(text)]
     return docs
@@ -40,7 +41,7 @@ def get_text_chunks_langchain(text: str):
 
 def get_doc_loader(
     request: DocumentEmbeddingRequest, document_path: str, mode: str
-) -> Tuple:
+) -> Tuple[Optional[List[Document]], Optional[BaseLoader]]:
     content_type = request.contentType
 
     if document_path == "inline":
@@ -184,8 +185,6 @@ def generate_document_embeddings(  # Noqa: C901
     request: DocumentEmbeddingRequest,
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
-    chunk_size: int = 300,
-    chunk_overlap: int = 20,
 ) -> int:
     logger.info("generate_document_embeddings %s", request)
 
@@ -203,7 +202,7 @@ def generate_document_embeddings(  # Noqa: C901
     docs = direct_docs if direct_docs else file_loader.load()
 
     text_splitter = ConvoTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        chunk_size=request.chunk_size, chunk_overlap=request.chunk_overlap
     )
     docs = text_splitter.split_documents(docs)
 
