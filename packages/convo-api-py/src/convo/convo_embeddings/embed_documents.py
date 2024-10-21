@@ -186,7 +186,6 @@ def generate_document_embeddings(  # Noqa: C901
     graph_rag_config: GraphRagConfig,
     chunk_size: int = 300,
     chunk_overlap: int = 20,
-    embed_graph: bool = False,
 ) -> int:
     logger.info("generate_document_embeddings %s", request)
 
@@ -279,7 +278,7 @@ def generate_document_embeddings(  # Noqa: C901
 
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
-    if embed_graph:
+    if request.graphEmbedding:
         _ = graph_embed_docs(docs, graph_db_config, graph_rag_config)
 
     return total_inserted

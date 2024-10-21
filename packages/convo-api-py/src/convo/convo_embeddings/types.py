@@ -39,6 +39,8 @@ class DocumentEmbeddingRequest(BaseModel):
 
     clearMatching: Optional[List[str]] = None
 
+    graphEmbedding: bool = False
+
 
 class DocumentConversionRequest(BaseModel):
     srcPath: str

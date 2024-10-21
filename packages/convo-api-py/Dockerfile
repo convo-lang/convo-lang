@@ -35,8 +35,6 @@ COPY packages/convo-api-py/start-rest-server.sh start-rest-server.sh
 
 RUN poetry install --only=main --no-interaction --no-ansi
 
-ENV REST_PORT=8080
-
 EXPOSE 8080
 
-CMD [ "./start-rest-server.sh" ]
+CMD [ "uvicorn", "convo.main:app", "--port", "8080" ]
