@@ -12,7 +12,7 @@ dockerIgnore="../../$buildName.Dockerfile.dockerignore"
 cp Dockerfile "$dockerFile"
 cp .dockerignore "$dockerIgnore"
 
-docker build --progress=plain --platform linux/amd64 -t "$name" -f "$dockerFile" ../..
+docker build --platform linux/amd64 -t "$name" -f "$dockerFile" ../..
 
 rm "$dockerFile"
 rm "$dockerIgnore"
