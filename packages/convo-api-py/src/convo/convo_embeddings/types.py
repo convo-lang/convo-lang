@@ -73,3 +73,9 @@ class GraphDBConfig:
     user: str = os.getenv("PGUSER")
     password: str = os.getenv("PGPASSWORD")
     graph: str = os.getenv("PGGRAPH")
+
+
+@dataclass
+class EmbededDocument:
+    vec: List[float]
+    text: str

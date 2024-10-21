@@ -1,15 +1,11 @@
 import json
 import logging
+import os
 from typing import List, Optional, Tuple, Union
 
 import magic
 from fastapi import HTTPException
-from iyio_common import (
-    escape_sql_identifier,
-    exec_sql,
-    getEnvVar,
-    parse_s3_path,
-)
+from iyio_common import escape_sql_identifier, exec_sql, parse_s3_path
 from langchain.schema.document import Document
 from langchain_community.document_loaders import (
     DirectoryLoader,
@@ -23,11 +19,11 @@ from langchain_community.document_loaders.base import BaseLoader
 from openai import Client
 from psycopg import sql
 
+from . import types
 from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
 from .graph_embedding import graph_embed_docs
 from .s3_loader import S3FileLoaderEx
-from .types import DocumentEmbeddingRequest, GraphDBConfig, GraphRagConfig
 
 max_sql_len = 65536
 
@@ -41,7 +37,7 @@ def get_text_chunks_langchain(text: str) -> List[Document]:
 
 
 def get_doc_loader(
-    request: DocumentEmbeddingRequest, document_path: str, mode: str
+    request: types.DocumentEmbeddingRequest, document_path: str, mode: str
 ) -> Tuple[Optional[List[Document]], Optional[BaseLoader]]:
     content_type = request.contentType
 
@@ -81,7 +77,7 @@ def get_doc_loader(
 
 
 def get_content_category(
-    request: DocumentEmbeddingRequest, document_path: str, docs, direct_docs
+    request: types.DocumentEmbeddingRequest, document_path: str, docs, direct_docs
 ) -> Tuple[Optional[str], Optional[str]]:
     content_type = request.contentType
     mime_path = document_path
@@ -117,11 +113,11 @@ def get_content_category(
 
 
 def insert_vectors(
-    request: DocumentEmbeddingRequest,
+    request: types.DocumentEmbeddingRequest,
     colNameSql,
     colNames,
     cols,
-    all_docs,
+    all_docs: List[types.EmbededDocument],
 ) -> int:
     embeddings_table = request.embeddingsTable
 
@@ -139,7 +135,7 @@ def insert_vectors(
     for index in all_docs:
         chunk = (
             sql.SQL("({text},{vector}")
-            .format(text=index["text"], vector=json.dumps(index["vector"]))
+            .format(text=index.text, vector=json.dumps(index.vec))
             .as_string(None)
         )
 
@@ -183,14 +179,14 @@ def insert_vectors(
 
 async def generate_document_embeddings(  # Noqa: C901
     open_ai_client: Client,
-    request: DocumentEmbeddingRequest,
-    graph_db_config: GraphDBConfig,
-    graph_rag_config: GraphRagConfig,
+    request: types.DocumentEmbeddingRequest,
+    graph_db_config: types.GraphDBConfig,
+    graph_rag_config: types.GraphRagConfig,
 ) -> Union[int, HTTPException]:
     logger.info("generate_document_embeddings %s", request)
 
     document_path = request.location
-    docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
+    docPrefix = os.getenv("DOCUMENT_PREFIX_PATH")
 
     if document_path != "inline" and docPrefix:
         if not document_path.startswith("/"):
@@ -246,9 +242,11 @@ async def generate_document_embeddings(  # Noqa: C901
     if request.contentTypeCol:
         cols[request.contentTypeCol] = content_type
 
-    for doc in docs:
+    def embed_docs(doc: Document):
         vec = encode_text(open_ai_client, doc.page_content)
-        all_docs.append({**cols, "vector": vec, "text": doc.page_content})
+        return types.EmbededDocument(vec=vec, text=doc.page_content)
+
+    all_docs = [embed_docs(doc) for doc in docs]
 
     if request.cols and request.clearMatching:
         clearSql = f"DELETE FROM {escape_sql_identifier(embeddings_table)} where"
