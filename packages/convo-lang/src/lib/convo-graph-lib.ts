@@ -112,7 +112,7 @@ export const createConvoNodeExecCtxAsync=async (node:ConvoNode,convoOptions?:Con
         node,
         defaultVars,
         convo:createConvoNodeExecCtxConvo(node,defaultVars,convoOptions),
-        steps:node.steps.map((step,i)=>({
+        steps:node.steps.map((step)=>({
             nodeStep:step,
         }))
     }
