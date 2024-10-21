@@ -1,11 +1,12 @@
+import os
 from typing import List
 
-from iyio_common import SqsEventRecord, getEnvVar, run_sqs
+from iyio_common import SqsEventRecord, run_sqs
 
 from .convo_embeddings.embed_documents import generate_document_embeddings
 from .convo_embeddings.types import DocumentEmbeddingRequest
 
-queueUrl = getEnvVar("CONNECTED_QUEUE_URL")
+queueUrl = os.getenv("CONNECTED_QUEUE_URL")
 
 if not queueUrl:
     print("CONNECTED_QUEUE_URL env var required")
@@ -49,7 +50,7 @@ def onMessage(messages: List[SqsEventRecord]):
             )
 
 
-scaleTo0 = getEnvVar("TASK_INFO_MIN_INSTANCE_COUNT") == "0"
+scaleTo0 = os.getenv("TASK_INFO_MIN_INSTANCE_COUNT") == "0"
 
 if __name__ == "__main__":
     # receive first message from queue then exit

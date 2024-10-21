@@ -10,7 +10,6 @@ from convo.convo_embeddings.types import (
     GraphRagConfig,
 )
 from fastapi import APIRouter
-from iyio_common import getEnvVar
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -33,15 +32,7 @@ async def get_embed_text(data):
 async def embed_documents(request: DocumentEmbeddingRequest):
     open_ai_client = OpenAI()
     graph_rag_config = GraphRagConfig()
-
-    graph_db_config = GraphDBConfig(
-        host=getEnvVar("PGHOST"),
-        port=getEnvVar("PGPORT"),
-        dbname=getEnvVar("PGDATABASE"),
-        user=getEnvVar("PGUSER"),
-        password=getEnvVar("PGPASSWORD"),
-        graph=getEnvVar("PGGRAPH"),
-    )
+    graph_db_config = GraphDBConfig()
     return generate_document_embeddings(
         open_ai_client,
         request,

@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -62,9 +63,9 @@ class GraphRagConfig:
 
 @dataclass
 class GraphDBConfig:
-    host: str
-    port: str
-    dbname: str
-    user: str
-    password: str
-    graph: str
+    host: str = os.getenv("PGHOST")
+    port: str = os.getenv("PGPORT")
+    dbname: str = os.getenv("PGDATABASE")
+    user: str = os.getenv("PGUSER")
+    password: str = os.getenv("PGPASSWORD")
+    graph: str = os.getenv("PGGRAPH")

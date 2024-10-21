@@ -1,5 +1,6 @@
+import os
+
 import pdfminer
-from iyio_common import getEnvVar
 
 from .types import DocumentConversionRequest
 
@@ -8,7 +9,7 @@ def convert_document(request: DocumentConversionRequest):
     srcPath = request.srcPath
     destPath = request.destPath
 
-    docPrefix = getEnvVar("DOCUMENT_PREFIX_PATH")
+    docPrefix = os.getenv("DOCUMENT_PREFIX_PATH")
     if docPrefix:
         if not srcPath.startswith("/"):
             srcPath = "/" + srcPath
