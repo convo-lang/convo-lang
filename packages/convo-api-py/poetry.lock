@@ -1472,13 +1472,13 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "huggingface-hub"
-version = "0.26.0"
+version = "0.26.1"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
 optional = false
 python-versions = ">=3.8.0"
 files = [
-    {file = "huggingface_hub-0.26.0-py3-none-any.whl", hash = "sha256:e43b8f36042b2103b48dea822535e08f5f089c4aa7013a067fca7b4ebf7f85a3"},
-    {file = "huggingface_hub-0.26.0.tar.gz", hash = "sha256:524fe9281b015b76aa73ff1a83bf1cbe8cab851c9ac5ae5fcd2a25d5173ce629"},
+    {file = "huggingface_hub-0.26.1-py3-none-any.whl", hash = "sha256:5927a8fc64ae68859cd954b7cc29d1c8390a5e15caba6d3d349c973be8fdacf3"},
+    {file = "huggingface_hub-0.26.1.tar.gz", hash = "sha256:414c0d9b769eecc86c70f9d939d0f48bb28e8461dd1130021542eff0212db890"},
 ]
 
 [package.dependencies]
@@ -1590,14 +1590,11 @@ description = "Common utilities"
 optional = false
 python-versions = ">=3.8"
 files = []
-develop = false
+develop = true
 
 [package.source]
-type = "git"
-url = "https://github.com/iyioio/common.git"
-reference = "HEAD"
-resolved_reference = "3d49b514537a75bb0e0e442d31b50532eb800405"
-subdirectory = "packages/iyio-common-py"
+type = "directory"
+url = "../iyio-common-py"
 
 [[package]]
 name = "jinja2"
@@ -2609,13 +2606,13 @@ xxhash = "*"
 
 [[package]]
 name = "nano-vectordb"
-version = "0.0.4"
+version = "0.0.4.1"
 description = "A simple, easy-to-hack Vector Database implementation"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "nano_vectordb-0.0.4-py3-none-any.whl", hash = "sha256:13ac63d4620687a06ef8efb10aaa74444d2f835f82490ac6a0e12a09fca15446"},
-    {file = "nano_vectordb-0.0.4.tar.gz", hash = "sha256:4da362471fd3a52c8ad49b66f4e0a76c3e9dca09524eeb8221aa819f2d328b02"},
+    {file = "nano_vectordb-0.0.4.1-py3-none-any.whl", hash = "sha256:d646d885687ce70fd7c010172ec05f8deccc1a15f0fe3b4d65e1149dea196795"},
+    {file = "nano_vectordb-0.0.4.1.tar.gz", hash = "sha256:24f4c6cb35f6300a6c5ce344ea8deb6b016e0d88c1b4b6b1fc18d88a8fb64fac"},
 ]
 
 [package.dependencies]
@@ -2653,13 +2650,13 @@ files = [
 
 [[package]]
 name = "networkx"
-version = "3.4.1"
+version = "3.4.2"
 description = "Python package for creating and manipulating graphs and networks"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "networkx-3.4.1-py3-none-any.whl", hash = "sha256:e30a87b48c9a6a7cc220e732bffefaee585bdb166d13377734446ce1a0620eed"},
-    {file = "networkx-3.4.1.tar.gz", hash = "sha256:f9df45e85b78f5bd010993e897b4f1fdb242c11e015b101bd951e5c0e29982d8"},
+    {file = "networkx-3.4.2-py3-none-any.whl", hash = "sha256:df5d4365b724cf81b8c6a7312509d0c22386097011ad1abe274afd5e9d3bbc5f"},
+    {file = "networkx-3.4.2.tar.gz", hash = "sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1"},
 ]
 
 [package.extras]
@@ -5542,4 +5539,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "88b04c516407a3139a6a4a8199e4c39aeff24d0f2be98ea6a1a8b3399bef3df5"
+content-hash = "4654cf1d8da6bc92396af404ba45208d5873fa2ed8e3cdd1efc074a5b586fe9c"
