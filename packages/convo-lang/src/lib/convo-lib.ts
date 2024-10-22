@@ -1495,3 +1495,60 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         apiKey:flat.apiKey,
     }
 }
+
+export interface NormalizedFlatMessageListOptions
+{
+    disableAll?:boolean;
+    disableRag?:boolean;
+}
+
+export const getNormalizedFlatMessageList=(
+    flat:FlatConvoConversationBase,
+    options?:NormalizedFlatMessageListOptions
+):FlatConvoMessage[]=>{
+
+    if(options?.disableAll){
+        return flat.messages;
+    }
+
+    const messages=[...flat.messages];
+
+
+    let lastContentMessage:FlatConvoMessage|undefined;
+    let lastContentMessageI=0;
+
+    const disableRag=options?.disableRag;
+
+    for(let i=0;i<messages.length;i++){
+        const msg=messages[i];
+        if(!msg){continue}
+
+        if(msg.role==='rag' && !disableRag){
+
+            if(!lastContentMessage?.content){
+                continue;
+            }
+
+            let content=msg.content??'';
+            if(flat.ragPrefix){
+                content=flat.ragPrefix+'\n\n'+content;
+            }
+            if(flat.ragSuffix){
+                content+='\n\n'+flat.ragSuffix;
+            }
+            lastContentMessage={...lastContentMessage};
+            messages[lastContentMessageI]=lastContentMessage;
+            lastContentMessage.content+='\n\n'+content;
+            continue;
+        }
+
+        if(msg.content!==undefined){
+            lastContentMessage=msg;
+            lastContentMessageI=i;
+        }
+
+    }
+
+
+    return messages;
+}

@@ -1,8 +1,8 @@
-import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { Scope, asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parse as parseJson5 } from 'json5';
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
-import { openAiConvoInputType, openAiConvoOutputType } from "./openai-lib";
+import { openAiConvoInputType, openAiConvoOutputType, openAiMessageRoles } from "./openai-lib";
 import { getOpenAiModelsFromScope } from "./openai-model-helper";
 import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models";
 import { OpenAiModels } from "./openai-types";
@@ -103,8 +103,11 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
     }
 
     public convertConvoToInput(flat:FlatConvoConversation,inputType:string):ChatCompletionCreateParamsNonStreaming{
+
+        const messages=getNormalizedFlatMessageList(flat);
+
         const visionCapable=flat.capabilities?.includes('vision');
-        const lastContentMessage=getLastNonCalledConvoFlatMessage(flat.messages);
+        const lastContentMessage=getLastNonCalledConvoFlatMessage(messages);
 
         const model=flat?.responseModel??(visionCapable?this._visionModel:this._chatModel);
         if(!model){
@@ -113,7 +116,7 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
 
         const oMsgs:ChatCompletionMessageParam[]=[];
         const oFns:ChatCompletionTool[]=[];
-        for(const m of flat.messages){
+        for(const m of messages){
             if(m.fn){
                 oFns.push({
                     type:"function",
@@ -143,7 +146,7 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
                     content=m.content??'';
                 }
                 oMsgs.push(deleteUndefined(asType<ChatCompletionUserMessageParam|ChatCompletionAssistantMessageParam|ChatCompletionSystemMessageParam>({
-                    role:(m.role??'user') as any,
+                    role:((openAiMessageRoles.includes(m.role as any)?m.role:'user')??'user') as any,
                     content
                 })))
             }else if(m.called){
