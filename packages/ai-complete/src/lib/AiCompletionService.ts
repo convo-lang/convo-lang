@@ -50,6 +50,10 @@ export class AiCompletionService implements ConvoCompletionService<FlatConvoConv
         this.defaultMaxImageTokenLength=defaultMaxImageTokenLength;
     }
 
+    public canComplete(model:string|undefined,flat:FlatConvoConversation):boolean{
+        return true;
+    }
+
     private getProvider(lastMessage:AiCompletionMessage,request:AiCompletionRequest,options?:CompletionOptions):AiCompletionProvider|undefined{
         return this.providers.getFirst(null,p=>{
             if(p.canComplete?.(lastMessage,request,options)){
