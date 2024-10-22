@@ -123,7 +123,7 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
                     function:deleteUndefined({
                         name:m.fn.name,
                         description:m.fn.description,
-                        parameters:m.fnParams?((zodTypeToJsonScheme(m.fnParams) as Record<string,any>)??{}):{}
+                        parameters:(m._fnParams??(m.fnParams?(zodTypeToJsonScheme(m.fnParams)??{}):{})) as Record<string,any>
                     })
                 })
             }else if(m.content!==undefined){

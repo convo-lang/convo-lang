@@ -1,6 +1,7 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, parseXml } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, parseXml, zodTypeToJsonScheme } from "@iyio/common";
 import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
+import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
 import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
@@ -1478,6 +1479,36 @@ export const createFunctionCallConvoCompletionMessage=({
         )),
         ...(defaults && dupDeleteUndefined(defaults))
     };
+}
+
+export const getSerializableFlatConvoConversation=(flat:FlatConvoConversation|FlatConvoConversationBase):FlatConvoConversationBase=>{
+    const flatBase=flatConvoConversationToBase(flat);
+
+    const messages=[...flatBase.messages];
+    flatBase.messages=messages;
+
+    for(let i=0;i<messages.length;i++){
+        let msg=messages[i];
+        if(!msg){continue}
+
+        let updated=false
+
+        if(msg.fnParams){
+            if(!updated){
+                msg={...msg};
+                updated=true;
+                msg._fnParams=zodTypeToJsonScheme(msg.fnParams as ZodObject<any>);
+                delete msg.fnParams;
+            }
+        }
+
+        if(updated){
+            messages[i]=msg;
+        }
+
+
+    }
+    return flatBase;
 }
 
 export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoConversationBase):FlatConvoConversationBase=>{

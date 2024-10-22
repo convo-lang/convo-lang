@@ -619,10 +619,16 @@ export interface FlatConvoMessage
      * A function that can be called
      */
     fn?:ConvoFunction;
+
     /**
      * Params type of the function that can be called
      */
     fnParams?:ZodObject<any>;
+
+    /**
+     * fnParams as a JsonScheme for serialization,
+     */
+    _fnParams?:JsonScheme;
 
     /**
      * The target render area of the message.

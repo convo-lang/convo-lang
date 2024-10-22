@@ -1,5 +1,5 @@
 import { Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
-import { flatConvoConversationToBase, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
+import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
 import { ConvoCompletionMessage, ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types";
 import { convoCompletionService } from "./convo.deps";
 
@@ -91,7 +91,7 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
     {
         const r=await httpClient().postAsync<ConvoCompletionMessage[]>(
             joinPaths(this.getEndpoint(),'/completion'),
-            flatConvoConversationToBase(flat)
+            getSerializableFlatConvoConversation(flat)
         );
         if(!r){
             throw new Error('convo-lang ai endpoint returned empty response');
