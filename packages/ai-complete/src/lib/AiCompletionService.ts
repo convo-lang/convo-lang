@@ -1,4 +1,4 @@
-import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, convoTags } from '@convo-lang/convo-lang';
+import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, convoTags, passthroughConvoInputType, passthroughConvoOutputType } from '@convo-lang/convo-lang';
 import { ProviderTypeDef, Scope, TypeDef, UnauthorizedError, aryUnique, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { AiCompletionProviders, aiCompletionMaxAudioLengthParam, aiCompletionMaxImageLengthParam, aiCompletionMaxTextLengthParam } from "./_type.ai-complete";
@@ -14,8 +14,12 @@ export interface AiCompletionServiceOptions
     defaultMaxImageTokenLength?:number;
 }
 
-export class AiCompletionService implements ConvoCompletionService
+export class AiCompletionService implements ConvoCompletionService<FlatConvoConversation,ConvoCompletionMessage[]>
 {
+
+    public readonly inputType=passthroughConvoInputType;
+
+    public readonly outputType=passthroughConvoOutputType;
 
     public static fromScope(scope:Scope){
         return new AiCompletionService({

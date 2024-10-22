@@ -1,6 +1,6 @@
 import { Conversation, ConvoScope, convoCapabilitiesParams, convoVars, createConversationFromScope, parseConvoCode } from "@convo-lang/convo-lang";
-import { aiCompleteConvoModule } from '@iyio/ai-complete';
-import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiModule, openAiSecretsParam, openAiVisionModelParam } from '@iyio/ai-complete-openai';
+import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
+import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@iyio/ai-complete-openai';
 import { EnvParams, createJsonRefReplacer, deleteUndefined, initRootScope, rootScope } from "@iyio/common";
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { writeFile } from "fs/promises";
@@ -75,8 +75,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
         }) as Record<string,string>);
 
         reg.use(nodeCommonModule);
-        reg.use(openAiModule);
-        reg.use(aiCompleteConvoModule);
+        reg.use(openaiConvoModule);
     })
     await rootScope.getInitPromise();
     return config;

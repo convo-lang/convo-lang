@@ -1,7 +1,12 @@
+import { passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
 import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation } from "./convo-types";
 
-export class CallbackConvoCompletionService implements ConvoCompletionService
+export class CallbackConvoCompletionService implements ConvoCompletionService<FlatConvoConversation,ConvoCompletionMessage[]>
 {
+
+    public readonly inputType=passthroughConvoInputType;
+
+    public readonly outputType=passthroughConvoOutputType;
 
     private completeAsync:(flat:FlatConvoConversation)=>Promise<ConvoCompletionMessage[]>;
 

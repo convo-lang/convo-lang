@@ -47,9 +47,6 @@ python -m pip install convo-lang
 For use in a Javascript application install the @convo-lang/convo-lang package
 ``` sh
 npm i @convo-lang/convo-lang
-
-# To use OpenAI as a completion provider you will need to install @iyio/ai-complete and @iyio/ai-complete-openai as well
-npm i @iyio/ai-complete @iyio/ai-complete-openai
 ```
 
 For use on the command line install the @convo-lang/convo-lang-cli package
@@ -169,8 +166,7 @@ and LLMs to respond to messages from the user.
 ``` js
 import { Conversation } from '@convo-lang/convo-lang';
 import { initRootScope, EnvParams } from '@iyio/common';
-import { aiCompleteConvoModule } from '@iyio/ai-complete';
-import { openAiModule } from '@iyio/ai-complete-openai';
+import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
 
 // initRootScope is used to configure services and configuration variables
 initRootScope(reg=>{
@@ -188,11 +184,8 @@ initRootScope(reg=>{
     // EnvParams can optionally be used to load configuration variables from process.env
     reg.addParams(new EnvParams());
 
-    // Registers the AiComplete module that is used to relay messages to LLMs
-    reg.use(aiCompleteConvoModule);
-
-    // Registers the OpenAI module that will relay messages to OpenAI
-    reg.use(openAiModule);
+    // Converts and relays message to OpenAI
+    reg.use(openaiConvoModule);
 
     // aiCompleteLambdaModule can be used to relay messages to a lambda function for use in the browser
     //reg.use(aiCompleteLambdaModule);

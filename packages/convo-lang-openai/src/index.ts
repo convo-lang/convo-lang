@@ -1,2 +1,9 @@
-export * from './lib/pkg';
+export * from './lib/OpenAiConvoCompletionService';
+export * from './lib/OpenAiConvoConverter';
+export * from './lib/_module.ai-complete-convo';
+export * from './lib/convo-lang-openai-params';
+export * from './lib/openai-lib';
+export * from './lib/openai-model-helper';
+export * from './lib/openai-models';
+export * from './lib/openai-types';
 

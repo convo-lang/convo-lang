@@ -19,12 +19,6 @@
         "skipDefaultLibCheck": true,
         "baseUrl": ".",
         "paths": {
-            "@iyio/ai-complete": [
-                "packages/ai-complete/src/index.ts"
-            ],
-            "@iyio/ai-complete-openai": [
-                "packages/ai-complete-openai/src/index.ts"
-            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
@@ -36,6 +30,9 @@
             ],
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-openai": [
+                "packages/convo-lang-openai/src/index.ts"
             ],
             "@iyio/nx-common": [
                 "packages/nx-common/src/index.ts"

@@ -143,6 +143,11 @@ export interface ConvoMessage
      * If true the message should be evaluated as code
      */
     eval?:boolean;
+
+    /**
+     * The id of the user that sent the message
+     */
+    userId?:string;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -656,7 +661,15 @@ export interface FlatConvoMessage
      */
     responseModel?:string;
 
+    /**
+     * The endpoint the message has been requested to be completed with.
+     */
     responseEndpoint?:string;
+
+    /**
+     * The id of the user that sent the message
+     */
+    userId?:string;
 
     responseFormat?:string;
     responseFormatTypeName?:string;
@@ -712,6 +725,8 @@ export interface FlatConvoMessage
      */
     eval?:boolean;
 
+    vision?:boolean;
+
 }
 
 export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
@@ -729,11 +744,41 @@ export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
     endpoint?:string;
 }
 
-export interface ConvoCompletionService
+export interface ConvoCompletionService<TInput,TOutput>
 {
-    completeConvoAsync(flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>;
 
-    toModelFormat(flat:FlatConvoConversation):any;
+    inputType:string;
+
+    outputType:string;
+
+    completeConvoAsync(input:TInput,flat:FlatConvoConversation):Promise<TOutput>;
+
+    getModelsAsync?:()=>Promise<ConvoModelInfo[]|undefined>;
+}
+
+export interface ConvoConversationConverter<TInput,TOutput>
+{
+
+    supportedInputTypes:string[];
+
+    supportedOutputTypes:string[];
+
+    convertConvoToInput(flat:FlatConvoConversation,inputType:string):TInput;
+
+    convertOutputToConvo(
+        output:TOutput,
+        outputType:string,
+        input:TInput,
+        inputType:string,
+        flat:FlatConvoConversation
+    ):ConvoCompletionMessage[];
+}
+
+export interface ConvoConversion<T>
+{
+    success:boolean;
+    result?:T;
+    converter?:ConvoConversationConverter<any,any>
 }
 
 export type ConvoCompletionStatus='complete'|'busy'|'error'|'disposed';
@@ -793,6 +838,21 @@ export interface FlatConvoConversation
     ragSuffix?:string;
 
     toolChoice?:ConvoToolChoice;
+
+    /**
+     * The model the conversation has been requested to be completed with.
+     */
+    responseModel?:string;
+
+    /**
+     * The endpoint the conversation has been requested to be completed with.
+     */
+    responseEndpoint?:string;
+
+    /**
+     * The id of the user to last send a message
+     */
+    userId?:string;
 }
 
 export interface ConvoExecuteResult
@@ -1078,4 +1138,29 @@ export interface ParsedContentJsonOrString
 {
     value:any;
     isJson:boolean;
+}
+
+export type ConvoModelCapability='text'|'image'|'audio'|'video'|'embedding';
+export interface ConvoModelInfo
+{
+    name:string;
+    version?:string;
+    description?:string;
+    functionCallingSupport?:boolean;
+    contextWindowSize?:number;
+    inputCapabilities?:ConvoModelCapability[];
+    outputCapabilities?:ConvoModelCapability[];
+    inputTokenPriceUsd?:number;
+    outputTokenPriceUsd?:number;
+    inputAudioTokenPriceUsd?:number;
+    outputAudioTokenPriceUsd?:number;
+    inputVideoTokenPriceUsd?:number;
+    outputVideoTokenPriceUsd?:number;
+    inputMinutePriceUsd?:number;
+    outputMinutePriceUsd?:number;
+    outputDimension?:number;
+    imagePriceUsd?:number;
+    imageLgPriceUsd?:number;
+    imageHdPriceUsd?:number;
+    imageLgHdPriceUsd?:number;
 }

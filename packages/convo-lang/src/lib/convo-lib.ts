@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -94,6 +94,11 @@ export const convoVars={
      * Sets the default completion endpoint
      */
     __endpoint:'__endpoint',
+
+    /**
+     * Sets the default user id of the conversation
+     */
+    __userId:'__userId',
 
     /**
      * When set to true time tracking will be enabled.
@@ -431,6 +436,11 @@ export const convoTags={
      */
     eval:'eval',
 
+    /**
+     * Id of the user that created the message
+     */
+    userId:'userId',
+
 } as const;
 
 export const convoTaskTriggers={
@@ -499,6 +509,91 @@ export const allowedConvoDefinitionFunctions=[
     'encodeURI',
     'encodeURIComponent',
 ] as const;
+
+export const passthroughConvoInputType='FlatConvoConversation';
+
+export const passthroughConvoOutputType='ConvoCompletionMessageAry';
+
+export const convertConvoInput=(
+    flat:FlatConvoConversation,
+    inputType:string,
+    converters:ConvoConversationConverter<any,any>[]
+):ConvoConversion<any>=>{
+    for(const converter of converters){
+        if(converter.supportedInputTypes.includes(inputType)){
+            return {
+                success:true,
+                converter,
+                result:converter.convertConvoToInput(flat,inputType),
+            }
+        }
+    }
+    return {
+        success:false
+    }
+}
+
+export const convertConvoOutput=(
+    output:any,
+    outputType:string,
+    input:any,
+    inputType:string,
+    converters:ConvoConversationConverter<any,any>[],
+    flat:FlatConvoConversation
+):ConvoConversion<any>=>{
+    for(const converter of converters){
+        if(converter.supportedOutputTypes.includes(outputType)){
+            return {
+                success:true,
+                converter,
+                result:converter.convertOutputToConvo(output,outputType,input,inputType,flat),
+            }
+        }
+    }
+    return {
+        success:false
+    }
+}
+
+export const requireConvertConvoInput=(
+    flat:FlatConvoConversation,
+    inputType:string,
+    converters:ConvoConversationConverter<any,any>[]
+):any=>{
+    const r=convertConvoInput(flat,inputType,converters);
+    if(!r.success){
+        throw new Error(`No convo converter found for input type - ${inputType}`);
+    }
+    return r.result;
+}
+
+export const requireConvertConvoOutput=(
+    output:any,
+    outputType:string,
+    input:any,
+    inputType:string,
+    converters:ConvoConversationConverter<any,any>[],
+    flat:FlatConvoConversation
+):ConvoCompletionMessage[]=>{
+    const r=convertConvoOutput(output,outputType,input,inputType,converters,flat);
+    if(!r.success){
+        throw new Error(`No convo converter found for output type - ${outputType}`);
+    }
+    return r.result;
+}
+
+export const completeConvoUsingCompletionServiceAsync=async (
+    flat:FlatConvoConversation,
+    service:ConvoCompletionService<any,any>|null|undefined,
+    converters:ConvoConversationConverter<any,any>[]
+):Promise<ConvoCompletionMessage[]>=>{
+    if(!service){
+        return [];
+    }
+    const input=requireConvertConvoInput(flat,service.inputType,converters);
+    const r=await service.completeConvoAsync(input,flat);
+    return requireConvertConvoOutput(r,service.outputType,input,service.inputType,converters,flat);
+}
 
 export const createOptionalConvoValue=(value:any):OptionalConvoValue=>{
     return {
@@ -936,6 +1031,35 @@ export const isConvoTokenUsageEmpty=(usage:ConvoTokenUsage):boolean=>{
     );
 }
 
+export const unknownConvoTokenPrice=1000/1000000;
+export const calculateConvoTokenUsage=(
+    model:string,
+    models:ConvoModelInfo[],
+    inputTokens=0,
+    outputTokens=0,
+):ConvoTokenUsage=>{
+    const info=models.find(m=>m.name===model);
+    if(!info){
+        return {
+            inputTokens,
+            outputTokens,
+            tokenPrice:(
+                inputTokens*unknownConvoTokenPrice+
+                outputTokens*unknownConvoTokenPrice
+            )
+        }
+    }else{
+        return {
+            inputTokens,
+            outputTokens,
+            tokenPrice:(
+                inputTokens*(info.inputTokenPriceUsd??0)+
+                outputTokens*(info.inputTokenPriceUsd??0)
+            )
+        }
+    }
+}
+
 const jsonContentReg=/^\s*```\s*json.*?\n(.*)```\s*$/s;
 export const isConvoJsonMessage=(content:string|null|undefined):boolean=>{
     if(!content){
@@ -1246,4 +1370,112 @@ export const mergeConvoOptions=(source:ConversationOptions,override:Conversation
     }
 
     return merge;
+}
+
+export const getLastConvoMessageWithRole=<T extends ConvoMessage|FlatConvoMessage>(messages:T[]|undefined|null,role:string):T|undefined=>{
+    if(!messages){
+        return undefined;
+    }
+    for(let i=messages.length-1;i>=0;i--){
+        const msg=messages[i];
+        if(msg?.role===role){
+            return msg;
+        }
+    }
+    return undefined;
+}
+
+export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
+    for(let i=messages.length-1;i>=0;i--){
+        const msg=messages[i];
+        if(msg && !msg.called){
+            return msg;
+        }
+    }
+    return undefined;
+}
+
+export interface CreateTextConvoCompletionMessageOptions
+{
+    flat:FlatConvoConversation;
+    role:string;
+    content:string|null|undefined;
+    model:string;
+    models?:ConvoModelInfo[];
+    inputTokens?:number;
+    outputTokens?:number;
+    tags?:Record<string,string|undefined>;
+    defaults?:ConvoCompletionMessage;
+}
+export const createTextConvoCompletionMessage=({
+    flat,
+    role,
+    content,
+    model,
+    models,
+    inputTokens,
+    outputTokens,
+    defaults,
+}:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
+
+    const lastContentMessage=getLastNonCalledConvoFlatMessage(flat.messages);
+    const jsonMode=lastContentMessage?.responseFormat==='json';
+
+    return {
+        role:role,
+        content:content??undefined,
+        format:jsonMode?'json':undefined,
+        formatTypeName:jsonMode?lastContentMessage?.responseFormatTypeName:undefined,
+        formatIsArray:jsonMode?lastContentMessage?.responseFormatIsArray:undefined,
+        assignTo:lastContentMessage?.responseAssignTo,
+        endpoint:flat.responseEndpoint,
+        model,
+        ...(models && calculateConvoTokenUsage(
+            model,
+            models,
+            inputTokens,
+            outputTokens
+        )),
+        ...(defaults && dupDeleteUndefined(defaults))
+    }
+}
+
+
+export interface CreateFunctionCallConvoCompletionMessageOptions
+{
+    flat:FlatConvoConversation;
+    model:string;
+    toolId?:string;
+    callFn:string;
+    callParams:Record<string,any>|undefined;
+    models?:ConvoModelInfo[];
+    inputTokens?:number;
+    outputTokens?:number;
+    defaults?:ConvoCompletionMessage;
+}
+export const createFunctionCallConvoCompletionMessage=({
+    flat,
+    model,
+    toolId,
+    callFn,
+    callParams,
+    models,
+    inputTokens,
+    outputTokens,
+    defaults,
+}:CreateFunctionCallConvoCompletionMessageOptions):ConvoCompletionMessage=>{
+    return {
+        callFn,
+        callParams:callParams??[],
+        tags:toolId?{toolId}:undefined,
+        endpoint:flat.responseEndpoint,
+        model,
+        ...(models && calculateConvoTokenUsage(
+            model,
+            models,
+            inputTokens,
+            outputTokens
+        )),
+        ...(defaults && dupDeleteUndefined(defaults))
+    };
 }
