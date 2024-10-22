@@ -1829,6 +1829,7 @@ export class Conversation
             responseModel,
             responseEndpoint,
             userId,
+            apiKey:this.getDefaultApiKey()??undefined,
         }
 
         for(let i=0;i<messages.length;i++){

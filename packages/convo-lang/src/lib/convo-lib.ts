@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { parse as parseJson5 } from 'json5';
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -1397,7 +1397,7 @@ export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):Flat
 
 export interface CreateTextConvoCompletionMessageOptions
 {
-    flat:FlatConvoConversation;
+    flat:FlatConvoConversationBase;
     role:string;
     content:string|null|undefined;
     model:string;
@@ -1443,7 +1443,7 @@ export const createTextConvoCompletionMessage=({
 
 export interface CreateFunctionCallConvoCompletionMessageOptions
 {
-    flat:FlatConvoConversation;
+    flat:FlatConvoConversationBase;
     model:string;
     toolId?:string;
     callFn:string;
@@ -1478,4 +1478,20 @@ export const createFunctionCallConvoCompletionMessage=({
         )),
         ...(defaults && dupDeleteUndefined(defaults))
     };
+}
+
+export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoConversationBase):FlatConvoConversationBase=>{
+
+    return {
+        messages:flat.messages,
+        capabilities:flat.capabilities,
+        ragMode:flat.ragMode,
+        ragPrefix:flat.ragPrefix,
+        ragSuffix:flat.ragSuffix,
+        toolChoice:flat.toolChoice,
+        responseModel:flat.responseModel,
+        responseEndpoint:flat.responseEndpoint,
+        userId:flat.userId,
+        apiKey:flat.apiKey,
+    }
 }

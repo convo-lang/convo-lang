@@ -751,7 +751,9 @@ export interface ConvoCompletionService<TInput,TOutput>
 
     outputType:string;
 
-    completeConvoAsync(input:TInput,flat:FlatConvoConversation):Promise<TOutput>;
+    canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean;
+
+    completeConvoAsync(input:TInput,flat:FlatConvoConversationBase):Promise<TOutput>
 
     getModelsAsync?:()=>Promise<ConvoModelInfo[]|undefined>;
 }
@@ -763,14 +765,14 @@ export interface ConvoConversationConverter<TInput,TOutput>
 
     supportedOutputTypes:string[];
 
-    convertConvoToInput(flat:FlatConvoConversation,inputType:string):TInput;
+    convertConvoToInput(flat:FlatConvoConversationBase,inputType:string):TInput;
 
     convertOutputToConvo(
         output:TOutput,
         outputType:string,
         input:TInput,
         inputType:string,
-        flat:FlatConvoConversation
+        flat:FlatConvoConversationBase
     ):ConvoCompletionMessage[];
 }
 
@@ -810,13 +812,11 @@ export interface ConvoCompletion
     task:string;
 }
 
-export interface FlatConvoConversation
+export interface FlatConvoConversation extends FlatConvoConversationBase
 {
     exe:ConvoExecutionContext;
     vars:Record<string,any>
-    messages:FlatConvoMessage[];
     conversation:Conversation;
-    capabilities:ConvoCapability[];
     task:string;
     /**
      * Maps task triggers to tasks.
@@ -832,6 +832,14 @@ export interface FlatConvoConversation
      * If defined the debug function should be written to with debug info.
      */
     debug?:(...args:any[])=>void;
+
+}
+
+export interface FlatConvoConversationBase
+{
+    messages:FlatConvoMessage[];
+    capabilities:ConvoCapability[];
+
 
     ragMode?:ConvoRagMode;
     ragPrefix?:string;
@@ -853,6 +861,8 @@ export interface FlatConvoConversation
      * The id of the user to last send a message
      */
     userId?:string;
+
+    apiKey?:string;
 }
 
 export interface ConvoExecuteResult

@@ -31,6 +31,9 @@
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
             ],
+            "@convo-lang/convo-lang-api-routes": [
+                "packages/convo-lang-api-routes/src/index.ts"
+            ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],
