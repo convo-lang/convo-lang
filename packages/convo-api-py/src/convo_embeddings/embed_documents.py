@@ -201,7 +201,6 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
         chunk_len=len(chunk)
 
         if chunk_len + sql_len >= max_sql_len:
-            print(f'Inserting {inserted} embeddings into {embeddings_table}')
             exec_sql(''.join(sql_chucks)[:-1],request.dryRun)
             inserted=0
             sql_chucks=[head]
@@ -214,7 +213,6 @@ def generate_document_embeddings(request:DocumentEmbeddingRequest)->int:
         total_inserted=total_inserted+1
 
     if inserted > 0:
-        print(f'Inserting {inserted} embeddings into {embeddings_table}')
         exec_sql(''.join(sql_chucks)[:-1],request.dryRun)
 
     print(f'Inserted {total_inserted} embeddings into {embeddings_table}')

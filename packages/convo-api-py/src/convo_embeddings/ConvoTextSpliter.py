@@ -38,7 +38,6 @@ class ConvoTextSplitter(TextSplitter):
             part=parts[i]
 
             if len(part) > size:
-                print("to large ",i)
                 start=i
                 lines=splitOn(part,['\n'],size)
 
@@ -158,7 +157,6 @@ def splitOn(text:str,sepList:List[str],size:int)->List[str]:
         return parts
 
     else:
-        print('Split by size')
         parts:List[str]=[]
         i=0
         strLen=len(text)
