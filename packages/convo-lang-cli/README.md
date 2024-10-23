@@ -232,7 +232,7 @@ The convo CLI can be used to execute convo scripts from the command line
 
 ``` sh
 # install the convo cli
-npm install -g @iyio/convo-cli
+npm install -g @convo-lang/convo-cli
 
 # Results will be printed to stdout
 convo talky-time.convo
