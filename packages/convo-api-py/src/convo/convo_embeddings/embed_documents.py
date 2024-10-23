@@ -282,7 +282,7 @@ async def generate_document_embeddings(  # Noqa: C901
 
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
-    if request.graphEmbedding:
+    if request.graphEmbed:
         _ = await graph_embed_docs(docs, graph_db_config, graph_rag_config)
 
     return total_inserted

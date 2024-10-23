@@ -68,7 +68,7 @@ asyncio.run(
             ),
             contentType="text/markdown",
             cols={"sourceId": "abc-stuff"},
-            graphEmbedding=True,
+            graphEmbed=True,
         ),
         graph_db_config,
         graph_rag_config,
