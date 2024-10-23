@@ -39,4 +39,4 @@ RUN poetry install --only=main --no-interaction --no-ansi
 
 EXPOSE 8080
 
-CMD [ "uvicorn", "convo.main:app", "--port", "8080" ]
+CMD [ "uvicorn", "convo.main:app", "--host", "0.0.0.0", "--port", "8080" ]
