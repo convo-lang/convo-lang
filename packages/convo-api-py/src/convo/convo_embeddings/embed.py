@@ -10,13 +10,13 @@
 
 from typing import List, Union
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 
-def encode_text(open_ai_client: OpenAI, value: Union[List[str], str]):
+async def encode_text(open_ai_client: AsyncOpenAI, value: Union[List[str], str]):
     isList = isinstance(value, list)
 
-    response = open_ai_client.embeddings.create(
+    response = await open_ai_client.embeddings.create(
         input=value if isList else [value], model="text-embedding-3-small"
     )
 

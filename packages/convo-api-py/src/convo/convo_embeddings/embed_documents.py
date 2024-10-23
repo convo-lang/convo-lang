@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -16,7 +17,7 @@ from langchain_community.document_loaders import (
     UnstructuredURLLoader,
 )
 from langchain_community.document_loaders.base import BaseLoader
-from openai import Client
+from openai import AsyncOpenAI
 from psycopg import sql
 
 from . import types
@@ -178,7 +179,7 @@ def insert_vectors(
 
 
 async def generate_document_embeddings(  # Noqa: C901
-    open_ai_client: Client,
+    open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
     graph_db_config: types.GraphDBConfig,
     graph_rag_config: types.GraphRagConfig,
@@ -242,11 +243,12 @@ async def generate_document_embeddings(  # Noqa: C901
     if request.contentTypeCol:
         cols[request.contentTypeCol] = content_type
 
-    def embed_docs(doc: Document):
-        vec = encode_text(open_ai_client, doc.page_content)
+    async def embed_docs(doc: Document):
+        vec = await encode_text(open_ai_client, doc.page_content)
         return types.EmbededDocument(vec=vec, text=doc.page_content)
 
-    all_docs = [embed_docs(doc) for doc in docs]
+    all_docs_tasks = [embed_docs(doc) for doc in docs]
+    all_docs = await asyncio.gather(*all_docs_tasks)
 
     if request.cols and request.clearMatching:
         clearSql = f"DELETE FROM {escape_sql_identifier(embeddings_table)} where"
