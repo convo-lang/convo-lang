@@ -15,8 +15,9 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    graph_name = os.getenv("GRAPH_DB")
     try:
+        graph_name = os.getenv("GRAPH_DB")
+        assert graph_name is not None, "'GRAPH_DB' environment variable was not set"
         logger.info("Creating graph '%s' (if it does not exist)", graph_name)
         exec_sql(f"SELECT * FROM ag_catalog.create_graph('{graph_name}');", False)
     except Exception as e:
