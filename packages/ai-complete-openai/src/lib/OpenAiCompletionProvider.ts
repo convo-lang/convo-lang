@@ -1,7 +1,7 @@
 import { AiCompletionFunctionCallError, AiCompletionMessage, AiCompletionMessageType, AiCompletionOption, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, CompletionOptions, getLastNonCallAiCompleteMessage } from '@iyio/ai-complete';
-import { FileBlob, Lock, Scope, SecretManager, asType, delayAsync, deleteUndefined, httpClient, parseMarkdownImages, secretManager, shortUuid, unused } from '@iyio/common';
+import { Lock, Scope, SecretManager, asType, delayAsync, deleteUndefined, parseMarkdownImages, secretManager, shortUuid, unused } from '@iyio/common';
 import { parse } from 'json5';
-import OpenAIApi, { toFile } from 'openai';
+import OpenAIApi from 'openai';
 import { ImagesResponse } from 'openai/resources';
 import { ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
 import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from './_types.ai-complete-openai';
@@ -139,12 +139,15 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
     }
 
     private getChatParams(lastMessage:AiCompletionMessage,request:AiCompletionRequest){
-        const visionCapable=request.capabilities?.includes('vision');
+        let visionCapable=request.capabilities?.includes('vision');
         const lastContentMessage=getLastNonCallAiCompleteMessage(request.messages);
 
         const model=lastContentMessage?.model??(visionCapable?this._visionModel:this._chatModel);
         if(!model){
             throw new Error('Chat AI model not defined');
+        }
+        if(model.startsWith('gpt-4o')){
+            visionCapable=true;
         }
 
         const oMsgs:ChatCompletionMessageParam[]=[];
@@ -309,53 +312,54 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
 
     private async completeAudioAsync(lastMessage:AiCompletionMessage,request:AiCompletionRequest):Promise<AiCompletionResult>
     {
-        const model=lastMessage?.model??this._audioModel;
-        if(!model){
-            throw new Error('Audio AI model not defined');
-        }
+        // const model=lastMessage?.model??this._audioModel;
+        // if(!model){
+        //     throw new Error('Audio AI model not defined');
+        // }
 
-        const api=await this.getApiAsync(request.apiKey,lastMessage.endpoint);
+        // const api=await this.getApiAsync(request.apiKey,lastMessage.endpoint);
 
-        const type=lastMessage.dataContentType??'audio/mp3';
+        // const type=lastMessage.dataContentType??'audio/mp3';
 
-        const file=(lastMessage.dataUrl?
-            await (async ()=>{
-                const r=await httpClient().getResponseAsync(lastMessage.dataUrl??'');
-                if(!r){
-                    throw new Error('Fetch file failed')
-                }
-                const contentType=r.headers.get('Content-Type')||r.headers.get('content-type')||'';
-                const m=/\w+\/(\w+)/.exec(contentType);
-                const file=await toFile(r.blob(),`tmp.${m?.[1]??'file'}`);
-                return file;
-            })():
-            new FileBlob([Buffer.from(lastMessage.data??'','base64')],'audio.'+(type.split('/')[1]??'mp3'),{type})
-        );
+        // const file=(lastMessage.dataUrl?
+        //     await (async ()=>{
+        //         const r=await httpClient().getResponseAsync(lastMessage.dataUrl??'');
+        //         if(!r){
+        //             throw new Error('Fetch file failed')
+        //         }
+        //         const contentType=r.headers.get('Content-Type')||r.headers.get('content-type')||'';
+        //         const m=/\w+\/(\w+)/.exec(contentType);
+        //         const file=await toFile(r.blob(),`tmp.${m?.[1]??'file'}`);
+        //         return file;
+        //     })():
+        //     new FileBlob([Buffer.from(lastMessage.data??'','base64')],'audio.'+(type.split('/')[1]??'mp3'),{type})
+        // );
 
-        if(!file){
-            throw new Error('Unable to load data URL');
-        }
+        // if(!file){
+        //     throw new Error('Unable to load data URL');
+        // }
 
-        const r=await api.audio.transcriptions.create({
-            file,
-            model,
-            prompt:lastMessage.content,
-            response_format:'text',
-        })
+        // const r=await api.audio.transcriptions.create({
+        //     file,
+        //     model,
+        //     prompt:lastMessage.content,
+        //     response_format:'text',
+        // })
 
-        const text=r.text;
+        // const text=r;
 
-        return {
-            tokenPrice:1,// todo - use real price - for now just say $1, which is very high
-            options:[],
-            preGeneration:[{
-                id:shortUuid(),
-                type:'text',
-                role:lastMessage.role,
-                content:text,
-                replaceId:lastMessage.id,
-            }]
-        }
+        // return {
+        //     tokenPrice:1,// todo - use real price - for now just say $1, which is very high
+        //     options:[],
+        //     preGeneration:[{
+        //         id:shortUuid(),
+        //         type:'text',
+        //         role:lastMessage.role,
+        //         content:text,
+        //         replaceId:lastMessage.id,
+        //     }]
+        // }
+        return null as any;
     }
 
     private async completeImageAsync(lastMessage:AiCompletionMessage,request:AiCompletionRequest):Promise<AiCompletionResult>
