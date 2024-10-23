@@ -40,8 +40,6 @@ class DocumentEmbeddingRequest(BaseModel):
 
     clearMatching: Optional[List[str]] = None
 
-    graphEmbed: bool = False
-
     chunk_size: int = 300
 
     chunk_overlap: int = 20

@@ -1,4 +1,5 @@
 import logging
+import os
 
 from convo.convo_embeddings.convert_document import convert_document
 from convo.convo_embeddings.embed import encode_text
@@ -33,11 +34,13 @@ async def embed_documents(request: DocumentEmbeddingRequest):
     open_ai_client = AsyncOpenAI()
     graph_rag_config = GraphRagConfig()
     graph_db_config = GraphDBConfig()
+    run_graph_embed = os.getenv("RUN_GRAPH_EMBED").lower() == "true"
     return await generate_document_embeddings(
         open_ai_client,
         request,
         graph_db_config,
         graph_rag_config,
+        run_graph_embed,
     )
 
 

@@ -183,6 +183,7 @@ async def generate_document_embeddings(  # Noqa: C901
     request: types.DocumentEmbeddingRequest,
     graph_db_config: types.GraphDBConfig,
     graph_rag_config: types.GraphRagConfig,
+    run_graph_embded: bool,
 ) -> Union[int, HTTPException]:
     logger.info("generate_document_embeddings from %s", request.location)
 
@@ -282,7 +283,10 @@ async def generate_document_embeddings(  # Noqa: C901
 
     total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
 
-    if request.graphEmbed:
+    if run_graph_embded:
+        logging.info("Running graph embedding for %s", request.location)
         _ = await graph_embed_docs(docs, graph_db_config, graph_rag_config)
+    else:
+        logging.info("Skipping graph embedding for %s", request.location)
 
     return total_inserted
