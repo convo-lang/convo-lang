@@ -1,7 +1,17 @@
-import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation } from "./convo-types";
+import { passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
+import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, FlatConvoConversationBase } from "./convo-types";
 
-export class CallbackConvoCompletionService implements ConvoCompletionService
+export class CallbackConvoCompletionService implements ConvoCompletionService<FlatConvoConversation,ConvoCompletionMessage[]>
 {
+
+    public readonly inputType=passthroughConvoInputType;
+
+    public readonly outputType=passthroughConvoOutputType;
+
+    public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
+    {
+        return true;
+    }
 
     private completeAsync:(flat:FlatConvoConversation)=>Promise<ConvoCompletionMessage[]>;
 
@@ -10,15 +20,8 @@ export class CallbackConvoCompletionService implements ConvoCompletionService
         this.completeAsync=completeAsync;
     }
 
-
-
     public completeConvoAsync(flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
     {
         return this.completeAsync(flat);
-    }
-
-    public toModelFormat(flat:FlatConvoConversation):any
-    {
-        return undefined;
     }
 }

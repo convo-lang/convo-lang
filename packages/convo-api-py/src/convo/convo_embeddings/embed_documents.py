@@ -157,7 +157,7 @@ def insert_vectors(
         chunk_len = len(chunk)
 
         if chunk_len + sql_len >= max_sql_len:
-            logger.info("Inserting %s embeddings into %s", inserted, embeddings_table)
+            logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
             exec_sql("".join(sql_chucks)[:-1], request.dryRun)
             inserted = 0
             sql_chucks = [head]
@@ -170,7 +170,7 @@ def insert_vectors(
         total_inserted = total_inserted + 1
 
     if inserted > 0:
-        logger.info("Inserting %s embeddings into %s", inserted, embeddings_table)
+        logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
         exec_sql("".join(sql_chucks)[:-1], request.dryRun)
 
     logger.info("Inserted %s embeddings into %s", total_inserted, embeddings_table)
@@ -184,7 +184,7 @@ async def generate_document_embeddings(  # Noqa: C901
     graph_db_config: types.GraphDBConfig,
     graph_rag_config: types.GraphRagConfig,
 ) -> Union[int, HTTPException]:
-    logger.info("generate_document_embeddings %s", request)
+    logger.info("generate_document_embeddings from %s", request.location)
 
     document_path = request.location
     docPrefix = os.getenv("DOCUMENT_PREFIX_PATH")

@@ -7,6 +7,7 @@ export * from './lib/ConvoExecutionContext';
 export * from './lib/ConvoGraphCtrl';
 export * from './lib/ConvoLocalStorageGraphStore';
 export * from './lib/ConvoMemoryGraphStore';
+export * from './lib/HttpConvoCompletionService';
 export * from './lib/LocalStorageConvoDataStore';
 export * from './lib/convo-default-vars';
 export * from './lib/convo-from-scope';

@@ -1,7 +1,5 @@
 
-import { aiCompleteConvoModule } from "@iyio/ai-complete";
-//import { aiCompleteLambdaModule } from "@iyio/ai-complete-lambda";
-import { openAiModule } from "@iyio/ai-complete-openai";
+import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
 import { EnvParams, ScopeRegistration, delayAsync, getErrorMessage, initRootScope, parseCliArgsT, rootScope, safeParseNumberOrUndefined } from "@iyio/common";
 import { realpath, writeFile } from "fs/promises";
 import { join } from "path";
@@ -135,8 +133,7 @@ const main=async ()=>{
     initRootScope((reg:ScopeRegistration)=>{
         reg.addParams(new EnvParams())
         //reg.use(aiCompleteLambdaModule);
-        reg.use(openAiModule);
-        reg.use(aiCompleteConvoModule);
+        reg.use(openaiConvoModule);
     });
 
     await rootScope.getInitPromise();

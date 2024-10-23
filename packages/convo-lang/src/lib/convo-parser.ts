@@ -1069,6 +1069,12 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
+                    case convoTags.userId:
+                        if(tag.value){
+                            msg.userId=tag.value;
+                        }
+                        break;
+
                     case convoTags.eval:
                         msg.eval=true;
                         break;
