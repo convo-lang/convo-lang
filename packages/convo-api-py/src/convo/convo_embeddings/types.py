@@ -72,7 +72,7 @@ class GraphDBConfig:
     dbname: str = os.getenv("PGDATABASE")
     user: str = os.getenv("PGUSER")
     password: str = os.getenv("PGPASSWORD")
-    graph: str = os.getenv("PGGRAPH")
+    graph: str = os.getenv("GRAPH_DB")
 
 
 @dataclass
