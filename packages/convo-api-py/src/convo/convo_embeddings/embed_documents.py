@@ -92,9 +92,9 @@ def get_content_category(
     elif firstDoc and firstDoc.metadata and ("content_type" in firstDoc.metadata):
         content_type = firstDoc.metadata["content_type"]
     else:
-        if firstDoc and firstDoc.metadata and ("filename" in firstDoc.metadata):
+        if firstDoc and firstDoc.metadata and ("source" in firstDoc.metadata):
             logger.info("first doc filename %s", firstDoc)
-            mime_path = firstDoc.metadata["filename"]
+            mime_path = firstDoc.metadata["source"]
 
         if mime_path:
             mime = magic.Magic(mime=True)
@@ -218,10 +218,10 @@ async def generate_document_embeddings(  # Noqa: C901
     graph_rag_config: types.GraphRagConfig,
     run_graph_embded: bool,
 ) -> Union[int, HTTPException]:
-    logger.info("generate_document_embeddings from %s", request.location)
     logger.debug("Proccessing %s", request)
 
     document_path = clean_document_path(request.location)
+    logger.info("generate_document_embeddings from %s", document_path)
     is_direct_docs, docs = load_documents(request, document_path)
 
     if len(docs) == 0:
@@ -254,7 +254,7 @@ async def generate_document_embeddings(  # Noqa: C901
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    logger.info("Generating embeddings")
+    logger.info("Generating embeddings from %s", document_path)
 
     cols = request.cols.copy() if request.cols else dict()
 
@@ -287,6 +287,7 @@ async def generate_document_embeddings(  # Noqa: C901
             cf = False
 
         if not cf:
+            logger.debug("Clear matching query: %s", clearSql)
             exec_sql(clearSql, request.dryRun)
 
     col_names_escaped = list()
