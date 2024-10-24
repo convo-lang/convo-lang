@@ -6,7 +6,7 @@ from datetime import datetime
 import psycopg2
 from fastapi import FastAPI
 
-from . import rest_api
+from . import db, rest_api
 
 log_file_path = f"./embedding_api_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.log"
 logger = logging.getLogger(__name__)
@@ -33,6 +33,8 @@ def create_graph(graph_name: str):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await db.database.connect()
+
     try:
         graph_name = os.getenv("GRAPH_DB")
         assert graph_name is not None, "'GRAPH_DB' environment variable was not set"
@@ -42,6 +44,8 @@ async def lifespan(app: FastAPI):
         logger.info("Faild to create graph '%s' - reason: %s", graph_name, e)
 
     yield
+
+    await db.database.disconnect()
 
 
 app = FastAPI(lifespan=lifespan)
