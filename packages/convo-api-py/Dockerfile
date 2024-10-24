@@ -33,9 +33,8 @@ WORKDIR /app/convo-api-py
 COPY packages/convo-api-py/pyproject.toml pyproject.toml
 COPY packages/convo-api-py/poetry.lock poetry.lock
 COPY packages/convo-api-py/src/ src
-COPY packages/convo-api-py/start-rest-server.sh start-rest-server.sh
 
-RUN poetry install --only=main --no-interaction --no-ansi
+RUN poetry install --only=main --no-interaction --no-ansi --without dev
 
 EXPOSE 8080
 

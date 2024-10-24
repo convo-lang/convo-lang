@@ -108,6 +108,7 @@ class AgeGraphStorage(BaseGraphStorage):
 
     async def upsert_node(self, node_id: str, node_data: Dict[str, str]):
         node_type = node_data.get("entity_type", "UNKNOWN").strip('"')
+        node_data["doc_path"] = self.namespace
         params = _format_data(node_data)
         query = f"MERGE (n:{node_type} {{id: {node_id}}}) SET n += {params}"
         logger.debug("upsert-node query %s", query)
@@ -118,6 +119,7 @@ class AgeGraphStorage(BaseGraphStorage):
         self, source_node_id: str, target_node_id: str, edge_data: Dict[str, str]
     ):
         edge_data.setdefault("weight", 0.0)
+        edge_data["doc_path"] = self.namespace
         params = _format_data(edge_data)
         query = (
             f"MATCH (s), (t) "
@@ -132,22 +134,28 @@ class AgeGraphStorage(BaseGraphStorage):
 
 async def graph_embed_docs(
     docs: List[Document],
+    docs_path: str,
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
 ):
     logger.info("Graph embedding documents")
+
     age_graph = AgeGraphStorage(
-        namespace="NA",
+        # TODO: Insert document source here, but need to
+        #  look if there is more performant way of adding this
+        #  as an index
+        namespace=docs_path,
         global_config=asdict(graph_rag_config),
         **asdict(graph_db_config),
     )
+
     ids = [str(uuid.uuid4()) for _ in docs]
     chunks = {
         uuid: TextChunkSchema(
             tokens=0,  # Unused by graph-rag
             content=doc.page_content,
-            full_doc_id=uuid,
+            full_doc_id=docs_path,
             chunk_order_index=0,  # Unused by graph-rag
         )
         for i, (uuid, doc) in enumerate(zip(ids, docs))
