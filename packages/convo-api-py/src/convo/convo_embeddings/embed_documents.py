@@ -10,13 +10,13 @@ from iyio_common import escape_sql_identifier, exec_sql, parse_s3_path
 from langchain.schema.document import Document
 from langchain_community.document_loaders import (
     DirectoryLoader,
-    UnstructuredFileLoader,
     UnstructuredHTMLLoader,
     UnstructuredMarkdownLoader,
     UnstructuredPDFLoader,
     UnstructuredURLLoader,
 )
 from langchain_community.document_loaders.base import BaseLoader
+from langchain_unstructured import UnstructuredLoader
 from openai import AsyncOpenAI
 from psycopg import sql
 
@@ -57,7 +57,7 @@ def get_doc_loader(
         file_loader = DirectoryLoader(
             document_path,
             show_progress=True,
-            loader_cls=UnstructuredFileLoader,
+            loader_cls=UnstructuredLoader,
             loader_kwargs={"mode": mode},
         )
         direct_docs = None
@@ -71,20 +71,23 @@ def get_doc_loader(
         file_loader = UnstructuredMarkdownLoader(document_path, mode=mode)
         direct_docs = None
     else:
-        file_loader = UnstructuredFileLoader(document_path, mode=mode)
+        file_loader = UnstructuredLoader(document_path, mode=mode)
         direct_docs = None
 
     return direct_docs, file_loader
 
 
 def get_content_category(
-    request: types.DocumentEmbeddingRequest, document_path: str, docs, direct_docs
+    request: types.DocumentEmbeddingRequest,
+    document_path: str,
+    docs,
+    is_direct_docs: bool,
 ) -> Tuple[Optional[str], Optional[str]]:
     content_type = request.contentType
     mime_path = document_path
     firstDoc = docs[0]
 
-    if direct_docs:
+    if is_direct_docs:
         content_type = request.contentType
     elif firstDoc and firstDoc.metadata and ("content_type" in firstDoc.metadata):
         content_type = firstDoc.metadata["content_type"]
@@ -178,24 +181,16 @@ def insert_vectors(
     return total_inserted
 
 
-async def generate_document_embeddings(  # Noqa: C901
-    open_ai_client: AsyncOpenAI,
+def load_documents(
     request: types.DocumentEmbeddingRequest,
-    graph_db_config: types.GraphDBConfig,
-    graph_rag_config: types.GraphRagConfig,
-    run_graph_embded: bool,
-) -> Union[int, HTTPException]:
-    logger.info("generate_document_embeddings from %s", request.location)
-
+) -> Tuple[bool, List[Document]]:
     document_path = request.location
-    docPrefix = os.getenv("DOCUMENT_PREFIX_PATH")
+    doc_prefix = os.getenv("DOCUMENT_PREFIX_PATH")
 
-    if document_path != "inline" and docPrefix:
+    if document_path != "inline" and doc_prefix:
         if not document_path.startswith("/"):
             document_path = "/" + document_path
-        document_path = docPrefix + document_path
-
-    embeddings_table = request.embeddingsTable
+        document_path = doc_prefix + document_path
 
     direct_docs, file_loader = get_doc_loader(request, document_path, "single")
     docs = direct_docs if direct_docs else file_loader.load()
@@ -204,6 +199,24 @@ async def generate_document_embeddings(  # Noqa: C901
         chunk_size=request.chunk_size, chunk_overlap=request.chunk_overlap
     )
     docs = text_splitter.split_documents(docs)
+    is_direct_docs = direct_docs is not None
+
+    return is_direct_docs, docs
+
+
+async def generate_document_embeddings(  # Noqa: C901
+    open_ai_client: AsyncOpenAI,
+    request: types.DocumentEmbeddingRequest,
+    graph_db_config: types.GraphDBConfig,
+    graph_rag_config: types.GraphRagConfig,
+    run_graph_embded: bool,
+) -> Union[int, HTTPException]:
+    logger.info("generate_document_embeddings from %s", request.location)
+    logger.debug("Proccessing %s", request)
+
+    document_path = request.location
+    embeddings_table = request.embeddingsTable
+    is_direct_docs, docs = load_documents(request)
 
     if len(docs) == 0:
         msg = "No embedding documents found for {document_path}"
@@ -211,10 +224,12 @@ async def generate_document_embeddings(  # Noqa: C901
         return HTTPException(status_code=400, detail=msg)
 
     content_type, content_category = get_content_category(
-        request, document_path, docs, direct_docs
+        request, document_path, docs, is_direct_docs
     )
 
-    logger.info("Content category %s", content_category)
+    logger.info(
+        "Content category: %s, content type: %s", content_category, content_type
+    )
 
     if not content_category and request.contentCategoryCol:
         msg = "Unable to determine content category."
@@ -233,7 +248,6 @@ async def generate_document_embeddings(  # Noqa: C901
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    all_docs = list()
     logger.info("Generating embeddings")
 
     cols = request.cols.copy() if request.cols else dict()

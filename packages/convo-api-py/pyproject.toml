@@ -28,6 +28,7 @@ nano-graphrag = "^0.0.8"
 markdown = "^3.7"
 fastapi = "^0.115.2"
 uvicorn = "^0.32.0"
+langchain-unstructured = "^0.1.5"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"
