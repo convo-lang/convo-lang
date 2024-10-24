@@ -4,9 +4,8 @@ import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import magic
-from convo.db import db_insert_vector, text_blob
+from convo.db import db_delete_matching, db_insert_vector, text_blob
 from fastapi import HTTPException
-from iyio_common import escape_sql_identifier, exec_sql, parse_s3_path
 from langchain.schema.document import Document
 from langchain_community.document_loaders import (
     DirectoryLoader,
@@ -18,13 +17,13 @@ from langchain_community.document_loaders import (
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_unstructured import UnstructuredLoader
 from openai import AsyncOpenAI
-from psycopg import sql
 
 from . import types
 from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
 from .graph_embedding import graph_embed_docs
 from .s3_loader import S3FileLoaderEx
+from .utils import parse_s3_path
 
 max_sql_len = 65536
 
@@ -223,23 +222,8 @@ async def generate_document_embeddings(  # Noqa: C901
     all_docs = await asyncio.gather(*all_docs_tasks)
 
     if request.cols and request.clearMatching:
-        clearSql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
-        cf = True
-        for cc in request.clearMatching:
-            if cf:
-                cf = False
-            else:
-                clearSql += " AND"
-            if cols[cc] is None:
-                clearSql += f" {escape_sql_identifier(cc)} is NULL"
-            else:
-                inner = sql.SQL("{value}").format(value=cols[cc]).as_string(None)
-                clearSql += f" {escape_sql_identifier(cc)} = {inner}"
-            cf = False
-
-        if not cf:
-            logger.debug("Clear matching query: %s", clearSql)
-            exec_sql(clearSql, request.dryRun)
+        deleted = await db_delete_matching(cols)
+        logging.info("Deleted %s entries matching %s", len(deleted), cols)
 
     inserted_ids = await insert_vectors(cols, all_docs)
 

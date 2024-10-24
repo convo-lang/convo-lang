@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Any, Dict
 
 from databases import Database
 from pgvector.sqlalchemy import VECTOR
@@ -43,4 +43,11 @@ database = Database(DB_URL)
 
 async def db_insert_vector(payload: Dict):
     query = text_blob.insert().values(**payload)
+    return await database.execute(query=query)
+
+
+async def db_delete_matching(cols: Dict[str, Any]):
+    query = text_blob.delete()
+    for k, v in cols.items():
+        query = query.where(k == v)
     return await database.execute(query=query)
