@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
@@ -141,15 +142,15 @@ async def graph_embed_docs(
         global_config=asdict(graph_rag_config),
         **asdict(graph_db_config),
     )
-
+    ids = [str(uuid.uuid4()) for _ in docs]
     chunks = {
-        f"{i:#0{6}x}": TextChunkSchema(
+        uuid: TextChunkSchema(
             tokens=0,  # Unused by graph-rag
             content=doc.page_content,
-            full_doc_id=f"{i:#0{6}x}",
+            full_doc_id=uuid,
             chunk_order_index=0,  # Unused by graph-rag
         )
-        for i, doc in enumerate(docs)
+        for i, (uuid, doc) in enumerate(zip(ids, docs))
     }
 
     _ = await extract_entities(

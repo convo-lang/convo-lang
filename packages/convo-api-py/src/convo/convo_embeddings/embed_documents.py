@@ -262,7 +262,8 @@ async def generate_document_embeddings(  # Noqa: C901
             if cols[cc] is None:
                 clearSql += f" {escape_sql_identifier(cc)} is NULL"
             else:
-                clearSql += f' {escape_sql_identifier(cc)} = {sql.SQL("{cols[cc]}").as_string(None)}'
+                inner = sql.SQL("{value}").format(value=cols[cc]).as_string(None)
+                clearSql += f" {escape_sql_identifier(cc)} = {inner}"
             cf = False
 
         if not cf:
