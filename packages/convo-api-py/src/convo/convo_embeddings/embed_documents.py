@@ -181,17 +181,24 @@ def insert_vectors(
     return total_inserted
 
 
-def load_documents(
-    request: types.DocumentEmbeddingRequest,
-) -> Tuple[bool, List[Document]]:
-    document_path = request.location
+def clean_document_path(document_path: str) -> str:
     doc_prefix = os.getenv("DOCUMENT_PREFIX_PATH")
 
-    if document_path != "inline" and doc_prefix:
+    is_inline = document_path == "inline"
+    is_s3 = document_path.startswith("s3://")
+    is_url = document_path.startswith("https://") or document_path.startswith("http://")
+
+    if not (is_inline or is_s3 or is_url) and doc_prefix:
         if not document_path.startswith("/"):
             document_path = "/" + document_path
         document_path = doc_prefix + document_path
 
+    return document_path
+
+
+def load_documents(
+    request: types.DocumentEmbeddingRequest, document_path: str
+) -> Tuple[bool, List[Document]]:
     direct_docs, file_loader = get_doc_loader(request, document_path, "single")
     docs = direct_docs if direct_docs else file_loader.load()
 
@@ -214,9 +221,8 @@ async def generate_document_embeddings(  # Noqa: C901
     logger.info("generate_document_embeddings from %s", request.location)
     logger.debug("Proccessing %s", request)
 
-    document_path = request.location
-    embeddings_table = request.embeddingsTable
-    is_direct_docs, docs = load_documents(request)
+    document_path = clean_document_path(request.location)
+    is_direct_docs, docs = load_documents(request, document_path)
 
     if len(docs) == 0:
         msg = "No embedding documents found for {document_path}"
@@ -266,7 +272,7 @@ async def generate_document_embeddings(  # Noqa: C901
     all_docs = await asyncio.gather(*all_docs_tasks)
 
     if request.cols and request.clearMatching:
-        clearSql = f"DELETE FROM {escape_sql_identifier(embeddings_table)} where"
+        clearSql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
         cf = True
         for cc in request.clearMatching:
             if cf:
