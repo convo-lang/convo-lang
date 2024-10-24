@@ -223,7 +223,7 @@ async def generate_document_embeddings(  # Noqa: C901
 
     if request.cols and request.clearMatching:
         deleted = await db_delete_matching(cols)
-        logging.info("Deleted %s entries matching %s", len(deleted), cols)
+        logging.info("Deleted %s entries matching %s", deleted, cols)
 
     inserted_ids = await insert_vectors(cols, all_docs)
 
