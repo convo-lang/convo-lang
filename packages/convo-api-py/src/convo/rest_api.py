@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 document_handler = APIRouter()
 
 
-@document_handler.post("/embeddings/text")
+@document_handler.post("/api/embeddings/text")
 async def post_embed_text(data):
     open_ai_client = AsyncOpenAI()
     return await encode_text(open_ai_client, data)
 
 
-@document_handler.get("/embeddings/text")
+@document_handler.get("/api/embeddings/text")
 async def get_embed_text(data):
     open_ai_client = AsyncOpenAI()
     return await encode_text(open_ai_client, [data["text"] if "text" in data else ""])
 
 
-@document_handler.post("/embeddings/document")
+@document_handler.post("/api/embeddings/document")
 async def embed_documents(request: DocumentEmbeddingRequest):
     open_ai_client = AsyncOpenAI()
     graph_rag_config = GraphRagConfig()
@@ -44,6 +44,6 @@ async def embed_documents(request: DocumentEmbeddingRequest):
     )
 
 
-@document_handler.post("/document-conversion")
+@document_handler.post("/api/document-conversion")
 async def document_conversion(request: DocumentConversionRequest):
     return convert_document(request)
