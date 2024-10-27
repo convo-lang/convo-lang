@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import tempfile
 from typing import TYPE_CHECKING, List, Optional, Union
-import magic
 
-from langchain_community.document_loaders.unstructured import UnstructuredBaseLoader
+import magic
+from langchain_community.document_loaders.unstructured import (
+    UnstructuredBaseLoader,
+)
 
 if TYPE_CHECKING:
     import botocore
@@ -14,8 +16,8 @@ if TYPE_CHECKING:
 class S3FileLoaderEx(UnstructuredBaseLoader):
     """Load from `Amazon AWS S3` file."""
 
-    filepath:Optional[str]=None
-    content_type:Optional[str]=None
+    filepath: Optional[str] = None
+    content_type: Optional[str] = None
 
     def __init__(
         self,
@@ -127,12 +129,16 @@ class S3FileLoaderEx(UnstructuredBaseLoader):
             file_path = f"{temp_dir}/{self.key}"
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             s3.download_file(self.bucket, self.key, file_path)
-            self.filepath=file_path
+            self.filepath = file_path
             mime = magic.Magic(mime=True)
-            type=mime.from_file(file_path)
+            type = mime.from_file(file_path)
             if type:
-                self.content_type=type
+                self.content_type = type
             return partition(filename=file_path)
 
     def _get_metadata(self) -> dict:
-        return {"source": f"s3://{self.bucket}/{self.key}","filename":self.filepath,"content_type":self.content_type}
+        return {
+            "source": f"s3://{self.bucket}/{self.key}",
+            "filename": self.filepath,
+            "content_type": self.content_type,
+        }
