@@ -5,13 +5,13 @@ provided a uniform syntax for working with all LLMs.
 
 Convo-lang can be executed in Javascript, Python,
 from the command line or directly in VSCode via the Convo-lang extension.
-The core of Convo-lang consists of 2 parts, the Convo-lang language and the Convo-engine.
+The core of Convo-lang consists of 2 parts, the Convo-lang language and the Conversation Engine.
 
-The Convo-lang language or just simply "Convo-lang", is used to write prompts in a structured
+The **Convo-lang** language or just simply "Convo-lang", is used to write prompts in a structured
 language that can be interchangeably used with different LLMs.
 
-The Convo-engine is an interpreter that interprets code written in the Convo-lang language. The
-Convo-engine handles passing messages back forth to and from LLM. It also converting prompts written
+The **Conversation Engine** is an interpreter that interprets scripts written in the Convo-lang language. The
+Conversation Engine handles passing messages back forth to and from LLM. It also converting prompts written
 in Convo-lang to and from the message format of the LLM being conversed with.
 
 *@@static*
@@ -21,18 +21,18 @@ You are a prompt engineer learning Convo-lang. Prompting will never be the same 
 ```
 
 
-## The Doc 🤓
+## Doc
 Meet Doc, your personal assistant on your journey into the world of Convo-lang. Ask Doc any questions
 you have about Convo-lang and he will give you a hand. You can use the "Ask the Doc" chat box at the
 top of the screen at anytime during this tutorial.
 
-Below is all of Convo-lang for Doc. By the end of this tutorial you will be able to write your own
-skilled agents and more using Convo-lang.
+Below is the Convo-lang script for Doc. By the end of this tutorial you will be able to write your own
+skilled agent similar to Doc and more.
 
 *@@convo-source agent-doc*
 ``` convo
 > define
-langName="Conv-lang"
+langName="Convo-lang"
 
 > system
 You are teaching a prompt engineer a really cool 
@@ -75,14 +75,96 @@ What are tags
 What do you use variables
 ```
 
-Doc is purely written in Convo-lang
-and uses the very document you are reading right now as his knowledge base in combination with
-a few functions in integrate into the convo-lang.ai website. Doc is a great example of what can
-be done with Convo-lang.
+Doc is purely written in Convo-lang and uses the document you are reading right now as his knowledge
+base in combination with a few functions in integrate into the Convo-lang website. Doc is a great
+example of what can be done with Convo-lang.
 
 ## Summary
 
-## The Basics
+## Conversations
+At the heart of Convo-lang are Conversations. A Conversation is a collection
+of messages. Messages can either contain textual content, multi-modal content
+or executable statements.
+
+Conversations are managed by the Conversation Engine, which is a code interpreter
+that interpreters Convo-lang scripts. It handles all of the complexities of sending messages between
+a user and an LLM, executing tool use / calling function and manages the internal state of a Conversation.
+
+Convo-lang scripts are conversations written in the Convo-lang syntax and stored in a file or memory.
+When integrating Convo-lang into an application you will often store Convo-lang scripts in strings
+that are then passed to the Conversation Engine.
+
+Here is a simple example of a Convo-lang script.
+
+``` convo
+> define
+name="Jeff"
+
+> assistant
+Hello, I'm {{name}} 🥸. What can I help you with?
+
+> user
+What are the names of the planets in our solar system
+
+
+> assistant
+The planets in our solar system, in order from
+closest to the Sun to farthest, are:
+
+1. Mercury
+2. Venus
+3. Earth
+4. Mars
+5. Jupiter
+6. Saturn
+7. Uranus
+8. Neptune
+
+Additionally, there are also dwarf planets,
+with Pluto being the most well-known among them.
+
+> user
+Thank you
+
+> assistant
+You're welcome! If you have any more questions,
+feel free to ask.
+
+
+
+
+```
+
+## Integration
+Convo-lang can be integrated into any TypeScript/JavaScript or Python application. We won't go into
+depth about how to integrate Convo-lang into an application here, as we are mainly focused on learning
+the Convo-lang language in this document. Below are a couple of quick start guide and links to more
+information about integration.
+
+### TypeScript/Javascript Integration
+The follow NPM packages are available for TypeScript/JavaScript integration
+
+- @convo-lang/convo-lang - Contains the Convo-lang Conversation Engine, and a Typescript/Javascript library to use Convo-lang in your application.
+- @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
+- @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
+- @convo-lang/convo-vfs - Used to integrate Convo-lang into virtual file systems.
+- @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
+- @convo-lang/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
+  in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
+  In most cases, you will not install this package but instead install the vscode convo-lang extension.
+
+### VSCode extension
+To help you develop Convo-lang application faster and easier we provide a VSCode extension that gives
+you Convo-lang syntax highlighting and allows you to execute Convo-lang scripts directly in VSCode.
+
+You can install the vscode extension by searching for "convo-lang" in the vscode extension tab.
+
+[https://marketplace.visualstudio.com/items?itemName=IYIO.convo-lang-tools](https://marketplace.visualstudio.com/items?itemName=IYIO.convo-lang-tools)
+
+### Python Integration
+**Coming Soon**
+
+## Language Basics
 Convo-lang consists of a few simple building blocks, Content Message, Functions, Top Level Statements,
 Variables, Tags and Comments. By combining these building blocks Convo-lang allows you to create
 interactive, multi-modal conversations between humans and LLMs. These conversations.
@@ -161,7 +243,7 @@ This is a suggestion message
 
 
 ## Content Messages
-Content message represent textual and other multi-modal messages shared between an LLM and a user.
+Content message represent textual and multi-modal messages shared between an LLM and a user.
 
 Below is an example of a clown telling a jokes to a user.
 ``` convo
@@ -376,7 +458,7 @@ can be assigned to any variable type at any time.
 
 `struct` - A custom data structure. [read more](#structures)
 
-
+Below is an example different variable types
 ``` convo
 > define
 
@@ -557,7 +639,7 @@ underscore for user defined variables is prohibited.
 Function messages define functions ( also known as tools ) that LLMs can call at runtime. Function
 messages start with a `>` character followed by an optional modifier, identifier, 0 or more arguments
 and an optional function body. A function's body contains Convo-code the is executed by the
-Convo-engine. If a function does not define a body it will return the arguments
+Conversation Engine. If a function does not define a body it will return the arguments
 it is given as and object with key value paris matching the names an values of arguments passed. 
 
 Below is an example of an LLM using a `addNumbers` function to add numbers together.
@@ -595,7 +677,7 @@ message the LLM responds with a content message giving the result to the user in
 
 
 ### Extern Functions
-Extern function allow you do define functions in other languages that are call by the the Convo-engine
+Extern function allow you do define functions in other languages that are call by the the Conversation Engine
 This allows Convo-lang to integrate into existing systems and offload complex logic to more traditional programming languages
 
 Below is an example of an agent setting the color of an SVG shape based on input from the user
@@ -1216,6 +1298,7 @@ Deposit complete
 Messages can be concatenated or joined together using the `@concat` tag. The concat tag is often
 used with conditional messages to make larger messages containing conditionally rendered sections
 
+Try changing the name variable to "Matt" to see what happens.
 ``` convo
 > define
 name="Bob"
@@ -1237,9 +1320,30 @@ of my local Home Depot 👷🏼‍♂️
 
 
 
-## Code
-Code in Convo-lang refers to the code that is executed in top level statements and function bodies. 
-Code statements are evaluated at runtime by the Convo-engine interpreter.
+## Executable Statements
+Statements in Convo-lang refers to the executable code that is evaluated by the Conversation engine
+at runtime. Statements can be contained in function bodies, top level statement message and 
+in dynamic expression embedded in content messages.
+
+``` convo
+// all content in the define message are statements
+> define
+name="Jeff"
+ageInDays=mul(38 365)
+
+// The changeName function body contains 2 statements
+> changeName(newName:string) -> (
+    name=newName
+    print('name set to {{newName}}')
+)
+
+// The assistant message contains 2 dynamic
+// expressions containing statements
+@edge
+> assistant
+Hi, I'm {{name}} I'm {{div(ageInDays 365)}} years old
+
+```
 
 ### Keywords
 
