@@ -487,6 +487,36 @@ export const defaultConvoVars={
         return ary;
     }),
 
+    aryAdd:createConvoScopeFunction(scope=>{
+        let ary=scope.paramValues?.[0];
+        debugger
+        if(!scope.paramValues || !Array.isArray(ary)){
+            return ary;
+        }
+        ary=[...ary];
+        for(let i=1;i<scope.paramValues.length;i++){
+            ary.push(scope.paramValues[i]);
+        }
+        return ary;
+    }),
+
+    aryRemove:createConvoScopeFunction(scope=>{
+        let ary=scope.paramValues?.[0];
+        if(!scope.paramValues || !Array.isArray(ary)){
+            return [];
+        }
+        ary=[...ary];
+        for(let i=1;i<scope.paramValues.length;i++){
+            const index=ary.indexOf(scope.paramValues[i]);
+            if(index===-1){
+                continue;
+            }
+            ary.splice(index,1);
+            i--;
+        }
+        return ary;
+    }),
+
 
 
     add:createConvoScopeFunction(scope=>{

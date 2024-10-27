@@ -17,6 +17,7 @@ export interface ConvoGraphViewProps
     getNodeLink?:(node:ConvoNode)=>string|null|undefined;
     hideOutput?:boolean;
     onDrop?:(pt:Point)=>void;
+    ctrlScroll?:boolean;
 }
 
 export function ConvoGraphView({
@@ -26,6 +27,7 @@ export function ConvoGraphView({
     hideOutput,
     createViewCtrl,
     onDrop,
+    ctrlScroll,
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -246,6 +248,7 @@ export function ConvoGraphView({
                     getCtrl={setPanZoom}
                     ignoreClasses="NodeView"
                     dragTargets={dragTargets}
+                    ctrlScroll={ctrlScroll}
                 >
 
                     {ctrl && <ConvoGraphCanvas ctrl={ctrl} getNodeLink={getNodeLink} />}

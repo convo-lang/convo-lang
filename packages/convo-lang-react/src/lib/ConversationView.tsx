@@ -1,7 +1,7 @@
 import { ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { useShallowCompareItem, useSubject } from "@iyio/react-common";
-import { useContext, useEffect, useMemo } from "react";
+import { useContext, useEffect, useMemo, useRef } from "react";
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
 import { MessagesView } from "./MessagesView";
@@ -26,6 +26,8 @@ export interface ConversationViewProps
     renderTarget?:string;
     redirectMessagesView?:(view:any)=>void;
     min?:boolean;
+    defaultVars?:Record<string,any>;
+    externFunctions?:Record<string,(param:any)=>any>;
 }
 
 export function ConversationView({
@@ -45,11 +47,20 @@ export function ConversationView({
     renderTarget=defaultConvoRenderTarget,
     redirectMessagesView,
     min,
+    defaultVars,
+    externFunctions,
 }:ConversationViewProps){
 
+    const refs=useRef({defaultVars,externFunctions});
+    refs.current.defaultVars=defaultVars;
+    refs.current.externFunctions=externFunctions;
     const ctxCtrl=useContext(ConversationUiContext);
     const defaultCtrl=ctrlProp??ctxCtrl;
-    const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl(ctrlOptions),[defaultCtrl,ctrlOptions]);
+    const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl({
+        defaultVars:refs.current.defaultVars,
+        externFunctions:refs.current.externFunctions,
+        ...ctrlOptions
+    }),[defaultCtrl,ctrlOptions]);
 
     useEffect(()=>{
         if(content &&

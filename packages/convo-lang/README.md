@@ -309,10 +309,10 @@ Why did The Beatles cross the road? Because they knew it was the only way to get
 ```
 
 ## Templates
-**Documentation coming soon**
+**Deprecated**
 
 ## Tasks
-**Documentation coming soon**
+**Deprecated**
 
 ## ConvoGraph
 ConvoGraphs allow you to link convo-scripts together in a node based manner that allows you to define
@@ -321,8 +321,7 @@ complex automations and decision trees
 **More Documentation coming soon**
 
 ## Threads
-A convo-lang script can be divided into multiple threads using the `@thread` tag. A thread filter
-can then be passed to conversation completions to filter which threads to process.
+**Deprecated**
 
 ## The convo-lang syntax
 The convo-lang syntax is designed to be easily readable and follows a chat-like message structure.

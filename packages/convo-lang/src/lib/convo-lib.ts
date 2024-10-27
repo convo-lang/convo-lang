@@ -183,6 +183,18 @@ export const convoVars={
 
 } as const;
 
+export const convoImportModifiers={
+    /**
+     * Only system messages should be imported
+     */
+    system:'system',
+
+    /**
+     * Content messages should be ignored
+     */
+    ignoreContent:'ignoreContent'
+} as const;
+
 export const defaultConvoRagTol=1.2;
 
 export const convoTags={
@@ -307,7 +319,8 @@ export const convoTags={
 
     /**
      * Used to mark a message as a component. The value can be "render" or "input". The default
-     * value is "render" if no value is given
+     * value is "render" if no value is given. When the "input" value is used the rendered component
+     * will take input from a user then write the input received to the executing conversation.
      */
     component:'component',
 
@@ -441,6 +454,12 @@ export const convoTags={
      * Id of the user that created the message
      */
     userId:'userId',
+
+    /**
+     * Causes all white space in a content message to be preserved. By define all content message
+     * whitespace is preserved.
+     */
+    preSpace:'preSpace',
 
 } as const;
 
@@ -1551,8 +1570,14 @@ export const getNormalizedFlatMessageList=(
     const disableRag=options?.disableRag;
 
     for(let i=0;i<messages.length;i++){
-        const msg=messages[i];
+        let msg=messages[i];
         if(!msg){continue}
+
+        if(msg.prefix || msg.suffix){
+            msg={...msg}
+            messages[i]=msg;
+            msg.content=`${msg.prefix??''}${msg.content??''}${msg.suffix??''}`
+        }
 
         if(msg.role==='rag' && !disableRag){
 
@@ -1583,3 +1608,11 @@ export const getNormalizedFlatMessageList=(
 
     return messages;
 }
+
+const jsonReg=/json/i;
+
+export const formatConvoContentSpace=(content:string):string=>{
+    return content.replace(spaceFormatReg,(_,a:string,b:string)=>`${a} ${b}`);
+}
+
+const spaceFormatReg=/(\w|\.|,|\?|!)[ \t]*\r?\n(\w)/g;

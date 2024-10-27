@@ -378,7 +378,7 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
     }
     @.msg.suggestion{
         background-color:#000000;
-        border:1px solid color-mix( in srgb, @@agentColor , transparent 50% );
+        border:1px solid color-mix( in srgb, @@borderColor , transparent 50% );
         padding:0;
         display:flex;
         flex-direction:column;
@@ -392,7 +392,7 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         fill:@@agentColor;
     }
     @.suggestBtn{
-        border-top:1px solid color-mix( in srgb, @@agentColor , transparent 50% );
+        border-top:1px solid color-mix( in srgb, @@borderColor , transparent 50% );
         padding:@@messagePadding;
         transition:background-color 0.2s ease-in-out;
         text-align:center;
@@ -416,6 +416,7 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         margin-top:0.5rem;
         margin-bottom:-0.5rem;
         margin:0.5rem 0.5rem -0.5rem 0.5rem;
-        opacity:0.7;
+        opacity:0.5;
+        font-size:0.9em;
     }
 `});

@@ -13,6 +13,7 @@ export interface ConvoLangTheme
     borderRadius:string;
     padding:string;
     gap:string;
+    borderColor:string;
 
     userBackground:string;
     userColor:string;
@@ -45,6 +46,7 @@ export const defaultLightConvoLangTheme:ConvoLangTheme={
     borderRadius:'0.5rem',
     buttonColor:'#cccccc',
     buttonForeground:'#111111',
+    borderColor:'#333333',
     padding:'1rem',
     gap:'1rem',
     fontSize:'1rem',
@@ -65,6 +67,7 @@ export const defaultDarkConvoLangTheme:ConvoLangTheme={
     ...defaultLightConvoLangTheme,
     foregroundColor:'#ffffff',
     inputBackground:'#333333',
+    borderColor:'#999999',
     inputShadow:'0 0 20px 0px #ffffff11',
     inputBorder:'1px solid #ffffff22',
     buttonColor:'#333333',
