@@ -1,4 +1,4 @@
-import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, FlatConvoConversationBase, convoTags, passthroughConvoInputType, passthroughConvoOutputType } from '@convo-lang/convo-lang';
+import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, FlatConvoConversationBase, convoTags, getNormalizedFlatMessageList, passthroughConvoInputType, passthroughConvoOutputType } from '@convo-lang/convo-lang';
 import { ProviderTypeDef, Scope, TypeDef, UnauthorizedError, aryUnique, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { AiCompletionProviders, aiCompletionMaxAudioLengthParam, aiCompletionMaxImageLengthParam, aiCompletionMaxTextLengthParam } from "./_type.ai-complete";
@@ -311,14 +311,19 @@ export class AiCompletionService implements ConvoCompletionService<FlatConvoConv
 
     public flatConvoToRequest(flat:FlatConvoConversationBase):AiCompletionRequest
     {
+
+        const flatMsgs=getNormalizedFlatMessageList(flat,{
+            disableRag:true,
+        });
+
         const messages:AiCompletionMessage[]=[];
         const functions:AiCompletionFunction[]=[];
 
         const baseId=shortUuid()+'_';
         let lastContentMessage:AiCompletionMessage|undefined;
 
-        for(let i=0;i<flat.messages.length;i++){
-            const msg=flat.messages[i];
+        for(let i=0;i<flatMsgs.length;i++){
+            const msg=flatMsgs[i];
             if(!msg || msg.renderOnly){
                 continue;
             }
