@@ -1615,4 +1615,4 @@ export const formatConvoContentSpace=(content:string):string=>{
     return content.replace(spaceFormatReg,(_,a:string,b:string)=>`${a} ${b}`);
 }
 
-const spaceFormatReg=/(\w|\.|,|\?|!)[ \t]*\r?\n(\w)/g;
+const spaceFormatReg=/(\w|\.|,|\?|!)[ \t]*\r?\n([a-zA-Z])/g;
