@@ -28,6 +28,7 @@ export interface ConversationViewProps
     min?:boolean;
     defaultVars?:Record<string,any>;
     externFunctions?:Record<string,(param:any)=>any>;
+    codeInputAutoScrollBehavior?:ScrollBehavior;
 }
 
 export function ConversationView({
@@ -49,6 +50,7 @@ export function ConversationView({
     min,
     defaultVars,
     externFunctions,
+    codeInputAutoScrollBehavior,
 }:ConversationViewProps){
 
     const refs=useRef({defaultVars,externFunctions});
@@ -97,7 +99,7 @@ export function ConversationView({
     const sourceMode=_sourceMode??sourceModeCtrl;
 
     const messagesView=(showSource?
-        <MessagesSourceView mode={sourceMode} ctrl={ctrl} />
+        <MessagesSourceView autoScrollBehavior={codeInputAutoScrollBehavior} mode={sourceMode} ctrl={ctrl} />
     :
         <MessagesView renderTarget={renderTarget} ctrl={ctrl} ragRenderer={ragRenderer} />
     )
