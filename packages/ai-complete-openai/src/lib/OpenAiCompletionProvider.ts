@@ -154,7 +154,7 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
         for(const m of request.messages){
             if(m.type==='text'){
                 let content:string|Array<ChatCompletionContentPart>;
-                const vc=(visionCapable || m.vision) && m.vision!==false;
+                const vc=(visionCapable || m.vision) && m.vision!==false && m.role!=='system';
                 if(vc){
                     const items=parseMarkdownImages(m.content??'');
                     if(items.length===1 && (typeof items[0]?.text === 'string')){
