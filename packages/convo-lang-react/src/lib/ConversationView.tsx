@@ -29,6 +29,7 @@ export interface ConversationViewProps
     defaultVars?:Record<string,any>;
     externFunctions?:Record<string,(param:any)=>any>;
     codeInputAutoScrollBehavior?:ScrollBehavior;
+    messageBottomPadding?:string;
 }
 
 export function ConversationView({
@@ -51,6 +52,7 @@ export function ConversationView({
     defaultVars,
     externFunctions,
     codeInputAutoScrollBehavior,
+    messageBottomPadding,
 }:ConversationViewProps){
 
     const refs=useRef({defaultVars,externFunctions});
@@ -99,9 +101,18 @@ export function ConversationView({
     const sourceMode=_sourceMode??sourceModeCtrl;
 
     const messagesView=(showSource?
-        <MessagesSourceView autoScrollBehavior={codeInputAutoScrollBehavior} mode={sourceMode} ctrl={ctrl} />
+        <MessagesSourceView
+            ctrl={ctrl}
+            autoScrollBehavior={codeInputAutoScrollBehavior}
+            mode={sourceMode}
+        />
     :
-        <MessagesView renderTarget={renderTarget} ctrl={ctrl} ragRenderer={ragRenderer} />
+        <MessagesView
+            ctrl={ctrl}
+            messageBottomPadding={messageBottomPadding}
+            renderTarget={renderTarget}
+            ragRenderer={ragRenderer}
+         />
     )
 
     useEffect(()=>{

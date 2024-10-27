@@ -14,7 +14,7 @@ const renderResult=(
     showSystemMessages:boolean,
     showFunctions:boolean,
     rowClassName:string|undefined,
-    ragRenderer:ConvoRagRenderer|undefined,
+    ragRenderer:ConvoRagRenderer|undefined
 ):any=>{
     if((typeof result !== 'object') || !result){
         return null;
@@ -206,12 +206,14 @@ export interface MessagesViewProps
     ctrl?:ConversationUiCtrl;
     renderTarget?:string;
     ragRenderer?:ConvoRagRenderer;
+    messageBottomPadding?:string;
 }
 
 export function MessagesView({
     renderTarget=defaultConvoRenderTarget,
     ctrl:_ctrl,
     ragRenderer,
+    messageBottomPadding='120px'
 }:MessagesViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl)
@@ -263,7 +265,7 @@ export function MessagesView({
 
 
     return (
-        <div className={style.root()} style={style.vars(theme)}>
+        <div className={style.root()} style={style.vars({...theme,messageBottomPadding})}>
             <ScrollView flex1 autoScrollEnd autoScrollEndFilter={()=>!shouldDisableConvoAutoScroll(messages)}>
                 <div className={style.list()}>
 
@@ -296,7 +298,7 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         display:flex;
         flex-direction:column;
         gap:@@gap;
-        padding:@@padding @@padding 120px @@padding;
+        padding:@@padding @@padding @@messageBottomPadding @@padding;
     }
     @.msg{
         padding:@@messagePadding;
