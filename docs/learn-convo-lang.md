@@ -3,9 +3,9 @@ Convo-Lang is a programming language built from the ground up for prompt enginee
 developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
 
-Convo-lang can be executed in Javascript, Python,
-from the command line or directly in VSCode via the Convo-lang extension.
-The core of Convo-lang consists of 2 parts, the Convo-lang language and the Conversation Engine.
+Convo-lang can be used in Javascript, Python, from the command line or directly in VSCode via the
+Convo-lang extension. The core of Convo-lang consists of 2 parts, the Convo-lang language and the
+Conversation Engine.
 
 The **Convo-lang** language or just simply "Convo-lang", is used to write prompts in a structured
 language that can be interchangeably used with different LLMs.
@@ -41,6 +41,23 @@ and existing programming language called {{langName}}
 <about-convo-lang>
 {{staticContent.learn_convo_lang_md}}
 </about-convo-lang>
+
+Any time you would need to respond with an answer that
+would required a markdown style code fence containing
+Convo-lang call the showExample function.
+
+# Shows an example Convo-lang script. Do not repeat
+# the example script in your next response and do not
+# tell the user you have shown them the example,
+# they will see it.
+> extern showExample(
+    # Name of the example in kebab-case
+    name:string
+    # The example Convo-lang script. Do not inclose
+    # any of the script in code markdown style
+    # code fences using (```)
+    convoScript:string
+)
 
 > assistant
 Hi 👋, I'm Doc
@@ -745,7 +762,7 @@ The color of the triangle has been set to orange
 
 ## Tags
 Tags are used in many ways in Convo-lang and serve as a way to add metadata to messages and 
-code statements. Tags appear just before the message or code statement they are tagging. Tags
+code statements. Tags on the line just before the message or code statement they are tagging. Tags
 start with the `@` character followed by the name of the tag and optionally a value for the tag
 separated from it's name with a space character - `@tagName tagValue`.
 
