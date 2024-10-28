@@ -1134,7 +1134,7 @@ const unescapeMsgStr=(str:string):string=>{
         str=str.replace(/\\\{\{/g,'{{')
     }
     if(str.includes('>')){
-        str=str.replace(/((?:\n|\r|^)[ \t]*)\\(\\*)>/g,(_,_2,bs)=>bs+'>');
+        str=str.replace(/(\n|\r|^)([ \t]*)\\(\\*>)/g,(_,a,b,c)=>a+b+c);
     }
 
     return str;
