@@ -1,6 +1,0 @@
-{
-    "name": "@convo-lang/convo-lang-chrome",
-    "version": "0.6.0",
-    "type": "commonjs",
-    "sideEffects": false
-}
