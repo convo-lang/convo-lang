@@ -80,3 +80,4 @@ venv
 /packages/tmpl-gen
 /packages/iyio-common-py
 /packages/vfs
+/packages/rtxt

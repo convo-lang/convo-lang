@@ -66,5 +66,12 @@
         "dest": "packages/vfs",
         "key": "packages/vfs",
         "indexPath": "src/index.ts"
+    },
+    {
+        "dir": "../iyio-common/packages/rtxt",
+        "npmName": "@iyio/rtxt",
+        "dest": "packages/rtxt",
+        "key": "packages/rtxt",
+        "indexPath": "src/index.ts"
     }
 ]

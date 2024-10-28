@@ -19,26 +19,56 @@
         "skipDefaultLibCheck": true,
         "baseUrl": ".",
         "paths": {
+            "@convo-lang/ai-complete": [
+                "packages/ai-complete/src/index.ts"
+            ],
+            "@convo-lang/ai-complete-openai": [
+                "packages/ai-complete-openai/src/index.ts"
+            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
             "@convo-lang/convo-lang": [
                 "packages/convo-lang/src/index.ts"
             ],
-            "@convo-lang/convo-lang-cli": [
-                "packages/convo-lang-cli/src/index.ts"
-            ],
-            "@convo-lang/convo-lang-react": [
-                "packages/convo-lang-react/src/index.ts"
-            ],
             "@convo-lang/convo-lang-api-routes": [
                 "packages/convo-lang-api-routes/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-cli": [
+                "packages/convo-lang-cli/src/index.ts"
             ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],
+            "@convo-lang/convo-lang-react": [
+                "packages/convo-lang-react/src/index.ts"
+            ],
+            "@iyio/at-dot-css": [
+                "packages/at-dot-css/src/index.ts"
+            ],
+            "@iyio/common": [
+                "packages/iyio-common/src/index.ts"
+            ],
+            "@iyio/media-common": [
+                "packages/media-common/src/index.ts"
+            ],
+            "@iyio/node-common": [
+                "packages/node-common/src/index.ts"
+            ],
             "@iyio/nx-common": [
                 "packages/nx-common/src/index.ts"
+            ],
+            "@iyio/react-common": [
+                "packages/react-common/src/index.ts"
+            ],
+            "@iyio/rtxt": [
+                "packages/rtxt/src/index.ts"
+            ],
+            "@iyio/syn-taxi": [
+                "packages/syn-taxi/src/index.ts"
+            ],
+            "@iyio/vfs": [
+                "packages/vfs/src/index.ts"
             ]
         }
     },

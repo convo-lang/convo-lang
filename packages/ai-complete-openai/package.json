@@ -1,6 +1,6 @@
 {
-    "name": "@iyio/ai-complete-openai",
-    "version": "0.6.0",
+    "name": "@convo-lang/ai-complete-openai",
+    "version": "0.5.6",
     "type": "commonjs",
     "sideEffects": false
 }

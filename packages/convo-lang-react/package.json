@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-react",
-    "version": "0.6.0",
+    "version": "0.5.6",
     "type": "commonjs",
     "sideEffects": false
 }

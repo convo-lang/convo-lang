@@ -8,6 +8,7 @@
         {"dir":"../iyio-common/packages/react-common"},
         {"dir":"../iyio-common/packages/syn-taxi"},
         {"dir":"../iyio-common/packages/vfs"},
+        {"dir":"../iyio-common/packages/rtxt"},
         {"dir":"../iyio-common/packages/tmpl-gen","disableTsConfigPath":true}
     ]
 }
