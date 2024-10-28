@@ -73,5 +73,12 @@
         "dest": "packages/rtxt",
         "key": "packages/rtxt",
         "indexPath": "src/index.ts"
+    },
+    {
+        "dir": "../iyio-common/packages/nx-common",
+        "npmName": "@iyio/nx-common",
+        "dest": "packages/nx-common",
+        "key": "packages/nx-common",
+        "indexPath": "src/index.ts"
     }
 ]
