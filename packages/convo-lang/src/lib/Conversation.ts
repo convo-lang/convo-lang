@@ -455,11 +455,17 @@ export class Conversation
         this._isDisposed=true;
     }
 
-    private _defaultApiKey:string|null=null;
-    public setDefaultApiKey(key:string|null){
+    private _defaultApiKey:string|null|(()=>string|null)=null;
+    public setDefaultApiKey(key:string|null|(()=>string|null)){
         this._defaultApiKey=key;
     }
-    public getDefaultApiKey(){return this._defaultApiKey}
+    public getDefaultApiKey():string|null{
+        if(typeof this._defaultApiKey==='function'){
+            return this._defaultApiKey();
+        }else{
+            return this._defaultApiKey;
+        }
+    }
 
 
 
@@ -1694,7 +1700,7 @@ export class Conversation
                 continue;
             }
 
-            if(this.defaultOptions.formatWhitespace && flat.content && !flat.preSpace){
+            if(this.defaultOptions.formatWhitespace && flat.content && !flat.preSpace && flat.role!=='system'){
                 flat.content=formatConvoContentSpace(flat.content);
             }
 
