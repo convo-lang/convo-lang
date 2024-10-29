@@ -3,11 +3,13 @@ A Conversational Language
 
 ![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/learn-convo-demo.webp)
 
-You can check out an interactive demo of Convo-Lang here - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)
+**Interactive Demo** - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)
 
-If you want to learn the Convo-Lang language check out this tutorial  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+**Convo-Lang Tutorial**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
 
-Checkout the source code on GitHub -[ https://github.com/convo-lang/convo-lang](https://github.com/convo-lang/convo-lang)
+**GitHub** - [ https://github.com/convo-lang/convo-lang](https://github.com/convo-lang/convo-lang)
+
+**NPM** - [https://www.npmjs.com/package/@convo-lang/convo-lang](https://www.npmjs.com/package/@convo-lang/convo-lang)
 
 
 ## What is Convo-Lang?
