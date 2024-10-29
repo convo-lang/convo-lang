@@ -1468,7 +1468,7 @@ var3: {{var3}}
 
 #### Heredoc
 Heredoc strings begin and end with 3 dashes and the contents of the string are highlighted with the
-convo-lang syntax highlighter but are not. They are useful when defining strings with conversation
+convo-lang syntax highlighter. They are useful when defining strings with conversation
 messages in them.
 
 ``` convo
