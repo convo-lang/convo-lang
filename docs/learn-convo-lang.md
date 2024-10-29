@@ -1,4 +1,4 @@
-# Convo-lang.
+# Convo-Lang.
 Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
 developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
@@ -11,7 +11,7 @@ The **Convo-lang** language or just simply "Convo-lang", is used to write prompt
 language that can be interchangeably used with different LLMs.
 
 The **Conversation Engine** is an interpreter that interprets scripts written in the Convo-lang language. The
-Conversation Engine handles passing messages back forth to and from LLM. It also converting prompts written
+Conversation Engine handles passing messages back forth to and from LLM. It also converts prompts written
 in Convo-lang to and from the message format of the LLM being conversed with.
 
 *@@static*
@@ -170,7 +170,7 @@ The follow NPM packages are available for TypeScript/JavaScript integration
   in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
-### VSCode extension
+### VSCode Extension
 To help you develop Convo-lang application faster and easier we provide a VSCode extension that gives
 you Convo-lang syntax highlighting and allows you to execute Convo-lang scripts directly in VSCode.
 
@@ -1005,9 +1005,7 @@ Enjoy your day!
 ```
 
 ## RAG
-Retrieval augmented generation or RAG is a keep part of any serious AI application, but it can be
-complicated to implement correctly right. The Convo-lang provides an easy to use interface to connect
-a conversation to any RAG source.
+Retrieval augmented generation or RAG is a key part of any serious AI application, but it can be complicated to implement correctly. Convo-lang provides an easy to use interface to connect a conversation to any RAG source.
 
 **How does RAG work in Convo-lang**
 1. A user sends a message
@@ -1198,10 +1196,8 @@ Tree frogs dream of flavors they long to seek.
 You can use the following advanced messaging techniques to create highly dynamic messages that
 allow a conversation to be transformed based on the state of the conversation.
 
-### Conditional messages
-Conditional messages use the `@condition` tag to be conditional remove them selfs from a conversation
-based on the value of a variable. Conditional messages allow you to alter a conversation based on
-the current state of the conversation.
+### Conditional Messages
+Conditional messages use the `@condition` tag to conditionally remove them from a conversation based on the value of a variable. Conditional messages allow you to alter a conversation based on the current state of the conversation.
 
 ``` convo
 > define
@@ -1264,7 +1260,7 @@ you this time. Catch!  🎈
 ```
 
 
-### Edge messages
+### Edge Messages
 An edge message is a message that is evaluated at the end or "edge" of a conversation. Typically
 variable assignment and other state changes have no effect the messages that follow them, but 
 this is not the case with edge messages. Edge messages are evaluated after all variable assignment
@@ -1313,7 +1309,7 @@ Deposit complete
 
 ### Message Concatenation
 Messages can be concatenated or joined together using the `@concat` tag. The concat tag is often
-used with conditional messages to make larger messages containing conditionally rendered sections
+used with conditional messages to make larger messages containing conditionally rendered sections.
 
 Try changing the name variable to "Matt" to see what happens.
 ``` convo
@@ -1428,7 +1424,7 @@ Hi, I'm {{name}} I'm {{div(ageInDays 365)}} years old
 ### Strings
 There are 3 types of string in convo.
 
-#### ( " ) Double quote
+#### ( " ) Double Quote
 Double quote strings are the simplest strings in convo, they start and end with a double 
 quote character. To include a double quote character in a double quote string escape it with a
 back slash. Double quote strings can span multiple lines.
@@ -1448,8 +1444,8 @@ var2: {{var2}}
 var3: {{var3}}
 ```
 
-#### ( ' ) Single quote
-Single quote strings are similar to double quote but also support embedded statements. Embedded
+#### ( ' ) Single Quote
+Single quote strings are similar to double quotes but also support embedded statements. Embedded
 statements are surrounded with double curly bracket pairs and contain any valid convo statement
 
 ``` convo
@@ -1472,7 +1468,7 @@ var3: {{var3}}
 
 #### Heredoc
 Heredoc strings begin and end with 3 dashes and the contents of the string are highlighted with the
-convo-lang syntax highlighter but are not. They are useful when defining strings with conversation
+convo-lang syntax highlighter. They are useful when defining strings with conversation
 messages in them.
 
 ``` convo
@@ -1575,7 +1571,7 @@ before the colon used to denote the properties type. Properties of a structure c
 documented using documenting comments to help describe the structure to LLMs.
 
 New instances of a structure can be created using the `new` function. The new function takes
-the a structure type as its first argument and an object that conforms to the structure
+the structure type as its first argument and an object that conforms to the structure
 as its second argument.
 
 ``` convo
@@ -1683,7 +1679,7 @@ This car is designed to comply with the specifications and regulations necessary
 
 ```
 
-## System functions
+## System Functions
 
 ### Util Functions
 
@@ -2344,11 +2340,11 @@ a free pizza
         {{workflow.message}}
 ```
 
-## Example agents
+## Example Agents
 
 ### Pizza Agent
 
-Below is an example of creating an agent named Willy that is helping a user order a pizza.
+Below is an example of creating an agent named Willy that will help a user order a pizza.
 ``` convo
 // define is a top level statement and is being used to define 
 > define
