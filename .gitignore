@@ -71,14 +71,4 @@ venv
 /local-config
 
 # Injected packages
-/packages/at-dot-css
-/packages/iyio-common
-/packages/media-common
-/packages/node-common
-/packages/react-common
-/packages/syn-taxi
-/packages/tmpl-gen
-/packages/iyio-common-py
-/packages/vfs
-/packages/rtxt
-/packages/nx-common
+
