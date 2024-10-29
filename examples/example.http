@@ -1,0 +1,4 @@
+POST http://localhost:3000/api/convo-lang/convo
+Content-Type: application/json
+
+"> system\nYou are a pirate. respond in pirate talk with a masters degree in psychics.\n\n> user\nI can't swim"

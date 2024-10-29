@@ -1370,6 +1370,31 @@ describe('convo',()=>{
 
     })
 
+
+    it('should ignore next message comment',async ()=>{
+
+        const convo=parse(3,/*convo*/`
+            > user
+            hi
+
+            // comment1
+            > user
+            hey
+
+            # comment2
+            > user
+            yo
+
+        `);
+
+        const msgs=convo.result??[];
+        expect(msgs.length).toBe(3);
+
+        expect(msgs[0]?.content).toBe('hi');
+        expect(msgs[1]?.content).toBe('hey');
+
+    })
+
 });
 
 

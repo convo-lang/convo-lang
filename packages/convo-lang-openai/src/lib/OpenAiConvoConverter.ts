@@ -106,12 +106,17 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
 
         const messages=getNormalizedFlatMessageList(flat);
 
-        const visionCapable=flat.capabilities?.includes('vision');
+        let visionCapable=flat.capabilities?.includes('vision');
         const lastContentMessage=getLastNonCalledConvoFlatMessage(messages);
 
         const model=flat?.responseModel??(visionCapable?this._visionModel:this._chatModel);
         if(!model){
             throw new Error('Chat AI model not defined');
+        }
+
+        const info=openAiModels.find(m=>m.name===model);
+        if(info && info.inputCapabilities?.includes('image') || model.startsWith('gtp-4o')){
+            visionCapable=true;
         }
 
         const oMsgs:ChatCompletionMessageParam[]=[];

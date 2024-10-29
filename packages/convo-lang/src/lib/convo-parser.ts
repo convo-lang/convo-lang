@@ -35,7 +35,7 @@ const tagReg=/(\w+)\s*=?(.*)/
 const space=/\s/;
 const allSpace=/^\s$/;
 
-const tagOrCommentReg=/(\n|\r|^)[ \t]*[#@]/;
+const tagOrCommentReg=/(\n|\r|^)[ \t]*(#|@|\/\/)/;
 
 const paramTrimPlaceHolder='{{**PLACE_HOLDER**}}';
 
@@ -117,7 +117,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
             }
 
             const line=code.substring(s,e+1).trim();
-            const isMeta=line.startsWith('#') || line.startsWith('@');
+            const isMeta=line.startsWith('#') || line.startsWith('@') || line.startsWith('//');
 
             if(line && !isMeta){
                 break;
@@ -272,7 +272,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
                 const line=code.substring(s,e+1).trim();
 
-                if(line && !line.startsWith('#') && !line.startsWith('@')){
+                if(line && !line.startsWith('#') && !line.startsWith('//') && !line.startsWith('@')){
                     break;
                 }
                 e=s-1;
@@ -293,7 +293,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
                 const line=end.substring(s,e+1).trim();
 
-                if(line && !line.startsWith('#') && !line.startsWith('@')){
+                if(line && !line.startsWith('#') && !line.startsWith('//') && !line.startsWith('@')){
                     break;
                 }
                 e=s-1;
@@ -1079,6 +1079,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         msg.eval=true;
                         break;
 
+                    case convoTags.preSpace:
+                        msg.preSpace=true;
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;
@@ -1130,7 +1134,7 @@ const unescapeMsgStr=(str:string):string=>{
         str=str.replace(/\\\{\{/g,'{{')
     }
     if(str.includes('>')){
-        str=str.replace(/((?:\n|\r|^)[ \t]*)\\(\\*)>/g,(_,_2,bs)=>bs+'>');
+        str=str.replace(/(\n|\r|^)([ \t]*)\\(\\*>)/g,(_,a,b,c)=>a+b+c);
     }
 
     return str;

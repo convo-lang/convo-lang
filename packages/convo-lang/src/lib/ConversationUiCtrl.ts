@@ -31,6 +31,8 @@ export interface ConversationUiCtrlOptions
     removeDanglingUserMessages?:boolean;
     enableSlashCommand?:boolean;
     sceneCtrl?:SceneCtrl;
+    defaultVars?:Record<string,any>;
+    externFunctions?:Record<string,(...args:any[])=>any>;
 }
 
 export class ConversationUiCtrl
@@ -189,6 +191,9 @@ export class ConversationUiCtrl
 
     public readonly sceneCtrl?:SceneCtrl;
 
+    public readonly defaultVars:Record<string,any>;
+    public readonly externFunctions:Record<string,(param:any)=>any>;
+
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
 
     public constructor({
@@ -203,11 +208,16 @@ export class ConversationUiCtrl
         store='localStorage',
         enableSlashCommand=false,
         sceneCtrl,
+        defaultVars,
+        externFunctions,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
 
         this.sceneCtrl=sceneCtrl;
+
+        this.defaultVars=defaultVars?{...defaultVars}:{};
+        this.externFunctions=externFunctions?{...externFunctions}:{}
 
         this._removeDanglingUserMessages=new BehaviorSubject<boolean>(removeDanglingUserMessages);
         this._enabledSlashCommands=new BehaviorSubject(enableSlashCommand);
@@ -250,6 +260,15 @@ export class ConversationUiCtrl
     protected initConvo(convo:Conversation,options:InitConversationUiCtrlConvoOptions){
         if(this.initConvoCallback){
             this.initConvoCallback(convo);
+        }
+        for(const e in this.defaultVars){
+            convo.defaultVars[e]=this.defaultVars[e];
+        }
+        for(const e in this.externFunctions){
+            const f=this.externFunctions[e];
+            if(f){
+                convo.implementExternFunction(e,f);
+            }
         }
         if(this.sceneCtrl){
             convo.defaultVars[convoVars.__sceneCtrl]=this.sceneCtrl;

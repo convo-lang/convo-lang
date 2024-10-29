@@ -19,26 +19,29 @@
         "skipDefaultLibCheck": true,
         "baseUrl": ".",
         "paths": {
+            "@convo-lang/ai-complete": [
+                "packages/ai-complete/src/index.ts"
+            ],
+            "@convo-lang/ai-complete-openai": [
+                "packages/ai-complete-openai/src/index.ts"
+            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
             "@convo-lang/convo-lang": [
                 "packages/convo-lang/src/index.ts"
             ],
-            "@convo-lang/convo-lang-cli": [
-                "packages/convo-lang-cli/src/index.ts"
-            ],
-            "@convo-lang/convo-lang-react": [
-                "packages/convo-lang-react/src/index.ts"
-            ],
             "@convo-lang/convo-lang-api-routes": [
                 "packages/convo-lang-api-routes/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-cli": [
+                "packages/convo-lang-cli/src/index.ts"
             ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],
-            "@iyio/nx-common": [
-                "packages/nx-common/src/index.ts"
+            "@convo-lang/convo-lang-react": [
+                "packages/convo-lang-react/src/index.ts"
             ]
         }
     },

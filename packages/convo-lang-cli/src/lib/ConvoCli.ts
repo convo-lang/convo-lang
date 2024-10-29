@@ -1,6 +1,6 @@
+import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/ai-complete-openai';
 import { Conversation, ConvoScope, convoCapabilitiesParams, convoVars, createConversationFromScope, parseConvoCode } from "@convo-lang/convo-lang";
 import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
-import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@iyio/ai-complete-openai';
 import { EnvParams, createJsonRefReplacer, deleteUndefined, initRootScope, rootScope } from "@iyio/common";
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { writeFile } from "fs/promises";

@@ -1,9 +1,9 @@
-import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, convoTags, passthroughConvoInputType, passthroughConvoOutputType } from '@convo-lang/convo-lang';
+import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, FlatConvoConversationBase, convoTags, getNormalizedFlatMessageList, passthroughConvoInputType, passthroughConvoOutputType } from '@convo-lang/convo-lang';
 import { ProviderTypeDef, Scope, TypeDef, UnauthorizedError, aryUnique, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { AiCompletionProviders, aiCompletionMaxAudioLengthParam, aiCompletionMaxImageLengthParam, aiCompletionMaxTextLengthParam } from "./_type.ai-complete";
 import { CallAiFunctionInterfaceResult, aiCompleteDefaultModel, applyResultToAiMessage, callAiFunctionInterfaceAsync, mergeAiCompletionMessages } from "./ai-complete-lib";
-import { AiCompletionCapabilityScheme, AiCompletionFunction, AiCompletionFunctionInterface, AiCompletionMessage, AiCompletionMessageType, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, CompletionOptions, isAiCompletionRole } from "./ai-complete-types";
+import { AiCompletionFunction, AiCompletionFunctionInterface, AiCompletionMessage, AiCompletionMessageType, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, CompletionOptions, isAiCompletionRole } from "./ai-complete-types";
 import { parseAiCompletionMessages } from "./ai-message-converter";
 
 export interface AiCompletionServiceOptions
@@ -14,7 +14,7 @@ export interface AiCompletionServiceOptions
     defaultMaxImageTokenLength?:number;
 }
 
-export class AiCompletionService implements ConvoCompletionService<FlatConvoConversation,ConvoCompletionMessage[]>
+export class AiCompletionService implements ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>
 {
 
     public readonly inputType=passthroughConvoInputType;
@@ -50,7 +50,7 @@ export class AiCompletionService implements ConvoCompletionService<FlatConvoConv
         this.defaultMaxImageTokenLength=defaultMaxImageTokenLength;
     }
 
-    public canComplete(model:string|undefined,flat:FlatConvoConversation):boolean{
+    public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean{
         return true;
     }
 
@@ -309,16 +309,21 @@ export class AiCompletionService implements ConvoCompletionService<FlatConvoConv
         })??(message.length/2)
     }
 
-    public flatConvoToRequest(flat:FlatConvoConversation):AiCompletionRequest
+    public flatConvoToRequest(flat:FlatConvoConversationBase):AiCompletionRequest
     {
+
+        const flatMsgs=getNormalizedFlatMessageList(flat,{
+            disableRag:true,
+        });
+
         const messages:AiCompletionMessage[]=[];
         const functions:AiCompletionFunction[]=[];
 
         const baseId=shortUuid()+'_';
         let lastContentMessage:AiCompletionMessage|undefined;
 
-        for(let i=0;i<flat.messages.length;i++){
-            const msg=flat.messages[i];
+        for(let i=0;i<flatMsgs.length;i++){
+            const msg=flatMsgs[i];
             if(!msg || msg.renderOnly){
                 continue;
             }
@@ -378,20 +383,20 @@ export class AiCompletionService implements ConvoCompletionService<FlatConvoConv
         const request:AiCompletionRequest={
             messages,
             functions,
-            debug:flat.debug,
+            //debug:flat.debug,
             capabilities:[],
             toolChoice:flat.toolChoice,
-            apiKey:flat.conversation.getDefaultApiKey()??undefined,
+            apiKey:flat.apiKey??undefined,
             ragPrefix:flat.ragPrefix,
             ragSuffix:flat.ragSuffix,
         }
 
-        for(const c of flat.conversation.serviceCapabilities){
-            const p=AiCompletionCapabilityScheme.safeParse(c);
-            if(p.success===true){
-                request.capabilities?.push(p.data);
-            }
-        }
+        // for(const c of flat.conversation.serviceCapabilities){
+        //     const p=AiCompletionCapabilityScheme.safeParse(c);
+        //     if(p.success===true){
+        //         request.capabilities?.push(p.data);
+        //     }
+        // }
 
         return request;
 

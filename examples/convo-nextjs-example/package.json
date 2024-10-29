@@ -1,0 +1,29 @@
+{
+  "name": "convo-nextjs-example",
+  "version": "0.6.5",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@convo-lang/convo-lang-api-routes": "^0.6.5",
+    "@convo-lang/convo-lang-openai": "^0.6.5",
+    "@convo-lang/convo-lang-react": "^0.6.5",
+    "@iyio/nextjs-common": "^0.6.5",
+    "@iyio/node-common": "^0.6.5",
+    "@iyio/react-common": "^0.6.5",
+    "@iyio/syn-taxi": "^0.6.5",
+    "next": "14.2.16",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}

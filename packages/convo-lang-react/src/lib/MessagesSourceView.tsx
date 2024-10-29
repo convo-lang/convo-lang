@@ -12,6 +12,7 @@ export interface MessagesSourceViewProps
 {
     ctrl?:ConversationUiCtrl;
     mode?:ConvoEditorMode;
+    autoScrollBehavior?:ScrollBehavior;
 
 }
 
@@ -20,7 +21,8 @@ export interface MessagesSourceViewProps
  */
 export function MessagesSourceView({
     ctrl:_ctrl,
-    mode='code'
+    mode='code',
+    autoScrollBehavior
 }:MessagesSourceViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -66,6 +68,7 @@ export function MessagesSourceView({
             <ScrollView
                 flex1
                 autoScrollTrigger={lastMsg}
+                autoScrollBehavior={autoScrollBehavior}
                 autoScrollSelector=".language-convo"
                 autoScrollYOffset={100}
                 containerFill

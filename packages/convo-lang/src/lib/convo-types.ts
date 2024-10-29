@@ -148,6 +148,13 @@ export interface ConvoMessage
      * The id of the user that sent the message
      */
     userId?:string;
+
+    /**
+     * If true and the message is a content message the content message will have all space preserved.
+     * By default content messages will  have newlines removed between lines of text that that
+     * begin and end with alpha numeric characters.
+     */
+    preSpace?:boolean;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -616,6 +623,16 @@ export interface FlatConvoMessage
     content?:string;
 
     /**
+     * Content prefix
+     */
+    prefix?:string;
+
+    /**
+     * Content suffix
+     */
+    suffix?:string;
+
+    /**
      * A function that can be called
      */
     fn?:ConvoFunction;
@@ -732,6 +749,8 @@ export interface FlatConvoMessage
     eval?:boolean;
 
     vision?:boolean;
+
+    preSpace?:boolean;
 
 }
 
@@ -1093,6 +1112,22 @@ export interface AppendConvoMessageObjOptions
 export interface ConvoImport
 {
     name:string;
+    /**
+     * Modifiers of the import statement. Modifiers are defined as part of an import using a bang (!)
+     * before the modifiers name.
+     * @example \@import teaching-agent !system
+     */
+    modifiers:string[];
+
+    /**
+     * If true only system messages should be imported.
+     */
+    system:boolean;
+
+    /**
+     * If true content messages should not be imported.
+     */
+    ignoreContent:boolean;
 }
 
 export interface ConvoImportResult
