@@ -3,36 +3,36 @@ Convo-Lang is a programming language built from the ground up for prompt enginee
 developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
 
-Convo-lang can be used in Javascript, Python, from the command line or directly in VSCode via the
-Convo-lang extension. The core of Convo-lang consists of 2 parts, the Convo-lang language and the
+Convo-Lang can be used in Javascript, Python, from the command line or directly in VSCode via the
+Convo-Lang extension. The core of Convo-Lang consists of 2 parts, the Convo-Lang language and the
 Conversation Engine.
 
-The **Convo-lang** language or just simply "Convo-lang", is used to write prompts in a structured
+The **Convo-Lang** language or just simply "Convo-Lang", is used to write prompts in a structured
 language that can be interchangeably used with different LLMs.
 
-The **Conversation Engine** is an interpreter that interprets scripts written in the Convo-lang language. The
+The **Conversation Engine** is an interpreter that interprets scripts written in the Convo-Lang language. The
 Conversation Engine handles passing messages back forth to and from LLM. It also converts prompts written
-in Convo-lang to and from the message format of the LLM being conversed with.
+in Convo-Lang to and from the message format of the LLM being conversed with.
 
 *@@static*
 ``` convo
 > system
-You are a prompt engineer learning Convo-lang. Prompting will never be the same 🥹
+You are a prompt engineer learning Convo-Lang. Prompting will never be the same 🥹
 ```
 
 
 ## Doc
-Meet Doc, your personal assistant on your journey into the world of Convo-lang. Ask Doc any questions
-you have about Convo-lang and he will give you a hand. You can use the "Ask the Doc" chat box at the
+Meet Doc, your personal assistant on your journey into the world of Convo-Lang. Ask Doc any questions
+you have about Convo-Lang and he will give you a hand. You can use the "Ask the Doc" chat box at the
 top of the screen at anytime during this tutorial.
 
-Below is the Convo-lang script for Doc. By the end of this tutorial you will be able to write your own
+Below is the Convo-Lang script for Doc. By the end of this tutorial you will be able to write your own
 skilled agent similar to Doc and more.
 
 *@@convo-source agent-doc*
 ``` convo
 > define
-langName="Convo-lang"
+langName="Convo-Lang"
 
 > system
 You are teaching a prompt engineer a really cool 
@@ -44,16 +44,16 @@ and existing programming language called {{langName}}
 
 Any time you would need to respond with an answer that
 would required a markdown style code fence containing
-Convo-lang call the showExample function.
+Convo-Lang call the showExample function.
 
-# Shows an example Convo-lang script. Do not repeat
+# Shows an example Convo-Lang script. Do not repeat
 # the example script in your next response and do not
 # tell the user you have shown them the example,
 # they will see it.
 > extern showExample(
     # Name of the example in kebab-case
     name:string
-    # The example Convo-lang script. Do not inclose
+    # The example Convo-Lang script. Do not inclose
     # any of the script in code markdown style
     # code fences using (```)
     convoScript:string
@@ -92,26 +92,26 @@ What are tags
 What do you use variables
 ```
 
-Doc is purely written in Convo-lang and uses the document you are reading right now as his knowledge
-base in combination with a few functions in integrate into the Convo-lang website. Doc is a great
-example of what can be done with Convo-lang.
+Doc is purely written in Convo-Lang and uses the document you are reading right now as his knowledge
+base in combination with a few functions in integrate into the Convo-Lang website. Doc is a great
+example of what can be done with Convo-Lang.
 
 ## Summary
 
 ## Conversations
-At the heart of Convo-lang are Conversations. A Conversation is a collection
+At the heart of Convo-Lang are Conversations. A Conversation is a collection
 of messages. Messages can either contain textual content, multi-modal content
 or executable statements.
 
 Conversations are managed by the Conversation Engine, which is a code interpreter
-that interpreters Convo-lang scripts. It handles all of the complexities of sending messages between
+that interpreters Convo-Lang scripts. It handles all of the complexities of sending messages between
 a user and an LLM, executing tool use / calling function and manages the internal state of a Conversation.
 
-Convo-lang scripts are conversations written in the Convo-lang syntax and stored in a file or memory.
-When integrating Convo-lang into an application you will often store Convo-lang scripts in strings
+Convo-Lang scripts are conversations written in the Convo-Lang syntax and stored in a file or memory.
+When integrating Convo-Lang into an application you will often store Convo-Lang scripts in strings
 that are then passed to the Conversation Engine.
 
-Here is a simple example of a Convo-lang script.
+Here is a simple example of a Convo-Lang script.
 
 ``` convo
 > define
@@ -153,26 +153,26 @@ feel free to ask.
 ```
 
 ## Integration
-Convo-lang can be integrated into any TypeScript/JavaScript or Python application. We won't go into
-depth about how to integrate Convo-lang into an application here, as we are mainly focused on learning
-the Convo-lang language in this document. Below are a couple of quick start guide and links to more
+Convo-Lang can be integrated into any TypeScript/JavaScript or Python application. We won't go into
+depth about how to integrate Convo-Lang into an application here, as we are mainly focused on learning
+the Convo-Lang language in this document. Below are a couple of quick start guide and links to more
 information about integration.
 
 ### TypeScript/Javascript Integration
 The follow NPM packages are available for TypeScript/JavaScript integration
 
-- @convo-lang/convo-lang - Contains the Convo-lang Conversation Engine, and a Typescript/Javascript library to use Convo-lang in your application.
+- @convo-lang/convo-lang - Contains the Convo-Lang Conversation Engine, and a Typescript/Javascript library to use Convo-Lang in your application.
 - @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
 - @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
-- @convo-lang/convo-vfs - Used to integrate Convo-lang into virtual file systems.
+- @convo-lang/convo-vfs - Used to integrate Convo-Lang into virtual file systems.
 - @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
 - @convo-lang/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
   in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
 ### VSCode Extension
-To help you develop Convo-lang application faster and easier we provide a VSCode extension that gives
-you Convo-lang syntax highlighting and allows you to execute Convo-lang scripts directly in VSCode.
+To help you develop Convo-Lang application faster and easier we provide a VSCode extension that gives
+you Convo-Lang syntax highlighting and allows you to execute Convo-Lang scripts directly in VSCode.
 
 You can install the vscode extension by searching for "convo-lang" in the vscode extension tab.
 
@@ -182,12 +182,12 @@ You can install the vscode extension by searching for "convo-lang" in the vscode
 **Coming Soon**
 
 ## Language Basics
-Convo-lang consists of a few simple building blocks, Content Message, Functions, Top Level Statements,
-Variables, Tags and Comments. By combining these building blocks Convo-lang allows you to create
+Convo-Lang consists of a few simple building blocks, Content Message, Functions, Top Level Statements,
+Variables, Tags and Comments. By combining these building blocks Convo-Lang allows you to create
 interactive, multi-modal conversations between humans and LLMs. These conversations.
 
 - Content Message - Textual and multi-modal messages shared between humans and LLMs
-- Comments - There are 2 type of comments in Convo-lang, Document Comment and Coding Comments
+- Comments - There are 2 type of comments in Convo-Lang, Document Comment and Coding Comments
     - Documenting Comments - Used to document functions and data structures for LLMs. Documenting Comments start with a (`#`) character .
     - Coding Comments - Used to level comments about code or messages. LLMs are not aware of coding comments. Coding Comments start the (`//`)
 - Top Level Statements - Blocks of executable statements that can define variables, data structures and execute arbitrary code
@@ -314,7 +314,7 @@ It is currently 4:20 pm
 ```
 
 ## Comments
-There are 2 types of comments in Convo-lang: documenting comments and non-documenting comments.
+There are 2 types of comments in Convo-Lang: documenting comments and non-documenting comments.
 
 Documenting comments begin with the `#` character and continue to the end of the line the comment is
 written on. Documenting comments are relayed to the LLM and help inform the LLM. For example a 
@@ -442,12 +442,12 @@ called from within a `do` message.
 
 ## Variables
 Variables allow you to store state information about a conversation in named variables and
-can be defined directly in Convo-lang or injected from external sources. Using variables allows
+can be defined directly in Convo-Lang or injected from external sources. Using variables allows
 you to create prompt template and avoid purely relying on the memory of an LLM to keep track of
 important information. Variables must always start with a lowercase letter.
 
 ### Variable Types
-Convo-lang defines a set of built-in primitive types, strings, arrays, enums and custom data structures.
+Convo-Lang defines a set of built-in primitive types, strings, arrays, enums and custom data structures.
 Strings are enclosed in pairs of single or double quotes. Variables are dynamically typed so they 
 can be assigned to any variable type at any time.
 
@@ -695,7 +695,7 @@ message the LLM responds with a content message giving the result to the user in
 
 ### Extern Functions
 Extern function allow you do define functions in other languages that are call by the the Conversation Engine
-This allows Convo-lang to integrate into existing systems and offload complex logic to more traditional programming languages
+This allows Convo-Lang to integrate into existing systems and offload complex logic to more traditional programming languages
 
 Below is an example of an agent setting the color of an SVG shape based on input from the user
 
@@ -761,7 +761,7 @@ The color of the triangle has been set to orange
 ```
 
 ## Tags
-Tags are used in many ways in Convo-lang and serve as a way to add metadata to messages and 
+Tags are used in many ways in Convo-Lang and serve as a way to add metadata to messages and 
 code statements. Tags on the line just before the message or code statement they are tagging. Tags
 start with the `@` character followed by the name of the tag and optionally a value for the tag
 separated from it's name with a space character - `@tagName tagValue`.
@@ -813,7 +813,7 @@ How many planets are there in the solar system
 ```
 
 ### System Tags
-Below is a full list of system tags Convo-lang uses.
+Below is a full list of system tags Convo-Lang uses.
 
 `@disableAutoComplete` - When applied to a function the return value of the function will not be 
   used to generate a new assistant message.
@@ -919,7 +919,7 @@ Below is a full list of system tags Convo-lang uses.
 `@import` - Allows you to import external convo-lang scripts. [read more](#imports)
 
 ## Imports
-Imports allow external Convo-lang sources to be imported into the current conversation. Imports can
+Imports allow external Convo-Lang sources to be imported into the current conversation. Imports can
 be used to import libraries of functions, agent personas, knowledge sources, etc.
 
 Imports are defined using the `@import` tag followed by the name or location of the source to import
@@ -929,7 +929,7 @@ Import sources can be http endpoints or custom named sources that are retired us
 registered import handlers. Import handlers allow application to use any type of logic to handle
 loading import sources.
 
-The following example includes 3 snippets of Convo-lang. The first to are import sources and the
+The following example includes 3 snippets of Convo-Lang. The first to are import sources and the
 last is the conversation importing the first 2.
 
 *@@static*
@@ -1005,14 +1005,14 @@ Enjoy your day!
 ```
 
 ## RAG
-Retrieval augmented generation or RAG is a key part of any serious AI application, but it can be complicated to implement correctly. Convo-lang provides an easy to use interface to connect a conversation to any RAG source.
+Retrieval augmented generation or RAG is a key part of any serious AI application, but it can be complicated to implement correctly. Convo-Lang provides an easy to use interface to connect a conversation to any RAG source.
 
-**How does RAG work in Convo-lang**
+**How does RAG work in Convo-Lang**
 1. A user sends a message
 2. A registered RAG callback function is called and is passed the message the user is sending
 3. The RAG callback then preforms the task of retrieving information related to the user's message
 4. The RAG callback returns the related information
-5. Convo-lang then appends the related information to the user's message and optionally encloses the information in a prefix and suffix
+5. Convo-Lang then appends the related information to the user's message and optionally encloses the information in a prefix and suffix
 
 The following RAG example uses a very simple keyword matching algorithm. If the user's message
 contains all of the keywords of one of the JSON items below that item will be used as RAG source.
@@ -1083,7 +1083,7 @@ production vehicles ever made
 ```
 
 ## Vision
-Vision capabilities are enabled in Convo-lang using markdown style images. Markdown images are
+Vision capabilities are enabled in Convo-Lang using markdown style images. Markdown images are
 converted into the native format of LLM at runtime.
 
 *@@tall*
@@ -1334,7 +1334,7 @@ of my local Home Depot 👷🏼‍♂️
 
 
 ## Executable Statements
-Statements in Convo-lang refers to the executable code that is evaluated by the Conversation engine
+Statements in Convo-Lang refers to the executable code that is evaluated by the Conversation engine
 at runtime. Statements can be contained in function bodies, top level statement message and 
 in dynamic expression embedded in content messages.
 
@@ -2152,7 +2152,7 @@ print(value)
 
 
 ## Library Functions
-Convo-lang defines a standard set of libraries for common coding needs.
+Convo-Lang defines a standard set of libraries for common coding needs.
 
 ### now()
 Returns the current date time as a timestamp. now uses Date.now() to get the current timestamp.
@@ -2239,7 +2239,7 @@ Opens a new browser window
 ```
 
 ## Convo-graph - beta
-Convo-graph is an advanced workflow system that defines workflows in the Convo-lang syntax.
+Convo-graph is an advanced workflow system that defines workflows in the Convo-Lang syntax.
 Convo-graphs are often combined with custom UI renders to create interactive AI powered workflows.
 
 Controls:

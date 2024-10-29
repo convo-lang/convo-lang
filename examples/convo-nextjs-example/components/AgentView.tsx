@@ -4,7 +4,7 @@ import { NextJsBaseLayoutView } from "@iyio/nextjs-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useEffect, useRef, useState } from "react";
 
-// For syntax highlighting of Convo-lang install the Convo-lang VSCode extension.
+// For syntax highlighting of Convo-Lang install the Convo-Lang VSCode extension.
 // Search for "convo-lang" in the extensions window.
 const exampleConvo=/*convo*/`
 

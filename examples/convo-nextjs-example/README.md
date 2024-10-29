@@ -1,6 +1,6 @@
-# Convo-lang NextJs example
+# Convo-Lang NextJs example
 
-If you want to learn the Convo-lang language check out this tutorial  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+If you want to learn the Convo-Lang language check out this tutorial  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
 
 ## Getting Started
 
