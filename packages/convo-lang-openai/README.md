@@ -1,7 +1,7 @@
 # Convo-Lang
 A Conversational Language
 
-![convo](https://learn.convo-lang.ai/convo.webp)
+![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/learn-convo-demo.webp)
 
 You can check out an interactive demo of Convo-Lang here - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)
 
