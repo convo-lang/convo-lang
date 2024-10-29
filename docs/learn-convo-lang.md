@@ -10,9 +10,9 @@ Conversation Engine.
 The **Convo-Lang** language or just simply "Convo-Lang", is used to write prompts in a structured
 language that can be interchangeably used with different LLMs.
 
-The **Conversation Engine** is an interpreter that interprets scripts written in the Convo-Lang language. The
-Conversation Engine handles passing messages back forth to and from LLM. It also converts prompts written
-in Convo-Lang to and from the message format of the LLM being conversed with.
+The **Conversation Engine** is a code interpreter that executes scripts written in the
+Convo-Lang language. It handles passing messages between users and LLMs and manages all the lower
+level details of working with an LLM such as implementing the usages of tools.
 
 *@@static*
 ``` convo
