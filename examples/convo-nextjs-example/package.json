@@ -9,13 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@convo-lang/convo-lang-api-routes": "^0.5.8",
-    "@convo-lang/convo-lang-openai": "^0.5.8",
-    "@convo-lang/convo-lang-react": "^0.5.8",
-    "@iyio/nextjs-common": "^0.6.4",
-    "@iyio/node-common": "^0.6.4",
-    "@iyio/react-common": "^0.6.4",
-    "@iyio/syn-taxi": "^0.6.4",
+    "@convo-lang/convo-lang-api-routes": "^0.6.5",
+    "@convo-lang/convo-lang-openai": "^0.6.5",
+    "@convo-lang/convo-lang-react": "^0.6.5",
+    "@iyio/nextjs-common": "^0.6.5",
+    "@iyio/node-common": "^0.6.5",
+    "@iyio/react-common": "^0.6.5",
+    "@iyio/syn-taxi": "^0.6.5",
     "next": "14.2.16",
     "react": "^18",
     "react-dom": "^18"

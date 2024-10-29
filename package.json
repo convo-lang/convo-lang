@@ -68,6 +68,7 @@
         "@iyio/at-dot-css": "^0.6.5",
         "@iyio/common": "^0.6.5",
         "@iyio/media-common": "^0.6.5",
+        "@iyio/nextjs-common": "^0.6.5",
         "@iyio/node-common": "^0.6.5",
         "@iyio/nx-common": "^0.6.5",
         "@iyio/react-common": "^0.6.5",
