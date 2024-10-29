@@ -1,6 +1,6 @@
 import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { Form } from "@iyio/react-common";
+import { BasicIcon, Form, SlimButton } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
@@ -15,6 +15,7 @@ export interface ConversationInputProps
     submitTrigger?:any;
     min?:boolean;
     children?:any;
+    noSubmitButton?:boolean;
 }
 
 export function ConversationInput({
@@ -27,6 +28,7 @@ export function ConversationInput({
     submitTrigger,
     min,
     children,
+    noSubmitButton,
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -49,6 +51,14 @@ export function ConversationInput({
             refs.current.submit();
         }
     },[submitTrigger]);
+
+    if(children===undefined && !noSubmitButton){
+        children=(
+            <SlimButton className={style.submitBtn({show:!!value})} type="submit">
+                <BasicIcon icon="circle-up" size={20} color={theme.userBackground} />
+            </SlimButton>
+        )
+    }
 
     return (
         <Form
@@ -93,5 +103,20 @@ const style=atDotCss({name:'ConversationInput',order:'framework',namespace:'iyio
     }
     @.input.min{
         margin:0;
+    }
+    @.submitBtn{
+        position:absolute;
+        right:0.5rem;
+        top:50%;
+        transform:translateY(-50%);
+        opacity:0;
+        visibility:hidden;
+        transition:
+            opacity 0.2s ease-in-out,
+            visibility 0.2s ease-in-out;
+    }
+    @.submitBtn.show{
+        opacity:1;
+        visibility:visible;
     }
 `});
