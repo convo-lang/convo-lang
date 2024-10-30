@@ -1,7 +1,7 @@
 import asyncio
 
-from convo.convo_embeddings.embed_documents import generate_document_embeddings
-from convo.convo_embeddings.types import (
+from convo.embeddings.embed_documents import generate_document_embeddings
+from convo.embeddings.types import (
     DocumentEmbeddingRequest,
     GraphDBConfig,
     GraphRagConfig,

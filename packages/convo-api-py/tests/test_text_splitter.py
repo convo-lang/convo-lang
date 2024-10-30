@@ -1,5 +1,5 @@
 # flake8: noqa
-from convo.convo_embeddings.convo_text_splitter import ConvoTextSplitter
+from convo.embeddings.convo_text_splitter import ConvoTextSplitter
 
 
 def test_text_splitter():
