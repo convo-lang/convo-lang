@@ -624,6 +624,57 @@ colorama = {version = "*", markers = "sys_platform == \"win32\""}
 development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
 
 [[package]]
+name = "confluent-kafka"
+version = "2.4.0"
+description = "Confluent's Python client for Apache Kafka"
+optional = false
+python-versions = "*"
+files = [
+    {file = "confluent-kafka-2.4.0.tar.gz", hash = "sha256:201c6182304c5864c8a1b1aae2f99bf51fa332017abbec05a3a1fb2ff242c41d"},
+    {file = "confluent_kafka-2.4.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:827820321e0ac6a7f75f119f7ab4dcbbbd59c95d7807f6eb79f03a4cb6b9ab25"},
+    {file = "confluent_kafka-2.4.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:4c74a06a658f72dd0f6df9b0fbfc5b1b483b3263fde6abd925bba512879995cc"},
+    {file = "confluent_kafka-2.4.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:108bc30e1153734cd36d88a299c7cf0c69fe6c95d67f4cce9f9180adaefef839"},
+    {file = "confluent_kafka-2.4.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:cbe32df72b9d7fee198cf12eb3770270d99b122613b0e3abfb55a13294f6a54a"},
+    {file = "confluent_kafka-2.4.0-cp310-cp310-win_amd64.whl", hash = "sha256:c2e9e1dd2238e5b55cf541c9dbd3e665531418e0cc965e6143f593f64a3f79a5"},
+    {file = "confluent_kafka-2.4.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:a28bf5b59f28e3357d113cc8c50ba09389dcc3327ca13cc502e9c3228f2ab5dc"},
+    {file = "confluent_kafka-2.4.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:506c867d987ab78494fc94ec6a966ddcb3ce3cb75809e098060d654d280281e0"},
+    {file = "confluent_kafka-2.4.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3b02cd0eb338a8dc5db0ea07243bbf457670655a3846732f81a091b8e3d5d456"},
+    {file = "confluent_kafka-2.4.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:15d356dd1c7699ed332f262bf0aa825a177c50f7debca0f1ec14873531603b2d"},
+    {file = "confluent_kafka-2.4.0-cp311-cp311-win_amd64.whl", hash = "sha256:0c1b89e1bd790dd82b64a4dd746e7a0ce3ebed7f17b0642d488c1bb0056ba763"},
+    {file = "confluent_kafka-2.4.0-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:a11acfd79f0448095c6492d2ea34cd3df4864d78d72326bed0859d875eb7a62d"},
+    {file = "confluent_kafka-2.4.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:dd53d58a6648e4d5e435ff5178248b91af050a4478ed51a95b2b0eaedddafdb1"},
+    {file = "confluent_kafka-2.4.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8a5e9cc9fff71c70f1520ab917f33cf66181b29c46cf9940da1af6a52cc086a6"},
+    {file = "confluent_kafka-2.4.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:b0d5a2d7563b9ca9bef09668d6aae6e360f1e9455672dc0886d78d76ced682c9"},
+    {file = "confluent_kafka-2.4.0-cp312-cp312-win_amd64.whl", hash = "sha256:d09aa0c67532c47ec6cd08c50feaa8338e77d18fc83181c46e5a5cb88a5b25ce"},
+    {file = "confluent_kafka-2.4.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:f2e39794270088157f65e5b2b5ba7e0217759412de20088f5873bdb176084ab3"},
+    {file = "confluent_kafka-2.4.0-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0591645e709ea8392f8d41b9ff752f1cdb57c71730c9be2deae3184303d3efaf"},
+    {file = "confluent_kafka-2.4.0-cp36-cp36m-manylinux_2_28_aarch64.whl", hash = "sha256:07f38339da116527d9516a0b1899b499ebfe5f906ef54c0780a309ebee585c12"},
+    {file = "confluent_kafka-2.4.0-cp36-cp36m-win_amd64.whl", hash = "sha256:c661f4c014f78ee478667a5018fb62ec2a4b61322410a9be314bdbf6ead481d7"},
+    {file = "confluent_kafka-2.4.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:a8b440684a22d9239b857d1be065ea2844537ff20bb675c75e7a9e2adbd5ce9a"},
+    {file = "confluent_kafka-2.4.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9ac7120919a4189018120a40da8d9c05bd6e024f60638901483bb6a46c45a115"},
+    {file = "confluent_kafka-2.4.0-cp37-cp37m-manylinux_2_28_aarch64.whl", hash = "sha256:6a2b81902b0c824549f85f49774535285242b1472e52ab0a18260526840a8ecf"},
+    {file = "confluent_kafka-2.4.0-cp37-cp37m-win_amd64.whl", hash = "sha256:78f6776aca06c81308c8be66c754a3b8281a20dd9af697b2cfcb5c2272878df9"},
+    {file = "confluent_kafka-2.4.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:2858fb428f29086df2a50554d9093d176ec4b1f76240a62efe136acc493f7fb6"},
+    {file = "confluent_kafka-2.4.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:9608b8b1145a0b41e6c6949ac9ec974e74f1ed2d065b26eae73e208668fa20cf"},
+    {file = "confluent_kafka-2.4.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:baaf1022972bd213bf20cfccb1b13b613d7ab13ebcafacd65220bd5908f5e460"},
+    {file = "confluent_kafka-2.4.0-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:16be3360f040b5d17dcb7e1b66a170b72f428c98d0978705b0a3081de756b2c7"},
+    {file = "confluent_kafka-2.4.0-cp38-cp38-win_amd64.whl", hash = "sha256:45e6f719f6bd95210e0451b50cd19f33a44d7b16be560217240caa71f165420d"},
+    {file = "confluent_kafka-2.4.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:3cf1b40ae59569e50ba15da1dc0030bac904b74d8aff82f02a16df3bb9b87e53"},
+    {file = "confluent_kafka-2.4.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:5b5dd225596325159eee928caba47e0cf3f03ce3c8244371457a1823d7c66c22"},
+    {file = "confluent_kafka-2.4.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d338e8189f5836b916c632e0f2db9a197352c199db7323ca3f2bd1785cb9a747"},
+    {file = "confluent_kafka-2.4.0-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:40d18f1bd1bac6d2cf8dbf47da11cdb82d077b26a81ea551136515a1079ec532"},
+    {file = "confluent_kafka-2.4.0-cp39-cp39-win_amd64.whl", hash = "sha256:52f937ab1cde9aacb01288293d374bf09da728b79cf907504dec8f3c4f82030e"},
+]
+
+[package.extras]
+avro = ["avro (>=1.11.1,<2)", "fastavro (>=0.23.0,<1.0)", "fastavro (>=1.0)", "requests"]
+dev = ["avro (>=1.11.1,<2)", "fastavro (>=0.23.0,<1.0)", "fastavro (>=1.0)", "flake8", "pytest", "pytest (==4.6.4)", "pytest-timeout", "requests"]
+doc = ["avro (>=1.11.1,<2)", "fastavro (>=0.23.0,<1.0)", "fastavro (>=1.0)", "requests", "sphinx", "sphinx-rtd-theme"]
+json = ["jsonschema", "pyrsistent", "pyrsistent (==0.16.1)", "requests"]
+protobuf = ["protobuf", "requests"]
+schema-registry = ["requests"]
+
+[[package]]
 name = "contourpy"
 version = "1.3.0"
 description = "Python library for calculating contours of 2D quadrilateral grids"
@@ -3933,6 +3984,34 @@ files = [
 ]
 
 [[package]]
+name = "quixstreams"
+version = "3.1.0"
+description = "Python library for building stream processing applications with Apache Kafka"
+optional = false
+python-versions = "<4,>=3.9"
+files = [
+    {file = "quixstreams-3.1.0-py3-none-any.whl", hash = "sha256:2b9efe8d3d98042107375f02bfa59e23ba88df1805911635e9c09eac1928c6f8"},
+]
+
+[package.dependencies]
+confluent-kafka = ">=2.2,<2.5"
+jsonschema = ">=4.3.0"
+orjson = ">=3.9,<4"
+pydantic = ">=2.7,<2.10"
+pydantic-settings = ">=2.3,<2.7"
+requests = ">=2.32"
+rocksdict = ">=0.3,<0.4"
+typing-extensions = ">=4.8"
+
+[package.extras]
+all = ["boto3", "fastavro (>=1.8,<2.0)", "influxdb3-python (>=0.7,<1.0)", "mypy-boto3-glue", "protobuf (>=5.27.2,<6.0)", "pyarrow", "pyiceberg"]
+avro = ["fastavro (>=1.8,<2.0)"]
+iceberg = ["pyarrow", "pyiceberg"]
+iceberg-aws = ["boto3", "mypy-boto3-glue", "pyarrow", "pyiceberg"]
+influxdb3 = ["influxdb3-python (>=0.7,<1.0)"]
+protobuf = ["protobuf (>=5.27.2,<6.0)"]
+
+[[package]]
 name = "rapidfuzz"
 version = "3.10.0"
 description = "rapid fuzzy string matching"
@@ -4184,6 +4263,51 @@ files = [
 
 [package.dependencies]
 requests = ">=2.0.1,<3.0.0"
+
+[[package]]
+name = "rocksdict"
+version = "0.3.23"
+description = "Rocksdb Python Binding"
+optional = false
+python-versions = "*"
+files = [
+    {file = "rocksdict-0.3.23-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:e6940f8441a62f4a18a3f33bf6e456ff516a85c5993509bc9a77842dab175d9d"},
+    {file = "rocksdict-0.3.23-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:476f6f75335b361ca11cd6830651c2b3609407c14a4caedeba2a8ab904864be0"},
+    {file = "rocksdict-0.3.23-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1a6610565d9ca005dde9bfe8d596a116902d90b6a95c00e94465df15637d066b"},
+    {file = "rocksdict-0.3.23-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:71c1246bb75518b3cb2c9d83a7d305a6bfeca8b02b9dd3c826022fa8286e8436"},
+    {file = "rocksdict-0.3.23-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:baaef3eaa95f85af511f96b1814f4881726fd8570b9512659f0dd60f05c2e2a6"},
+    {file = "rocksdict-0.3.23-cp310-none-win_amd64.whl", hash = "sha256:ed01dac8d48842dec925ecc0ca158ff88227273dff269292c14fb78fc6ea56ff"},
+    {file = "rocksdict-0.3.23-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:2f64a510e6a8747296ee6c7b108f474f2c6aece4438dba19f545611d4f566973"},
+    {file = "rocksdict-0.3.23-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3f2c73a698cb430e5987a9055b982225c33b7d49ef6eb117bdf4415978e50f0c"},
+    {file = "rocksdict-0.3.23-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ec60d041e55c5e329130852ca01bb67ceedabc88c7d151457c8ab1147d435b23"},
+    {file = "rocksdict-0.3.23-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:6213a126c995a5777882a542226841f79dea746ba457fa6ee060d4158385e698"},
+    {file = "rocksdict-0.3.23-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:62427f4ab972d928b9c9356134c0556f0f8c6e6a8a0052c2df453030646f18d5"},
+    {file = "rocksdict-0.3.23-cp311-none-win_amd64.whl", hash = "sha256:cc671b41d5336e14fe7df66dac6faa5ff010676ebf0cf450770c3092ee128674"},
+    {file = "rocksdict-0.3.23-cp312-cp312-macosx_10_14_x86_64.whl", hash = "sha256:2a0ca48a11379fd925d387fcfdf1ac269b3cfa854579f1fba2d02a5263931c5c"},
+    {file = "rocksdict-0.3.23-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:62dce9b1ff48f3d8048a939f87689f5d863dd877153ee2b3f2b2e52ae8e3450c"},
+    {file = "rocksdict-0.3.23-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3cc24a1b7375fc6de75bd2bab89890a9d47ad45097a90914fce5f5a7995ed36b"},
+    {file = "rocksdict-0.3.23-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:0e09692a9ef85854d12d5b7aab0cdebbce681afc572548bc57259b1f34db9497"},
+    {file = "rocksdict-0.3.23-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:80ac76c9bb23edd36ffce4834ef0b30be6f07bd1529d05104f7637426c9166f8"},
+    {file = "rocksdict-0.3.23-cp312-none-win_amd64.whl", hash = "sha256:38dd896afbd623b6d3a8d6fd31bb287ab4df3c7c3dbcb27b61d2541431f17ee2"},
+    {file = "rocksdict-0.3.23-cp37-cp37m-macosx_10_14_x86_64.whl", hash = "sha256:f86820d9d74954340eb45008dd21a50705a8df8093672979495c5226ce73b9c2"},
+    {file = "rocksdict-0.3.23-cp37-cp37m-macosx_11_0_arm64.whl", hash = "sha256:3d2456d7e6e38e902dacc0d11685247ba9c2bfe3b7d9d43a7788d46eaf24b491"},
+    {file = "rocksdict-0.3.23-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:507d71f036559256218b7ceb1ad20e07c2eeac3d1121c407b583a090d347c809"},
+    {file = "rocksdict-0.3.23-cp37-cp37m-manylinux_2_28_aarch64.whl", hash = "sha256:4045b2781d76425ead6c63168e982690082070293466d709202ef46839eedf48"},
+    {file = "rocksdict-0.3.23-cp37-cp37m-manylinux_2_28_x86_64.whl", hash = "sha256:a1726d718159400839b9c3e747e6b0362346680d69c22c7a9bb29f6105a47972"},
+    {file = "rocksdict-0.3.23-cp37-none-win_amd64.whl", hash = "sha256:765ecf9b330f3614a02a6e98cf2e0f868ca2debcc05ad8d5900ab3da45dcb2c1"},
+    {file = "rocksdict-0.3.23-cp38-cp38-macosx_10_14_x86_64.whl", hash = "sha256:338f2772d286fe7c442a562e91f3443ccb9de5728a1d6de8818ae6345630a17a"},
+    {file = "rocksdict-0.3.23-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:f2c36a26a9fea06682ee75f08b4b19a8cc1d308770b7f2ebc168bf6716468ad2"},
+    {file = "rocksdict-0.3.23-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0db204a0950beb632d5c3771bafacdff678f158c045fe0326bfe64e0ae2b49e3"},
+    {file = "rocksdict-0.3.23-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:d31261a9607a5daebb68d23f95f47e8eede794b6bf7632d812e85d8f2f722f2b"},
+    {file = "rocksdict-0.3.23-cp38-cp38-manylinux_2_28_x86_64.whl", hash = "sha256:9ab84b22b3212370dcbb6bb89f50a3a502cf0c8faa1b230360e5ed184671bbf7"},
+    {file = "rocksdict-0.3.23-cp38-none-win_amd64.whl", hash = "sha256:fa671aec33e32549a2a6f9e5c32c53134c5f49c7ab2bc6c1e0e637c4a81b4957"},
+    {file = "rocksdict-0.3.23-cp39-cp39-macosx_10_14_x86_64.whl", hash = "sha256:dfc42feac0a0534872ae56f97fa885aefc971db28ad853be74451adddac643fb"},
+    {file = "rocksdict-0.3.23-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:15fb4f4ff9c65b28f24f5cf4b846c9e1113dc17d2ebb1da8cebfaea812e8bc74"},
+    {file = "rocksdict-0.3.23-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fa2a80e14c002bf6b64f0532241e4067cd2635249019a3ee89b906723a93a28a"},
+    {file = "rocksdict-0.3.23-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:fa7f63c340fd32540673f430882bd9ff184cd1670592620436bcfb717e56e681"},
+    {file = "rocksdict-0.3.23-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:b7f59bbfe6bb552e3d003c05e4cdefa6c37bfcf61b19e21d280ff75177119b0e"},
+    {file = "rocksdict-0.3.23-cp39-none-win_amd64.whl", hash = "sha256:f541c5c9734fc896eec1c9e33c8604de4f487d4d35a37680afcb80c9495344d1"},
+]
 
 [[package]]
 name = "rpds-py"
@@ -5557,4 +5681,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "422bf2b9101162d0ee7cce2dbd83309349d6267995a616cc5077ab30e076c00d"
+content-hash = "8677d9e76719b1003d16314271ac423b824ed6ca5432d1200de3f90b946adf96"
