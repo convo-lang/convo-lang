@@ -1,117 +1,59 @@
 import asyncio
+import io
 import json
 import logging
 import os
 from typing import List, Optional, Tuple, Union
 
-import magic
 from fastapi import HTTPException
-from iyio_common import escape_sql_identifier, exec_sql, parse_s3_path
-from langchain.schema.document import Document
-from langchain_community.document_loaders import (
-    DirectoryLoader,
-    UnstructuredHTMLLoader,
-    UnstructuredMarkdownLoader,
-    UnstructuredPDFLoader,
-    UnstructuredURLLoader,
-)
-from langchain_community.document_loaders.base import BaseLoader
-from langchain_unstructured import UnstructuredLoader
+from iyio_common import escape_sql_identifier, exec_sql  # , parse_s3_path
 from openai import AsyncOpenAI
 from psycopg import sql
+from unstructured.chunking.title import chunk_by_title
+from unstructured.documents.elements import Element
+from unstructured.partition.auto import partition
 
 from . import types
-from .convo_text_splitter import ConvoTextSplitter
 from .embed import encode_text
 from .graph_embedding import graph_embed_docs
-from .s3_loader import S3FileLoaderEx
 
 max_sql_len = 65536
 
 logger = logging.getLogger(__name__)
 
 
-def get_text_chunks_langchain(text: str) -> List[Document]:
-    text_splitter = ConvoTextSplitter(chunk_size=300, chunk_overlap=20)
-    docs = [Document(page_content=x) for x in text_splitter.split_text(text)]
-    return docs
-
-
-def get_doc_loader(
-    request: types.DocumentEmbeddingRequest, document_path: str, mode: str
-) -> Tuple[Optional[List[Document]], Optional[BaseLoader]]:
-    content_type = request.contentType
-
+def load_documents(
+    request: types.DocumentEmbeddingRequest, document_path: str
+) -> Tuple[bool, List[Element]]:
     if document_path == "inline":
-        direct_docs = get_text_chunks_langchain(request.inlineContent)
-        file_loader = None
-    elif document_path.startswith("s3://"):
-        s3Path = parse_s3_path(document_path)
-        file_loader = S3FileLoaderEx(s3Path["bucket"], s3Path["key"])
-        file_loader.mode = mode
-        direct_docs = None
+        content = str.encode(request.inlineContent)
+        elements = partition(io.BytesIO(content))
     elif document_path.startswith("https://") or document_path.startswith("http://"):
-        file_loader = UnstructuredURLLoader([document_path], mode=mode)
-        direct_docs = None
-    elif document_path.endswith("/*"):
-        file_loader = DirectoryLoader(
-            document_path,
-            show_progress=True,
-            loader_cls=UnstructuredLoader,
-            loader_kwargs={"mode": mode},
-        )
-        direct_docs = None
-    elif content_type and content_type.endswith("/pdf"):
-        file_loader = UnstructuredPDFLoader(document_path, mode=mode)
-        direct_docs = None
-    elif content_type and content_type.endswith("/html"):
-        file_loader = UnstructuredHTMLLoader(document_path, mode=mode)
-        direct_docs = None
-    elif content_type and content_type.endswith("/markdown"):
-        file_loader = UnstructuredMarkdownLoader(document_path, mode=mode)
-        direct_docs = None
+        elements = partition(url=document_path)
     else:
-        file_loader = UnstructuredLoader(document_path, mode=mode)
-        direct_docs = None
+        elements = partition(filename=document_path)
 
-    return direct_docs, file_loader
+    chunks = chunk_by_title(
+        elements, new_after_n_chars=request.chunk_size, overlap=request.chunk_overlap
+    )
+    return chunks
 
 
 def get_content_category(
     request: types.DocumentEmbeddingRequest,
-    document_path: str,
-    docs,
-    is_direct_docs: bool,
+    chunks: List[Element],
 ) -> Tuple[Optional[str], Optional[str]]:
     content_type = request.contentType
-    mime_path = document_path
-    firstDoc = docs[0]
 
-    if is_direct_docs:
-        content_type = request.contentType
-    elif firstDoc and firstDoc.metadata and ("content_type" in firstDoc.metadata):
-        content_type = firstDoc.metadata["content_type"]
-    else:
-        if firstDoc and firstDoc.metadata and ("source" in firstDoc.metadata):
-            logger.info("first doc filename %s", firstDoc)
-            mime_path = firstDoc.metadata["source"]
-
-        if mime_path:
-            mime = magic.Magic(mime=True)
-            type = mime.from_file(mime_path)
-            if type:
-                content_type = type
-                logger.info("content type set to %s", type)
+    if content_type is None:
+        content_type = chunks[0].metadata.filetype
 
     if content_type == "application/pdf":
         content_category = "document"
     elif content_type is not None:
-        content_category = content_type.split("/")[0]
+        content_category = content_type.split("/")[0].lower()
     else:
         content_category = None
-
-    if content_category:
-        content_category = content_category.lower()
 
     return content_type, content_category
 
@@ -121,7 +63,7 @@ def insert_vectors(
     colNameSql,
     colNames,
     cols,
-    all_docs: List[types.EmbededDocument],
+    embeded_chunks: List[types.EmbededChunk],
 ) -> int:
     embeddings_table = request.embeddingsTable
 
@@ -136,7 +78,7 @@ def insert_vectors(
     sql_chucks = [head]
     sql_len = len(head)
 
-    for index in all_docs:
+    for index in embeded_chunks:
         chunk = (
             sql.SQL("({text},{vector}")
             .format(text=index.text, vector=json.dumps(index.vec))
@@ -196,21 +138,6 @@ def clean_document_path(document_path: str) -> str:
     return document_path
 
 
-def load_documents(
-    request: types.DocumentEmbeddingRequest, document_path: str
-) -> Tuple[bool, List[Document]]:
-    direct_docs, file_loader = get_doc_loader(request, document_path, "single")
-    docs = direct_docs if direct_docs else file_loader.load()
-
-    text_splitter = ConvoTextSplitter(
-        chunk_size=request.chunk_size, chunk_overlap=request.chunk_overlap
-    )
-    docs = text_splitter.split_documents(docs)
-    is_direct_docs = direct_docs is not None
-
-    return is_direct_docs, docs
-
-
 async def generate_document_embeddings(  # Noqa: C901
     open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
@@ -222,16 +149,14 @@ async def generate_document_embeddings(  # Noqa: C901
 
     document_path = clean_document_path(request.location)
     logger.info("generate_document_embeddings from %s", document_path)
-    is_direct_docs, docs = load_documents(request, document_path)
+    chunks = load_documents(request, document_path)
 
-    if len(docs) == 0:
+    if len(chunks) == 0:
         msg = "No embedding documents found for {document_path}"
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    content_type, content_category = get_content_category(
-        request, document_path, docs, is_direct_docs
-    )
+    content_type, content_category = get_content_category(request, chunks)
 
     logger.info(
         "Content category: %s, content type: %s", content_category, content_type
@@ -247,8 +172,9 @@ async def generate_document_embeddings(  # Noqa: C901
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    if request.contentCategoryFilter and not (
-        content_category in request.contentCategoryFilter
+    if (
+        request.contentCategoryFilter
+        and content_category in request.contentCategoryFilter
     ):
         msg = "content_category filtered out - {content_category}"
         logger.info(msg)
@@ -264,12 +190,12 @@ async def generate_document_embeddings(  # Noqa: C901
     if request.contentTypeCol:
         cols[request.contentTypeCol] = content_type
 
-    async def embed_docs(doc: Document):
-        vec = await encode_text(open_ai_client, doc.page_content)
-        return types.EmbededDocument(vec=vec, text=doc.page_content)
+    async def embed_chunk(chunk: Element):
+        vec = await encode_text(open_ai_client, chunk.text)
+        return types.EmbededChunk(vec=vec, text=chunk.text)
 
-    all_docs_tasks = [embed_docs(doc) for doc in docs]
-    all_docs = await asyncio.gather(*all_docs_tasks)
+    embed_chunk_tasks = [embed_chunk(chunk) for chunk in chunks]
+    embedded_chunks = await asyncio.gather(*embed_chunk_tasks)
 
     if request.cols and request.clearMatching:
         clearSql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
@@ -303,12 +229,14 @@ async def generate_document_embeddings(  # Noqa: C901
     if len(col_names_escaped):
         col_name_sql = "," + (",".join(col_names_escaped))
 
-    total_inserted = insert_vectors(request, col_name_sql, col_names, cols, all_docs)
+    total_inserted = insert_vectors(
+        request, col_name_sql, col_names, cols, embedded_chunks
+    )
 
     if run_graph_embded:
         logging.info("Running graph embedding for %s", request.location)
         _ = await graph_embed_docs(
-            docs, request.location, graph_db_config, graph_rag_config
+            chunks, request.location, graph_db_config, graph_rag_config
         )
     else:
         logging.info("Skipping graph embedding for %s", request.location)
