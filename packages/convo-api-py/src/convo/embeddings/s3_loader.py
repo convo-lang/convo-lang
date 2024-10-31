@@ -1,3 +1,4 @@
+import pathlib
 import re
 import tempfile
 from typing import List, Optional, Union
@@ -44,7 +45,9 @@ def load_s3(
         config=boto_config,
     )
 
-    with tempfile.TemporaryFile() as tf:
+    suffix = pathlib.Path(path).suffix
+
+    with tempfile.NamedTemporaryFile(suffix=suffix) as tf:
         with open(tf.name, mode="wb") as f:
             s3.download_fileobj(bucket, key, f)
         with open(tf.name, mode="rb") as f:
