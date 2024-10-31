@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 from fastapi import HTTPException
@@ -19,26 +20,33 @@ from .graph_embedding import graph_embed_docs
 from .s3_loader import load_s3
 
 max_sql_len = 65536
+doc_prefix = os.getenv("DOCUMENT_PREFIX_PATH")
 
 logger = logging.getLogger(__name__)
 
 
 def load_documents(
-    request: types.DocumentEmbeddingRequest, document_path: str
+    request: types.DocumentEmbeddingRequest,
 ) -> Tuple[bool, List[Element]]:
     if request.contentType is not None:
         kwargs = dict(content_type=request.contentType)
     else:
         kwargs = dict
 
-    if document_path == "inline":
+    location = request.location
+
+    if location == "inline":
         content = str.encode(request.inlineContent)
         elements = partition(file=io.BytesIO(content), **kwargs)
-    elif document_path.startswith("s3://"):
-        elements = load_s3(document_path, **kwargs)
-    elif document_path.startswith("https://") or document_path.startswith("http://"):
-        elements = partition(url=document_path, **kwargs)
+    elif location.startswith("s3://"):
+        elements = load_s3(location, **kwargs)
+    elif location.startswith("https://") or location.startswith("http://"):
+        elements = partition(url=location, **kwargs)
     else:
+        document_path = location
+        if doc_prefix is not None:
+            document_path = str(Path(doc_prefix) / Path(document_path))
+
         elements = partition(filename=document_path, **kwargs)
 
     chunks = chunk_by_title(
@@ -131,21 +139,6 @@ def insert_vectors(
     return total_inserted
 
 
-def clean_document_path(document_path: str) -> str:
-    doc_prefix = os.getenv("DOCUMENT_PREFIX_PATH")
-
-    is_inline = document_path == "inline"
-    is_s3 = document_path.startswith("s3://")
-    is_url = document_path.startswith("https://") or document_path.startswith("http://")
-
-    if not (is_inline or is_s3 or is_url) and doc_prefix:
-        if not document_path.startswith("/"):
-            document_path = "/" + document_path
-        document_path = doc_prefix + document_path
-
-    return document_path
-
-
 async def generate_document_embeddings(  # Noqa: C901
     open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
@@ -155,12 +148,11 @@ async def generate_document_embeddings(  # Noqa: C901
 ) -> Union[int, HTTPException]:
     logger.debug("Proccessing %s", request)
 
-    document_path = clean_document_path(request.location)
-    logger.info("generate_document_embeddings from %s", document_path)
-    chunks = load_documents(request, document_path)
+    logger.info("generate_document_embeddings from %s", request.location)
+    chunks = load_documents(request)
 
     if len(chunks) == 0:
-        msg = "No embedding documents found for {document_path}"
+        msg = "No embedding documents found for {request.location}"
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
@@ -188,7 +180,7 @@ async def generate_document_embeddings(  # Noqa: C901
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    logger.info("Generating embeddings from %s", document_path)
+    logger.info("Generating embeddings from %s", request.location)
 
     cols = request.cols.copy() if request.cols else dict()
 
