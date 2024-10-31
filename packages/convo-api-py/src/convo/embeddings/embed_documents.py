@@ -26,15 +26,20 @@ logger = logging.getLogger(__name__)
 def load_documents(
     request: types.DocumentEmbeddingRequest, document_path: str
 ) -> Tuple[bool, List[Element]]:
+    if request.contentType is not None:
+        kwargs = dict(content_type=request.contentType)
+    else:
+        kwargs = dict
+
     if document_path == "inline":
         content = str.encode(request.inlineContent)
-        elements = partition(io.BytesIO(content))
+        elements = partition(file=io.BytesIO(content), **kwargs)
     elif document_path.startswith("s3://"):
-        elements = load_s3(document_path)
+        elements = load_s3(document_path, **kwargs)
     elif document_path.startswith("https://") or document_path.startswith("http://"):
-        elements = partition(url=document_path)
+        elements = partition(url=document_path, **kwargs)
     else:
-        elements = partition(filename=document_path)
+        elements = partition(filename=document_path, **kwargs)
 
     chunks = chunk_by_title(
         elements, new_after_n_chars=request.chunk_size, overlap=request.chunk_overlap

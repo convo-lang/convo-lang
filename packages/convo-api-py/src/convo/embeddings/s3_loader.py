@@ -27,6 +27,7 @@ def load_s3(
     aws_secret_access_key: Optional[str] = None,
     aws_session_token: Optional[str] = None,
     boto_config: Optional[Config] = None,
+    **kwargs,
 ) -> List[Element]:
     bucket, key = parse_s3_path(path)
 
@@ -47,4 +48,4 @@ def load_s3(
         with open(tf.name, mode="wb") as f:
             s3.download_fileobj(bucket, key, f)
         with open(tf.name, mode="rb") as f:
-            return partition(file=f)
+            return partition(file=f, **kwargs)
