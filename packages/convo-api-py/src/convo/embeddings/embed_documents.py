@@ -6,7 +6,7 @@ import os
 from typing import List, Optional, Tuple, Union
 
 from fastapi import HTTPException
-from iyio_common import escape_sql_identifier, exec_sql  # , parse_s3_path
+from iyio_common import escape_sql_identifier, exec_sql
 from openai import AsyncOpenAI
 from psycopg import sql
 from unstructured.chunking.title import chunk_by_title
@@ -16,6 +16,7 @@ from unstructured.partition.auto import partition
 from . import types
 from .embed import encode_text
 from .graph_embedding import graph_embed_docs
+from .s3_loader import load_s3
 
 max_sql_len = 65536
 
@@ -28,6 +29,8 @@ def load_documents(
     if document_path == "inline":
         content = str.encode(request.inlineContent)
         elements = partition(io.BytesIO(content))
+    elif document_path.startswith("s3://"):
+        elements = load_s3(document_path)
     elif document_path.startswith("https://") or document_path.startswith("http://"):
         elements = partition(url=document_path)
     else:
