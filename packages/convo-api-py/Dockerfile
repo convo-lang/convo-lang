@@ -18,7 +18,7 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_HOME='/usr/local'
 
 # prepend poetry and venv to path
-ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:/root/.cargo/bin:$PATH"
 
 WORKDIR /app
 
@@ -26,6 +26,9 @@ RUN apt-get update
 RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr curl build-essential
 
 RUN curl -sSL https://install.python-poetry.org | python3 -
+
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+
 
 COPY packages/iyio-common-py ./iyio-common-py
 RUN ls .
