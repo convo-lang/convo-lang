@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 
 from fastapi import HTTPException
 from iyio_common import escape_sql_identifier, exec_sql
@@ -58,20 +58,33 @@ def load_documents(
 def get_content_category(
     request: types.DocumentEmbeddingRequest,
     chunks: List[Element],
-) -> Tuple[Optional[str], Optional[str]]:
-    content_type = request.contentType
-
-    if content_type is None:
-        content_type = chunks[0].metadata.filetype
-
-    if content_type == "application/pdf":
-        content_category = "document"
-    elif content_type is not None:
-        content_category = content_type.split("/")[0].lower()
+) -> Tuple[str, str, str]:
+    if request.location == "inline":
+        content_type = "inline"
     else:
-        content_category = None
+        content_type = Path(request.location).suffix
 
-    return content_type, content_category
+    mime_type = chunks[0].metadata.filetype
+    mime_type = "NA" if mime_type is None else mime_type
+
+    if content_type == "inline":
+        content_category = "inline"
+    elif content_type in {".csv", ".xlsx", ".xls"}:
+        content_category = "tabular"
+    elif content_type == ".html":
+        content_category = "website"
+    elif content_type in {".eml", ".msg"}:
+        content_category = "email"
+    elif content_type in {".txt", ".text", ".log"}:
+        content_category = "plain-text"
+    elif content_type in {".md", ".odt", ".pdf", ".rst", ".rtf", ".doc", ".docx"}:
+        content_category = "document"
+    elif content_type in {".ppt", ".pptx"}:
+        content_category = "presentation"
+    else:
+        content_category = "unknown"
+
+    return content_type, mime_type, content_category
 
 
 def insert_vectors(
@@ -156,10 +169,13 @@ async def generate_document_embeddings(  # Noqa: C901
         logger.info(msg)
         return HTTPException(status_code=400, detail=msg)
 
-    content_type, content_category = get_content_category(request, chunks)
+    content_type, mime_type, content_category = get_content_category(request, chunks)
 
     logger.info(
-        "Content category: %s, content type: %s", content_category, content_type
+        "Content category: %s, mime-type: %s, content type: %s",
+        content_category,
+        mime_type,
+        content_type,
     )
 
     if not content_category and request.contentCategoryCol:

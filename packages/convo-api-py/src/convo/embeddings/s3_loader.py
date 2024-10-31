@@ -1,6 +1,6 @@
-import pathlib
 import re
 import tempfile
+from pathlib import Path
 from typing import List, Optional, Union
 
 import boto3
@@ -45,7 +45,7 @@ def load_s3(
         config=boto_config,
     )
 
-    suffix = pathlib.Path(path).suffix
+    suffix = Path(path).suffix
 
     with tempfile.NamedTemporaryFile(suffix=suffix) as tf:
         with open(tf.name, mode="wb") as f:
