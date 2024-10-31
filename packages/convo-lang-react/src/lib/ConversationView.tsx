@@ -1,7 +1,7 @@
 import { ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { useShallowCompareItem, useSubject } from "@iyio/react-common";
-import { useContext, useEffect, useMemo, useRef } from "react";
+import { useContext, useEffect, useMemo } from "react";
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
 import { MessagesView } from "./MessagesView";
@@ -59,14 +59,9 @@ export function ConversationView({
     template,
 }:ConversationViewProps){
 
-    const refs=useRef({defaultVars,externFunctions});
-    refs.current.defaultVars=defaultVars;
-    refs.current.externFunctions=externFunctions;
     const ctxCtrl=useContext(ConversationUiContext);
     const defaultCtrl=ctrlProp??ctxCtrl;
     const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl({
-        defaultVars:refs.current.defaultVars,
-        externFunctions:refs.current.externFunctions,
         ...ctrlOptions,
         template:template??ctrlOptions?.template,
         convoOptions:{
@@ -76,6 +71,18 @@ export function ConversationView({
             ):ctrlOptions?.convoOptions?.completionService
         }
     }),[defaultCtrl,ctrlOptions,httpEndpoint,template]);
+
+    useEffect(()=>{
+        if(externFunctions){
+            ctrl.externFunctions=externFunctions;
+        }
+    },[ctrl,externFunctions]);
+
+    useEffect(()=>{
+        if(defaultVars){
+            ctrl.defaultVars=defaultVars;
+        }
+    },[ctrl,defaultVars]);
 
     useEffect(()=>{
         if(content &&

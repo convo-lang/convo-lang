@@ -18,4 +18,3 @@ export const initOpenAiBackend=(apiKey?:string,module?:ScopeModule)=>{
         reg.use(module);
     })
 }
-initOpenAiBackend();
