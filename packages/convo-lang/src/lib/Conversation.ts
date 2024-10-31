@@ -2369,13 +2369,8 @@ export class Conversation
         return this.define(fns.map(fn=>({fn})),override);
     }
 
-    public implementExternFunction(name:string,func:(param:any)=>any){
-        this.defineFunction({
-            name,
-            local:true,
-            callback:func,
-            registerOnly:true,
-        })
+    public implementExternFunction(name:string,func:(...param:any[])=>any){
+        this.externFunctions[name]=scope=>func(...(scope.paramValues??[]))
     }
 
     public defineLocalFunctions(funcs:Record<string,(...args:any[])=>any>){

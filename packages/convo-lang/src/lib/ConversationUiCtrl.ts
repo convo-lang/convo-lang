@@ -1,4 +1,4 @@
-import { DisposeCallback, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, DisposeCallback, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
@@ -191,8 +191,50 @@ export class ConversationUiCtrl
 
     public readonly sceneCtrl?:SceneCtrl;
 
-    public readonly defaultVars:Record<string,any>;
-    public readonly externFunctions:Record<string,(param:any)=>any>;
+    private readonly _defaultVars:BehaviorSubject<Record<string,any>>;
+    public get defaultVarsSubject():ReadonlySubject<Record<string,any>>{return this._defaultVars}
+    public get defaultVars(){return this._defaultVars.value}
+    public set defaultVars(value:Record<string,any>){
+        if(value==this._defaultVars.value){
+            return;
+        }
+        if(this.convo){
+            const current=this._defaultVars.value;
+            for(const e in current){
+                if(this.convo.defaultVars[e]===current[e]){
+                    delete this.convo.defaultVars[e];
+                }
+            }
+            for(const e in value){
+                this.convo.defaultVars[e]=value[e];
+            }
+        }
+        this._defaultVars.next(value);
+    }
+
+    private readonly _externFunctions:BehaviorSubject<Record<string,AnyFunction>>;
+    public get externFunctionsSubject():ReadonlySubject<Record<string,AnyFunction>>{return this._externFunctions}
+    public get externFunctions(){return this._externFunctions.value}
+    public set externFunctions(value:Record<string,AnyFunction>){
+        if(value==this._externFunctions.value){
+            return;
+        }
+        if(this.convo){
+            const current=this._externFunctions.value;
+            for(const e in current){
+                if(this.convo.externFunctions[e]===current[e]){
+                    delete this.convo.externFunctions[e];
+                }
+            }
+            for(const e in value){
+                const fn=value[e];
+                if(fn){
+                    this.convo.implementExternFunction(e,fn);
+                }
+            }
+        }
+        this._externFunctions.next(value);
+    }
 
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
 
@@ -216,8 +258,8 @@ export class ConversationUiCtrl
 
         this.sceneCtrl=sceneCtrl;
 
-        this.defaultVars=defaultVars?{...defaultVars}:{};
-        this.externFunctions=externFunctions?{...externFunctions}:{}
+        this._defaultVars=new BehaviorSubject<Record<string,any>>(defaultVars?{...defaultVars}:{});
+        this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});
 
         this._removeDanglingUserMessages=new BehaviorSubject<boolean>(removeDanglingUserMessages);
         this._enabledSlashCommands=new BehaviorSubject(enableSlashCommand);
