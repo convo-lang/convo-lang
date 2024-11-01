@@ -1,29 +1,25 @@
-FROM python:3.11
+FROM python:3.11-buster
 
-ENV PYTHONUNBUFFERED=1 \
-    # prevents python creating .pyc files
-    PYTHONDONTWRITEBYTECODE=1 \
-    \
-    # pip
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100 \
-    \
-    # poetry
-    # https://python-poetry.org/docs/configuration/#using-environment-variables
-    POETRY_VERSION=1.8.3 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_CACHE_DIR='/var/cache/pypoetry' \
-    POETRY_HOME='/usr/local'
+RUN pip install poetry==1.8.4
 
-# prepend poetry and venv to path
-ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:/root/.cargo/bin:$PATH"
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=1 \
+    POETRY_VIRTUALENVS_CREATE=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
 
 WORKDIR /app
 
-RUN apt-get update
-RUN apt-get install -y libmagic1 libgl1-mesa-dev ffmpeg tesseract-ocr curl build-essential
+RUN apt-get update && \
+    apt-get install -y \
+    libmagic1 \
+    libgl1-mesa-dev \
+    ffmpeg \
+    tesseract-ocr \
+    curl \
+    build-essential \
+    poppler-utils \
+    libreoffice \
+    pandoc
 
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
@@ -33,12 +29,16 @@ RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 COPY packages/iyio-common-py ./iyio-common-py
 RUN ls .
 WORKDIR /app/convo-api-py
+
 COPY packages/convo-api-py/pyproject.toml pyproject.toml
 COPY packages/convo-api-py/poetry.lock poetry.lock
+
+RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
+
 COPY packages/convo-api-py/src/ src
 
-RUN poetry install --only=main --no-interaction --no-ansi --without dev
+RUN poetry install --without dev
 
 EXPOSE 8080
 
-CMD [ "uvicorn", "convo.main:app", "--host", "0.0.0.0", "--port", "8080" ]
+CMD ["poetry", "run", "uvicorn", "convo.main:app", "--host", "0.0.0.0", "--port", "8080" ]

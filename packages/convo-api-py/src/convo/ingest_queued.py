@@ -4,8 +4,8 @@ from typing import List
 
 from iyio_common import SqsEventRecord, run_sqs
 
-from .convo_embeddings.embed_documents import generate_document_embeddings
-from .convo_embeddings.types import DocumentEmbeddingRequest
+from .embeddings.embed_documents import generate_document_embeddings
+from .embeddings.types import DocumentEmbeddingRequest
 
 queueUrl = os.getenv("CONNECTED_QUEUE_URL")
 
