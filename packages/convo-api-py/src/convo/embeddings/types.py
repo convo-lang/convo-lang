@@ -74,6 +74,6 @@ class GraphDBConfig:
 
 
 @dataclass
-class EmbededDocument:
+class EmbededChunk:
     vec: List[float]
     text: str

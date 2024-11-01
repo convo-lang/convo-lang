@@ -1,10 +1,10 @@
 import logging
 import os
 
-from convo.convo_embeddings.convert_document import convert_document
-from convo.convo_embeddings.embed import encode_text
-from convo.convo_embeddings.embed_documents import generate_document_embeddings
-from convo.convo_embeddings.types import (
+from convo.embeddings.convert_document import convert_document
+from convo.embeddings.embed import encode_text
+from convo.embeddings.embed_documents import generate_document_embeddings
+from convo.embeddings.types import (
     DocumentConversionRequest,
     DocumentEmbeddingRequest,
     GraphDBConfig,

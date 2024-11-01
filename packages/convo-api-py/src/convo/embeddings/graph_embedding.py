@@ -5,13 +5,13 @@ from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
 import age
-from langchain_core.documents import Document
 from nano_graphrag._op import extract_entities
 from nano_graphrag.base import (
     BaseGraphStorage,
     BaseVectorStorage,
     TextChunkSchema,
 )
+from unstructured.documents.elements import Element
 
 from .types import GraphDBConfig, GraphRagConfig
 
@@ -133,8 +133,8 @@ class AgeGraphStorage(BaseGraphStorage):
 
 
 async def graph_embed_docs(
-    docs: List[Document],
-    docs_path: str,
+    chunks: List[Element],
+    doc_path: str,
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
@@ -145,20 +145,20 @@ async def graph_embed_docs(
         # TODO: Insert document source here, but need to
         #  look if there is more performant way of adding this
         #  as an index
-        namespace=docs_path,
+        namespace=doc_path,
         global_config=asdict(graph_rag_config),
         **asdict(graph_db_config),
     )
 
-    ids = [str(uuid.uuid4()) for _ in docs]
+    ids = [str(uuid.uuid4()) for _ in chunks]
     chunks = {
         uuid: TextChunkSchema(
             tokens=0,  # Unused by graph-rag
-            content=doc.page_content,
-            full_doc_id=docs_path,
+            content=chunk.text,
+            full_doc_id=doc_path,
             chunk_order_index=0,  # Unused by graph-rag
         )
-        for i, (uuid, doc) in enumerate(zip(ids, docs))
+        for i, (uuid, chunk) in enumerate(zip(ids, chunks))
     }
 
     _ = await extract_entities(
