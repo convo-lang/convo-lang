@@ -20,7 +20,7 @@ from .graph_embedding import graph_embed_docs
 from .s3_loader import load_s3
 
 max_sql_len = 65536
-doc_prefix = os.getenv("DOCUMENT_PREFIX_PATH")
+doc_prefix_path = os.getenv("DOCUMENT_PREFIX_PATH")
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def load_documents(
     if request.contentType is not None:
         kwargs = dict(content_type=request.contentType)
     else:
-        kwargs = dict
+        kwargs = dict()
 
     location = request.location
 
@@ -43,10 +43,11 @@ def load_documents(
     elif location.startswith("https://") or location.startswith("http://"):
         elements = partition(url=location, **kwargs)
     else:
-        document_path = location
-        if doc_prefix is not None:
-            document_path = str(Path(doc_prefix) / Path(document_path))
-
+        document_path = (
+            location
+            if doc_prefix_path is None
+            else str(Path(doc_prefix_path) / Path(location.lstrip("/")))
+        )
         elements = partition(filename=document_path, **kwargs)
 
     chunks = chunk_by_title(
