@@ -134,7 +134,7 @@ class AgeGraphStorage(BaseGraphStorage):
 
 async def graph_embed_docs(
     chunks: List[Element],
-    docs_path: str,
+    doc_path: str,
     graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
@@ -145,7 +145,7 @@ async def graph_embed_docs(
         # TODO: Insert document source here, but need to
         #  look if there is more performant way of adding this
         #  as an index
-        namespace=docs_path,
+        namespace=doc_path,
         global_config=asdict(graph_rag_config),
         **asdict(graph_db_config),
     )
@@ -155,7 +155,7 @@ async def graph_embed_docs(
         uuid: TextChunkSchema(
             tokens=0,  # Unused by graph-rag
             content=chunk.text,
-            full_doc_id=chunk.metadata.filename,
+            full_doc_id=doc_path,
             chunk_order_index=0,  # Unused by graph-rag
         )
         for i, (uuid, chunk) in enumerate(zip(ids, chunks))
