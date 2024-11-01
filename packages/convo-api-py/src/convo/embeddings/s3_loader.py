@@ -30,6 +30,13 @@ def load_s3(
     boto_config: Optional[Config] = None,
     **kwargs,
 ) -> List[Element]:
+    """
+    Read partitions from S3 file
+
+    Download document from S3 to temporary
+    file, and then extract unstructured
+    text partitions.
+    """
     bucket, key = parse_s3_path(path)
 
     s3 = boto3.client(

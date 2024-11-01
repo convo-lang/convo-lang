@@ -28,6 +28,16 @@ logger = logging.getLogger(__name__)
 def load_documents(
     request: types.DocumentEmbeddingRequest,
 ) -> Tuple[bool, List[Element]]:
+    """
+    Load documents and extract text chunks
+
+    Load a document from a file-path, url or s3 bucket.
+    First extracts unstructured partitions, and then
+    chunk using unstructured title-level chunking.
+    The document type can be passed with the request,
+    but if not provided will use unstructured's automatic
+    detection.
+    """
     if request.contentType is not None:
         kwargs = dict(content_type=request.contentType)
     else:
@@ -53,6 +63,7 @@ def load_documents(
     chunks = chunk_by_title(
         elements, new_after_n_chars=request.chunk_size, overlap=request.chunk_overlap
     )
+
     return chunks
 
 
@@ -60,6 +71,13 @@ def get_content_category(
     request: types.DocumentEmbeddingRequest,
     chunks: List[Element],
 ) -> Tuple[str, str, str]:
+    """
+    Extract document type information
+
+    Extracts the document file-extension, mime-type
+    (if provided during loading) and broader
+    category (derived from the extension).
+    """
     if request.location == "inline":
         content_type = "inline"
     else:
