@@ -26,6 +26,7 @@ pre-commit = "^4.0.1"
 pytest = "^8.3.3"
 moto = "^5.0.18"
 docx = "^0.2.4"
+reportlab = "^4.2.5"
 
 [build-system]
 requires = ["poetry-core"]

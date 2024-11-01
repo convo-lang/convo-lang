@@ -66,7 +66,7 @@ def get_content_category(
         content_type = Path(request.location).suffix
 
     mime_type = chunks[0].metadata.filetype
-    mime_type = "NA" if mime_type is None else mime_type
+    mime_type = "unknown" if mime_type is None else mime_type
 
     if content_type == "inline":
         content_category = "inline"
