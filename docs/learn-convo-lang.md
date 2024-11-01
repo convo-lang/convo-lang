@@ -20,6 +20,144 @@ level details of working with an LLM such as implementing the usages of tools.
 You are a prompt engineer learning Convo-Lang. Prompting will never be the same 🥹
 ```
 
+## Why Convo-Lang
+Q. Why do we need another programming language when LLMs understand English?
+
+A. Well, The short answer is there's more to prompting than you may think.
+
+When using applications like ChatGTP, Grok or Gemini prompting typically involves writing a message
+or series of messages and sending them to an LLM and getting a response. This type of free form
+interaction with an LLM can be very useful in many situations and requires nothing more than the
+use of english. But the nature of this type of unstructured and unguided conversation does fit well
+inside the setting of a purposeful application.
+
+When building AI powered (agentic) applications more structure is needed.
+The prompts that help power agentic applications need the ability to define the behavior,
+personality and knowledge of their agents. They need to be able to expression both sides of a
+conversation, both the user and agent. And they need to be able to define how agents connect
+to the outside world when using tools. This is why we need a new programming language (Convo-Lang).
+
+*@@static*
+``` convo
+> system
+Personality, Behavior, Knowledge
+
+> extern connectToReality(command:string)
+
+> assistant
+Welcome to Convo-Lang 🥳
+
+> user
+This is amazing 🤩
+```
+
+## A Quick Comparison
+To demonstrate some of the advantages of Convo-Lang we will take a look at the same prompt in
+both the OpenAI standard and in Convo-Lang. The prompt instructs an agent to act as a funny dude
+and to always respond to the user with a joke and if the user likes a joke to call the likeJoke function.
+
+OpenAI Standard:
+``` json
+{
+    "model": "gpt-4o",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are a funny dude. respond to all messages with a joke regardless of the situation.\n\nIf a user says that they like one of your jokes call the like Joke function"
+        },
+        {
+            "role": "assistant",
+            "content": "How can I make you laugh today 🤓"
+        }
+    ],
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "likeJoke",
+                "description": "Call when the user likes a joke",
+                "parameters": {
+                    "type": "object",
+                    "required": [
+                        "joke"
+                    ],
+                    "properties": {
+                        "joke": {
+                            "type": "string",
+                            "description": "The joke the user liked"
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "The reason they liked the joke"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
+```
+
+Convo-Lang:
+*@@static*
+``` convo
+# Call when the user likes a joke
+> likeJoke(
+    # The joke the user liked
+    joke:string
+    # The reason they liked the joke
+    reason?:string
+) -> (
+    httpPost("https://funny-jokes.com/api/like" __args)
+)
+
+> system
+You are a funny dude. respond to all messages with a joke regardless of the situation.
+
+If a user says that they like one of your jokes call the like Joke function
+
+> assistant
+How can I make you laugh today 🤓
+```
+
+You can decide which version you prefer, but it's pretty obvious which one is easier to read. And
+as an added bonus the Convo-Lang version even handles making the HTTP request to submit the liked
+joke, this is completely out of the scope of the OpenAI standard and requires a non-trivial 
+amount of additional code when not using Convo-Lang.
+
+## How does it work?
+Convo-Lang is much more than just a pretty way to format prompts, it's a full programming
+language and runtime. At a high level, Convo-Lang scripts are executed on a
+client device and the output of the script is used to create prompts in the format
+of the LLM, then the converted prompt are sent to the LLM. This process of execution and conversion
+allows Convo-Lang to work with any LLM that an adaptor can be written for and allows Convo-Lang to
+add enhanced capabilities to an LLM without needed to make any changes to the model itself.
+
+Convo-Lang execution flow:
+
+![1. Parse Convo-Lang script. The parsed script results in a collection of message objects.
+2. Load parsed messages objects into a Conversation context. The Conversation context contains message, variables, callbacks for tools and more.
+3. Wait for user input or continue if explicitly instructed
+4. Evaluate and flatten the messages of the conversation. When a message is flatten any dynamic expressions in the message are evaluated and the resulting flatten message is a static string.
+5. Send flattened messages an LLM adapter. LLM adapters handle the sending of messages to an LLM in the format expected by the LLM.
+6. LLM adapter converts flattened messages into the format required by its target LLM.
+7. Messages are sent to the LLM.
+8. LLM sends back a response.
+9. The LLM adapter converts the response messages to a collection of ConvoCompletionMessage objects which is usable by the Conversation context.
+10. The LLM adapter sends the ConvoCompletionMessage objects to the Conversation context.
+11. The Conversation context appends the new messages to the conversation.
+12. If no tool calls are required return to step 3 otherwise continue
+13. Requested tool / function is invoked and its return value is appended to the conversation as a message. The actual code that gets ran can either be external code such as JavaScript or Python or can be Convo-Lang executional statements.
+14. The return value message is sent to the LLM using an LLM adapter using steps 5 - 11.
+15. The LLM returns a response message based on the return value message
+16. Return to step 3](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-execution-flow.png?raw=true)
+
+
+
+# Learning Time.
+Now that you have have a basic understanding of how Convo-Lang works its time to start your 
+journey with the language and learn its ways 🥷. The following Convo-Lang tutorial is full of
+interactive snippets. We encourage you to try them all, the best way to learn is to do.
 
 ## Doc
 Meet Doc, your personal assistant on your journey into the world of Convo-Lang. Ask Doc any questions
@@ -378,7 +516,7 @@ function is used for and what the arguments of the function are used for.
 
 
 ## Top Level Statement Messages
-Top level statements are used to define variables and data structures and execute Convo-code.
+Top level statements are used to define variables, data structures and execute statements.
 There are 4 types of top level statement messages. In most cases you will use `define` or `do`.
 
 - `define` - Used to define variables and types. Code written in a define message have a limited set of functions they can call.
