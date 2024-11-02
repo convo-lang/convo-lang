@@ -48,16 +48,17 @@ export const getConvoNodeMetadataAsync=async (convo:Conversation|null):Promise<C
     const outputTypes:ConvoNodeOutput[]=[];
     const metadata:ConvoNodeMetadata={outputTypes}
     const typeMap:Record<string,ZodType<any>>={}
+    let sharedVars:Record<string,any>|undefined;
 
     if(!convo){
-        return {metadata,typeMap};
+        return {metadata,typeMap,sharedVars:{}};
     }
 
     try{
         const flat=await convo.getLastAutoFlatAsync();
 
         if(!flat){
-            return {metadata,typeMap}
+            return {metadata,typeMap,sharedVars:{}}
         }
 
         const inputVar=flat.exe.getVarAsType('Input');
@@ -89,11 +90,13 @@ export const getConvoNodeMetadataAsync=async (convo:Conversation|null):Promise<C
                 name:'Input'
             })
         }
+
+        sharedVars=flat.exe.getUserSharedVarsExcludeTypes();
     }catch(ex){
         console.warn('Creating ConvoMetadataAndTypeMap failed. This could be due to undefined vars in the last step of a node',ex)
     }
 
-    return {metadata,typeMap}
+    return {metadata,typeMap,sharedVars:sharedVars??{}}
 }
 
 export const createConvoNodeExecCtxAsync=async (node:ConvoNode,convoOptions?:ConversationOptions):Promise<ConvoNodeExecCtx>=>{

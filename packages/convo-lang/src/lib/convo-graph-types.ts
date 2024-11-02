@@ -194,6 +194,8 @@ export interface ConvoMetadataAndTypeMap
      * metadata related to a ConvoNode
      */
     metadata:ConvoNodeMetadata;
+
+    sharedVars:Record<string,any>;
 }
 
 /**

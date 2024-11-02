@@ -2,7 +2,7 @@ import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, cr
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, getConvoGraphEventString, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
@@ -400,6 +400,19 @@ export class ConvoGraphCtrl
             return 'failed';
         }
 
+    }
+
+    public async getNodeMetadataAsync(node:ConvoNode){
+        const convoOptions=await this.getConvoOptionsAsync(undefined);
+
+        const defaultVars={
+            ...convoOptions?.defaultVars
+        }
+
+        return await getConvoNodeMetadataAsync((node.sharedConvo || node.steps.length)?
+            createConvoNodeExecCtxConvo(node,defaultVars,convoOptions,(node.steps[node.steps.length-1]?.convo??'')):
+            null
+        );
     }
 
     private async _nextAsync(tv:ConvoTraverser,group?:ConvoTraverserGroup):Promise<ConvoNodeExeState>{

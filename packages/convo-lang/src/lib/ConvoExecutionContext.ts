@@ -66,8 +66,20 @@ export class ConvoExecutionContext
     public getUserSharedVars(){
         const vars={...this.sharedVars}
         delete vars['convo'];
+        delete vars['graphCtrl'];
+        delete vars['evalJavascript'];
         for(const e in defaultConvoVars){
             delete vars[e];
+        }
+        return vars;
+    }
+
+    public getUserSharedVarsExcludeTypes(){
+        const vars=this.getUserSharedVars();
+        for(const e in vars){
+            if(e[0]===e[0]?.toUpperCase() || (typeof vars[e] === 'function')){
+                delete vars[e];
+            }
         }
         return vars;
     }
