@@ -5,11 +5,13 @@ import chalk from 'chalk';
 import { enumProjects } from './enum-projects.mjs'
 import devkit from '@nrwl/devkit';
 
-const { readCachedProjectGraph } = devkit;
+const _publishScope=process.env['NPM_PUBLISH_SCOPE'];
+if(!_publishScope){
+    throw new Error('NPM_PUBLISH_SCOPE env var not defined')
+}
+const publishScope=_publishScope+'/';
 
 const [, , version] = process.argv;
-
-const graph = readCachedProjectGraph();
 
 const addVersions=(a,b)=>{
     const aAry=a.split('.').map(n=>Number(n));
@@ -18,6 +20,10 @@ const addVersions=(a,b)=>{
 }
 
 enumProjects({publicOnly:true},({name,version:v,pkg,packageJson})=>{
+
+    if(!pkg.name.startsWith(publishScope)){
+        return;
+    }
 
     if(pkg.iyioSetVersion===false){
         console.log(`${name} opts out of auto setting version`);
