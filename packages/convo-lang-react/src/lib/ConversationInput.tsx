@@ -1,8 +1,9 @@
 import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { BasicIcon, Form, SlimButton } from "@iyio/react-common";
+import { Form, SlimButton } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
+import { Icon } from "./icon/Icon";
 
 export interface ConversationInputProps
 {
@@ -55,7 +56,7 @@ export function ConversationInput({
     if(children===undefined && !noSubmitButton){
         children=(
             <SlimButton className={style.submitBtn({show:!!value})} type="submit">
-                <BasicIcon icon="circle-up" size={20} color={theme.userBackground} />
+                <Icon icon="circle-up" size={20} color={theme.userBackground} />
             </SlimButton>
         )
     }
