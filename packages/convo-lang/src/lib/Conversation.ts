@@ -1,4 +1,4 @@
-import { ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { AnyFunction, ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
@@ -118,6 +118,10 @@ export interface ConversationOptions
     ragSuffix?:string;
 
     formatWhitespace?:boolean;
+
+    externFunctions?:Record<string,AnyFunction>;
+
+    externScopeFunctions?:Record<string,ConvoScopeFunction>;
 }
 
 export class Conversation
@@ -284,6 +288,8 @@ export class Conversation
             define,
             onComponentMessages,
             componentCompletionCallback,
+            externFunctions,
+            externScopeFunctions,
         }=options;
         this.defaultOptions=options;
         this.defaultVars=defaultVars?defaultVars:{};
@@ -321,6 +327,24 @@ export class Conversation
                 }
             }else{
                 this.watchComponentMessages(onComponentMessages);
+            }
+        }
+
+        if(externFunctions){
+            for(const e in externFunctions){
+                const f=externFunctions[e];
+                if(f){
+                    this.implementExternFunction(e,f);
+                }
+            }
+        }
+
+        if(externScopeFunctions){
+            for(const e in externScopeFunctions){
+                const f=externScopeFunctions[e];
+                if(f){
+                    this.externFunctions[e]=f;
+                }
             }
         }
 
