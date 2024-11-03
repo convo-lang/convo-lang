@@ -51,7 +51,7 @@ A full featured CLI tool that can load Convo-Lang scripts, accept messages over 
 ## REPL
 When running `server.mjs` in REPL / interactive mode the server will read input line by line.
 If a line starts with a `>`, `@`, `#` or `\` the REPL will buffer all following lines until an empty
-line is received then send all of the buffered lines. While message are being buffered lines only
+line is received then send all of the buffered lines. While messages are being buffered lines only
 containing a single `\` are added to the buffer as an empty line. Message buffering allows you to
 send multi-line messages. If a message does not start with one of the said characters and the REPL
 is not buffering lines then the line will be send as a user message.
