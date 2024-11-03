@@ -41,24 +41,120 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
 
-## Installation
-For use in an application install the @convo-lang/convo-lang package
-``` sh
-npm i @convo-lang/convo-lang
-```
-
-For use on the command line install the @convo-lang/convo-lang-cli package
-``` sh
-npm i @convo-lang/convo-lang-cli -g
-```
-
-
 ## VSCode extension
 You will also probably want to install the vscode extension for syntax highlighting and other
 developer niceties. You can install the vscode extension by searching for "convo-lang" in the
 vscode extension tab.
 
 https://marketplace.visualstudio.com/items?itemName=IYIO.convo-lang-tools 
+
+
+## Using Convo-Lang
+When using Convo-Lang in a TypeScript or JavaScript project will use the Convo-Lang Conversation Engine
+by creating instances of the `Conversation` class and appending messages and awaiting the
+completion of those messages. Conversations are made up of collections of messages that represent
+messages from the user, LLM, tool definitions and more.
+
+Install Convo-Lang packages
+``` sh
+npm install @convo-lang/convo-lang @convo-lang/convo-lang-openai
+```
+
+*(note - syntax highlighting for Convo-Lang embedded in string template literals is provided using the "convo-lang" VSCode extension)*
+``` js
+// example.mjs
+import { Conversation } from "@convo-lang/convo-lang";
+import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
+
+initOpenAiBackend();
+const conversation=new Conversation();
+
+
+await conversation.completeAsync(/*convo*/`
+> system
+You are a super smart and funny astronomer that love make funny quotes
+
+> define
+Planet = struct(
+    name: string
+    moonCount: number
+    quote: string
+)
+
+@json Planet[]
+> user
+List the planets in our solar system
+`);
+
+
+console.log(conversation.convo);
+```
+
+``` sh
+# Set the OPENAI_API_KEY env var however you see fit
+export OPENAI_API_KEY=sk-___YOUR_KEY___
+
+node example.mjs
+
+```
+
+Output:
+``` convo
+@format json
+> assistant
+[
+    {
+        "name": "Mercury",
+        "moonCount": 0,
+        "quote": "I'm Mercury. I don't have any moons, but who needs them when you're this close to the Sun? 🍳"
+    },
+    {
+        "name": "Venus",
+        "moonCount": 0,
+        "quote": "Venus here! No moons in sight, but you should see my cloud cover. It's haute couture! ☁️👗"
+    },
+    {
+        "name": "Earth",
+        "moonCount": 1,
+        "quote": "Earth, the only planet with pizza! Oh, and one moon which we keep for dramatic lunar eclipses. 🌕🍕"
+    },
+    {
+        "name": "Mars",
+        "moonCount": 2,
+        "quote": "Mars calling! With my two moons, Phobos and Deimos, I basically have my own double feature in the sky! 🎬🌌"
+    },
+    {
+        "name": "Jupiter",
+        "moonCount": 79,
+        "quote": "Jupiter, moon hoarder extraordinaire! With 79 moons, my nightly show is never the same—it's cosmic channel surfing! 📺🌔"
+    },
+    {
+        "name": "Saturn",
+        "moonCount": 83,
+        "quote": "Saturn here, all about those rings AND 83 moons! Talk about accessories stealing the spotlight! 💍🌕"
+    },
+    {
+        "name": "Uranus",
+        "moonCount": 27,
+        "quote": "Uranus checking in! With 27 moons, I have more natural satellites than most people have friends. 🌑👽"
+    },
+    {
+        "name": "Neptune",
+        "moonCount": 14,
+        "quote": "Neptune, ruler of the deep space! With 14 moons, I'm never alone, even in the far reaches of the solar system. 🌊🔭"
+    }
+]
+```
+
+## NodeJs example project
+The `convo-lang/convo-lang-node-example` repo contains a full featured CLI tool that can load
+Convo-Lang scripts, accept messages over HTTP and accept live input.
+
+https://github.com/convo-lang/convo-lang-node-example
+
+![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-node-example.webp?raw=true)
+
+
 
 ## Using convo-lang in a NextJs project
 
@@ -157,97 +253,6 @@ https://github.com/convo-lang/convo-lang-nextjs-example
 
 
 
-## Using Convo-Lang in without a UI framework
-When using convo-lang in a javascript application, you will primarily interact with Conversation objects.
-Conversation objects store the messages of a convo script and allow new messages to be appended
-and LLMs to respond to messages from the user.
-
-``` js
-import { Conversation } from "@convo-lang/convo-lang";
-import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
-
-initOpenAiBackend();
-const conversation=new Conversation();
-
-
-await conversation.completeAsync(/*convo*/`
-> system
-You are a super smart and funny astronomer that love make funny quotes
-
-> define
-Planet = struct(
-    name: string
-    moonCount: number
-    quote: string
-)
-
-@json Planet[]
-> user
-List the planets in our solar system
-`);
-
-
-console.log(conversation.convo);
-```
-
-Output:
-``` convo
-@format json
-> assistant
-[
-    {
-        "name": "Mercury",
-        "moonCount": 0,
-        "quote": "I'm Mercury. I don't have any moons, but who needs them when you're this close to the Sun? 🍳"
-    },
-    {
-        "name": "Venus",
-        "moonCount": 0,
-        "quote": "Venus here! No moons in sight, but you should see my cloud cover. It's haute couture! ☁️👗"
-    },
-    {
-        "name": "Earth",
-        "moonCount": 1,
-        "quote": "Earth, the only planet with pizza! Oh, and one moon which we keep for dramatic lunar eclipses. 🌕🍕"
-    },
-    {
-        "name": "Mars",
-        "moonCount": 2,
-        "quote": "Mars calling! With my two moons, Phobos and Deimos, I basically have my own double feature in the sky! 🎬🌌"
-    },
-    {
-        "name": "Jupiter",
-        "moonCount": 79,
-        "quote": "Jupiter, moon hoarder extraordinaire! With 79 moons, my nightly show is never the same—it's cosmic channel surfing! 📺🌔"
-    },
-    {
-        "name": "Saturn",
-        "moonCount": 83,
-        "quote": "Saturn here, all about those rings AND 83 moons! Talk about accessories stealing the spotlight! 💍🌕"
-    },
-    {
-        "name": "Uranus",
-        "moonCount": 27,
-        "quote": "Uranus checking in! With 27 moons, I have more natural satellites than most people have friends. 🌑👽"
-    },
-    {
-        "name": "Neptune",
-        "moonCount": 14,
-        "quote": "Neptune, ruler of the deep space! With 14 moons, I'm never alone, even in the far reaches of the solar system. 🌊🔭"
-    }
-]
-```
-
-## NodeJs example project
-The `convo-lang/convo-lang-node-example` repo contains a full featured CLI tool that can load
-Convo-Lang scripts, accept messages over HTTP and accept live input.
-
-https://github.com/convo-lang/convo-lang-node-example
-
-![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-node-example.webp?raw=true)
-
-
-
 ## Using the convo-lang extension
 With the convo vscode extension installed, you can execute convo scripts directly in vscode. Just
 press **(CMD+R)** to run a script.
@@ -258,8 +263,14 @@ search for "Complete Convo Conversation" and press enter. Then the snippet will 
 convo file and completed. This is great for quick prototyping and testing prompts in your application
 without having to start your full application.
 
+
 ## Using the CLI
 The convo CLI can be used to execute convo scripts from the command line
+
+For use on the command line install the @convo-lang/convo-lang-cli package
+``` sh
+npm i @convo-lang/convo-lang-cli -g
+```
 
 ``` sh
 # install the convo cli
