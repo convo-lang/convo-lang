@@ -2,14 +2,14 @@ import { Conversation, ConvoModelInfo, FlatConvoConversation, completeConvoUsing
 import { BadRequestError, escapeRegex, getErrorMessage } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 
-export interface VfsHttpRouteOptions
+export interface ConvoLangRouteOptions
 {
     prefix?:string;
 }
 
 export const createConvoLangApiRoutes=({
     prefix=defaultConvoHttpEndpointPrefix,
-}:VfsHttpRouteOptions={}):HttpRoute[]=>{
+}:ConvoLangRouteOptions={}):HttpRoute[]=>{
 
     if(!prefix.startsWith('/')){
         prefix='/'+prefix;
