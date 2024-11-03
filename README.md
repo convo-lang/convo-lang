@@ -274,7 +274,7 @@ npm i @convo-lang/convo-lang-cli -g
 
 ``` sh
 # install the convo cli
-npm install -g @iyio/convo-cli
+npm i -g @convo-lang/convo-lang-cli
 
 # Results will be printed to stdout
 convo talky-time.convo
@@ -305,6 +305,12 @@ following contents. Remember to replace the API key with your OpenAI api key.
     }
 }
 ```
+
+## IYIO ( eye·o )
+Convo-Lang uses many of the packages of the IYIO library and began as a package in the IYIO library.
+IYIO is a collection of utilities and frameworks useful for many different situations.
+
+IYIO - https://github.com/iyioio/common
 
 ## Learn More
 You can check out an interactive demo of Convo-Lang here - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)

@@ -4,6 +4,10 @@
     "license": "MIT",
     "scripts": {},
     "private": true,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
     "devDependencies": {
         "@babel/core": "^7.24.9",
         "@babel/preset-react": "^7.24.7",

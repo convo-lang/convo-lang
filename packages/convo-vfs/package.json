@@ -2,5 +2,9 @@
     "name": "@convo-lang/convo-vfs",
     "version": "0.6.7",
     "type": "commonjs",
-    "sideEffects": false
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
 }

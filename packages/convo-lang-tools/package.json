@@ -24,8 +24,7 @@
     "main": "./lsp/client/out/extension",
     "repository": {
         "type": "git",
-        "url": "https://github.com/iyioio/common.git",
-        "directory": "packages/convo-lang-cli"
+        "url": "https://github.com/convo-lang/convo-lang.git"
     },
     "contributes": {
         "languages": [
