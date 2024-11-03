@@ -2,7 +2,7 @@
 
 This is an example project using [Convo-Lang](https://learn.convo-lang.ai) in a NextJS application
 
-![Example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-nextjs-example.webp?raw=true)
+![Convo-Lang NextJs example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-nextjs-example.webp?raw=true)
 
 If you want to learn the Convo-Lang language check out this tutorial  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai)
 

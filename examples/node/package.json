@@ -1,0 +1,19 @@
+{
+  "name": "node",
+  "version": "1.0.0",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs -i -l"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@convo-lang/convo-lang": "^0.6.7",
+    "@convo-lang/convo-lang-openai": "^0.6.7",
+    "@iyio/common": "^0.6.5",
+    "@iyio/node-common": "^0.6.5"
+  }
+}

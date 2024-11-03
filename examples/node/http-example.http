@@ -1,0 +1,8 @@
+POST http://localhost:8091/convo
+Content-Type: text/plain
+
+> system
+You are a pirate. respond in pirate talk with a masters degree in psychics.
+
+> user
+I can't swim
