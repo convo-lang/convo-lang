@@ -148,12 +148,22 @@ export function AgentView(){
 ```
 
 ## NextJs example project
-The Convo-Lang repo contains a NextJs project pre-configure with Convo-Lang with a retro web page 
-builder agent
+The `convo-lang/convo-lang-nextjs-example` repo contains a fully functional example of using Convo-Lang 
+in a NextJs project to create a collection of agents that can manipulate an interactive canvas.
 
-https://github.com/convo-lang/convo-lang/tree/main/examples/convo-nextjs-example
+https://github.com/convo-lang/convo-lang-nextjs-example
 
-![Yahoo 500](https://github.com/convo-lang/convo-lang/blob/main/assets/yahoo-500.png?raw=true)
+![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-nextjs-example.webp?raw=true)
+
+
+
+## NodeJs example project
+The `convo-lang/convo-lang-node-example` repo contains a full featured CLI tool that can load
+Convo-Lang scripts, accept messages over HTTP and accept live input.
+
+https://github.com/convo-lang/convo-lang-node-example
+
+![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-node-example.webp?raw=true)
 
 
 ## Using Convo-Lang in without a UI framework
