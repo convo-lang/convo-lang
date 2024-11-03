@@ -1,7 +1,7 @@
 import { XmlNode } from "@iyio/common";
 import { Conversation } from "./Conversation";
 import { ConversationUiCtrl } from "./ConversationUiCtrl";
-import { FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import { ConvoCompletionOptions, ConvoMessagePrefixOptions, FlatConvoConversation, FlatConvoMessage } from "./convo-types";
 
 export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
 
@@ -85,4 +85,38 @@ export interface ConvoUiMessageAppendEvt
 {
     isCommand:boolean;
     message:string;
+}
+
+export interface ConvoUiAppendTrigger
+{
+    /**
+     * If role is defined the `append` prop is appended as a content message using the role.
+     * Otherwise append is appended as raw convo.
+     */
+    role?:string;
+
+    /**
+     * The content or raw convo to append.
+     */
+    append?:string;
+
+    /**
+     * Options used when a role is provided.
+     */
+    options?:ConvoMessagePrefixOptions;
+
+    /**
+     * If true or an object the appended message should trigger the completions process.
+     */
+    complete?:boolean|ConvoCompletionOptions;
+
+    /**
+     * If true and no role is provided the appended content will be merged with the previous message.
+     */
+    mergeWithPrev?:boolean;
+
+    /**
+     * Call if an error occurs
+     */
+    errorCallback?:(error:any)=>void;
 }

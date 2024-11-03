@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
+import { ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo } from "react";
@@ -12,6 +12,8 @@ export interface ConversationViewProps
 {
     className?:string;
     ctrl?:ConversationUiCtrl;
+    getCtrl?:(ctrl:ConversationUiCtrl)=>void;
+    appendTrigger?:ConvoUiAppendTrigger;
     ctrlOptions?:ConversationUiCtrlOptions,
     content?:string;
     enabledSlashCommands?:boolean;
@@ -37,6 +39,7 @@ export interface ConversationViewProps
 export function ConversationView({
     className,
     ctrl:ctrlProp,
+    getCtrl,
     ctrlOptions,
     content,
     enabledSlashCommands,
@@ -57,6 +60,7 @@ export function ConversationView({
     messageBottomPadding,
     httpEndpoint,
     template,
+    appendTrigger,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -98,6 +102,40 @@ export function ConversationView({
             ctrl.enabledSlashCommands=enabledSlashCommands;
         }
     },[ctrl,enabledSlashCommands]);
+
+    useEffect(()=>{
+        if(!appendTrigger){
+            return;
+        }
+        try{
+            if(appendTrigger.append){
+                if(appendTrigger.role){
+                    ctrl.convo?.appendMessage(appendTrigger.role,appendTrigger.append,appendTrigger.options);
+                }else{
+                    ctrl.convo?.append(appendTrigger.append,appendTrigger.mergeWithPrev);
+                }
+            }
+
+            if(appendTrigger.complete){
+                (async ()=>{
+                    try{
+                        ctrl.convo?.completeAsync((typeof appendTrigger.complete === 'object')?appendTrigger.complete:undefined);
+                    }catch(ex){
+                        console.error('appendTrigger complete failed',appendTrigger,ex);
+                        appendTrigger.errorCallback?.(ex);
+                    }
+                })();
+            }
+        }catch(ex){
+            console.error('appendTrigger failed',appendTrigger,ex);
+            appendTrigger.errorCallback?.(ex);
+        }
+
+    },[ctrl,appendTrigger]);
+
+    useEffect(()=>{
+        getCtrl?.(ctrl);
+    },[ctrl,getCtrl]);
 
     const themeValue=useShallowCompareItem(_theme);
     useEffect(()=>{
