@@ -157,6 +157,87 @@ https://github.com/convo-lang/convo-lang-nextjs-example
 
 
 
+## Using Convo-Lang in without a UI framework
+When using convo-lang in a javascript application, you will primarily interact with Conversation objects.
+Conversation objects store the messages of a convo script and allow new messages to be appended
+and LLMs to respond to messages from the user.
+
+``` js
+import { Conversation } from "@convo-lang/convo-lang";
+import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
+
+initOpenAiBackend();
+const conversation=new Conversation();
+
+
+await conversation.completeAsync(/*convo*/`
+> system
+You are a super smart and funny astronomer that love make funny quotes
+
+> define
+Planet = struct(
+    name: string
+    moonCount: number
+    quote: string
+)
+
+@json Planet[]
+> user
+List the planets in our solar system
+`);
+
+
+console.log(conversation.convo);
+```
+
+Output:
+``` convo
+@format json
+> assistant
+[
+    {
+        "name": "Mercury",
+        "moonCount": 0,
+        "quote": "I'm Mercury. I don't have any moons, but who needs them when you're this close to the Sun? 🍳"
+    },
+    {
+        "name": "Venus",
+        "moonCount": 0,
+        "quote": "Venus here! No moons in sight, but you should see my cloud cover. It's haute couture! ☁️👗"
+    },
+    {
+        "name": "Earth",
+        "moonCount": 1,
+        "quote": "Earth, the only planet with pizza! Oh, and one moon which we keep for dramatic lunar eclipses. 🌕🍕"
+    },
+    {
+        "name": "Mars",
+        "moonCount": 2,
+        "quote": "Mars calling! With my two moons, Phobos and Deimos, I basically have my own double feature in the sky! 🎬🌌"
+    },
+    {
+        "name": "Jupiter",
+        "moonCount": 79,
+        "quote": "Jupiter, moon hoarder extraordinaire! With 79 moons, my nightly show is never the same—it's cosmic channel surfing! 📺🌔"
+    },
+    {
+        "name": "Saturn",
+        "moonCount": 83,
+        "quote": "Saturn here, all about those rings AND 83 moons! Talk about accessories stealing the spotlight! 💍🌕"
+    },
+    {
+        "name": "Uranus",
+        "moonCount": 27,
+        "quote": "Uranus checking in! With 27 moons, I have more natural satellites than most people have friends. 🌑👽"
+    },
+    {
+        "name": "Neptune",
+        "moonCount": 14,
+        "quote": "Neptune, ruler of the deep space! With 14 moons, I'm never alone, even in the far reaches of the solar system. 🌊🔭"
+    }
+]
+```
+
 ## NodeJs example project
 The `convo-lang/convo-lang-node-example` repo contains a full featured CLI tool that can load
 Convo-Lang scripts, accept messages over HTTP and accept live input.
@@ -166,71 +247,6 @@ https://github.com/convo-lang/convo-lang-node-example
 ![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-node-example.webp?raw=true)
 
 
-## Using Convo-Lang in without a UI framework
-When using convo-lang in a javascript application, you will primarily interact with Conversation objects.
-Conversation objects store the messages of a convo script and allow new messages to be appended
-and LLMs to respond to messages from the user.
-
-``` js
-import { Conversation } from '@convo-lang/convo-lang';
-import { initRootScope, EnvParams } from '@iyio/common';
-import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
-
-// initRootScope is used to configure services and configuration variables
-initRootScope(reg=>{
-
-    // register OpenAI configuration variables. These variates could also be stored as environment
-    // variables and loaded using reg.addParams(new EnvParams()).
-    reg.addParams({
-        "openAiApiKey":"YOUR_OPEN_AI_KEY",
-        "openAiChatModel":"gpt-4-1106-preview",
-        "openAiVisionModel":"gpt-4-vision-preview",
-        "openAiAudioModel":"whisper-1",
-        "openAiImageModel":"dall-e-3"
-    })
-
-    // EnvParams can optionally be used to load configuration variables from process.env
-    reg.addParams(new EnvParams());
-
-    // Converts and relays message to OpenAI
-    reg.use(openaiConvoModule);
-
-    // aiCompleteLambdaModule can be used to relay messages to a lambda function for use in the browser
-    //reg.use(aiCompleteLambdaModule);
-})
-
-const main=async ()=>{
-    const convo=new Conversation();
-
-    // adding /*convo*/ before a template literal will give you convo syntax highlighting when you have
-    // the convo-lang vscode extension installed.
-
-    convo.append(/*convo*/`
-        > system
-        You are a friendly and very skilled fisherman. Taking a group of tourist on a fishing expedition
-        off the coast of Maine.
-
-        > user
-        What kind of clothes should I wear?
-    `);
-
-    // Calling completeAsync will answer the user's question using the configured LLM
-    await convo.completeAsync();
-
-
-    // The convo property of the Conversation object will be updated with the answer from the LLM
-    console.log(convo.convo)
-
-    // You can get a flatted view of the conversation by calling flattenAsync. The flatted version
-    // of the conversation contains messages with all templates populated and is suitable to be 
-    // used to render a view of the conversation to the user.
-    const flat=await convo.flattenAsync();
-    console.log('flat',flat.messages);
-}
-
-main();
-
-```
 
 ## Using the convo-lang extension
 With the convo vscode extension installed, you can execute convo scripts directly in vscode. Just
