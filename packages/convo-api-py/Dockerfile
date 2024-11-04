@@ -21,15 +21,7 @@ RUN apt-get update && \
     libreoffice \
     pandoc
 
-RUN curl -sSL https://install.python-poetry.org | python3 -
-
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-
-
-COPY packages/iyio-common-py ./iyio-common-py
-RUN ls .
 WORKDIR /app/convo-api-py
-
 COPY packages/convo-api-py/pyproject.toml pyproject.toml
 COPY packages/convo-api-py/poetry.lock poetry.lock
 
