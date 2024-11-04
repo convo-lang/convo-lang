@@ -1,0 +1,10 @@
+{
+    "name": "@convo-lang/convo-lang-doc-query",
+    "version": "0.6.8",
+    "type": "commonjs",
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
+}

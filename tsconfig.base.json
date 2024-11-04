@@ -42,6 +42,9 @@
             ],
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-doc-query": [
+                "packages/convo-lang-doc-query/src/index.ts"
             ]
         }
     },
