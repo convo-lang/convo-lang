@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
-from convo.db import database, escape_sql_identifier
+from convo.db import escape_sql_identifier
+from databases import Database
 from fastapi import HTTPException
 from openai import AsyncOpenAI
 from psycopg import sql
@@ -107,6 +108,7 @@ def get_content_category(
 
 
 async def insert_vectors(
+    db: Database,
     request: types.DocumentEmbeddingRequest,
     colNameSql,
     colNames,
@@ -155,7 +157,7 @@ async def insert_vectors(
             if request.dryRun:
                 logger.debug("execute_statement - %s", query)
             else:
-                await database.execute(query)
+                await db.execute(query)
             inserted = 0
             sql_chucks = [head]
             sql_len = len(head)
@@ -172,7 +174,7 @@ async def insert_vectors(
         if request.dryRun:
             logger.debug("execute_statement - %s", query)
         else:
-            await database.execute(query)
+            await db.execute(query)
 
     logger.info("Inserted %s embeddings into %s", total_inserted, embeddings_table)
 
@@ -180,7 +182,7 @@ async def insert_vectors(
 
 
 async def clear_matching(
-    request: types.DocumentEmbeddingRequest, cols: Dict[str, Any]
+    db: Database, request: types.DocumentEmbeddingRequest, cols: Dict[str, Any]
 ) -> None:
     clear_sql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
     cf = True
@@ -201,10 +203,11 @@ async def clear_matching(
         if request.dryRun:
             logger.debug("execute_statement - %s", clear_sql)
         else:
-            await database.execute(clear_sql)
+            await db.execute(clear_sql)
 
 
 async def generate_document_embeddings(
+    db: Database,
     open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
     graph_db_config: types.GraphDBConfig,
@@ -266,7 +269,7 @@ async def generate_document_embeddings(
     embedded_chunks = await asyncio.gather(*embed_chunk_tasks)
 
     if request.cols and request.clearMatching:
-        await clear_matching(request, cols)
+        await clear_matching(db, request, cols)
 
     col_names_escaped = list()
     col_names = list()
@@ -282,7 +285,7 @@ async def generate_document_embeddings(
         col_name_sql = "," + (",".join(col_names_escaped))
 
     total_inserted = await insert_vectors(
-        request, col_name_sql, col_names, cols, embedded_chunks
+        db, request, col_name_sql, col_names, cols, embedded_chunks
     )
 
     if run_graph_embded:
