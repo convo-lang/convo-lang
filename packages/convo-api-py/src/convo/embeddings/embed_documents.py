@@ -291,7 +291,14 @@ async def generate_document_embeddings(
 
     if run_graph_embded:
         logging.info("Running graph embedding for %s", request.location)
-        _ = await graph_embed_docs(graph_db, chunks, request.location, graph_rag_config)
+        _ = await graph_embed_docs(
+            graph_db,
+            chunks,
+            request.location,
+            cols,
+            request.clearMatching,
+            graph_rag_config,
+        )
     else:
         logging.info("Skipping graph embedding for %s", request.location)
 

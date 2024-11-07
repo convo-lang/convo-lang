@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import age
 from nano_graphrag._op import extract_entities
@@ -35,6 +35,7 @@ def _format_data(x: Dict[str, str]):
 @dataclass
 class AgeGraphStorage(BaseGraphStorage):
     ag: age.Age
+    cols: Dict[str, Any]
     namespace: str
 
     async def has_node(self, node_id: str) -> bool:
@@ -93,6 +94,7 @@ class AgeGraphStorage(BaseGraphStorage):
     async def upsert_node(self, node_id: str, node_data: Dict[str, str]):
         node_type = node_data.get("entity_type", "UNKNOWN").strip('"')
         node_data["doc_path"] = self.namespace
+        node_data.update(self.cols)
         params = _format_data(node_data)
         query = f"MERGE (n:{node_type} {{id: {node_id}}}) SET n += {params}"
         logger.debug("upsert-node query %s", query)
@@ -104,6 +106,7 @@ class AgeGraphStorage(BaseGraphStorage):
     ):
         edge_data.setdefault("weight", 0.0)
         edge_data["doc_path"] = self.namespace
+        edge_data.update(self.cols)
         params = _format_data(edge_data)
         query = (
             f"MATCH (s), (t) "
@@ -115,11 +118,21 @@ class AgeGraphStorage(BaseGraphStorage):
         self.ag.execCypher(query)
         self.ag.commit()
 
+    async def delete_matching(self, clear_matching: List[str]):
+        matching = {self.cols[c] for c in clear_matching}
+        params = _format_data(matching)
+        query = f"MATCH (v {params}) DETACH DELETE v"
+        logger.debug("delete-matching query %s", query)
+        self.ag.execCypher(query)
+        self.ag.commit()
+
 
 async def graph_embed_docs(
     graph_db: age.Age,
     chunks: List[Element],
     doc_path: str,
+    cols: Dict[str, Any],
+    clear_matching: Optional[List[str]],
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
 ):
@@ -131,8 +144,12 @@ async def graph_embed_docs(
         #  look if there is more performant way of adding this
         #  as an index
         namespace=doc_path,
+        cols=cols,
         global_config=asdict(graph_rag_config),
     )
+
+    if clear_matching:
+        await age_graph.delete_matching(clear_matching)
 
     ids = [str(uuid.uuid4()) for _ in chunks]
     chunks = {
