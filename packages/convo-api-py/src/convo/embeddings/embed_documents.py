@@ -4,10 +4,11 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
+from convo.db import escape_sql_identifier
+from databases import Database
 from fastapi import HTTPException
-from iyio_common import escape_sql_identifier, exec_sql
 from openai import AsyncOpenAI
 from psycopg import sql
 from unstructured.chunking.title import chunk_by_title
@@ -106,7 +107,8 @@ def get_content_category(
     return content_type, mime_type, content_category
 
 
-def insert_vectors(
+async def insert_vectors(
+    db: Database,
     request: types.DocumentEmbeddingRequest,
     colNameSql,
     colNames,
@@ -151,7 +153,11 @@ def insert_vectors(
 
         if chunk_len + sql_len >= max_sql_len:
             logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
-            exec_sql("".join(sql_chucks)[:-1], request.dryRun)
+            query = "".join(sql_chucks)[:-1]
+            if request.dryRun:
+                logger.debug("execute_statement - %s", query)
+            else:
+                await db.execute(query)
             inserted = 0
             sql_chucks = [head]
             sql_len = len(head)
@@ -164,14 +170,44 @@ def insert_vectors(
 
     if inserted > 0:
         logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
-        exec_sql("".join(sql_chucks)[:-1], request.dryRun)
+        query = "".join(sql_chucks)[:-1]
+        if request.dryRun:
+            logger.debug("execute_statement - %s", query)
+        else:
+            await db.execute(query)
 
     logger.info("Inserted %s embeddings into %s", total_inserted, embeddings_table)
 
     return total_inserted
 
 
-async def generate_document_embeddings(  # Noqa: C901
+async def clear_matching(
+    db: Database, request: types.DocumentEmbeddingRequest, cols: Dict[str, Any]
+) -> None:
+    clear_sql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
+    cf = True
+
+    for cc in request.clearMatching:
+        if cf:
+            cf = False
+        else:
+            clear_sql += " AND"
+        if cols[cc] is None:
+            clear_sql += f" {escape_sql_identifier(cc)} is NULL"
+        else:
+            inner = sql.SQL("{value}").format(value=cols[cc]).as_string(None)
+            clear_sql += f" {escape_sql_identifier(cc)} = {inner}"
+        cf = False
+
+    if not cf:
+        if request.dryRun:
+            logger.debug("execute_statement - %s", clear_sql)
+        else:
+            await db.execute(clear_sql)
+
+
+async def generate_document_embeddings(
+    db: Database,
     open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
     graph_db_config: types.GraphDBConfig,
@@ -233,23 +269,7 @@ async def generate_document_embeddings(  # Noqa: C901
     embedded_chunks = await asyncio.gather(*embed_chunk_tasks)
 
     if request.cols and request.clearMatching:
-        clearSql = f"DELETE FROM {escape_sql_identifier(request.embeddingsTable)} where"
-        cf = True
-        for cc in request.clearMatching:
-            if cf:
-                cf = False
-            else:
-                clearSql += " AND"
-            if cols[cc] is None:
-                clearSql += f" {escape_sql_identifier(cc)} is NULL"
-            else:
-                inner = sql.SQL("{value}").format(value=cols[cc]).as_string(None)
-                clearSql += f" {escape_sql_identifier(cc)} = {inner}"
-            cf = False
-
-        if not cf:
-            logger.debug("Clear matching query: %s", clearSql)
-            exec_sql(clearSql, request.dryRun)
+        await clear_matching(db, request, cols)
 
     col_names_escaped = list()
     col_names = list()
@@ -264,8 +284,8 @@ async def generate_document_embeddings(  # Noqa: C901
     if len(col_names_escaped):
         col_name_sql = "," + (",".join(col_names_escaped))
 
-    total_inserted = insert_vectors(
-        request, col_name_sql, col_names, cols, embedded_chunks
+    total_inserted = await insert_vectors(
+        db, request, col_name_sql, col_names, cols, embedded_chunks
     )
 
     if run_graph_embded:

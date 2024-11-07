@@ -1,28 +1,17 @@
-# from sentence_transformers import SentenceTransformer
-
-# modelPath='../ai-models/all-mpnet-base-v2'
-
-# model = SentenceTransformer(modelPath)
-
-# def encode_text(sentences):
-
-#     return model.encode(sentences).tolist()
-
 from typing import List, Union
 
 from openai import AsyncOpenAI
 
 
 async def encode_text(open_ai_client: AsyncOpenAI, value: Union[List[str], str]):
-    isList = isinstance(value, list)
+    is_list = isinstance(value, list)
+    input = value if is_list else [value]
 
     response = await open_ai_client.embeddings.create(
-        input=value if isList else [value], model="text-embedding-3-small"
+        input=input, model="text-embedding-3-small"
     )
 
-    if not isList:
+    if not is_list:
         return response.data[0].embedding
-
-    all = [em.embedding for em in response.data]
-
-    return all
+    else:
+        return [em.embedding for em in response.data]

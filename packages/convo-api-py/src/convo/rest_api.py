@@ -10,7 +10,7 @@ from convo.embeddings.types import (
     GraphDBConfig,
     GraphRagConfig,
 )
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -30,14 +30,15 @@ async def get_embed_text(data):
 
 
 @document_handler.post("/api/embeddings/document")
-async def embed_documents(request: DocumentEmbeddingRequest):
+async def embed_documents(doc_request: DocumentEmbeddingRequest, request: Request):
     open_ai_client = AsyncOpenAI()
     graph_rag_config = GraphRagConfig()
     graph_db_config = GraphDBConfig()
     run_graph_embed = os.getenv("RUN_GRAPH_EMBED").lower() == "true"
     return await generate_document_embeddings(
+        request.app.state.db,
         open_ai_client,
-        request,
+        doc_request,
         graph_db_config,
         graph_rag_config,
         run_graph_embed,
