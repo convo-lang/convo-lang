@@ -13,7 +13,7 @@ from nano_graphrag.base import (
 )
 from unstructured.documents.elements import Element
 
-from .types import GraphDBConfig, GraphRagConfig
+from .types import GraphRagConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,24 +34,8 @@ def _format_data(x: Dict[str, str]):
 
 @dataclass
 class AgeGraphStorage(BaseGraphStorage):
+    ag: age.Age
     namespace: str
-    host: str
-    port: str
-    dbname: str
-    user: str
-    password: str
-    graph: str
-    ag: age.Age = None
-
-    def __post_init__(self):
-        self.ag = age.connect(
-            host=self.host,
-            port=self.port,
-            dbname=self.dbname,
-            user=self.user,
-            password=self.password,
-            graph=self.graph,
-        )
 
     async def has_node(self, node_id: str) -> bool:
         query = f"MATCH (n) WHERE n.id = {node_id} RETURN COUNT(n) > 0"
@@ -133,21 +117,21 @@ class AgeGraphStorage(BaseGraphStorage):
 
 
 async def graph_embed_docs(
+    graph_db: age.Age,
     chunks: List[Element],
     doc_path: str,
-    graph_db_config: GraphDBConfig,
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
 ):
     logger.info("Graph embedding documents")
 
     age_graph = AgeGraphStorage(
+        ag=graph_db,
         # TODO: Insert document source here, but need to
         #  look if there is more performant way of adding this
         #  as an index
         namespace=doc_path,
         global_config=asdict(graph_rag_config),
-        **asdict(graph_db_config),
     )
 
     ids = [str(uuid.uuid4()) for _ in chunks]

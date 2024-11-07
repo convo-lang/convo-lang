@@ -3,6 +3,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+import age
 from databases import Database
 from fastapi import FastAPI
 
@@ -18,6 +19,8 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO)
 async def lifespan(app: FastAPI):
     db_url = get_db_url()
     app.state.db = Database(db_url)
+    app.state.ag = age.Age()
+    app.state.RUN_GRAPH_EMBED = os.getenv("RUN_GRAPH_EMBED").lower() == "true"
 
     await app.state.db.connect()
 
@@ -30,9 +33,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.info("Faild to create graph '%s' - reason: %s", graph_name, e)
 
+    graph_db_name = os.getenv("GRAPH_DB")
+    app.state.ag.connect(dsn=db_url, graph=graph_db_name)
+
     yield
 
     await app.state.db.disconnect()
+    app.state.ag.close()
 
 
 app = FastAPI(lifespan=lifespan)
