@@ -27,13 +27,13 @@ export class ConvoLocalStorageCache extends ConvoHashCacheBase
         this.keyPrefix=keyPrefix;
     }
 
-    protected override getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
+    public override getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
     {
         const v=globalThis.localStorage?.getItem(this.keyPrefix+key);
         return v?JSON.parse(v):undefined;
     }
 
-    protected override cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
+    public override cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
     {
         globalThis.localStorage?.setItem(this.keyPrefix+key,JSON.stringify(messages));
     }

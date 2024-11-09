@@ -1,6 +1,6 @@
 /* eslint-disable */
 export default {
-    displayName: 'convo-lang-doc-query',
+    displayName: 'convo-lang-pdf',
     preset: '../../jest.preset.js',
     testEnvironment: 'node',
     transform: {
@@ -10,5 +10,5 @@ export default {
         ],
     },
     moduleFileExtensions: ['ts', 'js', 'html'],
-    coverageDirectory: '../../coverage/packages/convo-lang-doc-query',
+    coverageDirectory: '../../coverage/packages/convo-lang-pdf',
 };

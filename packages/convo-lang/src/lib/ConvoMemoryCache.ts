@@ -15,13 +15,13 @@ export class ConvoMemoryCache extends ConvoHashCacheBase
         super(commonConvoCacheTypes.memory)
     }
 
-    protected override getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
+    public override getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
     {
         const v=this._cache[key];
         return v?JSON.parse(v):undefined;
     }
 
-    protected override cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
+    public override cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
     {
         this._cache[key]=JSON.stringify(messages);
     }

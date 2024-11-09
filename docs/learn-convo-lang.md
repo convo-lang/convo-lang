@@ -748,6 +748,10 @@ System variables are used to control the configuration of a conversation at run 
 variable assignment. All system variables start with a double underscore `__` and using a double
 underscore for user defined variables is prohibited.
 
+`__cache` - Used to enabled prompt caching. A value of true will use the default prompt cached
+  which by default uses the `ConvoLocalStorageCache`. If assigned a string a cache with a matching
+  type will be used.
+
 `__args` - A reference to the parameters passed the the current function as any object.
 
 `__return` - A reference to the last return value of a function called by a call message
@@ -952,6 +956,10 @@ How many planets are there in the solar system
 
 ### System Tags
 Below is a full list of system tags Convo-Lang uses.
+
+`@cache` Enables caching for the message the tag is applied to. No value of a value of true will use
+  the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned a string
+  a cache with a matching type will be used.
 
 `@disableAutoComplete` - When applied to a function the return value of the function will not be 
   used to generate a new assistant message.

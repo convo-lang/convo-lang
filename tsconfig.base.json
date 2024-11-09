@@ -37,6 +37,9 @@
             "@convo-lang/convo-lang-cli": [
                 "packages/convo-lang-cli/src/index.ts"
             ],
+            "@convo-lang/convo-lang-pdf": [
+                "packages/convo-lang-pdf/src/index.ts"
+            ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],

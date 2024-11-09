@@ -23,7 +23,7 @@ export class ConvoHashCacheBase implements ConvoConversationCache
         return this.getMessagesByKey(key);
     }
 
-    protected getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
+    public getMessagesByKey(key:string):ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>
     {
         return undefined;
     }
@@ -34,7 +34,7 @@ export class ConvoHashCacheBase implements ConvoConversationCache
         return this.cacheMessagesByKey(key,messages);
     }
 
-    protected cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
+    public cacheMessagesByKey(key:string,messages:ConvoCompletionMessage[])
     {
         // do nothing
     }

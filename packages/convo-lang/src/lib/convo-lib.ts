@@ -489,9 +489,14 @@ export const convoTaskTriggers={
 export const commonConvoCacheTypes={
     localStorage:'localStorage',
     memory:'memory',
+    vfs:'vfs',
+    userVfs:'userVfs',
 }
 
-export const defaultConvoCacheType=commonConvoCacheTypes.localStorage;
+/**
+ * In the browser the default cache type is local storage and on the backend vfs is the default cache type.
+ */
+export const defaultConvoCacheType=globalThis.window?commonConvoCacheTypes.localStorage:commonConvoCacheTypes.vfs;
 
 export const convoDateFormat="yyyy-MM-dd'T'HH:mm:ssxxx";
 
