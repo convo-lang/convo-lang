@@ -1215,3 +1215,11 @@ export interface ConvoModelInfo
     imageHdPriceUsd?:number;
     imageLgHdPriceUsd?:number;
 }
+
+export type ConvoStartOfConversationCallback=()=>string|ConvoMessage[]|undefined|null;
+
+export interface ConvoConversationCache{
+    cacheType:string;
+    getCachedResponse?:(flat:FlatConvoConversation)=>ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>;
+    cachedResponse?:(flat:FlatConvoConversation,messages:ConvoCompletionMessage[])=>void|Promise<void>;
+}

@@ -76,6 +76,15 @@ export const convoFunctions={
  */
 export const convoVars={
 
+    [convoResultReturnName]:convoResultReturnName,
+
+    /**
+     * Used to enabled prompt caching. A value of true will use the default prompt cached which
+     * by default uses the `ConvoLocalStorageCache`. If assigned a string a cache with a matching
+     * type will be used.
+     */
+    __cache:'__cache',
+
     /**
      * In environments that have access to the filesystem __cwd defines the current working directory.
      */
@@ -198,6 +207,13 @@ export const convoImportModifiers={
 export const defaultConvoRagTol=1.2;
 
 export const convoTags={
+
+    /**
+     * Enables caching for the message the tag is applied to. No value of a value of true will use
+     * the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned
+     * a string a cache with a matching type will be used.
+     */
+    cache:'cache',
 
     /**
      * When applied to a function the return value of the function will not be used to generate a
@@ -469,6 +485,13 @@ export const convoTaskTriggers={
      */
     onResponse:'onResponse'
 } as const;
+
+export const commonConvoCacheTypes={
+    localStorage:'localStorage',
+    memory:'memory',
+}
+
+export const defaultConvoCacheType=commonConvoCacheTypes.localStorage;
 
 export const convoDateFormat="yyyy-MM-dd'T'HH:mm:ssxxx";
 
@@ -854,7 +877,7 @@ export interface EscapeConvoMessageContentOptions
     removeNewLines?:boolean;
 }
 
-export const escapeConvoMessageContent=(content:string|null|undefined,isStartOfMessage=true,options?:EscapeConvoMessageContentOptions):string=>{
+export const escapeConvo=(content:string|null|undefined,isStartOfMessage=true,options?:EscapeConvoMessageContentOptions):string=>{
     // todo escape tags at end of message
 
     if(!content){
@@ -877,6 +900,8 @@ export const escapeConvoMessageContent=(content:string|null|undefined,isStartOfM
     }
     return content;
 }
+
+export const escapeConvoMessageContent=escapeConvo;
 
 export const spreadConvoArgs=(args:Record<string,any>,format?:boolean):string=>{
     const json=JSON.stringify(args,null,format?4:undefined);
@@ -1366,27 +1391,36 @@ export const getConvoMessageComponent=(msg:FlatConvoMessage|null|undefined):Conv
     return comp;
 }
 
-export const mergeConvoOptions=(source:ConversationOptions,override:ConversationOptions|null|undefined):ConversationOptions=>{
-    if(!override){
-        return source;
-    }
-    const merge={
-        ...source,
-        ...dupDeleteUndefined(override),
+export const mergeConvoOptions=(source:ConversationOptions|null|undefined,...overrides:(ConversationOptions|null|undefined)[]):ConversationOptions=>{
+    if(!overrides?.length){
+        return source??{};
     }
 
-    if(source.onComponentMessages && override.onComponentMessages){
-        merge.onComponentMessages=[
-            ...asArray(source.onComponentMessages),
-            ...asArray(override.onComponentMessages)
-        ]
-    }
+    let merge=source??{};
 
-    if(source.define && override.define){
-        merge.define=[
-            ...source.define,
-            ...override.define,
-        ]
+    for(const override of overrides){
+        if(!override){
+            continue;
+        }
+        const source=merge;
+        merge={
+            ...source,
+            ...dupDeleteUndefined(override),
+        }
+
+        if(source.onComponentMessages && override.onComponentMessages){
+            merge.onComponentMessages=[
+                ...asArray(source.onComponentMessages),
+                ...asArray(override.onComponentMessages)
+            ]
+        }
+
+        if(source.define && override.define){
+            merge.define=[
+                ...source.define,
+                ...override.define,
+            ]
+        }
     }
 
     return merge;
@@ -1616,3 +1650,35 @@ export const formatConvoContentSpace=(content:string):string=>{
 }
 
 const spaceFormatReg=/(\w|\.|,|\?|!)[ \t]*\r?\n([a-zA-Z])/g;
+
+/**
+ * Converts the flat conversation to a string for display purposes. This function does not
+ * preserve all of the information of the conversation and should not be used for purposes
+ * outside of logging and display. For example all code in define, do and function bodies are
+ * lost and not part of the output of this function.
+ */
+export const getFlattenConversationDisplayString=(flat:FlatConvoConversation,includeConsoleHeaderFooter=false):string=>{
+    const out:string[]=[];
+
+    if(includeConsoleHeaderFooter){
+        out.push('Flat Conversation\n------------\n');
+    }
+    for(const msg of flat.messages){
+        if(msg.tags){
+            for(const e in msg.tags){
+                const v=msg.tags[e];
+                out.push(`@${e}${v?' '+v:''}\n`)
+            }
+        }
+        out.push(`>${msg.called?' call':''} ${msg.fn?`${msg.fn.name}()`:msg.role}\n`);
+        if(msg.content){
+            out.push(msg.content)
+            out.push('\n\n');
+        }
+    }
+    if(includeConsoleHeaderFooter){
+        out.push('------------\n');
+    }
+
+    return out.join('');
+}

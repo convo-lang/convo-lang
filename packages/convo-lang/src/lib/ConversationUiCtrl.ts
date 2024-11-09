@@ -6,7 +6,7 @@ import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
 import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
 import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
-import { ConvoAppend, FlatConvoMessage } from "./convo-types";
+import { ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -236,6 +236,20 @@ export class ConversationUiCtrl
         this._externFunctions.next(value);
     }
 
+    private readonly _getStartOfConversation:BehaviorSubject<{cb:ConvoStartOfConversationCallback}|null|undefined>=new BehaviorSubject<{cb:ConvoStartOfConversationCallback}|null|undefined>(undefined);
+    public get getStartOfConversationSubject():ReadonlySubject<{cb:ConvoStartOfConversationCallback}|null|undefined>{return this._getStartOfConversation}
+    public get getStartOfConversation(){return this._getStartOfConversation.value}
+    public set getStartOfConversation(value:{cb:ConvoStartOfConversationCallback}|null|undefined){
+        if(value==this._getStartOfConversation.value){
+            return;
+        }
+        if(this.convo && value!==undefined){
+            this.convo.getStartOfConversation=value?.cb;
+        }
+        this._getStartOfConversation.next(value);
+    }
+
+
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
 
     public constructor({
@@ -311,6 +325,9 @@ export class ConversationUiCtrl
             if(f){
                 convo.implementExternFunction(e,f);
             }
+        }
+        if(this.getStartOfConversation!==undefined){
+            convo.getStartOfConversation=this.getStartOfConversation?.cb;
         }
         if(this.sceneCtrl){
             convo.defaultVars[convoVars.__sceneCtrl]=this.sceneCtrl;

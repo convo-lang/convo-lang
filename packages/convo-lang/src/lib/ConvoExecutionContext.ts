@@ -701,6 +701,11 @@ export class ConvoExecutionContext
         return this.getVarEx(nameOrPath,path,scope??undefined,false)??defaultValue;
     }
 
+    public getStringVar(nameOrPath:string,scope?:ConvoScope|null,defaultValue?:string):string|undefined{
+        const val=this.getVar(nameOrPath,scope,defaultValue);
+        return (typeof val === 'string')?val:undefined;
+    }
+
     public setRefValue(statement:ConvoStatement|null|undefined,value:any,scope?:ConvoScope):any{
         if(!statement){
             return value;

@@ -4,12 +4,13 @@ import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
+import { getDefaultConvoCache } from "./default-convo-cache";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
 
 export interface ConversationOptions
@@ -122,6 +123,30 @@ export interface ConversationOptions
     externFunctions?:Record<string,AnyFunction>;
 
     externScopeFunctions?:Record<string,ConvoScopeFunction>;
+
+    /**
+     * Called each time the conversation is flattened allowing dynamic messages to be inserted
+     * at the start of the conversation.
+     */
+    getStartOfConversation?:ConvoStartOfConversationCallback;
+
+    /**
+     * Used to cache responses
+     */
+    cache?:boolean|ConvoConversationCache|ConvoConversationCache[];
+
+    /**
+     * If true the flattened version of the conversation will be logged before sending to LLMs.
+     * @note Cached responses are not logged. Use `logFlatCached` to log both cached and non-cached
+     * flattened conversations.
+     */
+    logFlat?:boolean;
+
+    /**
+     * If true both cached and non-cached versions of the conversation are logged before being set
+     * to an LLM
+     */
+    logFlatCached?:boolean;
 }
 
 export class Conversation
@@ -249,6 +274,8 @@ export class Conversation
      */
     private readonly ragCallback?:ConvoRagCallback;
 
+    public getStartOfConversation?:ConvoStartOfConversationCallback;
+
 
 
     /**
@@ -262,6 +289,21 @@ export class Conversation
     private readonly defaultOptions:ConversationOptions;
 
     public readonly defaultVars:Record<string,any>;
+
+    public cache?:ConvoConversationCache[];
+
+    /**
+     * If true the flattened version of the conversation will be logged before sending to LLMs.
+     * @note Cached responses are not logged. Use `logFlatCached` to log both cached and non-cached
+     * flattened conversations.
+     */
+    public logFlat:boolean;
+
+    /**
+     * If true both cached and non-cached versions of the conversation are logged before being set
+     * to an LLM
+     */
+    public logFlatCached:boolean;
 
     public constructor(options:ConversationOptions={}){
         const {
@@ -290,8 +332,16 @@ export class Conversation
             componentCompletionCallback,
             externFunctions,
             externScopeFunctions,
+            getStartOfConversation,
+            cache,
+            logFlat=false,
+            logFlatCached=false,
         }=options;
         this.defaultOptions=options;
+        this.getStartOfConversation=getStartOfConversation;
+        this.cache=typeof cache==='boolean'?(cache?[getDefaultConvoCache()]:[]):asArray(cache);
+        this.logFlat=logFlat;
+        this.logFlatCached=logFlatCached;
         this.defaultVars=defaultVars?defaultVars:{};
         this.userRoles=userRoles;
         this.roleMap=roleMap;
@@ -866,7 +916,7 @@ export class Conversation
         const result=await this.tryCompleteAsync(
             appendOrOptions?.task,
             appendOrOptions,
-            flat=>completeConvoUsingCompletionServiceAsync(flat,completionService,this.converters)
+            flat=>this.completeWithServiceAsync(flat,completionService),
         );
 
         if(appendOrOptions?.debug){
@@ -877,6 +927,51 @@ export class Conversation
         }
 
         return result;
+    }
+
+    private async completeWithServiceAsync(
+        flat:FlatConvoConversation,
+        completionService:ConvoCompletionService<any,any>|undefined
+    ):Promise<ConvoCompletionMessage[]>{
+
+        const lastMsg=flat.messages[flat.messages.length-1];
+        let cacheType=(
+            (lastMsg?.tags && (convoTags.cache in lastMsg.tags) && (lastMsg.tags[convoTags.cache]??defaultConvoCacheType))??
+            flat.exe.getVar(convoVars.__cache)
+        );
+
+        if(this.logFlatCached){
+            console.info(getFlattenConversationDisplayString(flat,true));
+        }
+
+        let cache=cacheType?this.cache?.find(c=>c.cacheType===cacheType):this.cache?.[0];
+        if(!cache && (cacheType===true || cacheType===defaultConvoCacheType)){
+            cache=getDefaultConvoCache();
+        }
+
+        if(cache?.getCachedResponse){
+            const cached=await cache.getCachedResponse(flat);
+            if(cached){
+                return cached;
+            }
+        }
+
+        if(this.logFlat){
+            console.info(getFlattenConversationDisplayString(flat,true));
+        }
+
+        if(!completionService){
+            return [];
+        }
+
+        const messages=await completeConvoUsingCompletionServiceAsync(flat,completionService,this.converters);
+
+        if(cache?.cachedResponse){
+            await cache.cachedResponse(flat,messages);
+        }
+
+        return messages;
+
     }
 
     /**
@@ -1577,16 +1672,30 @@ export class Conversation
             varCount:0,
         };
         exe.setVar(true,mdVarCtx.vars,convoVars.__md);
+        let sourceMessages=this._messages;
+        if(this.getStartOfConversation){
+            const start=this.getStartOfConversation();
+            if(Array.isArray(start)){
+                sourceMessages=[...start,...sourceMessages];
+            }else if(start){
+                const r=parseConvoCode(start);
+                if(r.error){
+                    console.error('Dynamic start of conversation parsing failed'+r.error);
+                }else if(r.result){
+                    sourceMessages=[...r.result,...sourceMessages];
+                }
+            }
+        }
 
-        exe.loadFunctions(this._messages,this.externFunctions);
+        exe.loadFunctions(sourceMessages,this.externFunctions);
         let hasNonDefaultTasks=false;
         let maxTaskMsgCount=-1;
         let taskTriggers:Record<string,string[]>|undefined;
         let templates:ConvoMessageTemplate[]|undefined;
         let componentIndex=0;
 
-        for(let i=0;i<this._messages.length;i++){
-            const msg=this._messages[i];
+        for(let i=0;i<sourceMessages.length;i++){
+            const msg=sourceMessages[i];
 
             if(!msg){
                 continue;
@@ -1679,7 +1788,7 @@ export class Conversation
                         }
                         messages.push(varSetter)
                     }
-                    const prev=this._messages[i-1];
+                    const prev=sourceMessages[i-1];
                     if(msg.role==='result' && prev?.fn?.call){
                         flat.role='function';
                         flat.called=prev.fn;
