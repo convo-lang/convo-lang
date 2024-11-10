@@ -9,17 +9,18 @@ packages = [{include = "convo", from = "src"}]
 python = ">=3.11,<3.13"
 pydantic = "^2.9.2"
 openai = "^1.51.2"
-psycopg = "^3.2.3"
 botocore = "^1.35.36"
-iyio_common = { path = "../iyio-common-py", develop=true }
 boto3 = "^1.35.36"
-psycopg2-binary = "^2.9.9"
 # Need to use this fork until build issues are resolved with the main age Python package
 apache-age-python = { git = "https://github.com/zombie-einstein/age.git", subdirectory = "drivers/python" }
 nano-graphrag = "^0.0.8"
 fastapi = "^0.115.2"
 uvicorn = "^0.32.0"
 unstructured = { version = "^0.15.13", extras = ["csv", "doc", "docx", "epub", "md", "msg", "odt", "org", "pdf", "ppt", "pptx", "rtf", "rst", "tsv", "xlsx"] }
+databases =  {version = "^0.9.0", extras = ["postgresql"]}
+pgvector = "^0.3.6"
+sqlalchemy = "^2.0.36"
+psycopg2-binary = "^2.9.10"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"
