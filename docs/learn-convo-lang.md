@@ -957,7 +957,11 @@ How many planets are there in the solar system
 ### System Tags
 Below is a full list of system tags Convo-Lang uses.
 
-`@cache` Enables caching for the message the tag is applied to. No value of a value of true will use
+`@parallel` - When applied to 2 or more consecutive user messages at the end of a conversation the
+messages will be completed in parallel. Since the messages will be executed in parallel the
+response of the messages will not visible to each other.
+
+`@cache` - Enables caching for the message the tag is applied to. No value of a value of true will use
   the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned a string
   a cache with a matching type will be used.
 
@@ -1295,6 +1299,38 @@ What is the biggest planet in our solar system
     "distanceFromSun": 484000000,
     "numberOfMoons": 79
 }
+```
+
+## Caching
+**(Documentation coming soon)**
+
+## Parallel
+Parallel message execution allows multiple messages to be completed at the same time. This is useful
+when you need to generated multiple responses within the same conversation and you want to reduce
+the time it takes to get back all of the responses.
+
+*(note - Chat based interfaces are not the intended use case on parallel messages. Below is just a demonstration)*
+**Press the send button in the chat window to complete all messages at once**
+``` convo
+> addNumbers(a:number b:number) -> (add(a b))
+
+@parallel
+@call
+> user
+Add 1 plus {{'3'}}
+
+@parallel
+> user
+Tell me a joke about cats
+
+@parallel
+> user
+Tell me a joke about birds
+
+@parallel
+@call
+> user
+Add 55 plus {{'45'}}
 ```
 
 ## Stats Tracking
