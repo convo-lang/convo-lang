@@ -155,6 +155,11 @@ export interface ConvoMessage
      * begin and end with alpha numeric characters.
      */
     preSpace?:boolean;
+
+    /**
+     * If true the message can be executed in parallel
+     */
+    parallel?:boolean;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -752,6 +757,11 @@ export interface FlatConvoMessage
 
     preSpace?:boolean;
 
+    /**
+     * If true the message can be executed in parallel
+     */
+    parallel?:boolean;
+
 }
 
 export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
@@ -1079,6 +1089,7 @@ export interface CloneConversationOptions
 {
     systemOnly?:boolean;
     noFunctions?:boolean;
+    cloneConvoString?:boolean;
 }
 
 export interface ConvoDocumentReference
@@ -1107,6 +1118,13 @@ export interface AppendConvoMessageObjOptions
 {
     disableAutoFlatten?:boolean;
     appendCode?:boolean;
+}
+
+export interface AppendConvoOptions
+{
+    mergeWithPrev?:boolean;
+    throwOnError?:boolean;
+    disableAutoFlatten?:boolean;
 }
 
 export interface ConvoImport
@@ -1222,4 +1240,10 @@ export interface ConvoConversationCache{
     cacheType:string;
     getCachedResponse?:(flat:FlatConvoConversation)=>ConvoCompletionMessage[]|null|undefined|Promise<ConvoCompletionMessage[]|null|undefined>;
     cachedResponse?:(flat:FlatConvoConversation,messages:ConvoCompletionMessage[])=>void|Promise<void>;
+}
+
+export interface ParallelConvoTrimResult
+{
+    convo:string;
+    messages:string[];
 }

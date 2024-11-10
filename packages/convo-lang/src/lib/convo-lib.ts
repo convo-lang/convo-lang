@@ -4,7 +4,7 @@ import { parse as parseJson5 } from 'json5';
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParallelConvoTrimResult, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -207,6 +207,13 @@ export const convoImportModifiers={
 export const defaultConvoRagTol=1.2;
 
 export const convoTags={
+
+    /**
+     * When applied to 2 or more consecutive user messages at the end of a conversation the messages
+     * will be completed in parallel. Since the messages will be executed in parallel the response of
+     * the messages will not visible to each other.
+     */
+    parallel:'parallel',
 
     /**
      * Enables caching for the message the tag is applied to. No value of a value of true will use
@@ -1687,3 +1694,58 @@ export const getFlattenConversationDisplayString=(flat:FlatConvoConversation,inc
 
     return out.join('');
 }
+
+export const trimParallelConvo=(convo:string):ParallelConvoTrimResult=>{
+    const lines=convo.split('\n');
+    let para=false;
+    let inMsgMeta=false;
+    let match:RegExpExecArray|null;
+    const messages:string[]=[];
+    let firstMsg=true;
+    let msgAdded=false;
+    const takeMsg=(i:number)=>{
+        messages.unshift(lines.splice(i+1,lines.length).join('\n').trim());
+    }
+    for(let i=lines.length-1;i>=-1;i--){
+        const line=i===-1?'_':lines[i];
+        if(!line){continue}
+
+        if(msgReg.test(line)){
+            if(para){
+                takeMsg(i);
+            }
+            if(firstMsg){
+                firstMsg=false;
+            }else if(!para && !msgAdded){
+                break;
+            }
+            inMsgMeta=true;
+            para=false;
+            msgAdded=false;
+        }else if(inMsgMeta){
+            if(match=tagReg.exec(line)){
+                if(match[1]===convoTags.parallel && parseConvoBooleanTag(match[2])){
+                    para=true;
+                }
+            }else if(!commentReg.test(line)){
+                if(para){
+                    takeMsg(i);
+                    para=false;
+                    msgAdded=true;
+                    inMsgMeta=false;
+                }else{
+                    break;
+                }
+                // inMsgMeta=false;
+                // para=false;
+            }
+        }
+    }
+    return {
+        convo:lines.join('\n'),
+        messages,
+    }
+}
+const msgReg=/^\s*>\s\w+/
+const commentReg=/^\s*(#|\/\/)/
+const tagReg=/^\s*@(\w+)\s*(.*)$/

@@ -1083,6 +1083,12 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         msg.preSpace=true;
                         break;
 
+                    case convoTags.parallel:
+                        if(parseConvoBooleanTag(tag.value)){
+                            msg.parallel=true;
+                        }
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;

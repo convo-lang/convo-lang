@@ -5,9 +5,9 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -580,12 +580,7 @@ export class Conversation
 
     public createChild(options?:ConversationOptions)
     {
-        const convo=new Conversation({
-            ...this.defaultOptions,
-            debug:this.debugToConversation,
-            debugMode:this.shouldDebug(),
-            ...options
-        });
+        const convo=new Conversation(this.getCloneOptions(options));
 
         if(this._defaultApiKey){
             convo.setDefaultApiKey(this._defaultApiKey);
@@ -594,12 +589,26 @@ export class Conversation
         return convo;
     }
 
+    public getCloneOptions(options?:ConversationOptions):ConversationOptions{
+        return {
+            ...this.defaultOptions,
+            debug:this.debugToConversation,
+            debugMode:this.shouldDebug(),
+            ...options,
+            defaultVars:{...this.defaultVars,...options?.defaultVars},
+            externFunctions:{...this.externFunctions,...options?.externFunctions},
+        }
+    }
+
     /**
      * Creates a new Conversation and appends the messages of this conversation to the newly
      * created conversation.
      */
-    public clone(options?: CloneConversationOptions):Conversation{
-        const conversation=new Conversation(this.defaultOptions);
+    public clone(options?:CloneConversationOptions,convoOptions?:ConversationOptions):Conversation{
+        const conversation=new Conversation(this.getCloneOptions(convoOptions));
+        if(this._defaultApiKey){
+            conversation.setDefaultApiKey(this._defaultApiKey);
+        }
         let messages=this.messages;
         if (options?.noFunctions) {
             messages=messages.filter(m=>!m.fn || m.fn.topLevel);
@@ -607,13 +616,7 @@ export class Conversation
         if (options?.systemOnly) {
             messages=messages.filter(m=>m.role === 'system' || m.fn?.topLevel || m.fn?.name===convoFunctions.getState);
         }
-        conversation.appendMessageObject(messages);
-        for(const e in this.externFunctions){
-            const f=this.externFunctions[e];
-            if(f){
-                conversation.externFunctions[e]=f;
-            }
-        }
+        conversation.appendMessageObject(messages,{disableAutoFlatten:true,appendCode:options?.cloneConvoString});
         return conversation;
     }
 
@@ -674,7 +677,17 @@ export class Conversation
         return append.text;
     }
 
-    public append(messages:string|(ConvoMessagePart|string)[],mergeWithPrev=false,throwOnError=true):ConvoParsingResult{
+    public append(messages:string|(ConvoMessagePart|string)[],mergeWithPrev?:boolean,throwOnError?:boolean):ConvoParsingResult;
+    public append(messages:string|(ConvoMessagePart|string)[],options?:AppendConvoOptions):ConvoParsingResult;
+    public append(messages:string|(ConvoMessagePart|string)[],mergeWithPrevOrOptions:boolean|AppendConvoOptions=false,_throwOnError=true):ConvoParsingResult{
+        const options=(typeof mergeWithPrevOrOptions === 'object')?mergeWithPrevOrOptions:{mergeWithPrev:mergeWithPrevOrOptions};
+
+        const {
+            mergeWithPrev=false,
+            throwOnError=_throwOnError,
+            disableAutoFlatten,
+        }=options;
+
         let visibleContent:string|undefined=undefined;
         let hasHidden=false;
         if(Array.isArray(messages)){
@@ -723,7 +736,7 @@ export class Conversation
             messages:r.result??[]
         });
 
-        if(!this.disableAutoFlatten){
+        if(!this.disableAutoFlatten && !disableAutoFlatten){
             this.autoFlattenAsync(false);
         }
 
@@ -1069,6 +1082,99 @@ export class Conversation
         }
     }
 
+    private async tryCompleteParallelAsync(
+        options:ConvoCompletionOptions|undefined
+    ):Promise<ConvoCompletion|undefined>{
+        const last=this.messages[this.messages.length-1];
+
+        if(last?.parallel){
+            let pCount=1;
+            for(let i=this.messages.length-2;i>=0;i--){
+                const msg=this.messages[i];
+                if(!msg?.parallel){
+                    break;
+                }
+                pCount++;
+            }
+
+            if(pCount>1){
+                const messages=this.messages.slice(this.messages.length-pCount);
+                const c=await this.completeParallelMessagesAsync(messages,options);
+                if(c){
+                    return c;
+                }
+
+            }
+
+        }
+
+        return undefined;
+    }
+
+    private async completeParallelMessagesAsync(
+        messages:ConvoMessage[],
+        options:ConvoCompletionOptions|undefined
+    ):Promise<ConvoCompletion|undefined>{
+        const all=await Promise.all(messages.map(async (msg,i)=>{
+            const clone=this.clone(undefined,{disableAutoFlatten:true});
+            while(clone.messages[clone.messages.length-1]?.parallel){
+                clone.messages.pop();
+            }
+            const msgCount=clone._messages.length;
+            clone._messages.push(msg);
+            clone._convo.splice(0,clone._convo.length);
+            const cps=clone.completionService;
+            const messages:ConvoCompletionMessage[]=[];
+            if(cps){
+                clone.completionService={
+                    inputType:cps.inputType,
+                    outputType:cps.outputType,
+                    canComplete:(model:string|undefined,flat:FlatConvoConversationBase)=>{
+                        return cps.canComplete(model,flat)
+                    },
+                    completeConvoAsync:async (input:any,flat:FlatConvoConversationBase)=>{
+                        const m=await cps.completeConvoAsync(input,flat);
+                        messages.push(...m);
+                        return m;
+                    },
+                    getModelsAsync:async ()=>{
+                        return await cps.getModelsAsync?.();
+                    }
+                }
+            }
+            try{
+                const completion=await clone.completeAsync(options);
+                return {
+                    completion,
+                    messages:clone.messages.slice(msgCount),
+                    convo:clone.convo,
+                    msg,
+                }
+            }finally{
+                clone.dispose();
+
+            }
+        }));
+
+        while(this.messages[this.messages.length-1]?.parallel){
+            this.messages.pop();
+        }
+        const convo=this.convo;
+        this._convo.splice(1,this._convo.length-1);
+        const trim=trimParallelConvo(convo);
+        this._convo[0]=trim.convo;
+
+        for(let i=0;i<all.length;i++){
+            const c=all[i];
+            if(!c){continue}
+            this.append((trim.messages[i]??'')+'\n\n'+c.convo,{
+                disableAutoFlatten:true,
+            })
+        }
+
+        return all[all.length-1]?.completion;
+    }
+
     private readonly _isCompleting:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
     public get isCompletingSubject():ReadonlySubject<boolean>{return this._isCompleting}
     public get isCompleting(){return this._isCompleting.value}
@@ -1097,6 +1203,17 @@ export class Conversation
         }
 
         const messageStartIndex=this._messages.length;
+
+        const parallelResult=await this.tryCompleteParallelAsync(additionalOptions);
+        if(parallelResult){
+            if(!this.disableAutoFlatten && isDefaultTask){
+                this.autoFlattenAsync(false);
+            }
+            if(updateTaskCount){
+                this._activeTaskCount.next(this.activeTaskCount-1);
+            }
+            return parallelResult;
+        }
 
         try{
             const append:string[]=[];
@@ -1558,6 +1675,9 @@ export class Conversation
         }
         if(msg.preSpace){
             flat.preSpace=true;
+        }
+        if(msg.parallel){
+            flat.parallel=true;
         }
         return flat;
     }
