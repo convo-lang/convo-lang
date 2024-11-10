@@ -5,7 +5,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
@@ -16,6 +16,8 @@ import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFu
 export interface ConversationOptions
 {
     userRoles?:string[];
+    assistantRoles?:string[];
+    systemRoles?:string[];
     roleMap?:Record<string,string>;
     completionService?:ConvoCompletionService<any,any>;
     converters?:ConvoConversationConverter<any,any>[];
@@ -234,6 +236,8 @@ export class Conversation
     public readonly unregisteredVars:Record<string,any>={};
 
     public userRoles:string[];
+    public assistantRoles:string[];
+    public systemRoles:string[];
     public roleMap:Record<string,string>
 
     private completionService?:ConvoCompletionService<any,any>;
@@ -308,6 +312,8 @@ export class Conversation
     public constructor(options:ConversationOptions={}){
         const {
             userRoles=['user'],
+            assistantRoles=['assistant'],
+            systemRoles=['system'],
             roleMap={},
             completionService=convoCompletionService.get(),
             converters=convoConversationConverterProvider.all(),
@@ -343,7 +349,9 @@ export class Conversation
         this.logFlat=logFlat;
         this.logFlatCached=logFlatCached;
         this.defaultVars=defaultVars?defaultVars:{};
-        this.userRoles=userRoles;
+        this.userRoles=[...userRoles];
+        this.assistantRoles=[...assistantRoles];
+        this.systemRoles=[...systemRoles];
         this.roleMap=roleMap;
         this.completionService=completionService;
         this.converters=converters;
@@ -1655,8 +1663,14 @@ export class Conversation
         if(msg.markdown){
             flat.markdown=msg.markdown;
         }
-        if(this.userRoles.includes(flat.role)){
+        if(this.userRoles.includes(flat.role) && !msg.fn){
             flat.isUser=true;
+        }
+        if(this.assistantRoles.includes(flat.role) && !msg.fn){
+            flat.isAssistant=true;
+        }
+        if(this.systemRoles.includes(flat.role) && !msg.fn){
+            flat.isSystem=true;
         }
         if(msg.tid){
             flat.tid=msg.tid;
@@ -1866,6 +1880,22 @@ export class Conversation
             const flat=this.flattenMsg(msg,false);
             if(flat.component){
                 flat.componentIndex=componentIndex++;
+            }
+
+            if(getFlatConvoTag(flat,convoTags.clear)){
+                const clearSystem=flat.tags?.[convoTags.clear]==='system';
+                for(let i=messages.length-1;i>=0;i--){
+                    const m=messages[i];
+                    if(!m){
+                        continue;
+                    }
+                    if( (m.isUser || m.isAssistant) &&
+                        !getFlatConvoTag(m,convoTags.noClear) &&
+                        (clearSystem?true:!m.isSystem)
+                    ){
+                        messages.splice(i,1);
+                    }
+                }
             }
 
             const setMdVars=(

@@ -965,6 +965,11 @@ response of the messages will not visible to each other.
   the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned a string
   a cache with a matching type will be used.
 
+`@clear` - Clears all content messages that precede the messages with the exception of system
+messages. If the value of "system" is given as the tags value system message will also be cleared.
+
+`@noClear` - Prevents a message from being clear when followed by a message with a `@clear` tag applied.
+
 `@disableAutoComplete` - When applied to a function the return value of the function will not be 
   used to generate a new assistant message.
 

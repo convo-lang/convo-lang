@@ -209,6 +209,17 @@ export const defaultConvoRagTol=1.2;
 export const convoTags={
 
     /**
+     * Clears all content messages that precede the messages with the exception of system messages.
+     * If the value of "system" is given as the tags value system message will also be cleared.
+     */
+    clear:'clear',
+
+    /**
+     * Prevents a message from being clear when followed by a message with a `@clear` tag applied.
+     */
+    noClear:'noClear',
+
+    /**
      * When applied to 2 or more consecutive user messages at the end of a conversation the messages
      * will be completed in parallel. Since the messages will be executed in parallel the response of
      * the messages will not visible to each other.

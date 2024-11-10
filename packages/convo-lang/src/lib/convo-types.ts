@@ -625,6 +625,10 @@ export interface FlatConvoMessage
 
     isUser?:boolean;
 
+    isAssistant?:boolean;
+
+    isSystem?:boolean;
+
     content?:string;
 
     /**
