@@ -73,7 +73,7 @@ ${'```'}
 
         const db=result.result?.db;
 
-        console.info('ConvoGraphDb',JSON.stringify(db,null,4));
+        //console.info('ConvoGraphDb',JSON.stringify(db,null,4));
 
         expect(result.error).toBeUndefined();
 
