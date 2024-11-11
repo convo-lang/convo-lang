@@ -256,14 +256,15 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
             let e=index-1;
             const hasNewline=end.includes('\n');
+            let first=true;
             while(true){
                 let s=code.lastIndexOf('\n',e);
                 if(s<startIndex){
                     if(!hasNewline){
                         s=startIndex;
                     }else{
-                        error='Start of captured tags and comments not found at end of text message';
-                        return false;
+                        end=''
+                        break;
                     }
                 }
                 if(s===-1){
@@ -930,6 +931,18 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     stack.push(body);
                     currentMessage.statement=openString('>');
                     index+=match[0].length;
+                    if(msgName===convoRoles.insert){
+                        let endI=code.indexOf('\n',index);
+                        if(endI===-1){
+                            endI=code.length;
+                        }
+                        const parts=code.substring(index,endI).split(' ');
+                        currentMessage.insert={
+                            label:parts[1]??'',
+                            before:parts[0]==='before',
+                        }
+                        index=endI;
+                    }
                     continue;
                 }
 
@@ -981,17 +994,11 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
-    let queueIndex=0;
-
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
         if(!msg){
             error=`Undefined message in result messages at index ${i}`;
             break;
-        }
-
-        if(msg.role===convoRoles.queue){
-            msg.label=`queue-${queueIndex++}`;
         }
 
         if(parseMd && msg.content!==undefined){
@@ -1092,12 +1099,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     case convoTags.label:
                         if(tag.value){
                             msg.label=tag.value;
-                        }
-                        break;
-
-                    case convoTags.parallel:
-                        if(parseConvoBooleanTag(tag.value)){
-                            msg.parallel=true;
                         }
                         break;
 

@@ -491,7 +491,6 @@ export const defaultConvoVars={
 
     aryAdd:createConvoScopeFunction(scope=>{
         let ary=scope.paramValues?.[0];
-        debugger
         if(!scope.paramValues || !Array.isArray(ary)){
             return ary;
         }

@@ -85,6 +85,8 @@ export interface ConvoMessage
     tags?:ConvoTag[];
     markdown?:MarkdownLine[];
 
+    insert?:ConvoInsert;
+
     /**
      * Used to mark the message for insertion and control flow. Some message types like queue
      * message are auto labeled. The `@label` tag can be used to manually tag messages.
@@ -161,11 +163,6 @@ export interface ConvoMessage
      * begin and end with alpha numeric characters.
      */
     preSpace?:boolean;
-
-    /**
-     * If true the message can be executed in parallel
-     */
-    parallel?:boolean;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -778,6 +775,8 @@ export interface FlatConvoMessage
      */
     parallel?:boolean;
 
+    insert?:ConvoInsert;
+
 }
 
 export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
@@ -923,6 +922,11 @@ export interface FlatConvoConversationBase
      * Reference to a queue that is being flushed
      */
     queueRef?:ConvoQueueRef;
+
+    /**
+     * Messages to execute in parallel.
+     */
+    parallelMessages?:ConvoMessage[];
 
     apiKey?:string;
 }
@@ -1280,4 +1284,10 @@ export interface ConvoTask
     name:string;
     progress?:Progress;
     documentUrl?:string;
+}
+
+export interface ConvoInsert
+{
+    label:string;
+    before:boolean;
 }

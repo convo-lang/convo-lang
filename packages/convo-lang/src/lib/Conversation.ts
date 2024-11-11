@@ -5,7 +5,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
@@ -1121,42 +1121,44 @@ export class Conversation
         }
     }
 
-    private async tryCompleteParallelAsync(
+    private async completeParallelAsync(
+        flat:FlatConvoConversation,
         options:ConvoCompletionOptions|undefined
     ):Promise<ConvoCompletion|undefined>{
-        const last=this.messages[this.messages.length-1];
 
-        if(last?.parallel){
-            let pCount=1;
-            for(let i=this.messages.length-2;i>=0;i--){
-                const msg=this.messages[i];
-                if(!msg?.parallel){
-                    break;
-                }
-                pCount++;
-            }
+        const messages=flat.parallelMessages;
 
-            if(pCount>1){
-                const messages=this.messages.slice(this.messages.length-pCount);
-                const c=await this.completeParallelMessagesAsync(messages,options);
-                if(c){
-                    return c;
-                }
-
-            }
-
+        if(!messages || messages.length<2){
+            return undefined;
         }
 
-        return undefined;
+        const startIndex=this.messages.indexOf(messages[0] as ConvoMessage);
+        if(startIndex===-1){
+            return undefined;
+        }
+
+        const c=await this.completeParallelMessagesAsync(
+            messages,
+            flat.messages.slice(flat.messages.length-messages.length).map(m=>m.label),
+            startIndex,
+            options,
+            flat.queueRef?true:false,
+        );
+        return c;
+
     }
 
     private async completeParallelMessagesAsync(
         messages:ConvoMessage[],
-        options:ConvoCompletionOptions|undefined
+        labels:(string|undefined)[],
+        startIndex:number,
+        options:ConvoCompletionOptions|undefined,
+        inQueue:boolean
     ):Promise<ConvoCompletion|undefined>{
         const all=await Promise.all(messages.map(async (msg,i)=>{
             const clone=this.clone(undefined,{disableAutoFlatten:true});
-            while(clone.messages[clone.messages.length-1]?.parallel){
+            clone.messages.splice(startIndex,clone.messages.length);
+            if(clone.messages[clone.messages.length-1]?.role===convoRoles.parallel){
                 clone.messages.pop();
             }
             const msgCount=clone._messages.length;
@@ -1195,18 +1197,14 @@ export class Conversation
             }
         }));
 
-        while(this.messages[this.messages.length-1]?.parallel){
-            this.messages.pop();
+        if(!inQueue){
+            this.append(`> ${convoRoles.parallelEnd}\n`,{disableAutoFlatten:true})
         }
-        const convo=this.convo;
-        this._convo.splice(1,this._convo.length-1);
-        const trim=trimParallelConvo(convo);
-        this._convo[0]=trim.convo;
 
         for(let i=0;i<all.length;i++){
             const c=all[i];
             if(!c){continue}
-            this.append((trim.messages[i]??'')+'\n\n'+c.convo,{
+            this.append(`> ${convoRoles.insert} after ${c.msg.label??labels[i]}\n\n${c.convo}\n\n> ${convoRoles.insertEnd}\n\n`,{
                 disableAutoFlatten:true,
             })
         }
@@ -1229,7 +1227,8 @@ export class Conversation
         preReturnValues?:any[],
         templates?:ConvoMessageTemplate[],
         updateTaskCount=true,
-        lastFnCall?:ConvoFnCallInfo
+        lastFnCall?:ConvoFnCallInfo,
+        appendBeforeReturn=''
     ):Promise<ConvoCompletion>{
 
         if(task===undefined){
@@ -1243,17 +1242,6 @@ export class Conversation
 
         const messageStartIndex=this._messages.length;
 
-        const parallelResult=await this.tryCompleteParallelAsync(additionalOptions);
-        if(parallelResult){
-            if(!this.disableAutoFlatten && isDefaultTask){
-                this.autoFlattenAsync(false);
-            }
-            if(updateTaskCount){
-                this._activeTaskCount.next(this.activeTaskCount-1);
-            }
-            return parallelResult;
-        }
-
         try{
             const append:string[]=[];
             const flatExe=this.createConvoExecutionContext(append);
@@ -1265,6 +1253,38 @@ export class Conversation
                 toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
             });
 
+            if(flat.parallelMessages?.length){
+                const parallelResult=await this.completeParallelAsync(flat,additionalOptions);
+                if(parallelResult){
+                    if(flat.queueRef){
+                        this.append(`> ${convoRoles.insert} before ${flat.queueRef.label}\n> ${convoRoles.flush}\n> ${convoRoles.insertEnd}\n`,{disableAutoFlatten:true})
+                    }
+                    if(!this.disableAutoFlatten && isDefaultTask){
+                        this.autoFlattenAsync(false);
+                    }
+                    if(updateTaskCount){
+                        this._activeTaskCount.next(this.activeTaskCount-1);
+                    }
+                    if(flat.queueRef){
+                        return await this._completeAsync(
+                            true,
+                            usage,
+                            task,
+                            additionalOptions,
+                            getCompletion,
+                            autoCompleteDepth,
+                            parallelResult.messages,
+                            [],
+                            templates,
+                            undefined,
+                            lastFnCall
+                        );
+                    }else{
+                        return parallelResult;
+                    }
+                }
+            }
+
             if(flat.templates && !templates){
                 templates=flat.templates;
             }
@@ -1274,7 +1294,7 @@ export class Conversation
             }
 
             if(flat.queueRef && isSourceMessage){
-                this.append(`> ${convoRoles.insertStart} ${flat.queueRef.label}`,{disableAutoFlatten:true,throwOnError:true})
+                this.append(`> ${convoRoles.insert} before ${flat.queueRef.label}`,{disableAutoFlatten:true,throwOnError:true})
             }
 
             for(const e in this.unregisteredVars){
@@ -1501,6 +1521,10 @@ export class Conversation
                 }
             }
 
+            if(flat.queueRef && isSourceMessage){
+                appendBeforeReturn+=`> ${convoRoles.flush}\n> ${convoRoles.insertEnd}\n`;
+            }
+
             if(append.length){
                 if(isDefaultTask){
                     for(const a of (append as string[])){
@@ -1508,15 +1532,28 @@ export class Conversation
                     }
                 }
             }else if(lastResultValue!==undefined && autoCompleteDepth<this.maxAutoCompleteDepth && !(additionalOptions?.returnOnCalled || directInvoke)){
-                return await this._completeAsync(false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth+1,completion,returnValues,templates,undefined,lastFnCall);
+                return await this._completeAsync(
+                    false,
+                    undefined,
+                    task,
+                    additionalOptions,
+                    getCompletion,
+                    autoCompleteDepth+1,
+                    completion,
+                    returnValues,
+                    templates,
+                    undefined,
+                    lastFnCall,
+                    appendBeforeReturn
+                );
             }
 
             if(isDefaultTask && templates?.length){
                 this.writeTemplates(templates,flat);
             }
 
-            if(flat.queueRef && isSourceMessage){
-                this.append(`> ${convoRoles.flushed}\n> ${convoRoles.insertEnd}`,{disableAutoFlatten:true,throwOnError:true});
+            if(appendBeforeReturn){
+                this.append(appendBeforeReturn,{disableAutoFlatten:true,throwOnError:true});
             }
 
             if(!this.disableAutoFlatten && isDefaultTask){
@@ -1528,7 +1565,7 @@ export class Conversation
                 this.startSubTasks(flat,convoTaskTriggers.onResponse,getCompletion,autoCompleteDepth+1,additionalOptions);
             }
 
-            if(flat.queueRef && isSourceMessage){
+            if(flat.queueRef){
                 return await this._completeAsync(
                     true,
                     usage,
@@ -1748,11 +1785,11 @@ export class Conversation
         if(msg.preSpace){
             flat.preSpace=true;
         }
-        if(msg.parallel){
-            flat.parallel=true;
-        }
         if(msg.label){
             flat.label=msg.label;
+        }
+        if(msg.insert){
+            flat.insert={...msg.insert};
         }
         return flat;
     }
@@ -1902,12 +1939,47 @@ export class Conversation
         let templates:ConvoMessageTemplate[]|undefined;
         let componentIndex=0;
         let secondPass=false;
+        let queueIndex=0;
+        let paraIndex=0;
+        let inPara=false;
+        let parallelMessages:ConvoMessage[]|undefined=undefined;
+        const parallelPairs:{msg:ConvoMessage,flat:FlatConvoMessage}[]=[];
 
-        for(let i=0;i<sourceMessages.length;i++){
+        messagesLoop: for(let i=0;i<sourceMessages.length;i++){
             const msg=sourceMessages[i];
 
-            if(!msg){
+            if(!msg || msg.role===convoRoles.nop){
                 continue;
+            }
+
+            let defaultLabel:string|undefined=undefined;
+            switch(msg.role){
+
+                case convoRoles.queue:
+                    defaultLabel=`queue-${queueIndex}`;
+                    queueIndex++;
+                    inPara=false;
+                    parallelMessages=undefined;
+                    break;
+
+                case convoRoles.parallel:
+                    inPara=true;
+                    parallelMessages=[];
+                    continue messagesLoop;
+
+                case convoRoles.parallelEnd:
+                    inPara=false;
+                    parallelMessages=undefined;
+                    continue messagesLoop;
+
+                default:
+                    if(inPara){
+                        defaultLabel=`parallel-${paraIndex}`;
+                        paraIndex++;
+                        parallelMessages?.push(msg);
+                    }
+                    break;
+
             }
 
             if(secondPassRoles.includes(msg.role)){
@@ -1947,6 +2019,14 @@ export class Conversation
             if(flat.component){
                 flat.componentIndex=componentIndex++;
             }
+            if(defaultLabel && !flat.label){
+                flat.label=defaultLabel;
+            }
+            if(inPara && msg.role!==convoRoles.parallelEnd){
+                flat.parallel=true;
+                parallelPairs.push({msg,flat});
+            }
+
 
             if(getFlatConvoTag(flat,convoTags.clear)){
                 const clearSystem=flat.tags?.[convoTags.clear]==='system';
@@ -2078,6 +2158,7 @@ export class Conversation
         if(secondPass){
             let insertLabel='';
             let insertStartIndex=0;
+            let insertAfter=false;
             let hasQueue=false;
             let insertOpen=false;
             for(let i=0;i<messages.length;i++){
@@ -2087,10 +2168,14 @@ export class Conversation
                 }
                 switch(msg.role){
 
-                    case convoRoles.insertStart:
-                        insertStartIndex=i;
-                        insertLabel=msg.content??'';
-                        insertOpen=true;
+                    case convoRoles.insert:
+
+                        if(msg.insert){
+                            insertStartIndex=i;
+                            insertAfter=!msg.insert.before;
+                            insertLabel=msg.insert.label;
+                            insertOpen=true;
+                        }
                         break;
 
                     case convoRoles.insertEnd:{
@@ -2101,8 +2186,8 @@ export class Conversation
                                 const removed=messages.splice(insertStartIndex,i-insertStartIndex+1);
                                 removed.pop();
                                 removed.shift();
-                                messages.splice(b,0,...removed);
                                 i-=2;
+                                messages.splice(b+(insertAfter?1:0),0,...removed);
                                 break;
                             }
                         }
@@ -2123,7 +2208,7 @@ export class Conversation
                     if(bm?.label==insertLabel){
                         const removed=messages.splice(insertStartIndex,messages.length);
                         removed.shift();
-                        messages.splice(b,0,...removed);
+                        messages.splice(b+(insertAfter?1:0),0,...removed);
                     }
                 }
             }
@@ -2134,7 +2219,7 @@ export class Conversation
                         continue;
                     }
 
-                    if(messages[i-1]?.role===convoRoles.flushed){
+                    if(messages[i-1]?.role===convoRoles.flush){
                         messages.splice(i-1,2);
                         i-=2;
                     }else{
@@ -2143,6 +2228,22 @@ export class Conversation
                             index:i,
                         };
                         messages.splice(i,messages.length);
+                        inPara=false;
+                        parallelMessages=undefined;
+                        if(messages[messages.length-1]?.parallel){
+                            inPara=true;
+                            parallelMessages=[];
+                            for(let x=messages.length-1;x>=0;x--){
+                                const xm=messages[x];
+                                if(!xm || !xm.parallel){
+                                    break;
+                                }
+                                const match=parallelPairs.find(p=>p.flat===xm);
+                                if(match){
+                                    parallelMessages.unshift(match.msg);
+                                }
+                            }
+                        }
                         break;
                     }
 
@@ -2322,6 +2423,7 @@ export class Conversation
             responseEndpoint,
             userId,
             queueRef,
+            parallelMessages,
             apiKey:this.getDefaultApiKey()??undefined,
         }
 
@@ -3104,8 +3206,8 @@ interface MdVarCtx
 const jsonReg=/json/i;
 
 const secondPassRoles:(string|undefined)[]=[
-    convoRoles.insertStart,
+    convoRoles.insert,
     convoRoles.insertEnd,
     convoRoles.queue,
-    convoRoles.flushed,
+    convoRoles.flush,
 ]
