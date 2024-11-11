@@ -47,6 +47,27 @@ export const convoRoles={
      * Used to define a suffix to add to rag messages
      */
     ragSuffix:'ragSuffix',
+
+    /**
+     * When encountered a conversation will executed the preceding message before continuing unless
+     * preceded by a flushed message.
+     */
+    queue:'queue',
+
+    /**
+     * signals a queue has been flushed
+     */
+    flushed:'flushed',
+
+    /**
+     * Starts an insertion block. Insertion blocks are used to reorder messages in a flattened conversation.
+     */
+    insertStart:'insertStart',
+
+    /**
+     * Ends an insertion block.
+     */
+    insertEnd:'insertEnd'
 } as const;
 
 export const convoFunctions={
@@ -209,6 +230,11 @@ export const convoImportModifiers={
 export const defaultConvoRagTol=1.2;
 
 export const convoTags={
+
+    /**
+     * Manually labels a message
+     */
+    label:'label',
 
     /**
      * Clears all content messages that precede the messages with the exception of system messages.

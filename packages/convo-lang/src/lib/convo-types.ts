@@ -86,6 +86,12 @@ export interface ConvoMessage
     markdown?:MarkdownLine[];
 
     /**
+     * Used to mark the message for insertion and control flow. Some message types like queue
+     * message are auto labeled. The `@label` tag can be used to manually tag messages.
+     */
+    label?:string;
+
+    /**
      * The target render area of the message.
      */
     renderTarget?:string;
@@ -632,6 +638,12 @@ export interface FlatConvoMessage
     content?:string;
 
     /**
+     * Used to mark the message for insertion and control flow. Some message types like queue
+     * message are auto labeled. The `@label` tag can be used to manually tag messages.
+     */
+    label?:string;
+
+    /**
      * Content prefix
      */
     prefix?:string;
@@ -874,6 +886,12 @@ export interface FlatConvoConversation extends FlatConvoConversationBase
 
 }
 
+export interface ConvoQueueRef
+{
+    label:string;
+    index:number;
+}
+
 export interface FlatConvoConversationBase
 {
     messages:FlatConvoMessage[];
@@ -900,6 +918,11 @@ export interface FlatConvoConversationBase
      * The id of the user to last send a message
      */
     userId?:string;
+
+    /**
+     * Reference to a queue that is being flushed
+     */
+    queueRef?:ConvoQueueRef;
 
     apiKey?:string;
 }

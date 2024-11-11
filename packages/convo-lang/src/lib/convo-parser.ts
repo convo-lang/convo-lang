@@ -1,6 +1,6 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parse as parseJson5 } from "json5";
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
@@ -981,11 +981,17 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
+    let queueIndex=0;
+
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
         if(!msg){
             error=`Undefined message in result messages at index ${i}`;
             break;
+        }
+
+        if(msg.role===convoRoles.queue){
+            msg.label=`queue-${queueIndex++}`;
         }
 
         if(parseMd && msg.content!==undefined){
@@ -1081,6 +1087,12 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
                     case convoTags.preSpace:
                         msg.preSpace=true;
+                        break;
+
+                    case convoTags.label:
+                        if(tag.value){
+                            msg.label=tag.value;
+                        }
                         break;
 
                     case convoTags.parallel:
