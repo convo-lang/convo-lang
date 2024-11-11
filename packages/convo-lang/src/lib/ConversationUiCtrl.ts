@@ -1,4 +1,4 @@
-import { AnyFunction, DisposeCallback, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
@@ -33,6 +33,8 @@ export interface ConversationUiCtrlOptions
     sceneCtrl?:SceneCtrl;
     defaultVars?:Record<string,any>;
     externFunctions?:Record<string,(...args:any[])=>any>;
+    imagePathConverter?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>string;
+    imageRenderer?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>any;
 }
 
 export class ConversationUiCtrl
@@ -251,6 +253,8 @@ export class ConversationUiCtrl
 
 
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
+    public imagePathConverter?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>string;
+    public imageRenderer?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>any;
 
     public constructor({
         id,
@@ -266,11 +270,16 @@ export class ConversationUiCtrl
         sceneCtrl,
         defaultVars,
         externFunctions,
+        imagePathConverter,
+        imageRenderer,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
 
         this.sceneCtrl=sceneCtrl;
+
+        this.imagePathConverter=imagePathConverter;
+        this.imageRenderer=imageRenderer;
 
         this._defaultVars=new BehaviorSubject<Record<string,any>>(defaultVars?{...defaultVars}:{});
         this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});

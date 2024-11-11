@@ -1,26 +1,89 @@
-import { Conversation, ConvoConversationCache, ConvoDocOutput, ConvoDocPageResult, ConvoDocQuery, ConvoDocQueryResult, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement, ConvoLocalStorageCache, convoDocResultFormatVersion, convoScript, escapeConvoMessageContent, getConvoDocReaderAsync, getConvoSelectContentType, isConvoDocSelectMatch, isConvoDocSelectPerPage } from "@convo-lang/convo-lang";
-import { CancelToken, InternalOptions, Lock, ReadonlySubject, getSortedObjectHash, joinPaths, readBlobAsDataUrlAsync } from '@iyio/common';
+import { Conversation, ConversationOptions, ConvoConversationCache, ConvoDocOutput, ConvoDocPageResult, ConvoDocQuery, ConvoDocQueryResult, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement, ConvoLocalStorageCache, convoDocResultFormatVersion, convoScript, escapeConvoMessageContent, getConvoDocReaderAsync, getConvoSelectContentType, isConvoDocSelectMatch, isConvoDocSelectPerPage } from "@convo-lang/convo-lang";
+import { CancelToken, InternalOptions, Lock, Progress, ReadonlySubject, deepClone, dupDeleteUndefined, getFileName, getSortedObjectHash, joinPaths, minuteMs, readBlobAsDataUrlAsync } from '@iyio/common';
 import { getVfsItemUrl, vfs } from '@iyio/vfs';
 import { parse as parseJson5 } from 'json5';
 import { BehaviorSubject } from 'rxjs';
+
+const lsKey='enableConvoDocRunnerLogging';
+let localStorageCheckedForLogging=false;
+const checkLsForLogging=()=>{
+    localStorageCheckedForLogging=true;
+    if(globalThis.localStorage){
+        if(globalThis.localStorage.getItem(lsKey)==='true'){
+            enableLogging=true;
+        }
+    }
+}
+
+let enableLogging=false;
+export const enableConvoDocRunnerLogging=(enable:boolean)=>{
+    enableLogging=enable;
+}
+
+if(globalThis.window){
+    try{
+        (globalThis.window as any).__enableConvoDocRunnerLogging=enableConvoDocRunnerLogging;
+    }catch{}
+}
+
+const removeFromCacheAfter=(key:string,ttl:number,log=enableLogging)=>{
+    if(ttl<=0){
+        return;
+    }
+    setTimeout(()=>{
+        const cached=memoryCache[key];
+        if(cached && cached.ttl<Date.now()){
+            delete memoryCache[key];
+            if(log){
+                console.log('Remove item from ConvoDocQueryRunner mem cache ',key);
+            }
+        }
+    },ttl+1000);
+}
+
+const memoryCache:Record<string,{r:ConvoDocQueryResult,ttl:number}>={};
+const cacheInMem=(ttl:number,key:string,result:ConvoDocQueryResult)=>{
+    memoryCache[key]={
+        r:deepClone(result),
+        ttl:Date.now()+ttl
+    }
+    removeFromCacheAfter(key,ttl);
+}
+
+const getFromMemCache=(key:string,ttl:number,log=enableLogging)=>{
+    const mem=memoryCache[key];
+    if(mem && mem.ttl>Date.now()){
+        removeFromCacheAfter(key,ttl);
+        if(log){
+            console.log(`doc query loaded from memory - ${key}`);
+        }
+        return deepClone(mem.r);
+    }else{
+        return undefined;
+    }
+}
 
 export interface ConvoDocQueryRunnerOptions
 {
     query:ConvoDocQuery;
     llmLock?:number;
     createConversation?:()=>Conversation;
+    conversationOptions?:ConversationOptions;
     cacheQueryResults?:boolean;
     cacheConversations?:boolean;
     conversationCache?:ConvoConversationCache;
+    memoryCacheTtlMs?:number;
     cacheVisionPass?:boolean;
+    cacheTextPass?:boolean;
     cacheDir?:string;
     outDir?:string;
     readerFactory?:ConvoDocReaderFactory|ConvoDocReaderFactory[];
+    log?:boolean;
 }
 
 export class ConvoDocQueryRunner
 {
-    private readonly options:InternalOptions<ConvoDocQueryRunnerOptions,'conversationCache'|'createConversation'|'outDir'|'readerFactory'>;
+    private readonly options:InternalOptions<ConvoDocQueryRunnerOptions,'conversationCache'|'createConversation'|'outDir'|'readerFactory'|'conversationOptions'>;
 
     private readonly _result:BehaviorSubject<ConvoDocQueryResult|null>=new BehaviorSubject<ConvoDocQueryResult|null>(null);
     public get resultSubject():ReadonlySubject<ConvoDocQueryResult|null>{return this._result}
@@ -34,31 +97,46 @@ export class ConvoDocQueryRunner
 
     private readonly disposeToken:CancelToken=new CancelToken();
 
+    public readonly progress:Progress;
+
     public constructor({
         query,
         llmLock=5,
         createConversation,
         cacheQueryResults=false,
         cacheVisionPass=cacheQueryResults,
+        cacheTextPass=cacheQueryResults,
         cacheConversations=false,
         conversationCache,
         cacheDir='/cache/document-queries',
         outDir,
         readerFactory,
+        memoryCacheTtlMs=cacheQueryResults?minuteMs*2:0,
+        log=false,
+        conversationOptions,
     }:ConvoDocQueryRunnerOptions)
     {
+        if(!localStorageCheckedForLogging && globalThis.localStorage){
+            checkLsForLogging()
+        }
         this.options={
             query,
             llmLock,
             createConversation,
             cacheQueryResults,
             cacheConversations,
+            cacheTextPass,
             conversationCache,
             cacheVisionPass,
             cacheDir,
             outDir,
-            readerFactory
+            readerFactory,
+            memoryCacheTtlMs,
+            log,
+            conversationOptions,
         }
+        const url=getVfsItemUrl(query.src);
+        this.progress=new Progress(`Document Query - ${getFileName(url)}`,'Starting');
         this.llmLock=new Lock(llmLock);
     }
 
@@ -81,6 +159,7 @@ export class ConvoDocQueryRunner
                 this.options.conversationCache??
                 (this.options.cacheConversations?new ConvoLocalStorageCache():undefined)
             ),
+            ...dupDeleteUndefined(this.options.conversationOptions)
         });
     }
 
@@ -91,10 +170,10 @@ export class ConvoDocQueryRunner
     }
 
     private pageLock=new Lock(1);
-    private pdfReader?:ConvoDocReader;
+    private reader?:ConvoDocReader;
     private readOpenCount=0;
     private async getPageImageAsync(index:number):Promise<Blob|undefined>{
-        if(!this.pdfReader?.pageToImageAsync){
+        if(!this.reader?.pageToImageAsync){
             return undefined;
         }
         const release=await this.pageLock.waitOrCancelAsync(this.disposeToken);
@@ -103,10 +182,29 @@ export class ConvoDocQueryRunner
         }
         this.readOpenCount++;
         try{
-            if(!this.pdfReader){
+            if(!this.reader){
                 return undefined;
             }
-            return await this.pdfReader.pageToImageAsync?.(index);
+            return await this.reader.pageToImageAsync?.(index);
+        }finally{
+            this.readOpenCount--;
+            release();
+        }
+    }
+    private async getPageTextAsync(index:number):Promise<string|undefined>{
+        if(!this.reader?.pageToTextAsync){
+            return undefined;
+        }
+        const release=await this.pageLock.waitOrCancelAsync(this.disposeToken);
+        if(!release){
+            return undefined;
+        }
+        this.readOpenCount++;
+        try{
+            if(!this.reader){
+                return undefined;
+            }
+            return await this.reader.pageToTextAsync?.(index);
         }finally{
             this.readOpenCount--;
             release();
@@ -121,8 +219,8 @@ export class ConvoDocQueryRunner
         let outputs:ConvoDocOutput[]|undefined;
         try{
             outputs=await vfs().readObjectAsync(cachePath)??undefined;
-            if(outputs){
-                console.info(`doc query pass ${pass} loaded from cache - ${cachePath}`);
+            if(outputs && enableLogging){
+                console.log(`doc query pass ${pass} loaded from cache - ${cachePath}`);
             }
         }catch(ex){
             console.error(`Failed to load doc query pass ${pass} from cached`,ex);
@@ -142,7 +240,9 @@ export class ConvoDocQueryRunner
         const cachePath=joinPaths(this.options.cacheDir,key+`-pass-${pass}.json`);
         try{
             await vfs().writeObjectAsync(cachePath,outputs);
-            console.info(`doc query pass ${pass} written to cache - ${cachePath}`);
+            if(enableLogging || this.options.log){
+                console.info(`doc query pass ${pass} written to cache - ${cachePath}`);
+            }
         }catch(ex){
             console.error(`Failed to write doc query pass to cache - ${pass}`,ex);
         }
@@ -157,6 +257,13 @@ export class ConvoDocQueryRunner
         }
     }
 
+    private progressTotal=0;
+    private progressStep=0;
+    private updateProgress(steps:number,status:string){
+        this.progressStep+=steps;
+        this.progress.set(this.progressStep/(this.progressTotal||1),status);
+    }
+
 
     private async _runQueryAsync():Promise<ConvoDocQueryResult>{
 
@@ -169,15 +276,25 @@ export class ConvoDocQueryRunner
             throw new Error("Unable to get url for src");
         }
 
-        const outDir=this.options.outDir;
-
         const hashKey=this.options.cacheQueryResults?getSortedObjectHash({_:convoDocResultFormatVersion,url,query}):'';
         const cachePathBase=joinPaths(this.options.cacheDir,hashKey);
         const cachePath=cachePathBase+'.json';
         if(this.options.cacheQueryResults){
-            const cached=await vfs().readObjectAsync(cachePath);
+            const mem=getFromMemCache(hashKey,this.options.memoryCacheTtlMs)
+            if(mem){
+                if(enableLogging || this.options.log){
+                    console.log(`doc query loaded from memory - ${hashKey}`);
+                }
+                return mem;
+            }
+            const cached=memoryCache[hashKey]?.r??await vfs().readObjectAsync(cachePath);
             if(cached){
-                console.info(`doc query pass load from cache - ${cachePath}`);
+                if(this.options.memoryCacheTtlMs>0){
+                    cacheInMem(this.options.memoryCacheTtlMs,hashKey,cached);
+                }
+                if(enableLogging || this.options.log){
+                    console.log(`doc query loaded from cache - ${cachePath}`);
+                }
                 return cached;
             }
         }
@@ -186,9 +303,10 @@ export class ConvoDocQueryRunner
         if(!reader){
             throw new Error(`Unable to get doc reader for query source. url - ${url}`);
         }
-        this.pdfReader=reader;
+        this.reader=reader;
 
         try{
+            this.updateProgress(0,'Loading document');
             const pageCount=await reader.getPageCountAsync();
 
             const pages:ConvoDocPageResult[]=[];
@@ -198,32 +316,47 @@ export class ConvoDocQueryRunner
                 }
                 pages.push(page);
             }
+            const useText=(query.textPass && reader.pageToTextAsync)?true:false;
+            const useVision=(query.visionPass && reader.pageToImageAsync)?true:false;
+            this.progressTotal=(useText?pageCount:0)+(useVision?pageCount:0)+(query.select?.length??0);
+            this.progressStep=0;
 
-            if(query.visionPass){
-                let loadedFromCached=false;
-                let passCacheKey:string|undefined;
-                if(this.options.cacheQueryResults || this.options.cacheVisionPass){
-                    const cached=await this.getCachedPassAsync(-1,query);
-                    passCacheKey=cached.key;
-                    if(cached.outputs){
-                        this.loadCached(cached.outputs);
-                        loadedFromCached=true;
+            if(useText){
+                this.updateProgress(0,'Reading text');
+                let readCount=0;
+                await this.runPassAsync(query,-2,pages,this.options.cacheTextPass,async page=>{
+                    const text=await this.getPageTextAsync(page.index);
+                    readCount++;
+                    this.updateProgress(1,`Page ${readCount} of ${pageCount} read`);
+                    if(!text){
+                        return;
                     }
-                }
-                if(!loadedFromCached){
-                    await Promise.all(pages.map(async page=>{
-                        const img=await this.getPageImageAsync(page.index);
-                        if(!img){
-                            return;
-                        }
+                    this.outputs.push({
+                        id:this.nextOutputId++,
+                        output:text,
+                        contentType:'text/plain',
+                        type:'content',
+                        pass:-2,
+                        pageIndexes:[page.index]
+                    });
+                })
+            }
 
-                        await this.convertPageImageAsync(page,img);
 
-                    }));
-                    if(passCacheKey){
-                        await this.writeCachedPassAsync(passCacheKey,-1);
+            if(useVision){
+                this.updateProgress(0,'Scanning with vision');
+                let readCount=0;
+                await this.runPassAsync(query,-1,pages,this.options.cacheVisionPass,async page=>{
+                    const img=await this.getPageImageAsync(page.index);
+                    if(!img){
+                        readCount++;
+                        this.updateProgress(1,`Page ${readCount} of ${pageCount} skipped`);
+                        return;
                     }
-                }
+                    await this.convertPageImageAsync(page,img);
+                    readCount++;
+                    this.updateProgress(1,`Page ${readCount} of ${pageCount} scanned`);
+                })
             }
 
 
@@ -255,6 +388,7 @@ export class ConvoDocQueryRunner
                             pass,
                             false
                         )));
+                        this.updateProgress(passSelects.length,`Pass ${pass} complete`);
                     }
 
 
@@ -269,10 +403,16 @@ export class ConvoDocQueryRunner
                 outputs:this.outputs
             }
 
+            if(this.options.memoryCacheTtlMs>0){
+                cacheInMem(this.options.memoryCacheTtlMs,hashKey,result);
+            }
+
             if(this.options.cacheQueryResults){
                 try{
                     await vfs().writeObjectAsync(cachePath,result);
-                    console.info(`doc query pass written to cache - ${cachePath}`);
+                    if(enableLogging || this.options.log){
+                        console.log(`doc query pass written to cache - ${cachePath}`);
+                    }
                 }catch(ex){
                     console.error('Failed to write document query result to cache',ex);
                 }
@@ -282,10 +422,35 @@ export class ConvoDocQueryRunner
 
         }finally{
             reader.dispose?.();
-            this.pdfReader=undefined;
+            this.reader=undefined;
         }
 
 
+    }
+
+    private async runPassAsync(
+        query:ConvoDocQuery,
+        pass:number,
+        pages:ConvoDocPageResult[],
+        cache:boolean,
+        pageCallback:(page:ConvoDocPageResult)=>Promise<void>
+    ){
+        let loadedFromCached=false;
+        let passCacheKey:string|undefined;
+        if(this.options.cacheQueryResults || cache){
+            const cached=await this.getCachedPassAsync(pass,query);
+            passCacheKey=cached.key;
+            if(cached.outputs){
+                this.loadCached(cached.outputs);
+                loadedFromCached=true;
+            }
+        }
+        if(!loadedFromCached){
+            await Promise.all(pages.map(pageCallback));
+            if(passCacheKey){
+                await this.writeCachedPassAsync(passCacheKey,pass);
+            }
+        }
     }
 
     private async convertPageImageAsync(page:ConvoDocPageResult,img:Blob){
@@ -305,11 +470,17 @@ export class ConvoDocQueryRunner
             If a blank image is given respond with the text "BLANK" in all caps.
             Do not enclose your responses in a markdown code block.
 
+            Respond with your conversation of the page verbatim. Do not give an explanation of how you converted the document or tell of any issues with the document.
+
             > user
             Convert the following page
 
             ![](${b64})
         `);
+
+        if(!r?.content || (r.content.length<=10 && r.content.includes('BLANK'))){
+            return;
+        }
 
         this.outputs.push({
             id:this.nextOutputId++,

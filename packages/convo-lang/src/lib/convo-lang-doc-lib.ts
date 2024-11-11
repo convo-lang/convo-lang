@@ -86,8 +86,13 @@ export const isConvoDocRangeMatch=(pageIndex:number,range:ConvoDocRangeOptions):
     return pageIndex>=range.from && pageIndex<=range.to;
 }
 
+export interface ConvoDocQueryStringFormatOptions
+{
+    escapeConvo?:boolean;
+    tagPages?:boolean;
+}
 
-export const convoDoQueryOutputToMessageContent=(queryResult:ConvoDocQueryResult):string=>{
+export const convoDoQueryOutputToMessageContent=(queryResult:ConvoDocQueryResult,options?:ConvoDocQueryStringFormatOptions):string=>{
     const lines:string[]=[];
 
     for(const page of queryResult.pages){
@@ -96,23 +101,26 @@ export const convoDoQueryOutputToMessageContent=(queryResult:ConvoDocQueryResult
             if(!output.pageIndexes.includes(page.index)){
                 continue;
             }
-            lines.push(convoDocOutputToString(output));
+            lines.push(convoDocOutputToString(output,options));
         }
     }
 
     return lines.join('\n');
 }
 
-export const convoDocPageToString=(pageIndex:number,queryResult:ConvoDocQueryResult):string=>{
+export const convoDocPageToString=(pageIndex:number,queryResult:ConvoDocQueryResult,options?:ConvoDocQueryStringFormatOptions):string=>{
     const outputs=queryResult.outputs.filter(p=>p.pageIndexes.includes(pageIndex));
-    return outputs.map(convoDocOutputToString).join('');
+    return outputs.map(v=>convoDocOutputToString(v,options)).join('');
 }
 
-export const convoDocOutputToString=(output:ConvoDocOutput):string=>{
+export const convoDocOutputToString=(output:ConvoDocOutput,{
+        escapeConvo:esc=true,
+        tagPages=true,
+    }:ConvoDocQueryStringFormatOptions={}):string=>{
     const tag=output.contentType==='text/markdown'?'page-content':'page-data';
-    return `<${tag}>\n${
-        (typeof output.output==='string')?escapeConvo(output.output):JSON.stringify(output.output)
-    }\n</${tag}>\n`;
+    return `${tagPages?`<${tag}>\n`:''}${
+        (typeof output.output==='string')?(esc!==false?escapeConvo(output.output):output.output):JSON.stringify(output.output)
+    }\n${tagPages?`</${tag}>`:''}\n`;
 
 }
 

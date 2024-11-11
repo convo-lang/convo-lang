@@ -1,4 +1,4 @@
-import { CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, XmlNode } from '@iyio/common';
+import { CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress, XmlNode } from '@iyio/common';
 import { BehaviorSubject } from 'rxjs';
 import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
@@ -1250,4 +1250,11 @@ export interface ParallelConvoTrimResult
 {
     convo:string;
     messages:string[];
+}
+
+export interface ConvoTask
+{
+    name:string;
+    progress?:Progress;
+    documentUrl?:string;
 }

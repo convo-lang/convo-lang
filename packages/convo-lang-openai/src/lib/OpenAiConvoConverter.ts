@@ -135,7 +135,7 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
                 let content:string|Array<ChatCompletionContentPart>;
                 const vc=(visionCapable || m.vision) && m.vision!==false && m.role!=='system';
                 if(vc){
-                    const items=parseMarkdownImages(m.content??'');
+                    const items=parseMarkdownImages(m.content??'',{requireImgProtocol:true});
                     if(items.length===1 && (typeof items[0]?.text === 'string')){
                         content=items[0]?.text??'';
                     }else{

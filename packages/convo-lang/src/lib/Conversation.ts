@@ -1,13 +1,13 @@
-import { AnyFunction, CancelToken, ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, trimParallelConvo, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -39,6 +39,11 @@ export interface ConversationOptions
      * Called whenever tokens usage occurs
      */
     onTokenUsage?:(usage:ConvoTokenUsage)=>void;
+
+    /**
+     * If defined the conversation will add used tokens to the usage object
+     */
+    usage?:ConvoTokenUsage;
 
 
     /**
@@ -165,6 +170,10 @@ export class Conversation
     private readonly _onAppend=new Subject<ConvoAppend>();
     public get onAppend():Observable<ConvoAppend>{return this._onAppend}
 
+    private readonly _openTasks:BehaviorSubject<ConvoTask[]>=new BehaviorSubject<ConvoTask[]>([]);
+    public get openTasksSubject():ReadonlySubject<ConvoTask[]>{return this._openTasks}
+    public get openTasks(){return this._openTasks.value}
+
     private readonly _activeTaskCount:BehaviorSubject<number>=new BehaviorSubject<number>(0);
     public get activeTaskCountSubject():ReadonlySubject<number>{return this._activeTaskCount}
     public get activeTaskCount(){return this._activeTaskCount.value}
@@ -190,6 +199,11 @@ export class Conversation
     }
 
     private readonly _onTokenUsage?:(usage:ConvoTokenUsage)=>void;
+
+    /**
+     * Tracks the token usages of the Conversation
+     */
+    public readonly usage:ConvoTokenUsage;
 
     private readonly _trackModel:BehaviorSubject<boolean>;
     public get trackModelSubject():ReadonlySubject<boolean>{return this._trackModel}
@@ -342,7 +356,9 @@ export class Conversation
             cache,
             logFlat=false,
             logFlatCached=false,
+            usage=createEmptyConvoTokenUsage(),
         }=options;
+        this.usage=usage;
         this.defaultOptions=options;
         this.getStartOfConversation=getStartOfConversation;
         this.cache=typeof cache==='boolean'?(cache?[convoCacheService()]:[]):asArray(cache);
@@ -407,6 +423,21 @@ export class Conversation
         }
 
         onConstructed?.(this);
+    }
+
+    public addTask(task:ConvoTask):DisposeCallback{
+
+        this._activeTaskCount.next(this._activeTaskCount.value+1);
+        pushBehaviorSubjectAry(this._openTasks,task);
+        let removed=false;
+        return ()=>{
+            if(removed){
+                return;
+            }
+            removed=true;
+            this._activeTaskCount.next(this._activeTaskCount.value-1);
+            removeBehaviorSubjectAryValue(this._openTasks,task);
+        }
     }
 
     public watchComponentMessages(callback:ConvoComponentMessagesCallback):Subscription{
@@ -1325,10 +1356,13 @@ export class Conversation
 
             for(const msg of completion){
 
-                let includeTokenUsage=(msg.inputTokens || msg.outputTokens)?true:false;
+                let includeTokenUsage=(msg.inputTokens || msg.outputTokens || msg.tokenPrice)?true:false;
 
-                if(includeTokenUsage && this._onTokenUsage){
-                    this._onTokenUsage(convoPartialUsageTokensToUsage(msg));
+                if(includeTokenUsage){
+                    addConvoUsageTokens(this.usage,msg);
+                    if(this._onTokenUsage){
+                        this._onTokenUsage(convoPartialUsageTokensToUsage(msg));
+                    }
                 }
 
                 const tagsCode=msg.tags?convoTagMapToCode(msg.tags,'\n'):'';
@@ -2913,6 +2947,13 @@ export class Conversation
         }
 
         return JSON.stringify(value,createJsonRefReplacer(),4);
+    }
+
+    public addUsage(usage:Partial<ConvoTokenUsage>){
+        addConvoUsageTokens(this.usage,usage);
+        if(this._onTokenUsage){
+            this._onTokenUsage(convoPartialUsageTokensToUsage(usage));
+        }
     }
 }
 

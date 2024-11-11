@@ -1,6 +1,7 @@
 import { ConvoDocReader } from "@convo-lang/convo-lang";
 import { PdfReader, pdfReaderPool } from "@iyio/pdf-viewer";
 import { VfsItem, getVfsItemUrl } from "@iyio/vfs";
+import { TextItem } from "pdfjs-dist/types/src/display/api";
 
 export class ConvoPdfDocReader implements ConvoDocReader
 {
@@ -34,5 +35,25 @@ export class ConvoPdfDocReader implements ConvoDocReader
     }
     public async getPageCountAsync():Promise<number>{
         return (await this.reader.getDocAsync())?.numPages??0;
+    }
+
+    public async pageToTextAsync(pageIndex:number){
+        const page=await this.reader.getPageAsync(pageIndex);
+        if(!page){
+            return '';
+        }
+        const content=await page.page.getTextContent();
+        const out:string[]=[];
+
+        for(const c of content.items){
+            const item=c as TextItem;
+            if(!item?.str){
+                continue;
+            }
+            out.push(item.str);
+            out.push(item.hasEOL?'\n\n':' ');
+        }
+
+        return out.join('')
     }
 }

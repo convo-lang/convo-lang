@@ -2420,6 +2420,22 @@ Returns the value as an attribute to be used with XML.
 ### openBrowserWindow( url:string target:string='_blank' )
 Opens a new browser window
 
+### readDoc( path:string from?:number to?:number )
+Reads a document by path and can optionally use a vision model to read the document to include
+information about images and charts in a document. readDoc also accepts a number of named arguments.
+
+Named arguments:
+- path - Path to the document to read
+- from - Starting page index to read from
+- to - Ending page index to stop reading. This index is inclusive.
+- useVision - If true a vision model will be used to read each page of the document
+- count - Number of pages to ready
+- cache - If true the reading of the document will be cached. Default = true
+- memoryCacheTtlMs - Number of milliseconds to cache the read document in memory. Default = 2 minutes
+- tagPages - If true page content will be enclosed in XML page tags
+- query - An optional doc query to run
+- salt - Salt that can be used to break the cache
+
 ``` convo
 > assistant
 <Component propName={{xAtt({prop1:'hello',prop2:77})}}>

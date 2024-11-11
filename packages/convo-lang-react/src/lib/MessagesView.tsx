@@ -3,6 +3,7 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
+import { ConvoTaskView } from "./ConvoTaskView";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
@@ -133,14 +134,18 @@ const renderMessage=(
 
         const parts=parseMarkdownImages(m.content);
 
+        // add renderer here
+
         return (<Fragment key={i+'f'}>{
             parts.map((p,pi)=>p.image?(
                 <div className={rowClassName} key={pi}>
-                    <img
-                        className={style.img({user:m.role==='user',agent:m.role!=='user'})}
-                        alt={p.image.description}
-                        src={p.image.url}
-                    />
+                    {ctrl.imageRenderer?.(p.image,style.img({user:m.role==='user',agent:m.role!=='user'}),m)??
+                        <img
+                            className={style.img({user:m.role==='user',agent:m.role!=='user'})}
+                            alt={p.image.description}
+                            src={ctrl.imagePathConverter?ctrl.imagePathConverter(p.image,style.img({user:m.role==='user',agent:m.role!=='user'}),m):p.image.url}
+                        />
+                    }
                 </div>
             ):(
                 <div className={rowClassName} key={pi}>
@@ -219,6 +224,7 @@ export function MessagesView({
     const ctrl=useConversationUiCtrl(_ctrl)
 
     const convo=useSubject(ctrl.convoSubject);
+    const convoTasks=useSubject(convo?.openTasksSubject);
 
     const flat=useSubject(convo?.flatSubject);
 
@@ -271,7 +277,7 @@ export function MessagesView({
 
                     {mapped}
 
-                    {!!currentTask && <div className={rowClassName}>{
+                    {!!currentTask && !convoTasks?.length && <div className={rowClassName}>{
                         (theme.wrapLoader===false?
                             <LoadingDots {...theme.loaderProps}/>
                         :
@@ -280,6 +286,8 @@ export function MessagesView({
                             </div>
                         )
                     }</div>}
+
+                    {convoTasks?.map((t,i)=><ConvoTaskView key={i} task={t} />)}
                 </div>
             </ScrollView>
         </div>

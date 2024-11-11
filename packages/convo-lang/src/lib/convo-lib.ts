@@ -68,7 +68,9 @@ export const convoFunctions={
 
     getVar:'getVar',
 
-    describeScene:'describeScene'
+    describeScene:'describeScene',
+
+    readDoc:'readDoc',
 } as const;
 
 /**
@@ -835,7 +837,17 @@ export const getConvoMetadata=(value:any):ConvoMetadata|undefined=>{
     return value?.[convoMetadataKey];
 }
 
-export const convoLabeledScopeParamsToObj=(scope:ConvoScope):Record<string,any>=>{
+export const convoLabeledScopeParamsToObj=(
+    scope:ConvoScope
+):Record<string,any>=>{
+    return convoParamsToObj(scope,undefined,false);
+}
+
+export const convoParamsToObj=(
+    scope:ConvoScope,
+    unlabeledMap?:string[],
+    unlabeledKey:string|boolean=true,
+):Record<string,any>=>{
     const obj:Record<string,any>={};
     const labels=scope.labels;
     let metadata:ConvoMetadata|undefined=undefined;
@@ -844,6 +856,7 @@ export const convoLabeledScopeParamsToObj=(scope:ConvoScope):Record<string,any>=
         metadata.properties={};
         (obj as any)[convoMetadataKey]=metadata;
     }
+    const labeled:number[]=[];
     if(labels){
         for(const e in labels){
             const label=labels[e];
@@ -853,6 +866,7 @@ export const convoLabeledScopeParamsToObj=(scope:ConvoScope):Record<string,any>=
             const isOptional=typeof label === 'object'
             const index=isOptional?label.value:label;
             if(index!==undefined){
+                labeled.push(index);
                 const v=scope.paramValues?.[index]
                 obj[e]=isOptional?createOptionalConvoValue(v):v;
 
@@ -865,6 +879,26 @@ export const convoLabeledScopeParamsToObj=(scope:ConvoScope):Record<string,any>=
                             tags:propStatement.tags
                         }
                     }
+                }
+
+            }
+        }
+    }
+    if(unlabeledKey){
+        const values:any[]=[];
+        if(scope.paramValues){
+            for(let i=0;i<scope.paramValues.length;i++){
+                if(!labeled.includes(i)){
+                    values.push(scope.paramValues[i]);
+                }
+            }
+        }
+        obj[unlabeledKey===true?'_':unlabeledKey]=values;
+        if(unlabeledMap){
+            for(let i=0;i<unlabeledMap.length;i++){
+                const key=unlabeledMap[i]??'';
+                if(obj[key]===undefined){
+                    obj[key]=values[i];
                 }
 
             }
@@ -1070,14 +1104,14 @@ export const parseConvoUsageTokens=(str:string):ConvoTokenUsage=>{
     }
 }
 
-export const addConvoUsageTokens=(to:ConvoTokenUsage,from:ConvoTokenUsage|string):void=>
+export const addConvoUsageTokens=(to:ConvoTokenUsage,from:Partial<ConvoTokenUsage>|string):void=>
 {
     if(typeof from === 'string'){
         from=parseConvoUsageTokens(from);
     }
-    to.inputTokens+=from.inputTokens;
-    to.outputTokens+=from.outputTokens;
-    to.tokenPrice+=from.tokenPrice;
+    to.inputTokens+=from.inputTokens??0;
+    to.outputTokens+=from.outputTokens??0;
+    to.tokenPrice+=from.tokenPrice??0;
 }
 
 export const createEmptyConvoTokenUsage=():ConvoTokenUsage=>({

@@ -93,12 +93,22 @@ export interface ConvoDocQuery
      */
     visionPass?:boolean;
 
+    /**
+     * If true each page will be converted to text using a document reader.
+     */
+    textPass?:boolean;
+
     select?:ConvoDocSelectStatement[];
+
+    /**
+     * Used to break cached results
+     */
+    salt?:string;
 
 }
 
 // update this value anytime a cached document result could be incompatible with ConvoDocQueryResult
-export const convoDocResultFormatVersion=1;
+export const convoDocResultFormatVersion=2;
 export interface ConvoDocQueryResult
 {
     outputs:ConvoDocOutput[];
@@ -161,6 +171,7 @@ export interface ConvoDocOutput
 export interface ConvoDocReader
 {
     pageToImageAsync?:(pageIndex:number,format?:string)=>Blob|undefined|Promise<Blob|undefined>;
+    pageToTextAsync?:(pageIndex:number)=>string|undefined|Promise<string|undefined>;
     dispose?:()=>void;
     getPageCountAsync:()=>number|Promise<number>;
 }
