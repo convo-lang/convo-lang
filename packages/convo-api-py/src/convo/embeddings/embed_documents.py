@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
+from age import Age
 from convo.db import escape_sql_identifier
 from databases import Database
 from fastapi import HTTPException
@@ -208,9 +209,9 @@ async def clear_matching(
 
 async def generate_document_embeddings(
     db: Database,
+    graph_db: Age,
     open_ai_client: AsyncOpenAI,
     request: types.DocumentEmbeddingRequest,
-    graph_db_config: types.GraphDBConfig,
     graph_rag_config: types.GraphRagConfig,
     run_graph_embded: bool,
 ) -> Union[int, HTTPException]:
@@ -291,7 +292,12 @@ async def generate_document_embeddings(
     if run_graph_embded:
         logging.info("Running graph embedding for %s", request.location)
         _ = await graph_embed_docs(
-            chunks, request.location, graph_db_config, graph_rag_config
+            graph_db,
+            chunks,
+            request.location,
+            cols,
+            request.clearMatching,
+            graph_rag_config,
         )
     else:
         logging.info("Skipping graph embedding for %s", request.location)
