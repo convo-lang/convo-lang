@@ -577,11 +577,11 @@ describe('convo',()=>{
 
         convo.append(/*convo*/`
 
-            @assign var1
+            @assignTo var1
             > user
             abc
 
-            @assign var2
+            @assignTo var2
             @format json
             > user
             {

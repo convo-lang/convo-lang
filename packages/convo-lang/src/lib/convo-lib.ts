@@ -319,7 +319,7 @@ export const convoTags={
     /**
      * Causes the response of the tagged message to be assigned to a variable
      */
-    responseAssign:'responseAssign',
+    assign:'assign',
 
     /**
      * When used with a message the json tag is short and for `@responseFormat json`
@@ -334,7 +334,7 @@ export const convoTags={
     /**
      * Used to assign the content or jsonValue of a message to a variable
      */
-    assign:'assign',
+    assignTo:'assignTo',
 
     /**
      * Used to enable capabilities. Only the first and last message in the conversation are used

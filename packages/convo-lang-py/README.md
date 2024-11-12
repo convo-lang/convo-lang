@@ -415,17 +415,17 @@ When the last message in a conversation is tagged with the `@json` tag json mode
 next completion. Custom user types can be used to define the scheme of the json that should
 be returned by setting the value of the @json tag to the name of the desired type - `@json TypeName`
 
-The json response can also be assigned to a variable by using the `@responseAssign` tag.
+The json response can also be assigned to a variable by using the `@assign` tag.
 
 #### JSON mode with no scheme
 ``` convo
 @json
-@responseAssign planets
+@assign planets
 > user
 List the planets in our solar system as a json array
 
 @format json
-@assign planets
+@assignTo planets
 > assistant
 {
     "planets": [
@@ -452,12 +452,12 @@ Planet = struct(
 )
 
 @json Planet[]
-@responseAssign planets
+@assign planets
 > user
 List the planets in our solar system as a json array
 
 @format json
-@assign planets
+@assignTo planets
 > assistant
 [
     {
@@ -517,7 +517,7 @@ Person = struct(
 )
 
 @json Person[]
-@responseAssign dudes
+@assign dudes
 > user
 Describe each person in this picture.
 
@@ -538,7 +538,7 @@ __return={
 
 
 @format json
-@assign dudes
+@assignTo dudes
 > assistant
 [
     {
@@ -609,10 +609,10 @@ How many fish are in the sea
 - @endpoint - Used to track the endpoint to generate completions
 - @responseEndpoint - Sets the requested endpoint to complete a message with
 - @responseFormat - Sets the format as message should be responded to with.
-- @responseAssign - Causes the response of the tagged message to be assigned to a variable
+- @assign - Causes the response of the tagged message to be assigned to a variable
 - @json - When used with a message the json tag is short and for `@responseFormat json`
 - @format - The format of a message
-- @assign - Used to assign the content or jsonValue of a message to a variable
+- @assignTo - Used to assign the content or jsonValue of a message to a variable
 - @capability - Used to enable capabilities. The capability tag can only be used on the first 
   message of the conversation if used on any other message it is ignored. Multiple capability tags
   can be applied to a message and multiple capabilities can be specified by separating them with a comma.

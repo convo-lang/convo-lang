@@ -882,7 +882,7 @@ export class Conversation
             tags+=`@${convoTags.format} ${msg.format}\n`
         }
         if(msg.assignTo){
-            tags+=`@${convoTags.assign} ${msg.assignTo}\n`
+            tags+=`@${convoTags.assignTo} ${msg.assignTo}\n`
         }
         return tags;
     }
@@ -2627,7 +2627,7 @@ export class Conversation
                     responseFormat=tag.value?'json '+tag.value:'json';
                     break;
 
-                case convoTags.responseAssign:
+                case convoTags.assign:
                     flat.responseAssignTo=tag.value;
                     break;
 

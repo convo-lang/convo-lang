@@ -987,13 +987,13 @@ messages. If the value of "system" is given as the tags value system message wil
 
 `@responseFormat` - Sets the format as message should be responded to with.
 
-`@responseAssign` - Causes the response of the tagged message to be assigned to a variable
+`@assign` - Causes the response of the tagged message to be assigned to a variable
 
 `@json` - When used with a message the json tag is short and for `@responseFormat json`
 
 `@format` - The format of a message
 
-`@assign` - Used to assign the content or jsonValue of a message to a variable
+`@assignTo` - Used to assign the content or jsonValue of a message to a variable
 
 `@capability` - Used to enable capabilities. The capability tag can only be used on the first 
   message of the conversation if used on any other message it is ignored. Multiple capability tags
