@@ -22,10 +22,13 @@ def _format_data(x: Dict[str, str]):
     def process_key(a: str) -> str:
         return a.strip('"')
 
-    def process_value(b: str) -> str:
+    def process_value(b: Optional[str]) -> str:
         if isinstance(b, str):
             b = b.replace('"', "'")
             b = '"' + b + '"'
+        # None should be converted to NULL (not a string)
+        elif b is None:
+            b = "NULL"
         return b
 
     entries = [(process_key(k), process_value(v)) for k, v in x.items()]
@@ -116,7 +119,7 @@ class AgeGraphStorage(BaseGraphStorage):
         self.ag.commit()
 
     async def delete_matching(self, clear_matching: List[str]):
-        matching = {self.cols[c] for c in clear_matching}
+        matching = {c: self.cols[c] for c in clear_matching}
         params = _format_data(matching)
         query = f"MATCH (v {params}) DETACH DELETE v"
         logger.debug("delete-matching query %s", query)
