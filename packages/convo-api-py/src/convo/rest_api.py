@@ -18,13 +18,6 @@ async def post_embed_text(data, request: Request):
     return await encode_text(request.app.state.open_ai_client, data)
 
 
-@document_handler.get("/api/embeddings/text")
-async def get_embed_text(data, request: Request):
-    return await encode_text(
-        request.app.state.open_ai_client, [data["text"] if "text" in data else ""]
-    )
-
-
 @document_handler.post("/api/embeddings/document")
 async def embed_documents(doc_request: DocumentEmbeddingRequest, request: Request):
     return await generate_document_embeddings(
