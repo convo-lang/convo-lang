@@ -1187,7 +1187,6 @@ export class Conversation
                 const completion=await clone.completeAsync(options);
                 return {
                     completion,
-                    messages:clone.messages.slice(msgCount),
                     convo:clone.convo,
                     msg,
                 }
@@ -1209,7 +1208,17 @@ export class Conversation
             })
         }
 
-        return all[all.length-1]?.completion;
+        const defaultC=all[all.length-1]?.completion;
+
+        if(defaultC){
+            for(let i=all.length-2;i>=0;i--){
+                const c=all[i];
+                if(!c){continue}
+                defaultC.exe?.consumeVars(c.completion.exe)
+            }
+        }
+
+        return defaultC;
     }
 
     private readonly _isCompleting:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
@@ -1405,6 +1414,10 @@ export class Conversation
                         this.append(`${this.getPrefixTags({includeTokenUsage,msg})}${tagsCode}> ${this.getReversedMappedRole(msg.role)}\n${escapeConvoMessageContent(msg.content)}\n`);
                     }
                     includeTokenUsage=false;
+                }
+
+                if(msg.assignTo){
+                    exe.setVarUsingCompletionMessage(true,msg,msg.assignTo);
                 }
 
                 if(additionalOptions?.returnOnCall && msg.callFn){
