@@ -1,5 +1,6 @@
 export * from './lib/ComponentRenderTarget';
 export * from './lib/ConversationInput';
+export * from './lib/ConversationStatusIndicator';
 export * from './lib/ConversationView';
 export * from './lib/ConvoComponentRenderer';
 export * from './lib/MarkdownViewer';

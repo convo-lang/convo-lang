@@ -1,8 +1,9 @@
 import { ConversationOptions, ConvoDocQuery, ConvoDocQueryRunnerOptions, convoDoQueryOutputToMessageContent, escapeConvoMessageContent, mergeConvoOptions } from "@convo-lang/convo-lang";
 import { asArray } from "@iyio/common";
-import { LoadingDots, useDeepCompareItem, useSubject } from "@iyio/react-common";
+import { useDeepCompareItem, useSubject } from "@iyio/react-common";
 import { VfsItem } from "@iyio/vfs";
 import { Fragment, useEffect, useMemo, useRef } from "react";
+import { ConversationStatusIndicator } from "../ConversationStatusIndicator";
 import { MarkdownViewer } from "../MarkdownViewer";
 import { GenNode } from "./GenNode";
 import { GenNodeOptions, GenNodeOptionsReactContext, GenNodeReactContext, GenNodeSuccessState, useGenNode, useGenNodeOptions } from './gen-lib';
@@ -70,6 +71,7 @@ export function Gen({
 
     const parentNode=useGenNode();
     const node=useMemo(()=>new GenNode(),[]);
+    const conversation=useSubject(node.conversationSubject);
 
     useEffect(()=>{
         return ()=>{
@@ -84,7 +86,7 @@ export function Gen({
     useEffect(()=>{
         node.convo=convo??'';
         node.options=options;
-        node.docQuery=docQuery??(document?{src:document}:null);
+        node.docQuery=docQuery??(document?{src:document,visionPass:true}:null);
         node.docQueryOptions=docQueryOptions??null;
         node.vars=vars??null;
     },[node,convo,options,docQuery,docQueryOptions,document,vars]);
@@ -138,7 +140,10 @@ export function Gen({
 
             </>}
 
-            {state.status==='generating' && (loadingIndicator??<LoadingDots />)}
+            <ConversationStatusIndicator
+                conversation={conversation}
+                busy={state.status==='generating'}
+            />
 
         </GenNodeReactContext.Provider>
         </GenNodeOptionsReactContext.Provider>

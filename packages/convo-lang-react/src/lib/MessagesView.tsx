@@ -1,9 +1,9 @@
 import { ConversationUiCtrl, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
-import { LoadingDots, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
+import { ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
-import { ConvoTaskView } from "./ConvoTaskView";
+import { ConversationStatusIndicator } from "./ConversationStatusIndicator";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
@@ -224,7 +224,6 @@ export function MessagesView({
     const ctrl=useConversationUiCtrl(_ctrl)
 
     const convo=useSubject(ctrl.convoSubject);
-    const convoTasks=useSubject(convo?.openTasksSubject);
 
     const flat=useSubject(convo?.flatSubject);
 
@@ -277,17 +276,15 @@ export function MessagesView({
 
                     {mapped}
 
-                    {!!currentTask && !convoTasks?.length && <div className={rowClassName}>{
+                    {!!currentTask && <div className={rowClassName}>{
                         (theme.wrapLoader===false?
-                            <LoadingDots {...theme.loaderProps}/>
+                            <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
                         :
                             <div className={style.msg({agent:true})}>
-                                <LoadingDots {...theme.loaderProps}/>
+                                <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
                             </div>
                         )
                     }</div>}
-
-                    {convoTasks?.map((t,i)=><ConvoTaskView key={i} task={t} />)}
                 </div>
             </ScrollView>
         </div>
