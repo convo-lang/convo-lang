@@ -559,6 +559,7 @@ export class Conversation
 
     private _isDisposed=false;
     private readonly _disposeToken:CancelToken=new CancelToken();
+    public get disposeToken(){return this._disposeToken}
     public get isDisposed(){return this._isDisposed}
     public dispose()
     {
