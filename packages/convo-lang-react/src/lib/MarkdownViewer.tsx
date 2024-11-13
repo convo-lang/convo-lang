@@ -47,7 +47,16 @@ export function MarkdownViewer({
 
         getMdAsync().then(md=>{
             if(m){
-                elem.innerHTML=md.render(markdown);
+                const match=mdBlock.exec(markdown);
+                if(match){
+                    let m=markdown.substring(match[0].length).trim();
+                    if(m.endsWith('```')){
+                        m=m.substring(0,m.length-3);
+                    }
+                    elem.innerHTML=md.render(m);
+                }else{
+                    elem.innerHTML=md.render(markdown);
+                }
             }
         })
 
@@ -90,3 +99,5 @@ export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
         width:100%;
     }
 `});
+
+const mdBlock=/[\s\n\r]*```\s*(md|markdown).*/
