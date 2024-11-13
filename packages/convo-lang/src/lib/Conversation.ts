@@ -1973,7 +1973,7 @@ export class Conversation
                     continue messagesLoop;
 
                 default:
-                    if(inPara){
+                    if(inPara && this.userRoles.includes(msg.role as string) && !msg.fn){
                         defaultLabel=`parallel-${paraIndex}`;
                         paraIndex++;
                         parallelMessages?.push(msg);
