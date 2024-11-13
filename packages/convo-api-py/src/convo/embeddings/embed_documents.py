@@ -63,7 +63,10 @@ def load_documents(
         elements = partition(filename=document_path, **kwargs)
 
     chunks = chunk_by_title(
-        elements, new_after_n_chars=request.chunk_size, overlap=request.chunk_overlap
+        elements,
+        new_after_n_chars=request.chunk_size,
+        overlap=request.chunk_overlap,
+        max_characters=request.max_characters,
     )
 
     return chunks

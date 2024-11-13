@@ -1,12 +1,11 @@
 import tempfile
-from reportlab.pdfgen import canvas
-from convo.embeddings.types import DocumentConversionRequest
 
 from convo.embeddings.convert_document import convert_document
+from convo.embeddings.types import DocumentConversionRequest
+from reportlab.pdfgen import canvas
 
 
 def test_convert_pdf():
-
     with tempfile.TemporaryDirectory() as tmpdir:
         f_path = f"{tmpdir}/test.pdf"
         o_path = f"{tmpdir}/test_out.txt"
@@ -27,6 +26,6 @@ def test_convert_pdf():
 
         assert result
 
-        with open(o_path, 'r') as f:
+        with open(o_path, "r") as f:
             txt = f.read()
             assert txt == "Hello World\n\n\x0c"
