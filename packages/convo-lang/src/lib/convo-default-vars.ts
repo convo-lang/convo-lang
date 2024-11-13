@@ -1191,6 +1191,7 @@ export const defaultConvoVars={
             conversationOptions:{
                 onTokenUsage:u=>ctx.convo.conversation?.addUsage(u)
             },
+            useRunLock:true,
             ...deleteUndefined(options),
         });
 
