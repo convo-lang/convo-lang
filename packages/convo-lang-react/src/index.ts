@@ -25,4 +25,6 @@ export * from './lib/graph/ConvoNodeView';
 export * from './lib/graph/ConvoTraverserView';
 export * from './lib/graph/convo-graph-react-lib';
 export * from './lib/graph/convo-graph-react-type';
+export * from './lib/img/GenImg';
+export * from './lib/img/gen-img-lib';
 
