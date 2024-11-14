@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -61,16 +60,6 @@ class GraphRagConfig:
     tiktoken_model_name: str = "gpt-4o"
     entity_summary_to_max_tokens: int = 500
     entity_extract_max_gleaning: int = 1
-
-
-@dataclass
-class GraphDBConfig:
-    host: str = os.getenv("PGHOST")
-    port: str = os.getenv("PGPORT")
-    dbname: str = os.getenv("PGDATABASE")
-    user: str = os.getenv("PGUSER")
-    password: str = os.getenv("PGPASSWORD")
-    graph: str = os.getenv("GRAPH_DB")
 
 
 @dataclass

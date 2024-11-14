@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import age
 from nano_graphrag._op import extract_entities
@@ -13,7 +13,7 @@ from nano_graphrag.base import (
 )
 from unstructured.documents.elements import Element
 
-from .types import GraphDBConfig, GraphRagConfig
+from .types import GraphRagConfig
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +22,13 @@ def _format_data(x: Dict[str, str]):
     def process_key(a: str) -> str:
         return a.strip('"')
 
-    def process_value(b: str) -> str:
+    def process_value(b: Optional[str]) -> str:
         if isinstance(b, str):
             b = b.replace('"', "'")
             b = '"' + b + '"'
+        # None should be converted to NULL (not a string)
+        elif b is None:
+            b = "NULL"
         return b
 
     entries = [(process_key(k), process_value(v)) for k, v in x.items()]
@@ -34,24 +37,8 @@ def _format_data(x: Dict[str, str]):
 
 @dataclass
 class AgeGraphStorage(BaseGraphStorage):
-    namespace: str
-    host: str
-    port: str
-    dbname: str
-    user: str
-    password: str
-    graph: str
-    ag: age.Age = None
-
-    def __post_init__(self):
-        self.ag = age.connect(
-            host=self.host,
-            port=self.port,
-            dbname=self.dbname,
-            user=self.user,
-            password=self.password,
-            graph=self.graph,
-        )
+    ag: age.Age
+    cols: Dict[str, Any]
 
     async def has_node(self, node_id: str) -> bool:
         query = f"MATCH (n) WHERE n.id = {node_id} RETURN COUNT(n) > 0"
@@ -108,7 +95,7 @@ class AgeGraphStorage(BaseGraphStorage):
 
     async def upsert_node(self, node_id: str, node_data: Dict[str, str]):
         node_type = node_data.get("entity_type", "UNKNOWN").strip('"')
-        node_data["doc_path"] = self.namespace
+        node_data.update(self.cols)
         params = _format_data(node_data)
         query = f"MERGE (n:{node_type} {{id: {node_id}}}) SET n += {params}"
         logger.debug("upsert-node query %s", query)
@@ -119,7 +106,7 @@ class AgeGraphStorage(BaseGraphStorage):
         self, source_node_id: str, target_node_id: str, edge_data: Dict[str, str]
     ):
         edge_data.setdefault("weight", 0.0)
-        edge_data["doc_path"] = self.namespace
+        edge_data.update(self.cols)
         params = _format_data(edge_data)
         query = (
             f"MATCH (s), (t) "
@@ -131,24 +118,35 @@ class AgeGraphStorage(BaseGraphStorage):
         self.ag.execCypher(query)
         self.ag.commit()
 
+    async def delete_matching(self, clear_matching: List[str]):
+        matching = {c: self.cols[c] for c in clear_matching}
+        params = _format_data(matching)
+        query = f"MATCH (v {params}) DETACH DELETE v"
+        logger.debug("delete-matching query %s", query)
+        self.ag.execCypher(query)
+        self.ag.commit()
+
 
 async def graph_embed_docs(
+    graph_db: age.Age,
     chunks: List[Element],
     doc_path: str,
-    graph_db_config: GraphDBConfig,
+    cols: Dict[str, Any],
+    clear_matching: Optional[List[str]],
     graph_rag_config: GraphRagConfig,
     entity_vdb: Optional[BaseVectorStorage] = None,
 ):
     logger.info("Graph embedding documents")
 
     age_graph = AgeGraphStorage(
-        # TODO: Insert document source here, but need to
-        #  look if there is more performant way of adding this
-        #  as an index
-        namespace=doc_path,
+        namespace="NA",  # Not used
+        ag=graph_db,
+        cols=cols,
         global_config=asdict(graph_rag_config),
-        **asdict(graph_db_config),
     )
+
+    if cols and clear_matching:
+        await age_graph.delete_matching(clear_matching)
 
     ids = [str(uuid.uuid4()) for _ in chunks]
     chunks = {
