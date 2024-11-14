@@ -17,6 +17,9 @@
             "patterns": [
                 { "include": "#interpolation"},
                 { "include": "#topLevelStatements"},
+                { "include": "#controlFlowStatements"},
+                { "include": "#insert"},
+                { "include": "#nop"},
                 { "include": "#function"},
                 { "include": "#role" },
                 { "include": "#functionBody"},
@@ -109,6 +112,51 @@
                 {"include":"#functionCall"},
                 {"include":"#paramLineExpression"}
             ]
+        },
+        "controlFlowStatements":{
+            "match": "^\\s*(>)\\s*(parallelEnd|parallel|insertEnd|queue|flush)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                }
+            }
+        },
+        "insert":{
+            "match": "^\\s*(>)\\s*(insert)\\s*((before|after)|(\\w+))\\s*(.*)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "4":{
+                    "name":"storage.modifier"
+                },
+                "5":{
+                    "name":"invalid"
+                },
+                "6":{
+                    "name":"string"
+                }
+            }
+        },
+        "nop":{
+            "match": "^\\s*(>)\\s*(nop)(\\s*|\\s(.*))$",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"constant.character.escape"
+                },
+                "3":{
+                    "name":"comment"
+                }
+            }
         },
         "function":{
             "begin": "^\\s*(>)\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
