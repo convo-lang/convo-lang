@@ -1,15 +1,32 @@
 import { Conversation, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix } from '@convo-lang/convo-lang';
-import { BadRequestError, escapeRegex, getErrorMessage } from "@iyio/common";
+import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
+import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
+import { createImageGenRoute } from './createImageGenRoute';
 
-export interface ConvoLangRouteOptions
-{
-    prefix?:string;
-}
 
 export const createConvoLangApiRoutes=({
     prefix=defaultConvoHttpEndpointPrefix,
+    imageGenOptions,
+    imageGenCallback,
+    fsRoot=defaultConvoLangFsRoot,
+    publicWebBasePath,
+    useResourceRedirects=publicWebBasePath?true:false,
+    enableVfs=false,
+    enableCaching=false,
+    cacheQueryParam=enableCaching?'cache':undefined,
+    cacheDir='cache',
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
+
+    const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
+        fsRoot,
+        cacheDir,
+        enableCaching,
+        useResourceRedirects,
+        cacheQueryParam,
+        publicWebBasePath,
+        enableVfs,
+    }
 
     if(!prefix.startsWith('/')){
         prefix='/'+prefix;
@@ -21,7 +38,7 @@ export const createConvoLangApiRoutes=({
 
     const regPrefix='^'+escapeRegex(prefix);
 
-    return [
+    const routes:HttpRoute[]=[
         {
             method:'GET',
             match:new RegExp(`${regPrefix}/models$`),
@@ -89,8 +106,23 @@ export const createConvoLangApiRoutes=({
                 return conversation.convo.substring(l);
             }
         },
+    ];
+
+    if(imageGenOptions || imageGenCallback){
+        const imageGenerator=imageGenCallback??imageGenOptions?.imageGenerator;
+        if(imageGenerator){
+            const imgOptions:ImageGenRouteOptions={
+                imageGenerator,
+                routeMatch:new RegExp(`${regPrefix}/image/([^/]+)/([^/]+)`),
+                promptQueryParam:2,
+                saltQueryParam:1,
+                ...baseOptions,
+                ...dupDeleteUndefined(imageGenOptions)
+            }
+            routes.push(createImageGenRoute(imgOptions));
+        }
+    }
 
 
-
-    ]
+    return routes;
 }

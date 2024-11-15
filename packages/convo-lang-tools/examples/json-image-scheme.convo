@@ -6,7 +6,7 @@ Person = struct(
 )
 
 @json Person[]
-@responseAssign dudes
+@assign dudes
 > user
 Describe each person in this picture.
 
@@ -30,7 +30,7 @@ __return={
 
 @tokenUsage 564 / 252 / $0.0132
 @format json
-@assign dudes
+@assignTo dudes
 > assistant
 [
     {

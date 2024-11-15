@@ -362,7 +362,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 }
             }
 
-            const assignTag=getConvoTag(currentMessage.tags,convoTags.assign);
+            const assignTag=getConvoTag(currentMessage.tags,convoTags.assignTo);
             if(assignTag?.value){
                 if(!isValidConvoIdentifier(assignTag.value)){
                     index=startIndex;

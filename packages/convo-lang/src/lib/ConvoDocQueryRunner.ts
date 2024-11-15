@@ -63,6 +63,8 @@ const getFromMemCache=(key:string,ttl:number,log=enableLogging)=>{
     }
 }
 
+const runLock=new Lock(1);
+
 export interface ConvoDocQueryRunnerOptions
 {
     query:ConvoDocQuery;
@@ -79,6 +81,12 @@ export interface ConvoDocQueryRunnerOptions
     outDir?:string;
     readerFactory?:ConvoDocReaderFactory|ConvoDocReaderFactory[];
     log?:boolean;
+    /**
+     * If true the doc query runner will use the global doc runner lock that only allows one
+     * doc query to execute at a time. In client applications the can be desired to prevent over
+     * consumption of resources.
+     */
+    useRunLock?:boolean;
 }
 
 export class ConvoDocQueryRunner
@@ -114,6 +122,7 @@ export class ConvoDocQueryRunner
         memoryCacheTtlMs=cacheQueryResults?minuteMs*2:0,
         log=false,
         conversationOptions,
+        useRunLock=false,
     }:ConvoDocQueryRunnerOptions)
     {
         if(!localStorageCheckedForLogging && globalThis.localStorage){
@@ -134,6 +143,7 @@ export class ConvoDocQueryRunner
             memoryCacheTtlMs,
             log,
             conversationOptions,
+            useRunLock
         }
         const url=getVfsItemUrl(query.src);
         this.progress=new Progress(`Document Query - ${getFileName(url)}`,'Starting');
@@ -161,12 +171,6 @@ export class ConvoDocQueryRunner
             ),
             ...dupDeleteUndefined(this.options.conversationOptions)
         });
-    }
-
-
-    private runPromise:Promise<ConvoDocQueryResult>|undefined;
-    public runQueryAsync():Promise<ConvoDocQueryResult>{
-        return this.runPromise??(this.runPromise=this._runQueryAsync());
     }
 
     private pageLock=new Lock(1);
@@ -262,6 +266,28 @@ export class ConvoDocQueryRunner
     private updateProgress(steps:number,status:string){
         this.progressStep+=steps;
         this.progress.set(this.progressStep/(this.progressTotal||1),status);
+    }
+
+
+    private runPromise:Promise<ConvoDocQueryResult>|undefined;
+    public async runQueryAsync():Promise<ConvoDocQueryResult>{
+        if(this.runPromise){
+            return await this.runPromise;
+        }
+        if(this.options.useRunLock){
+            const release=await runLock.waitOrCancelAsync(this.disposeToken);
+            if(!release){
+                return {outputs:[],pages:[]}
+            }
+            try{
+                this.runPromise=this._runQueryAsync();
+            }finally{
+                release();
+            }
+        }else{
+            this.runPromise=this._runQueryAsync();
+        }
+        return await this.runPromise;
     }
 
 

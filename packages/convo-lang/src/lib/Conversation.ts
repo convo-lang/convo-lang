@@ -559,6 +559,7 @@ export class Conversation
 
     private _isDisposed=false;
     private readonly _disposeToken:CancelToken=new CancelToken();
+    public get disposeToken(){return this._disposeToken}
     public get isDisposed(){return this._isDisposed}
     public dispose()
     {
@@ -882,7 +883,7 @@ export class Conversation
             tags+=`@${convoTags.format} ${msg.format}\n`
         }
         if(msg.assignTo){
-            tags+=`@${convoTags.assign} ${msg.assignTo}\n`
+            tags+=`@${convoTags.assignTo} ${msg.assignTo}\n`
         }
         return tags;
     }
@@ -1187,7 +1188,6 @@ export class Conversation
                 const completion=await clone.completeAsync(options);
                 return {
                     completion,
-                    messages:clone.messages.slice(msgCount),
                     convo:clone.convo,
                     msg,
                 }
@@ -1209,7 +1209,17 @@ export class Conversation
             })
         }
 
-        return all[all.length-1]?.completion;
+        const defaultC=all[all.length-1]?.completion;
+
+        if(defaultC){
+            for(let i=all.length-2;i>=0;i--){
+                const c=all[i];
+                if(!c){continue}
+                defaultC.exe?.consumeVars(c.completion.exe)
+            }
+        }
+
+        return defaultC;
     }
 
     private readonly _isCompleting:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
@@ -1405,6 +1415,10 @@ export class Conversation
                         this.append(`${this.getPrefixTags({includeTokenUsage,msg})}${tagsCode}> ${this.getReversedMappedRole(msg.role)}\n${escapeConvoMessageContent(msg.content)}\n`);
                     }
                     includeTokenUsage=false;
+                }
+
+                if(msg.assignTo){
+                    exe.setVarUsingCompletionMessage(true,msg,msg.assignTo);
                 }
 
                 if(additionalOptions?.returnOnCall && msg.callFn){
@@ -1973,7 +1987,7 @@ export class Conversation
                     continue messagesLoop;
 
                 default:
-                    if(inPara){
+                    if(inPara && this.userRoles.includes(msg.role as string) && !msg.fn){
                         defaultLabel=`parallel-${paraIndex}`;
                         paraIndex++;
                         parallelMessages?.push(msg);
@@ -2627,7 +2641,7 @@ export class Conversation
                     responseFormat=tag.value?'json '+tag.value:'json';
                     break;
 
-                case convoTags.responseAssign:
+                case convoTags.assign:
                     flat.responseAssignTo=tag.value;
                     break;
 

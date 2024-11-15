@@ -11,8 +11,6 @@ if(!_publishScope){
 }
 const publishScope=_publishScope+'/';
 
-console.log('NPM_TOKEN',process.env['NPM_TOKEN'])
-
 const dryRun=process.argv.includes('--dry-run');
 
 let includeProjects=null;

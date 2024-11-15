@@ -1,15 +1,14 @@
-import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepCompare, deleteUndefined, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, getFileName, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
+import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
-import { ConvoDocQueryRunner } from "./ConvoDocQueryRunner";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { convoDoQueryOutputToMessageContent } from "./convo-lang-doc-lib";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { createConvoSceneDescription } from "./convo-scene-lib";
 import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod";
+import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc";
 
 const ifFalse=Symbol();
 const ifTrue=Symbol();
@@ -1151,74 +1150,7 @@ export const defaultConvoVars={
         }
     }),
 
-    [convoFunctions.readDoc]:createConvoScopeFunction({usesLabels:true},async (scope,ctx)=>{
-
-        const args=convoParamsToObj(scope,['path','from','to']);
-
-        let {
-            path,
-            from,
-            to,
-            useVision,
-            count,
-            cache,
-            memoryCacheTtlMs,
-            tagPages=true,
-            query,
-            salt,
-            ...options
-        } = args;
-
-        if(!path){
-            throw new ConvoError('invalid-args',{statement:scope.s},'Document path required')
-        }
-
-        if((typeof count === 'number') && to===undefined){
-            to=(from??0)+count-1;
-        }
-
-        const runner=new ConvoDocQueryRunner({
-            query:{
-                src:path,
-                visionPass:useVision===true,
-                textPass:useVision!==true,
-                salt:(typeof salt=== 'string')?salt:undefined,
-                ...deleteUndefined(query),
-            },
-            cacheConversations:cache!==false,
-            cacheQueryResults:cache!==false,
-            cacheTextPass:cache!==false,
-            conversationOptions:{
-                onTokenUsage:u=>ctx.convo.conversation?.addUsage(u)
-            },
-            ...deleteUndefined(options),
-        });
-
-        const removeTask=ctx.convo.conversation?.addTask({
-            name:`Reading ${getFileName(path)}`,
-            progress:runner.progress,
-            documentUrl:path,
-        });
-
-        try{
-
-            let r=await runner.runQueryAsync();
-
-            if(from!==undefined || to!==undefined){
-                r={...r}
-                if(from===undefined){
-                    from=0;
-                }
-                r.pages=r.pages.filter(p=>p.index>=from && (to===undefined?true:p.index<=to))
-            }
-
-            return convoDoQueryOutputToMessageContent(r,{escapeConvo:false,tagPages:Boolean(tagPages)});
-
-        }finally{
-            runner.dispose();
-            removeTask?.();
-        }
-    }),
+    [convoFunctions.readDoc]:convoScopeFunctionReadDoc,
 
 
 

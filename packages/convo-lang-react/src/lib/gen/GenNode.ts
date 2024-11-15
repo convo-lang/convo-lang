@@ -80,6 +80,10 @@ export class GenNode
     public get childrenSubject():ReadonlySubject<GenNode[]>{return this._children}
     public get children(){return this._children.value}
 
+    private readonly _conversation:BehaviorSubject<Conversation|null>=new BehaviorSubject<Conversation|null>(null);
+    public get conversationSubject():ReadonlySubject<Conversation|null>{return this._conversation}
+    public get conversation(){return this._conversation.value}
+
 
     public constructor()
     {
@@ -216,6 +220,7 @@ export class GenNode
 
             this.setState({status:'generating',convo});
             const conversation=new Conversation(options?.conversationOptions);
+            this._conversation.next(conversation);
             const vars=conversation.defaultVars;
             setVars(vars);
 
