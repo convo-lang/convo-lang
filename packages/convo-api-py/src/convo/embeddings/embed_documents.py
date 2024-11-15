@@ -12,6 +12,7 @@ from databases import Database
 from fastapi import HTTPException
 from openai import AsyncOpenAI
 from psycopg import sql
+from unstructured.chunking.basic import chunk_elements
 from unstructured.chunking.title import chunk_by_title
 from unstructured.documents.elements import Element
 from unstructured.partition.auto import partition
@@ -62,12 +63,20 @@ def load_documents(
         )
         elements = partition(filename=document_path, **kwargs)
 
-    chunks = chunk_by_title(
-        elements,
-        new_after_n_chars=request.chunk_size,
-        overlap=request.chunk_overlap,
-        max_characters=request.max_characters,
-    )
+    if request.chunk_by_title:
+        chunks = chunk_by_title(
+            elements,
+            new_after_n_chars=request.chunk_size,
+            overlap=request.chunk_overlap,
+            max_characters=request.max_characters,
+        )
+    else:
+        chunks = chunk_elements(
+            elements,
+            new_after_n_chars=request.chunk_size,
+            overlap=request.chunk_overlap,
+            max_characters=request.max_characters,
+        )
 
     return chunks
 

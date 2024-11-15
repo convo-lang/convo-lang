@@ -45,6 +45,8 @@ class DocumentEmbeddingRequest(BaseModel):
 
     max_characters: int = 1_000
 
+    chunk_by_title: bool = True
+
 
 class DocumentConversionRequest(BaseModel):
     srcPath: str
