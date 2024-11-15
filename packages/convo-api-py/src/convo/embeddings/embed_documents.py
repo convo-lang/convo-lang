@@ -1,6 +1,5 @@
 import asyncio
 import io
-import json
 import logging
 import os
 from pathlib import Path
@@ -123,75 +122,51 @@ def get_content_category(
 async def insert_vectors(
     db: Database,
     request: types.DocumentEmbeddingRequest,
-    colNameSql,
-    colNames,
-    cols,
+    cols: Dict[str, Any],
     embeded_chunks: List[types.EmbededChunk],
-) -> int:
+) -> List[int]:
     embeddings_table = request.embeddingsTable
 
-    inserted = 0
-    total_inserted = 0
-    head = (
+    col_names_escaped = [escape_sql_identifier(col_name) for col_name in cols.keys()]
+    col_names_sql = "".join([f", {s}" for s in col_names_escaped])
+    value_place_holders = "".join([f", :{c}" for c in cols.keys()])
+
+    query = (
         f"INSERT INTO {escape_sql_identifier(embeddings_table)} "
-        f"({escape_sql_identifier(request.textCol)},"
-        f"{escape_sql_identifier(request.embeddingCol)}{colNameSql}) VALUES "
+        f"({escape_sql_identifier(request.textCol)}, "
+        f"{escape_sql_identifier(request.embeddingCol)}{col_names_sql}) VALUES "
+        f"(:{request.textCol}, :{request.embeddingCol}{value_place_holders}) "
+        f"RETURNING id"
     )
 
-    sql_chucks = [head]
-    sql_len = len(head)
+    cols = {k: str(v) for k, v in cols.items()}
 
-    for index in embeded_chunks:
-        chunk = (
-            sql.SQL("({text},{vector}")
-            .format(text=index.text, vector=json.dumps(index.vec))
-            .as_string(None)
-        )
+    values = [
+        {
+            request.textCol: chunk.text,
+            request.embeddingCol: str(chunk.vec),
+            **cols,
+        }
+        for chunk in embeded_chunks
+    ]
 
-        if len(colNames) and cols:
-            colData = []
-            for colName in colNames:
-                colData.append(
-                    sql.SQL("{value}")
-                    .format(
-                        value=cols[colName],
-                    )
-                    .as_string(None)
-                )
-            chunk = chunk + "," + (",".join(colData))
+    if request.dryRun:
+        for value in values:
+            logger.debug("inserting -value  %s", value)
+        inserted_ids = list()
+    else:
+        # To get back ids of newly inserted, have to execute these individually
+        inserted = [db.execute(query=query, values=v) for v in values]
+        inserted_ids = await asyncio.gather(*inserted)
 
-        chunk = chunk + "),"
+    logger.info(
+        "Inserted %s embeddings into %s, dry-run: %s",
+        len(inserted_ids),
+        embeddings_table,
+        request.dryRun,
+    )
 
-        chunk_len = len(chunk)
-
-        if chunk_len + sql_len >= max_sql_len:
-            logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
-            query = "".join(sql_chucks)[:-1]
-            if request.dryRun:
-                logger.debug("execute_statement - %s", query)
-            else:
-                await db.execute(query)
-            inserted = 0
-            sql_chucks = [head]
-            sql_len = len(head)
-
-        sql_len = sql_len + chunk_len
-        sql_chucks.append(chunk)
-
-        inserted = inserted + 1
-        total_inserted = total_inserted + 1
-
-    if inserted > 0:
-        logger.debug("Inserting %s embeddings into %s", inserted, embeddings_table)
-        query = "".join(sql_chucks)[:-1]
-        if request.dryRun:
-            logger.debug("execute_statement - %s", query)
-        else:
-            await db.execute(query)
-
-    logger.info("Inserted %s embeddings into %s", total_inserted, embeddings_table)
-
-    return total_inserted
+    return inserted_ids
 
 
 async def clear_matching(
@@ -284,28 +259,14 @@ async def generate_document_embeddings(
     if request.cols and request.clearMatching:
         await clear_matching(db, request, cols)
 
-    col_names_escaped = list()
-    col_names = list()
+    inserted_ids = await insert_vectors(db, request, cols, embedded_chunks)
 
-    if cols:
-        for colName in cols:
-            col_names.append(colName)
-            col_names_escaped.append(escape_sql_identifier(colName))
-
-    col_name_sql = ""
-
-    if len(col_names_escaped):
-        col_name_sql = "," + (",".join(col_names_escaped))
-
-    total_inserted = await insert_vectors(
-        db, request, col_name_sql, col_names, cols, embedded_chunks
-    )
-
-    if run_graph_embded:
+    if run_graph_embded and not request.dryRun:
         logging.info("Running graph embedding for %s", request.location)
         _ = await graph_embed_docs(
             graph_db,
             chunks,
+            inserted_ids,
             request.location,
             cols,
             request.clearMatching,
@@ -314,4 +275,4 @@ async def generate_document_embeddings(
     else:
         logging.info("Skipping graph embedding for %s", request.location)
 
-    return total_inserted
+    return len(inserted_ids)
