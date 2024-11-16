@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import age
+from convo.embeddings.types import GraphRagConfig
 from databases import Database
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 
 from . import rest_api
 from .db import get_db_url
@@ -20,6 +22,8 @@ async def lifespan(app: FastAPI):
     db_url = get_db_url()
     app.state.db = Database(db_url)
     app.state.ag = age.Age()
+    app.state.open_ai_client = AsyncOpenAI()
+    app.state.graph_rag_config = GraphRagConfig()
     app.state.RUN_GRAPH_EMBED = os.getenv("RUN_GRAPH_EMBED").lower() == "true"
 
     await app.state.db.connect()
@@ -40,6 +44,7 @@ async def lifespan(app: FastAPI):
 
     await app.state.db.disconnect()
     app.state.ag.close()
+    app.state.open_ai_client.close()
 
 
 app = FastAPI(lifespan=lifespan)

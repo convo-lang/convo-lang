@@ -43,6 +43,10 @@ class DocumentEmbeddingRequest(BaseModel):
 
     chunk_overlap: int = 20
 
+    max_characters: int = 1_000
+
+    chunk_by_title: bool = True
+
 
 class DocumentConversionRequest(BaseModel):
     srcPath: str

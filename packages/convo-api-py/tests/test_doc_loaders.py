@@ -1,4 +1,5 @@
 import tempfile
+from typing import Dict, Optional
 
 import boto3
 import docx
@@ -13,12 +14,13 @@ from moto import mock_aws
 from reportlab.pdfgen import canvas
 
 
+@pytest.mark.parametrize("chunk_by_title", [True, False])
 @pytest.mark.parametrize(
     "kwargs",
     [dict(), dict(content_type="application/vnd.openxmlformats-officedocument")],
 )
 @mock_aws
-def test_s3_load(kwargs):
+def test_s3_load(chunk_by_title: bool, kwargs: Dict):
     conn = boto3.resource("s3", region_name="us-east-1")
     conn.create_bucket(Bucket="bucket")
 
@@ -44,7 +46,9 @@ def test_s3_load(kwargs):
 
         content_type, _, content_category = get_content_category(
             DocumentEmbeddingRequest(
-                location=f_path, contentType=kwargs.get("content_type")
+                location=f_path,
+                contentType=kwargs.get("content_type"),
+                chunk_by_title=chunk_by_title,
             ),
             chunks,
         )
@@ -52,14 +56,17 @@ def test_s3_load(kwargs):
         content_category == "document"
 
 
+@pytest.mark.parametrize("chunk_by_title", [True, False])
 @pytest.mark.parametrize("content_type", [None, "text/markdown"])
-def test_load_url(content_type):
+def test_load_url(chunk_by_title: bool, content_type: Optional[str]):
     url = (
         "https://raw.githubusercontent.com/"
         "Unstructured-IO/unstructured/main/LICENSE.md"
     )
 
-    request = DocumentEmbeddingRequest(location=url, contentType=content_type)
+    request = DocumentEmbeddingRequest(
+        location=url, contentType=content_type, chunk_by_title=chunk_by_title
+    )
 
     chunks = load_documents(request)
 
@@ -70,7 +77,8 @@ def test_load_url(content_type):
     content_category == "document"
 
 
-def test_load_pdf_file():
+@pytest.mark.parametrize("chunk_by_title", [True, False])
+def test_load_pdf_file(chunk_by_title: bool):
     with tempfile.TemporaryDirectory() as tmpdir:
         f_path = f"{tmpdir}/test.pdf"
         pdf = canvas.Canvas(f_path)
@@ -83,6 +91,7 @@ def test_load_pdf_file():
         request = DocumentEmbeddingRequest(
             location=f_path,
             contentType="application/pdf",
+            chunk_by_title=chunk_by_title,
         )
 
         chunks = load_documents(request)
