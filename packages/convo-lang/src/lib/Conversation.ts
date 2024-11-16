@@ -7,7 +7,7 @@ import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
 import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -154,6 +154,8 @@ export interface ConversationOptions
      * to an LLM
      */
     logFlatCached?:boolean;
+
+    beforeCreateExeCtx?:BeforeCreateConversationExeCtx;
 }
 
 export class Conversation
@@ -260,6 +262,8 @@ export class Conversation
 
     public maxAutoCompleteDepth:number;
 
+    public beforeCreateExeCtx?:BeforeCreateConversationExeCtx;
+
     public readonly externFunctions:Record<string,ConvoScopeFunction>={};
 
     /**
@@ -357,9 +361,11 @@ export class Conversation
             logFlat=false,
             logFlatCached=false,
             usage=createEmptyConvoTokenUsage(),
+            beforeCreateExeCtx,
         }=options;
         this.usage=usage;
         this.defaultOptions=options;
+        this.beforeCreateExeCtx=beforeCreateExeCtx;
         this.getStartOfConversation=getStartOfConversation;
         this.cache=typeof cache==='boolean'?(cache?[convoCacheService()]:[]):asArray(cache);
         this.logFlat=logFlat;
@@ -634,6 +640,7 @@ export class Conversation
             ...this.defaultOptions,
             debug:this.debugToConversation,
             debugMode:this.shouldDebug(),
+            beforeCreateExeCtx:this.beforeCreateExeCtx,
             ...options,
             defaultVars:{...this.defaultVars,...options?.defaultVars},
             externFunctions:{...this.externFunctions,...options?.externFunctions},
@@ -1715,6 +1722,9 @@ export class Conversation
     }
 
     public createConvoExecutionContext(append:string[]=[]):ConvoExecutionContext{
+
+        this.beforeCreateExeCtx?.(this);
+
         const flatExe=new ConvoExecutionContext({
             conversation:this,
             convoPipeSink:(value)=>{

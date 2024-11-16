@@ -1291,3 +1291,5 @@ export interface ConvoInsert
     label:string;
     before:boolean;
 }
+
+export type BeforeCreateConversationExeCtx=(conversation:Conversation)=>void;

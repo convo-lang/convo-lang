@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo } from "react";
@@ -34,6 +34,7 @@ export interface ConversationViewProps
     messageBottomPadding?:string;
     httpEndpoint?:string;
     template?:string;
+    beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
 }
 
 export function ConversationView({
@@ -61,6 +62,7 @@ export function ConversationView({
     httpEndpoint,
     template,
     appendTrigger,
+    beforeCreateExeCtx,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -81,6 +83,10 @@ export function ConversationView({
             ctrl.externFunctions=externFunctions;
         }
     },[ctrl,externFunctions]);
+
+    useEffect(()=>{
+        ctrl.beforeCreateExeCtx=beforeCreateExeCtx;
+    },[beforeCreateExeCtx,ctrl]);
 
     useEffect(()=>{
         if(defaultVars){

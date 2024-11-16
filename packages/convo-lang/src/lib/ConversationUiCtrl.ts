@@ -6,7 +6,7 @@ import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
 import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
 import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
-import { ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -193,6 +193,19 @@ export class ConversationUiCtrl
 
     public readonly sceneCtrl?:SceneCtrl;
 
+    private readonly _beforeCreateExeCtx:BehaviorSubject<BeforeCreateConversationExeCtx|null|undefined>=new BehaviorSubject<BeforeCreateConversationExeCtx|null|undefined>(undefined);
+    public get beforeCreateExeCtxSubject():ReadonlySubject<BeforeCreateConversationExeCtx|null|undefined>{return this._beforeCreateExeCtx}
+    public get beforeCreateExeCtx(){return this._beforeCreateExeCtx.value}
+    public set beforeCreateExeCtx(value:BeforeCreateConversationExeCtx|null|undefined){
+        if(value==this._beforeCreateExeCtx.value){
+            return;
+        }
+        if(this.convo && value!==undefined){
+            this.convo.beforeCreateExeCtx=value??undefined;
+        }
+        this._beforeCreateExeCtx.next(value);
+    }
+
     private readonly _defaultVars:BehaviorSubject<Record<string,any>>;
     public get defaultVarsSubject():ReadonlySubject<Record<string,any>>{return this._defaultVars}
     public get defaultVars(){return this._defaultVars.value}
@@ -337,6 +350,9 @@ export class ConversationUiCtrl
         }
         if(this.getStartOfConversation!==undefined){
             convo.getStartOfConversation=this.getStartOfConversation?.cb;
+        }
+        if(this.beforeCreateExeCtx!==undefined){
+            convo.beforeCreateExeCtx=this.beforeCreateExeCtx??undefined;
         }
         if(this.sceneCtrl){
             convo.defaultVars[convoVars.__sceneCtrl]=this.sceneCtrl;
