@@ -25,6 +25,7 @@ export * from './lib/convo-helpers';
 export * from './lib/convo-img-types';
 export * from './lib/convo-lang-doc-lib';
 export * from './lib/convo-lang-doc-types';
+export * from './lib/convo-lang-doc.deps';
 export * from './lib/convo-lang-lock';
 export * from './lib/convo-lang-ui-lib';
 export * from './lib/convo-lang-ui-types';
