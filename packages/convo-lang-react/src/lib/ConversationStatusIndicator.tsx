@@ -22,14 +22,14 @@ export function ConversationStatusIndicator({
 
     const convoTasks=useSubject(conversation?.openTasksSubject);
 
-    return (
+    return (<>{
         convoTasks?.length?
-            convoTasks?.map((t,i)=><ConvoTaskView key={i} task={t} />)
+            convoTasks.map((t,i)=><ConvoTaskView key={i} task={t} />)
         :(currentTask || busy)?
             <LoadingDots/>
         :
             null
 
-    )
+    }</>)
 
 }
