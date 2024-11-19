@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
+import { ConvoGraphStyle } from "./convo-graph-react-type";
 
 export const ConvoGraphReactCtx=createContext<ConvoGraphViewCtrl|null>(null);
 
@@ -24,3 +25,10 @@ export const nodeElemKey=Symbol('nodeElemKey');
 
 export const convoGraphEntityDragClass='convo-entity-drag';
 export const convoGraphEntityClass='convo-entity';
+
+export const getDarkConvoGraphStyle=():ConvoGraphStyle=>({
+    bgColor:'#191919',
+    strokeColor:'#5F7477',
+    strokeWidth:'2',
+    hqLines:false,
+})

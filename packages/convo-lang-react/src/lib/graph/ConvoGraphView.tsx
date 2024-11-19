@@ -1,13 +1,13 @@
 import { ConvoGraphCtrl, ConvoNode, getConvoGraphEventString } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Point, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
-import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useWatchDeep } from "@iyio/react-common";
+import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useDeepCompareItem, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
 import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";
 import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl";
 import { ConvoGraphReactCtx, convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
-import { ConvoUiLine } from "./convo-graph-react-type";
+import { ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewProps
 {
@@ -18,6 +18,7 @@ export interface ConvoGraphViewProps
     hideOutput?:boolean;
     onDrop?:(pt:Point)=>void;
     ctrlScroll?:boolean;
+    style?:ConvoGraphStyle;
 }
 
 export function ConvoGraphView({
@@ -28,6 +29,7 @@ export function ConvoGraphView({
     createViewCtrl,
     onDrop,
     ctrlScroll,
+    style:_graphStyle,
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -36,6 +38,13 @@ export function ConvoGraphView({
             setViewCtrl(ctrl);
         }
     },[ctrl,setViewCtrl]);
+
+    const graphStyle=useDeepCompareItem(_graphStyle);
+    useEffect(()=>{
+        if(graphStyle!==undefined && ctrl){
+            ctrl.style=graphStyle;
+        }
+    },[ctrl,graphStyle])
 
     const [panZoom,setPanZoom]=useState<PanZoomCtrl|null>(null);
 

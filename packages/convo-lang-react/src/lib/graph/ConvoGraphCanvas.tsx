@@ -34,7 +34,7 @@ export function ConvoGraphCanvas({
         <div className={convoGraphCanvasStyle.root()}>
 
             <svg
-                className={convoGraphCanvasStyle.svg()}
+                className={convoGraphCanvasStyle.svg({hq:ctrl.style.hqLines})}
                 viewBox={`-${svgSpan} -${svgSpan} ${svgSpan*2} ${svgSpan*2}`}
                 width={svgSpan*2}
                 height={svgSpan*2}
@@ -100,6 +100,9 @@ export const convoGraphCanvasStyle=atDotCss({name:'ConvoGraphCanvas',css:`
         width:${svgSpan*2}px;
         overflow:visible;
         shape-rendering:optimizespeed;
+    }
+    @.svg.hq{
+        shape-rendering:unset;
     }
     @.bg{
 

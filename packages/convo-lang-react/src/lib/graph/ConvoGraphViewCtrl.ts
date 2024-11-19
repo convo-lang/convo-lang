@@ -4,11 +4,13 @@ import { PanZoomCtrl } from "@iyio/react-common";
 import { DragEvent } from "react";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ConvoLineCtrl } from "./ConvoLineCtrl";
-import { ConvoEntityLayoutCtrl, ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer, ConvoInputSource } from "./convo-graph-react-type";
+import { getDarkConvoGraphStyle } from "./convo-graph-react-lib";
+import { ConvoEntityLayoutCtrl, ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoInputSource } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewCtrlOptions
 {
     ctrl:ConvoGraphCtrl;
+    style?:ConvoGraphStyle;
 }
 
 export class ConvoGraphViewCtrl
@@ -22,6 +24,16 @@ export class ConvoGraphViewCtrl
     public readonly ctrl:ConvoGraphCtrl;
 
     public readonly lineCtrl:ConvoLineCtrl;
+
+    private readonly _style:BehaviorSubject<ConvoGraphStyle>;
+    public get styleSubject():ReadonlySubject<ConvoGraphStyle>{return this._style}
+    public get style(){return this._style.value}
+    public set style(value:ConvoGraphStyle){
+        if(value==this._style.value){
+            return;
+        }
+        this._style.next(value);
+    }
 
     private readonly _selected:BehaviorSubject<ConvoGraphSelection|null>=new BehaviorSubject<ConvoGraphSelection|null>(null);
     public get selectedSubject():ReadonlySubject<ConvoGraphSelection|null>{return this._selected}
@@ -101,8 +113,10 @@ export class ConvoGraphViewCtrl
     public get onDrop():Observable<Point>{return this._onDrop}
 
     public constructor({
-        ctrl
+        ctrl,
+        style,
     }:ConvoGraphViewCtrlOptions){
+        this._style=new BehaviorSubject<ConvoGraphStyle>(style??getDarkConvoGraphStyle());
         this.ctrl=ctrl;
         this.lineCtrl=new ConvoLineCtrl(this);
         if(hasConvoGraphDb(ctrl.store)){
@@ -159,6 +173,7 @@ export class ConvoGraphViewCtrl
     }
 
     public renderEntity(entity:ConvoGraphEntityRef|null|undefined):ConvoGraphEntityRenderResult|null{
+        console.log('hio 👋 👋 👋 REMOVE',entity);
         if(!entity){
             return null;
         }
