@@ -12,7 +12,7 @@ from nano_graphrag.base import (
 )
 from unstructured.documents.elements import Element
 
-from .types import GraphRagConfig
+from ..types import GraphRagConfig
 
 logger = logging.getLogger(__name__)
 

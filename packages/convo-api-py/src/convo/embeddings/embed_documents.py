@@ -18,7 +18,7 @@ from unstructured.partition.auto import partition
 
 from . import types
 from .embed import encode_text
-from .graph_embedding import graph_embed_docs
+from .graph.embedding import graph_embed_docs
 from .s3_loader import load_s3
 
 max_sql_len = 65536
