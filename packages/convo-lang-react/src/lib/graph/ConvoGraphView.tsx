@@ -1,7 +1,7 @@
 import { ConvoGraphCtrl, ConvoNode, getConvoGraphEventString } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Point, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
-import { DragTarget, PanZoomCtrl, PanZoomView, SlimButton, View, useDeepCompareItem, useWatchDeep } from "@iyio/react-common";
+import { DragTarget, PanZoomCtrl, PanZoomState, PanZoomView, SlimButton, View, useDeepCompareItem, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
 import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";
@@ -19,6 +19,9 @@ export interface ConvoGraphViewProps
     onDrop?:(pt:Point)=>void;
     ctrlScroll?:boolean;
     style?:ConvoGraphStyle;
+    disablePanZoom?:boolean;
+    initPanZoomState?:Partial<PanZoomState>;
+    defaultInputValue?:string;
 }
 
 export function ConvoGraphView({
@@ -30,6 +33,9 @@ export function ConvoGraphView({
     onDrop,
     ctrlScroll,
     style:_graphStyle,
+    disablePanZoom,
+    initPanZoomState,
+    defaultInputValue='{\n\n}'
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -155,7 +161,7 @@ export function ConvoGraphView({
                 id:ctrl.ctrl.store.getNextInputId(),
                 x:pt.x,
                 y:pt.y,
-                value:'{\n\n}'
+                value:defaultInputValue
             });
         }else if(e.shiftKey){
             wAryPush(ctrl.graph.edges,{
@@ -175,7 +181,7 @@ export function ConvoGraphView({
         }
 
 
-    },[panZoom,ctrl]);
+    },[panZoom,ctrl,defaultInputValue]);
 
     useWatchDeep(ctrl?.graph);
 
@@ -258,6 +264,8 @@ export function ConvoGraphView({
                     ignoreClasses="NodeView"
                     dragTargets={dragTargets}
                     ctrlScroll={ctrlScroll}
+                    disabled={disablePanZoom}
+                    initState={initPanZoomState}
                 >
 
                     {ctrl && <ConvoGraphCanvas ctrl={ctrl} getNodeLink={getNodeLink} />}
