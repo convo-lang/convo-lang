@@ -173,7 +173,6 @@ export class ConvoGraphViewCtrl
     }
 
     public renderEntity(entity:ConvoGraphEntityRef|null|undefined):ConvoGraphEntityRenderResult|null{
-        console.log('hio 👋 👋 👋 REMOVE',entity);
         if(!entity){
             return null;
         }
