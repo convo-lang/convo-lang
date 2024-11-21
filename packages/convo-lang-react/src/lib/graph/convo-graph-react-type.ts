@@ -78,3 +78,9 @@ export interface ConvoGraphEntityRenderResult
  */
 export type ConvoGraphEntityRenderer=(entity:ConvoGraphEntityRef)=>ConvoGraphEntityRenderResult|null;
 
+export interface ConvoGraphStyle{
+    bgColor:string;
+    strokeColor:string;
+    strokeWidth:string;
+    hqLines:boolean;
+}

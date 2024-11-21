@@ -3,10 +3,12 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { Point, ReadonlySubject, Rect, getDistanceBetweenPoints, wAryRemoveAt, wArySplice, wSetProp } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
-import { ConvoUiLine } from "./convo-graph-react-type";
+import { ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
 
 const plusSize=22;
 const plusSizeHalf=plusSize/2;
+
+
 
 export class ConvoLineCtrl
 {
@@ -103,7 +105,7 @@ export class ConvoLineCtrl
 
             let line=this.getLine(updateId,fromId,toId,isTo,ptIndex);
 
-            const lineColor=getLinkColor(line??undefined);
+            const lineColor=getLinkColor(this.parent.style,line??undefined);
 
             if(!line){
                 line={
@@ -128,10 +130,10 @@ export class ConvoLineCtrl
                 }
                 line.elem.setAttribute('stroke',lineColor);
                 line.elem.setAttribute('fill','none');
-                line.elem.setAttribute('stroke-width','2');
+                line.elem.setAttribute('stroke-width',this.parent.style.strokeWidth);
                 line.elem.style.pointerEvents='none';
 
-                line.elem2.setAttribute('stroke','#0C0C0C');
+                line.elem2.setAttribute('stroke',this.parent.style.bgColor);
                 line.elem2.setAttribute('stroke-width','6');
                 line.elem2.setAttribute('fill','none');
                 line.elem2.style.pointerEvents='none';
@@ -367,7 +369,7 @@ export class ConvoLineCtrl
             if(!line){continue}
 
             const toLeft=line.dir2===-1;
-            const lineColor=getLinkColor(line??undefined);
+            const lineColor=getLinkColor(this.parent.style,line??undefined);
 
 
             const aSize=7;
@@ -500,11 +502,11 @@ export class ConvoLineCtrl
 
 }
 
-const getLinkColor=(link?:ConvoUiLine):string=>{
+const getLinkColor=(style:ConvoGraphStyle,link?:ConvoUiLine):string=>{
     if(link?.color){
         return link.color;
     }
-    return '#5F7477';
+    return style.strokeColor;
 }
 
 export interface ProtoUiLengthStyle
