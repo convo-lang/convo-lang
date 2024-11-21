@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import Tuple
+from typing import Dict, Tuple
 
 from nano_graphrag._op import (
     _handle_single_entity_extraction,
@@ -10,14 +10,13 @@ from nano_graphrag._utils import (
     pack_user_ass_to_openai_messages,
     split_string_by_multi_markers,
 )
-from nano_graphrag.base import TextChunkSchema
 from nano_graphrag.prompt import PROMPTS
 
 
-async def process_single_content(
-    chunk: TextChunkSchema,
-    global_config: dict,
-) -> Tuple[dict, dict]:
+async def extract_chunk_entities_and_relationships(
+    chunk: str,
+    global_config: Dict,
+) -> Tuple[Dict, Dict]:
     use_llm_func: callable = global_config["best_model_func"]
     entity_extract_max_gleaning = global_config["entity_extract_max_gleaning"]
 
@@ -32,9 +31,7 @@ async def process_single_content(
         entity_types=",".join(PROMPTS["DEFAULT_ENTITY_TYPES"]),
     )
 
-    hint_prompt = entity_extract_prompt.format(
-        **context_base, input_text=chunk["content"]
-    )
+    hint_prompt = entity_extract_prompt.format(**context_base, input_text=chunk)
     final_result = await use_llm_func(hint_prompt)
 
     history = pack_user_ass_to_openai_messages(hint_prompt, final_result)
@@ -69,6 +66,7 @@ async def process_single_content(
             record, [context_base["tuple_delimiter"]]
         )
         if_entities = await _handle_single_entity_extraction(record_attributes, "NA")
+
         if if_entities is not None:
             maybe_nodes[if_entities["entity_name"]].append(if_entities)
             continue
@@ -76,6 +74,7 @@ async def process_single_content(
         if_relation = await _handle_single_relationship_extraction(
             record_attributes, "NA"
         )
+
         if if_relation is not None:
             maybe_edges[(if_relation["src_id"], if_relation["tgt_id"])].append(
                 if_relation
