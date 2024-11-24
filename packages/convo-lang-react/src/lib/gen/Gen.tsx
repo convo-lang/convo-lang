@@ -2,7 +2,7 @@ import { ConversationOptions, ConvoDocQuery, ConvoDocQueryRunnerOptions, convoDo
 import { asArray } from "@iyio/common";
 import { useDeepCompareItem, useSubject } from "@iyio/react-common";
 import { VfsItem } from "@iyio/vfs";
-import { Fragment, useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ConversationStatusIndicator } from "../ConversationStatusIndicator";
 import { MarkdownViewer } from "../MarkdownViewer";
 import { GenNode } from "./GenNode";
@@ -106,26 +106,29 @@ export function Gen({
 
 
     const parentNode=useGenNode();
-    const node=useMemo(()=>{
+    const [node,setNode]=useState<GenNode|null>(null);
+    useEffect(()=>{
         const node=new GenNode((parentNode?.id?parentNode.id+'+':'')+refs.current.id);
         if(parentNode){
             node._setParent(parentNode);
         }
-        return node;
-    },[parentNode]);
-    const conversation=useSubject(node.conversationSubject);
-
-    useEffect(()=>{
+        setNode(node);
         return ()=>{
             node.dispose();
         }
-    },[node]);
+    },[parentNode]);
+    const conversation=useSubject(node?.conversationSubject);
 
     useEffect(()=>{
-        onNode?.(node);
+        if(node && onNode){
+            onNode(node);
+        }
     },[node,onNode]);
 
     useEffect(()=>{
+        if(!node){
+            return;
+        }
         node.convo=(sharedConvo?sharedConvo+'\n\n':'')+(convo??'');
         node.options=options;
         node.docQuery=docQuery??(document?{src:document,visionPass:true}:null);
@@ -133,10 +136,10 @@ export function Gen({
         node.vars=vars??null;
     },[node,convo,sharedConvo,options,docQuery,docQueryOptions,document,vars]);
 
-    const state=useSubject(node.stateSubject);
-    const lastState=useSubject(node.lastGeneratedStateSubject);
+    const state=useSubject(node?.stateSubject);
+    const lastState=useSubject(node?.lastGeneratedStateSubject);
 
-    const genState=lastState.status==='generated'?lastState:undefined;
+    const genState=lastState?.status==='generated'?lastState:undefined;
     const value=genState?.value;
     const useDocOutput=(genState && !genState?.value && genState.docQueryResult)?true:false;
     const valueAry=useDocOutput?(genState?.docQueryResult?.outputs??[]):asArray(value);
@@ -144,13 +147,13 @@ export function Gen({
     const hasRenderer=(render || forEach || renderAfter)?true:false;
 
     useEffect(()=>{
-        if(!genState){
+        if(!genState || !node){
             return;
         }
         refs.current.onGen?.(genState.value,genState.vars,genState,node);
     },[genState,node]);
 
-    const forEachContent=genState?(
+    const forEachContent=(genState && node)?(
         forEach?valueAry?.map((item,i)=>(
             <Fragment key={i}>
                 {forEach(item,i,genState.vars,value,genState,node)}
@@ -162,7 +165,7 @@ export function Gen({
         <GenNodeOptionsReactContext.Provider value={options}>
         <GenNodeReactContext.Provider value={node}>
 
-            {genState && <>
+            {(genState && node) && <>
 
                 {render?.(value,genState.vars,genState,node)}
 
@@ -184,7 +187,7 @@ export function Gen({
 
             <ConversationStatusIndicator
                 conversation={conversation}
-                busy={state.status==='generating'}
+                busy={state?.status==='generating'}
                 loadingIndicator={loadingIndicator}
                 convoTaskViewClassName={convoTaskViewClassName}
             />
