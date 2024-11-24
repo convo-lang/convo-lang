@@ -287,7 +287,7 @@ export function ConvoGraphView({
     },[entityRenderer,ctrl]);
 
     useEffect(()=>{
-        if(!ctrl){
+        if(!ctrl || !enableChatView){
             return;
         }
         ctrl.addRenderer(convoGraphChatRenderer);
