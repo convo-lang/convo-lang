@@ -189,13 +189,11 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
                         }
                     }]
                 })
-                if(m.calledReturn!==undefined){
-                    oMsgs.push({
-                        role:'tool',
-                        tool_call_id:toolId,
-                        content:JSON.stringify(m.calledReturn),
-                    })
-                }
+                oMsgs.push({
+                    role:'tool',
+                    tool_call_id:toolId,
+                    content:m.calledReturn===undefined?'function-called':JSON.stringify(m.calledReturn),
+                })
             }
         }
 

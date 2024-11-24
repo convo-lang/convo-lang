@@ -844,6 +844,10 @@ export class Conversation
         )
     }
 
+    public getLastMessage():ConvoMessage|undefined{
+        return this.messages[this.messages.length-1];
+    }
+
     public appendUserMessage(message:string,options?:ConvoMessagePrefixOptions){
         this.append(formatConvoMessage('user',message,this.getPrefixTags(options)));
     }
@@ -1394,6 +1398,7 @@ export class Conversation
             let returnValues:any[]|undefined=undefined;
 
             let lastResultValue:any=undefined;
+            let hasReturnValue=false;
 
             for(const msg of completion){
 
@@ -1488,6 +1493,7 @@ export class Conversation
                     }
 
                     lastResultValue=(typeof callResultValue === 'function')?undefined:callResultValue;
+                    hasReturnValue=true;
 
                     const lines:string[]=[`${this.getPrefixTags()}> result`];
                     let lastSharedVar:string|undefined;
@@ -1516,6 +1522,7 @@ export class Conversation
 
                     if(disableAutoComplete){
                         lastResultValue=undefined;
+                        hasReturnValue=false;
                     }
 
                     if(isDefaultTask){
@@ -1552,7 +1559,7 @@ export class Conversation
                         this.append(a);
                     }
                 }
-            }else if(lastResultValue!==undefined && autoCompleteDepth<this.maxAutoCompleteDepth && !(additionalOptions?.returnOnCalled || directInvoke)){
+            }else if(hasReturnValue && autoCompleteDepth<this.maxAutoCompleteDepth && !(additionalOptions?.returnOnCalled || directInvoke)){
                 return await this._completeAsync(
                     false,
                     undefined,
@@ -1748,6 +1755,18 @@ export class Conversation
         return flatExe;
     }
 
+    public isSystemMessage(msg:ConvoMessage|null|undefined):boolean{
+        return (msg?.role && this.systemRoles.includes(msg.role) && !msg.fn)?true:false;
+    }
+
+    public isAssistantMessage(msg:ConvoMessage|null|undefined):boolean{
+        return (msg?.role && this.assistantRoles.includes(msg.role) && !msg.fn)?true:false;
+    }
+
+    public isUserMessage(msg:ConvoMessage|null|undefined):boolean{
+        return (msg?.role && this.userRoles.includes(msg.role) && !msg.fn)?true:false;
+    }
+
     private flattenMsg(msg:ConvoMessage,setContent:boolean):FlatConvoMessage{
         const flat:FlatConvoMessage={
             role:this.getMappedRole(msg.role),
@@ -1782,13 +1801,11 @@ export class Conversation
         if(msg.markdown){
             flat.markdown=msg.markdown;
         }
-        if(this.userRoles.includes(flat.role) && !msg.fn){
+        if(this.isUserMessage(msg)){
             flat.isUser=true;
-        }
-        if(this.assistantRoles.includes(flat.role) && !msg.fn){
+        }else if(this.isAssistantMessage(msg)){
             flat.isAssistant=true;
-        }
-        if(this.systemRoles.includes(flat.role) && !msg.fn){
+        }else if(this.isSystemMessage(msg)){
             flat.isSystem=true;
         }
         if(msg.tid){
