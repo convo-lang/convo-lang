@@ -347,6 +347,7 @@ export class GenNode
                     return;
                 }
 
+                this.setState({status:'generating',convo:conversation.convo});
                 this.completeAsync(conversation,runId,conversation.convo,options)
 
             },300);

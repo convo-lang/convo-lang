@@ -36,6 +36,7 @@ export interface GenProps
     disabled?:boolean;
     allowAppend?:boolean;
     passDownOptions?:boolean;
+    convoTaskViewClassName?:string;
 }
 
 export function Gen({
@@ -59,6 +60,7 @@ export function Gen({
     allowAppend,
     passDownOptions,
     sharedConvo,
+    convoTaskViewClassName,
 }:GenProps){
 
     if(disabled){
@@ -183,6 +185,8 @@ export function Gen({
             <ConversationStatusIndicator
                 conversation={conversation}
                 busy={state.status==='generating'}
+                loadingIndicator={loadingIndicator}
+                convoTaskViewClassName={convoTaskViewClassName}
             />
 
         </GenNodeReactContext.Provider>

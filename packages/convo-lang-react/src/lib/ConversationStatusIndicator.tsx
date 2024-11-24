@@ -7,12 +7,16 @@ export interface ConversationStatusIndicatorProps
     uiCtrl?:ConversationUiCtrl|null;
     conversation?:Conversation|null;
     busy?:boolean;
+    loadingIndicator?:any;
+    convoTaskViewClassName?:string;
 }
 
 export function ConversationStatusIndicator({
     uiCtrl,
     conversation,
     busy,
+    loadingIndicator,
+    convoTaskViewClassName,
 }:ConversationStatusIndicatorProps){
 
     const uiConvo=useSubject(uiCtrl?.convoSubject);
@@ -24,9 +28,9 @@ export function ConversationStatusIndicator({
 
     return (<>{
         convoTasks?.length?
-            convoTasks.map((t,i)=><ConvoTaskView key={i} task={t} />)
+            convoTasks.map((t,i)=><ConvoTaskView className={convoTaskViewClassName} key={i} task={t} />)
         :(currentTask || busy)?
-            <LoadingDots/>
+            (loadingIndicator??<LoadingDots/>)
         :
             null
 

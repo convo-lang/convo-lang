@@ -2,6 +2,7 @@ import { ConvoTask } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { ProgressBar, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { useEffect, useState } from "react";
+import { BaseLayoutProps } from "../../../iyio-common/src/lib/base-layout";
 
 export interface ConvoTaskViewProps
 {
@@ -9,8 +10,9 @@ export interface ConvoTaskViewProps
 }
 
 export function ConvoTaskView({
-    task
-}:ConvoTaskViewProps){
+    task,
+    ...props
+}:ConvoTaskViewProps & BaseLayoutProps){
 
     const progress=useSubject(task.progress?.progressSubject);
     const status=useSubject(task.progress?.statusSubject);
@@ -30,7 +32,7 @@ export function ConvoTaskView({
     }
 
     return (
-        <div className={style.root()}>
+        <div className={style.root(null,null,props)}>
 
             {task.documentUrl?
                 <SlimButton openLinkInNewWindow to={task.documentUrl}>
