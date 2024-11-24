@@ -1,8 +1,8 @@
 import { ConvoTask } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
+import { BaseLayoutProps } from "@iyio/common";
 import { ProgressBar, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { useEffect, useState } from "react";
-import { BaseLayoutProps } from "../../../iyio-common/src/lib/base-layout";
 
 export interface ConvoTaskViewProps
 {
