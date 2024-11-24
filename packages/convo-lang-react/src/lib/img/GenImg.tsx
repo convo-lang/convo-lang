@@ -9,6 +9,7 @@ export interface GenImgProps
 {
     salt?:string;
     prompt?:string;
+    src?:string
     metadata?:Record<string,any>;
     artStyle?:string;
     children?:any;
@@ -45,6 +46,7 @@ export function GenImg({
     sq,
     landscape,
     portrait,
+    src:srcProp,
     aspectRatio=landscape?'16/9':portrait?'9/16':sq?1:undefined,
     children,
     flatBottom,
@@ -79,7 +81,7 @@ export function GenImg({
 
     }):undefined;
 
-    const src=srcUrl||url;
+    const src=srcProp||srcUrl||url;
 
     useEffect(()=>{
         setLoaded(false);
@@ -153,7 +155,7 @@ export function GenImg({
 
 }
 
-const style=atDotCss({name:'GenImg',css:`
+const style=atDotCss({name:'GenImg',order:'framework',css:`
     @.root{
         position:relative;
         border-radius:@@borderRadius;

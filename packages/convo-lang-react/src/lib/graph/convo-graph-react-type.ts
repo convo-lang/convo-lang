@@ -1,6 +1,7 @@
 import { ConvoEdge, ConvoGraphEntityRef, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
 import { Point, Rect } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
+import { ConvoLangTheme } from "../convo-lang-theme";
 
 export interface ConvoEntityLayoutCtrl
 {
@@ -83,4 +84,5 @@ export interface ConvoGraphStyle{
     strokeColor:string;
     strokeWidth:string;
     hqLines:boolean;
+    conversationTheme?:ConvoLangTheme|'dark'|'light';
 }

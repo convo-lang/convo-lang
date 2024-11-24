@@ -13,6 +13,14 @@ export interface GenNodeOptions
 {
     conversationOptions?:ConversationOptions;
     completeOnCalled?:boolean;
+    allowAppend?:boolean;
+
+    _render?:GenItemRenderer;
+    _cache?:boolean;
+    _allowAppend?:boolean;
+    _sharedConvo?:string;
+    _passDownOptions?:boolean;
+
 }
 
 export const GenNodeOptionsReactContext=createContext<GenNodeOptions|null>(null);
@@ -69,3 +77,7 @@ export const GenMetadataReactContext=createContext<GenMetadataCtx|null>(null);
 export const useGenMetadata=()=>{
     return useContext(GenMetadataReactContext)?.metadata;
 }
+
+export type GenItemRenderer=(item:any,vars:Record<string,any>,state:GenNodeSuccessState,node:GenNode)=>any;
+export type GenListRenderer=(item:any,index:number,vars:Record<string,any>,value:any,state:GenNodeSuccessState,node:GenNode)=>any;
+export type GenListWrapperRenderer=(content:any,item:any,vars:Record<string,any>,state:GenNodeSuccessState,node:GenNode)=>any;

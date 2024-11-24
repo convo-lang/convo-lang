@@ -1,10 +1,13 @@
 import { Conversation, ConvoDocQuery, ConvoDocQueryResult, ConvoDocQueryRunner, ConvoDocQueryRunnerOptions, convoDoQueryOutputToMessageContent, convoDocPageToString } from "@convo-lang/convo-lang";
 import { ReadonlySubject, delayAsync, getErrorMessage, pushBehaviorSubjectAry, removeBehaviorSubjectAryValue } from "@iyio/common";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, Subscription } from "rxjs";
 import { GenNodeOptions, GenNodeState } from "./gen-lib";
 
 export class GenNode
 {
+
+    public readonly id?:string;
+
     private readonly _convo:BehaviorSubject<string>=new BehaviorSubject<string>('');
     public get convoSubject():ReadonlySubject<string>{return this._convo}
     public get convo(){return this._convo.value}
@@ -85,8 +88,9 @@ export class GenNode
     public get conversation(){return this._conversation.value}
 
 
-    public constructor()
+    public constructor(id?:string)
     {
+        this.id=id;
         this._state=new BehaviorSubject<GenNodeState>({status:'ready',convo:''});
         this._lastGeneratedState=new BehaviorSubject<GenNodeState>(this._state.value);
     }
@@ -101,6 +105,7 @@ export class GenNode
         this._isDisposed=true;
         this.runId++;
         this._setParent(null,true);
+        this.clearAppend();
     }
 
     _setParent(parent:GenNode|null,ignoreDispose=false){
@@ -144,6 +149,7 @@ export class GenNode
         const parentState=this._parent.value?._state.value;
 
         const runId=++this.runId;
+        this.clearAppend();
 
         if((parentState && parentState.status!=='generated') || (!convo && !docQuery && !docQueryOptions?.query)){
             return;
@@ -226,8 +232,32 @@ export class GenNode
 
             conversation.append(convo);
 
+            await this.completeAsync(conversation,runId,convo,options);
+
+            if(runId===this.runId && options?.allowAppend){
+                this.enableAppend(conversation,runId,options);
+            }
+
+        }catch(ex){
+            if(runId===this.runId){
+                this.setState({status:'error',errorMessage:getErrorMessage(ex),convo,error:ex})
+            }
+        }
+
+    }
+
+    private _completingCount=0;
+    private async completeAsync(
+        conversation:Conversation,
+        runId:number,
+        convo:string,
+        options:GenNodeOptions|undefined|null
+    ){
+        this._completingCount++;
+        try{
+
             const result=await conversation.completeAsync({
-                returnOnCalled:!options?.completeOnCalled,
+                returnOnCalled:options?.allowAppend?false:!options?.completeOnCalled,
             });
             if(runId!==this.runId){
                 return;
@@ -244,7 +274,7 @@ export class GenNode
 
             }else{
 
-                const msg=result.message;result.lastFnCall;
+                const msg=result.message;
 
                 this.setState({
                     status:'generated',
@@ -265,6 +295,8 @@ export class GenNode
             if(runId===this.runId){
                 this.setState({status:'error',errorMessage:getErrorMessage(ex),convo,error:ex})
             }
+        }finally{
+            this._completingCount--;
         }
     }
 
@@ -281,5 +313,50 @@ export class GenNode
             }
         }
 
+    }
+
+    public append(convo:string){
+        const options=this.options;
+        if(!options?.allowAppend || !this.conversation || this._completingCount){
+            return false;
+        }
+        this.conversation.append(convo);
+        return true;
+    }
+
+    public appendUserMessage(convo:string){
+        const options=this.options;
+        if(!options?.allowAppend || !this.conversation || this._completingCount){
+            return false;
+        }
+        this.conversation.appendUserMessage(convo);
+        return true;
+    }
+
+    private appendSub?:Subscription;
+    private enableAppend(conversation:Conversation,runId:number,options:GenNodeOptions|undefined|null){
+        this.clearAppend();
+        let iv:any=null;
+        this.appendSub=conversation.onAppend.subscribe(()=>{
+            if(runId!==this.runId){
+                return;
+            }
+            clearTimeout(iv);
+            iv=setTimeout(()=>{
+                if(runId!==this.runId || !conversation.isUserMessage(conversation.getLastMessage())){
+                    return;
+                }
+
+                this.completeAsync(conversation,runId,conversation.convo,options)
+
+            },300);
+        })
+    }
+
+    private clearAppend()
+    {
+        const sub=this.appendSub;
+        this.appendSub=undefined;
+        sub?.unsubscribe();
     }
 }

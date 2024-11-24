@@ -13,6 +13,7 @@ export interface MessagesSourceViewProps
     ctrl?:ConversationUiCtrl;
     mode?:ConvoEditorMode;
     autoScrollBehavior?:ScrollBehavior;
+    autoHeight?:boolean;
 
 }
 
@@ -22,7 +23,8 @@ export interface MessagesSourceViewProps
 export function MessagesSourceView({
     ctrl:_ctrl,
     mode='code',
-    autoScrollBehavior
+    autoScrollBehavior,
+    autoHeight
 }:MessagesSourceViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -61,42 +63,50 @@ export function MessagesSourceView({
             return;
         }
         ctrl.replaceAndCompleteAsync(code);
-    },[ctrl])
+    },[ctrl]);
+
+    const codeInput=(
+        <LazyCodeInput
+            lineNumbers
+            fillScrollHeight
+            language={mode==='code'?'convo':'json'}
+            value={
+                mode==='vars'?
+                    JSON.stringify(flatConvo?.exe.getUserSharedVars()??{},createJsonRefReplacer(),4)
+                :mode==='flat'?
+                    JSON.stringify(flatConvo?.messages??[],null,4)
+                :mode==='tree'?
+                    JSON.stringify(convo?.messages??[],null,4)
+                :mode==='model'?
+                    (flatConvo?(convo?.toModelFormatStr(flatConvo)??''):'')
+                :
+                    code
+            }
+            readOnly={!!currentTask || mode!=='code'}
+            onChange={setCode}
+            parser={mode==='code'?parseConvoCode:undefined}
+            logParsed
+            bottomPadding='100px'
+            onSubmit={submit}
+        />
+    )
 
     return (
-        <div className={style.root()} style={style.vars(theme)}>
-            <ScrollView
-                flex1
-                autoScrollTrigger={lastMsg}
-                autoScrollBehavior={autoScrollBehavior}
-                autoScrollSelector=".language-convo"
-                autoScrollYOffset={100}
-                containerFill
-            >
-                <LazyCodeInput
-                    lineNumbers
-                    fillScrollHeight
-                    language={mode==='code'?'convo':'json'}
-                    value={
-                        mode==='vars'?
-                            JSON.stringify(flatConvo?.exe.getUserSharedVars()??{},createJsonRefReplacer(),4)
-                        :mode==='flat'?
-                            JSON.stringify(flatConvo?.messages??[],null,4)
-                        :mode==='tree'?
-                            JSON.stringify(convo?.messages??[],null,4)
-                        :mode==='model'?
-                            (flatConvo?(convo?.toModelFormatStr(flatConvo)??''):'')
-                        :
-                            code
-                    }
-                    readOnly={!!currentTask || mode!=='code'}
-                    onChange={setCode}
-                    parser={mode==='code'?parseConvoCode:undefined}
-                    logParsed
-                    bottomPadding='100px'
-                    onSubmit={submit}
-                />
-            </ScrollView>
+        <div className={style.root({autoHeight})} style={style.vars(theme)}>
+            {autoHeight?
+                codeInput
+            :
+                    <ScrollView
+                    flex1
+                    autoScrollTrigger={lastMsg}
+                    autoScrollBehavior={autoScrollBehavior}
+                    autoScrollSelector=".language-convo"
+                    autoScrollYOffset={100}
+                    containerFill
+                >
+                    {codeInput}
+                </ScrollView>
+            }
             <div className={style.busy({show:currentTask})}>
                 <LoadingDots disabled={!currentTask}/>
             </div>
@@ -117,6 +127,9 @@ const style=atDotCss({name:'MessagesSourceView',order:'framework',namespace:'iyi
         flex:1;
         color:#ffffff;
         position:relative;
+    }
+    @.root.autoHeight{
+        flex:unset;
     }
     @.busy{
         position:absolute;

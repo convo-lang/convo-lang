@@ -1,5 +1,5 @@
 import { ConvoEdge, ConvoGraphCtrl, ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityAny, ConvoGraphEntityRef, ConvoGraphSelection, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser, compareConvoGraphSelections, createConvoGraphEntity, hasConvoGraphDb } from "@convo-lang/convo-lang";
-import { DisposeContainer, Point, ReadonlySubject, removeBehaviorSubjectAryValue, wAryPush } from "@iyio/common";
+import { DisposeContainer, Point, ReadonlySubject, Size, removeBehaviorSubjectAryValue, wAryPush } from "@iyio/common";
 import { PanZoomCtrl } from "@iyio/react-common";
 import { DragEvent } from "react";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -106,6 +106,19 @@ export class ConvoGraphViewCtrl
             return;
         }
         this._dragNodeFrom.next(value);
+    }
+
+    private readonly _canvasSize:BehaviorSubject<Size>=new BehaviorSubject<Size>({
+        width:globalThis.window?.innerWidth??1200,
+        height:globalThis.window?.innerHeight??720
+    });
+    public get canvasSizeSubject():ReadonlySubject<Size>{return this._canvasSize}
+    public get canvasSize(){return this._canvasSize.value}
+    public set canvasSize(value:Size){
+        if(value==this._canvasSize.value){
+            return;
+        }
+        this._canvasSize.next(value);
     }
 
 

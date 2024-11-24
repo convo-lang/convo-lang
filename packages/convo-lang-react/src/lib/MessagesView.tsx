@@ -212,13 +212,15 @@ export interface MessagesViewProps
     renderTarget?:string;
     ragRenderer?:ConvoRagRenderer;
     messageBottomPadding?:string;
+    autoHeight?:boolean;
 }
 
 export function MessagesView({
     renderTarget=defaultConvoRenderTarget,
     ctrl:_ctrl,
     ragRenderer,
-    messageBottomPadding='120px'
+    messageBottomPadding='120px',
+    autoHeight,
 }:MessagesViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl)
@@ -268,25 +270,32 @@ export function MessagesView({
 
     })
 
+    const body=(
+        <div className={style.list()}>
+
+            {mapped}
+
+            {!!currentTask && <div className={rowClassName}>{
+                (theme.wrapLoader===false?
+                    <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
+                :
+                    <div className={style.msg({agent:true})}>
+                        <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
+                    </div>
+                )
+            }</div>}
+        </div>
+    )
 
     return (
-        <div className={style.root()} style={style.vars({...theme,messageBottomPadding})}>
-            <ScrollView flex1 autoScrollEnd autoScrollEndFilter={()=>!shouldDisableConvoAutoScroll(messages)}>
-                <div className={style.list()}>
-
-                    {mapped}
-
-                    {!!currentTask && <div className={rowClassName}>{
-                        (theme.wrapLoader===false?
-                            <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
-                        :
-                            <div className={style.msg({agent:true})}>
-                                <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
-                            </div>
-                        )
-                    }</div>}
-                </div>
-            </ScrollView>
+        <div className={style.root({autoHeight})} style={style.vars({...theme,messageBottomPadding})}>
+            {autoHeight?
+                body
+            :
+                <ScrollView flex1 autoScrollEnd autoScrollEndFilter={()=>!shouldDisableConvoAutoScroll(messages)}>
+                    {body}
+                </ScrollView>
+            }
         </div>
     )
 
@@ -297,6 +306,9 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         flex:1;
         display:flex;
         flex-direction:column;
+    }
+    @.root.autoHeight{
+        flex:unset;
     }
 
     @.list{

@@ -11,6 +11,7 @@ export * from './lib/convo-lang-theme';
 export * from './lib/gen/Gen';
 export * from './lib/gen/GenMetadata';
 export * from './lib/gen/GenNode';
+export * from './lib/gen/createConvoVfsGenRenderer';
 export * from './lib/gen/gen-lib';
 export * from './lib/graph/ConvoEdgeView';
 export * from './lib/graph/ConvoGraphCanvas';

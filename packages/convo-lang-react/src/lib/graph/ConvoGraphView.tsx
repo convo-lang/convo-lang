@@ -1,13 +1,14 @@
 import { ConvoGraphCtrl, ConvoNode, getConvoGraphEventString } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { Point, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
-import { DragTarget, PanZoomCtrl, PanZoomState, PanZoomView, SlimButton, View, useDeepCompareItem, useWatchDeep } from "@iyio/react-common";
+import { Point, asArray, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
+import { DragTarget, PanZoomCtrl, PanZoomState, PanZoomView, SlimButton, View, useDeepCompareItem, useElementSize, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { convoGraphChatRenderer } from "../graph-chat/graph-chat-renderer";
 import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
 import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";
 import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl";
 import { ConvoGraphReactCtx, convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
-import { ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
+import { ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
 
 export interface ConvoGraphViewProps
 {
@@ -22,6 +23,9 @@ export interface ConvoGraphViewProps
     disablePanZoom?:boolean;
     initPanZoomState?:Partial<PanZoomState>;
     defaultInputValue?:string;
+    enableChatView?:boolean;
+    entityRenderer?:ConvoGraphEntityRenderer|ConvoGraphEntityRenderer[]|null;
+    children?:any;
 }
 
 export function ConvoGraphView({
@@ -35,7 +39,10 @@ export function ConvoGraphView({
     style:_graphStyle,
     disablePanZoom,
     initPanZoomState,
-    defaultInputValue='{\n\n}'
+    defaultInputValue='{\n\n}',
+    enableChatView,
+    entityRenderer,
+    children,
 }:ConvoGraphViewProps){
 
     const [ctrl,setCtrl]=useState<ConvoGraphViewCtrl|null>(null);
@@ -55,6 +62,12 @@ export function ConvoGraphView({
     const [panZoom,setPanZoom]=useState<PanZoomCtrl|null>(null);
 
     const [rootElem,setRootElem]=useState<HTMLElement|null>(null);
+    const [rootSize]=useElementSize(rootElem);
+    useEffect(()=>{
+        if(ctrl){
+            ctrl.canvasSize=rootSize;
+        }
+    },[ctrl,rootSize]);
 
     const [outputElem,setOutputElem]=useState<HTMLElement|null>(null);
     const refs=useRef({outputElem,rootElem,lastRemoveTime:0,createViewCtrl,onDrop});
@@ -253,6 +266,37 @@ export function ConvoGraphView({
         }
     },[ctrl]);
 
+    useEffect(()=>{
+        if(!entityRenderer || !ctrl){
+            return;
+        }
+        const ary=asArray(entityRenderer);
+        if(!ary.length){
+            return;
+        }
+
+        for(const r of ary){
+            ctrl.addRenderer(r);
+        }
+        return ()=>{
+            for(const r of ary){
+                ctrl.removeRenderer(r);
+            }
+        }
+
+    },[entityRenderer,ctrl]);
+
+    useEffect(()=>{
+        if(!ctrl){
+            return;
+        }
+        ctrl.addRenderer(convoGraphChatRenderer);
+        return ()=>{
+            ctrl.removeRenderer(convoGraphChatRenderer);
+        }
+
+    },[enableChatView,ctrl]);
+
     return (
         <ConvoGraphReactCtx.Provider value={ctrl}>
             <div className={style.root()} onContextMenu={onContextMenu} ref={setRootElem}>
@@ -286,6 +330,8 @@ export function ConvoGraphView({
                         </SlimButton>
                     </View>
                 </div>}
+
+                {children}
 
             </div>
         </ConvoGraphReactCtx.Provider>

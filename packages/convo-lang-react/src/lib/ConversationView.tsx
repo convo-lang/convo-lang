@@ -35,6 +35,7 @@ export interface ConversationViewProps
     httpEndpoint?:string;
     template?:string;
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
+    autoHeight?:boolean;
 }
 
 export function ConversationView({
@@ -50,7 +51,7 @@ export function ConversationView({
     theme:_theme='light',
     sourceMode:_sourceMode,
     showSource:_showSource,
-    showInputWithSource,
+    showInputWithSource=true,
     ragRenderer,
     renderTarget=defaultConvoRenderTarget,
     redirectMessagesView,
@@ -63,6 +64,7 @@ export function ConversationView({
     template,
     appendTrigger,
     beforeCreateExeCtx,
+    autoHeight,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -167,6 +169,7 @@ export function ConversationView({
             ctrl={ctrl}
             autoScrollBehavior={codeInputAutoScrollBehavior}
             mode={sourceMode}
+            autoHeight={autoHeight}
         />
     :
         <MessagesView
@@ -174,6 +177,7 @@ export function ConversationView({
             messageBottomPadding={messageBottomPadding}
             renderTarget={renderTarget}
             ragRenderer={ragRenderer}
+            autoHeight={autoHeight}
          />
     )
 
@@ -185,7 +189,7 @@ export function ConversationView({
 
         <ConversationUiContext.Provider value={ctrl}>
 
-            <div className={style.root(null,className)} style={style.vars(theme)}>
+            <div className={style.root({autoHeight},className)} style={style.vars(theme)}>
 
                 {redirectMessagesView?null:messagesView}
 
@@ -207,5 +211,8 @@ const style=atDotCss({name:'ConversationView',order:'framework',namespace:'iyio'
         flex-direction:column;
         flex:1;
         position:relative;
+    }
+    @.root.autoHeight{
+        flex:unset;
     }
 `});
