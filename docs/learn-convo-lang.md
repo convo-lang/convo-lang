@@ -2615,7 +2615,6 @@ I want a pizza with bacon, onions and sausage
 
 ### Sandwich Assistant
 ``` convo
-> define
 // We use a define top level statement to define the agents name
 > define
 name="Ricky"
