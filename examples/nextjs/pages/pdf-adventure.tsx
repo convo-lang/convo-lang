@@ -46,7 +46,7 @@ const sharedConvo=/*convo*/`
     > system
     Take into considerations the following user instructions
     <user-instructions>
-
+    {{userInstructions}}
     </user-instructions>
 
 `
