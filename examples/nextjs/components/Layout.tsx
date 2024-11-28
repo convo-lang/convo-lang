@@ -25,7 +25,15 @@ const links:UiActionItem[]=[
         title:'Cafe',
         to:'/cafe'
     },
-    
+    {
+        title:'Solar System',
+        to:'/solar-system'
+    },
+    {
+        title:'PDF Adventure',
+        to:'/pdf-adventure'
+    },
+
 ]
 
 const socialLinks:UiActionItem<IconType>[]=[
@@ -37,7 +45,7 @@ const socialLinks:UiActionItem<IconType>[]=[
         icon:'github',
         to:'https://github.com/convo-lang/convo-lang',
     },
-    
+
 ]
 
 export interface LayoutProps
@@ -62,7 +70,7 @@ export function Layout({
                         </SlimButton>
                     ))}
                 </View>
-                
+
                 <View row alignCenter g2>
                     {socialLinks.map((l,i)=>(
                         <SlimButton key={i} openLinkInNewWindow actionItem={l}>

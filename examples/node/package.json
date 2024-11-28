@@ -11,9 +11,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@convo-lang/convo-lang": "^0.6.7",
-    "@convo-lang/convo-lang-openai": "^0.6.7",
-    "@iyio/common": "^0.6.5",
-    "@iyio/node-common": "^0.6.5"
+    "@convo-lang/convo-lang": "^0.7.0",
+    "@convo-lang/convo-lang-openai": "^0.7.0",
+    "@iyio/common": "^0.7.0",
+    "@iyio/node-common": "^0.7.0"
   }
 }
