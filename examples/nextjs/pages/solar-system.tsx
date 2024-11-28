@@ -8,7 +8,7 @@ const convoScript=/*convo*/`
 
 `;
 
-export default function Empty(){
+export default function SolarSystem(){
 
     return (
         <ScrollView flex1>
@@ -31,7 +31,7 @@ export default function Empty(){
 
                         @json Planet[]
                         > user
-                        Generate a list planets in our solar system
+                        Generate a list planets in our solar system.
 
                     `}
                     forEach={planet=>(
@@ -42,7 +42,7 @@ export default function Empty(){
                                 <p>Moons: {planet.moonCount}</p>
                                 <p>Distance from sun: {planet.distanceFromSun.toLocaleString()} miles</p>
                             </div>
-                            <GenImg flex1 prompt={planet.visualDescription} sq artStyle="pixel art" />
+                            <GenImg flex1 prompt={planet.visualDescription} sq artStyle="modern art" />
                         </div>
                     )}
                 />
@@ -52,7 +52,7 @@ export default function Empty(){
 }
 
 // For syntax highlighting of at-dot-css install the "high-js" VSCode extension.
-const style=atDotCss({name:'Empty',css:`
+const style=atDotCss({name:'SolarSystem',css:`
 
     @.root{
         display:flex;
