@@ -11,6 +11,7 @@ import { ConvoInputView } from "./ConvoInputView";
 import { ConvoNodeView } from "./ConvoNodeView";
 import { ConvoSourceNodeView } from "./ConvoSourceNodeView";
 import { ConvoTraverserView } from "./ConvoTraverserView";
+import { ConvoUserDataView } from "./ConvoUserDataView";
 import { convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
 import { ConvoEntityLayoutCtrl, ConvoUiTarget } from "./convo-graph-react-type";
 
@@ -49,6 +50,8 @@ export function ConvoGraphEntityView({
     const key=useWProp(node??input,'key');
 
     const [isSelected,setIsSelected]=useState(false);
+
+    const [userDataOpen,setUserDataOpen]=useState(pos?.userData?true:false);
 
     useEffect(()=>{
         const sub=ctrl.selectedSubject.subscribe(()=>{
@@ -218,12 +221,18 @@ export function ConvoGraphEntityView({
                         />}
 
                     </View>
-                    {link?
-                        <SlimButton to={link} openLinkInNewWindow>{idComp}</SlimButton>
-                    :
-                        idComp
-                    }
+                    <View row alignCenter justifyBetween>
+                        {link?
+                            <SlimButton to={link} openLinkInNewWindow>{idComp}</SlimButton>
+                        :
+                            idComp
+                        }
+                        <SlimButton onClick={()=>setUserDataOpen(!userDataOpen)}>
+                            <Text opacity025 xs text="userData" className={style.link()}/>
+                        </SlimButton>
+                    </View>
 
+                    {userDataOpen && <ConvoUserDataView hasUserData={pos}/>}
 
                     {node && <ConvoNodeView node={node}/>}
 

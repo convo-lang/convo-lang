@@ -9,7 +9,9 @@ export const maxConvoGraphConcurrentStepExe=5;
 
 export const convoTraverserStateStoreSuffix='_suffix';
 
-export const convoTraverserProxyVar='_proxy'
+export const convoTraverserProxyVar='_proxy';
+
+export const defaultConvoGraphUserDataVarName='userData';
 
 export const applyConvoTraverserControlPath=(tv:ConvoTraverser)=>{
     if(tv.controlPath){
@@ -103,6 +105,13 @@ export const createConvoNodeExecCtxAsync=async (node:ConvoNode,convoOptions?:Con
 
     const defaultVars={
         ...convoOptions?.defaultVars
+    }
+
+    if(node.userData){
+        const varName=node.userDataVarName===undefined?defaultConvoGraphUserDataVarName:node.userDataVarName;
+        if(varName && defaultVars[varName]===undefined){
+            defaultVars[varName]={...node.userData}
+        }
     }
 
     const metadataAndMap=await getConvoNodeMetadataAsync((node.sharedConvo || node.steps.length)?

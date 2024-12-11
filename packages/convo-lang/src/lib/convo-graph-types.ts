@@ -116,6 +116,13 @@ export interface ConvoNode
     metadata?:ConvoNodeMetadata;
 
     /**
+     * The var name in global scope that will be given to the userData of the node at run time. If
+     * null userData will not be defined in the global scope.
+     * @default "userData"
+     */
+    userDataVarName?:string|null;
+
+    /**
      * User data that can be used for any purpose.
      */
     userData?:Record<string,any>;
@@ -280,6 +287,13 @@ export interface ConvoEdge
      * Extra points to be drawn between the edge and its to node.
      */
     toPoints?:Point[];
+
+    /**
+     * The var name in global scope that will be given to the userData of the edge at run time. If
+     * null userData will not be defined in the global scope.
+     * @default "userData"
+     */
+    userDataVarName?:string|null;
 
     /**
      * User data that can be used for any purpose.

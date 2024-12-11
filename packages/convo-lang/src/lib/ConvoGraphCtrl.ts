@@ -2,7 +2,7 @@ import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, cr
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
+import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, defaultConvoGraphUserDataVarName, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
 import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
@@ -613,6 +613,12 @@ export class ConvoGraphCtrl
                          {input,workflow}
                     )
                 )
+                if(edge.userData){
+                    const varName=edge.userDataVarName===undefined?defaultConvoGraphUserDataVarName:edge.userDataVarName;
+                    if(varName && conversation.defaultVars[varName]===undefined){
+                        conversation.defaultVars[varName]={...edge.userData}
+                    }
+                }
                 const flat=await conversation.flattenAsync();
                 const accept=flat.exe.getVar('edgeConditionResult');
                 if(!accept){
