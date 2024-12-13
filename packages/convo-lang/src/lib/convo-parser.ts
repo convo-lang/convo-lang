@@ -1102,6 +1102,12 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
+                    case convoTags.cid:
+                        if(tag.value){
+                            msg.cid=tag.value;
+                        }
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;

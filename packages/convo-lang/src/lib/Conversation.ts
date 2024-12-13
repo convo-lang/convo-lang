@@ -3,11 +3,13 @@ import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
+import { ConvoRoom } from "./ConvoRoom";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { convoScript } from "./convo-template";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -15,6 +17,8 @@ import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFu
 
 export interface ConversationOptions
 {
+    name?:string;
+    room?:ConvoRoom;
     userRoles?:string[];
     assistantRoles?:string[];
     systemRoles?:string[];
@@ -25,6 +29,10 @@ export interface ConversationOptions
     capabilities?:ConvoCapability[];
     disableMessageCapabilities?:boolean;
     maxAutoCompleteDepth?:number;
+    /**
+     * If true the conversation is an agent
+     */
+    isAgent?:boolean;
     /**
      * If true time tags will be added to appended user message
      */
@@ -165,6 +173,12 @@ export class Conversation
     public getConvoStrings(){
         return [...this._convo];
     }
+
+    public readonly name:string;
+
+    public readonly room:ConvoRoom;
+
+    public readonly isAgent:boolean;
 
     private _messages:ConvoMessage[]=[];
     public get messages(){return this._messages}
@@ -327,8 +341,16 @@ export class Conversation
      */
     public logFlatCached:boolean;
 
+    /**
+     * Sub conversations
+     */
+    public readonly subs:Record<string,Conversation>={}
+
     public constructor(options:ConversationOptions={}){
         const {
+            name=defaultConversationName,
+            isAgent=false,
+            room=new ConvoRoom(),
             userRoles=['user'],
             assistantRoles=['assistant'],
             systemRoles=['system'],
@@ -363,7 +385,9 @@ export class Conversation
             usage=createEmptyConvoTokenUsage(),
             beforeCreateExeCtx,
         }=options;
+        this.name=name;
         this.usage=usage;
+        this.isAgent=isAgent;
         this.defaultOptions=options;
         this.beforeCreateExeCtx=beforeCreateExeCtx;
         this.getStartOfConversation=getStartOfConversation;
@@ -393,6 +417,10 @@ export class Conversation
         if(debugMode){
             this.debugMode=true;
         }
+
+        this.room=room;
+        this.room.addConversation(this);
+
         if(initConvo){
             this.append(initConvo,true);
         }
@@ -575,6 +603,7 @@ export class Conversation
         this.autoFlattenId++;
         this._isDisposed=true;
         this._disposeToken.cancelNow();
+        this.room.removeConversation(this);
     }
 
     private _defaultApiKey:string|null|(()=>string|null)=null;
@@ -657,13 +686,25 @@ export class Conversation
             conversation.setDefaultApiKey(this._defaultApiKey);
         }
         let messages=this.messages;
-        if (options?.noFunctions) {
+        if(options?.noFunctions){
             messages=messages.filter(m=>!m.fn || m.fn.topLevel);
         }
-        if (options?.systemOnly) {
+        if(options?.systemOnly){
             messages=messages.filter(m=>m.role === 'system' || m.fn?.topLevel || m.fn?.name===convoFunctions.getState);
         }
+        if(options?.removeAgents){
+            messages=messages.filter(m=>m.tags?.some(t=>t.name===convoTags.agentSystem) || (m.fn && this.agents.some(a=>a.name===m.fn?.name)));
+            for(const agent of this.agents){
+                delete conversation.defaultVars[agent.name];
+            }
+        }else{
+            for(const agent of this.agents){
+                conversation.agents.push(agent);
+            }
+        }
+
         conversation.appendMessageObject(messages,{disableAutoFlatten:true,appendCode:options?.cloneConvoString});
+
         return conversation;
     }
 
@@ -683,6 +724,186 @@ export class Conversation
         return this.clone({noFunctions:true});
     }
 
+    private appendMsgsAry(messages:ConvoMessage[],index=this._messages.length){
+        let depth=0;
+        let subName:string|undefined;
+        let subs:ConvoMessage[]|undefined;
+        let endRole:string|undefined;
+        let subType:string|undefined;
+        let head:ConvoMessage|undefined;
+        let imp:{subs:ConvoMessage[],subType:string,head:ConvoMessage,convo:Conversation}[]|undefined;
+        for(let i=0;i<messages.length;i++){
+            const msg=messages[i];
+            if(!msg){continue}
+
+            if(msg.role===endRole){
+                depth--;
+                if(!depth){
+                    const sub=this.room.state.lookup[subName??'']??this.createChild({room:this.room});
+                    for(const agent of this.agents){
+                        delete sub.externFunctions[agent.name];
+                    }
+
+                    if(head){
+                        if(!imp){
+                            imp=[];
+                        }
+
+                        switch(subType){
+                            case convoMsgModifiers.agent:
+                                imp.push({subs:subs??[],subType:subType,head,convo:sub});
+                                break;
+
+                        }
+                    }
+                    endRole=undefined;
+                    subName=undefined;
+                    subs=undefined;
+                    subType=undefined;
+                    head=undefined;
+                    continue
+                }
+            }else if(msg.fn){
+                const mod=msg.fn.modifiers?.find(m=>convoScopedModifiers.includes(m as any));
+                if(mod){
+                    depth++;
+                    if(depth===1){
+                        subType=mod;
+                        endRole=mod+'End';
+                        subName=msg.fn.name;
+                        subs=[];
+                        head=msg;
+                        continue;
+                    }
+                }
+            }
+
+            if(subs){
+                subs.push(msg);
+            }else{
+                this._messages.splice(index,0,msg);
+                index++;
+            }
+        }
+        if(depth){
+            throw new Error(`Sub-conversation not ended - name=${subName}`);
+        }
+
+        if(imp){
+            for(const i of imp){
+                switch(i.subType){
+                    case 'agent':
+                        this.defineAgent(i.convo,i.head,i.subs);
+                }
+            }
+        }
+
+    }
+
+    private defineAgent(conversation:Conversation,headMsg:ConvoMessage,messages:ConvoMessage[]){
+        headMsg={...headMsg};
+        if(!headMsg.fn){
+            return;
+        }
+
+        const hasAgentSystem=this._messages.some(m=>m.tags?.some(t=>t.name===convoTags.agentSystem));
+        if(!hasAgentSystem){
+            this.append(
+                `@${convoTags.agentSystem}\n> system\nYou can use the following agents to assistant the user.\n`+
+                '{{getAgentList()}}\n\n'+
+                'To send a request to an agent either call the function with the same name as the agent or '+
+                'call a more specialized function that starts with the agents name, but DO NOT call both.'
+            )
+        }
+
+        const agent:ConvoAgentDef={
+            name:headMsg.fn.name===this.name?this.name+'_2':headMsg.fn.name,
+            description:headMsg.description,
+            main:headMsg,
+            capabilities:[],
+            functions:[]
+        }
+
+        if(headMsg.tags){
+            for(const tag of headMsg.tags){
+                if(tag.name===convoTags.cap && tag.value){
+                    agent.capabilities?.push(tag.value);
+                }
+            }
+        }
+
+        headMsg.fn={...headMsg.fn};
+        headMsg.fn.modifiers=[...headMsg.fn.modifiers];
+        headMsg.fn.local=true;
+        aryRemoveItem(headMsg.fn.modifiers,convoMsgModifiers.agent);
+        messages.push(headMsg);
+
+        const proxyFn={...headMsg};
+        if(proxyFn.fn){
+            proxyFn.fn={...proxyFn.fn}
+            delete proxyFn.fn.body;
+            proxyFn.fn.extern=true;
+            proxyFn.fn.local=false;
+            this.appendMessageObject(proxyFn);
+            this.externFunctions[agent.name]=async (scope:ConvoScope)=>{
+                if(!headMsg.fn){
+                    return null;
+                }
+                const clone=conversation.clone();
+                let r=await clone.callFunctionAsync(headMsg.fn.name,convoLabeledScopeParamsToObj(scope),{returnOnCalled:true});
+                if(!r){
+                    return r;
+                }
+                if(typeof r === 'object'){
+                    const keys=Object.keys(r);
+                    if(keys.length===1){
+                        r=r[keys[0]??''];
+                    }
+                    if(!r){
+                        return r;
+                    }
+                }
+                const sub=clone.onAppend.subscribe(a=>{
+                    this.appendAfterCall.push(a.text.replace(/(^|\n)\s*>/g,text=>`\n@cid ${agent.name}\n${text}`));
+                    // todo - append
+                })
+                try{
+                    clone.append(convoScript`> user\n${r}`);
+                    const completion=await clone.completeAsync();
+                    const returnValue=completion.message?.callParams??completion.message?.content;
+                    if(typeof returnValue === 'string'){
+                        return `${agent.name}'s response:\n<agent-response>\n${returnValue}\n</agent-response>`
+                    }else{
+                        return returnValue
+                    }
+
+                }finally{
+                    sub.unsubscribe();
+                }
+            }
+        }
+
+        conversation.appendMessageObject(messages);
+
+        for(const msg of messages){
+            if(!msg.fn || msg===headMsg || !msg.fn.modifiers.includes('public')){
+                continue;
+            }
+            // add to description - When call the agent "Max" will handle the execution of the function.
+            // create proxy
+        }
+
+        // create proxy for any public functions
+        this.agents.push(agent);
+
+    }
+
+    private appendAfterCall:string[]=[];
+
+    public readonly agents:ConvoAgentDef[]=[];
+
+
+
     /**
      * Appends new messages to the conversation and by default does not add code to the conversation.
      */
@@ -691,7 +912,7 @@ export class Conversation
         appendCode
     }:AppendConvoMessageObjOptions={}):void{
         const messages=asArray(message);
-        this._messages.push(...messages);
+        this.appendMsgsAry(messages);
 
         if(appendCode){
             for(const msg of messages){
@@ -773,9 +994,7 @@ export class Conversation
         }
 
         if(r.result){
-            for(const m of r.result){
-                this._messages.push(m);
-            }
+            this.appendMsgsAry(r.result);
         }
 
         this._onAppend.next({
@@ -913,7 +1132,6 @@ export class Conversation
         options?:ConvoCompletionOptions
     ):Promise<any>{
         const c=await this.tryCompleteAsync(options?.task,options,flat=>{
-
             if(typeof fn === 'object'){
                 flat.exe.loadFunctions([{
                     fn,
@@ -1173,8 +1391,7 @@ export class Conversation
             if(clone.messages[clone.messages.length-1]?.role===convoRoles.parallel){
                 clone.messages.pop();
             }
-            const msgCount=clone._messages.length;
-            clone._messages.push(msg);
+            clone.appendMsgsAry([msg])
             clone._convo.splice(0,clone._convo.length);
             const cps=clone.completionService;
             const messages:ConvoCompletionMessage[]=[];
@@ -1518,6 +1735,12 @@ export class Conversation
                     lines.push('');
                     if(isDefaultTask){
                         this.append(lines.join('\n'),true);
+                    }
+
+                    if(this.appendAfterCall.length){
+                        const appendAfter=this.appendAfterCall.join('\n\n');
+                        this.appendAfterCall.splice(0,this.appendAfterCall.length);
+                        this.append(appendAfter,{disableAutoFlatten:true})
                     }
 
                     if(disableAutoComplete){
@@ -1926,7 +2149,7 @@ export class Conversation
 
                 }
             }
-            this._messages.splice(index??this._messages.length,0,...r.result);
+            this.appendMsgsAry(r.result,index);
         }
 
         return r.result??[];
@@ -1989,7 +2212,7 @@ export class Conversation
         messagesLoop: for(let i=0;i<sourceMessages.length;i++){
             const msg=sourceMessages[i];
 
-            if(!msg || msg.role===convoRoles.nop){
+            if(!msg || msg.role===convoRoles.nop || (msg.cid && msg.cid!==this.name)){
                 continue;
             }
 
@@ -2919,8 +3142,11 @@ export class Conversation
                 }
                 this.createFunctionImpl(fn);
             }else{
-                push(this.createFunctionImpl(fn),item);
-                push('\n',item);
+                const content=this.createFunctionImpl(fn);
+                if(!fn.local){
+                    push(content,item);
+                    push('\n',item);
+                }
             }
         }
 

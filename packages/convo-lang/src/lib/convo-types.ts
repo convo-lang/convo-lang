@@ -163,6 +163,11 @@ export interface ConvoMessage
      * begin and end with alpha numeric characters.
      */
     preSpace?:boolean;
+
+    /**
+     * Conversation ID
+     */
+    cid?:string;
 }
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
@@ -297,6 +302,11 @@ export interface ConvoFunction
     name:string;
 
     modifiers:string[];
+
+    /**
+     * If true the function defines an agent
+     */
+    isAgent?:boolean;
 
     /**
      * Name of a type variable that the function returns. If undefined the function
@@ -1121,6 +1131,7 @@ export interface CloneConversationOptions
     systemOnly?:boolean;
     noFunctions?:boolean;
     cloneConvoString?:boolean;
+    removeAgents?:boolean;
 }
 
 export interface ConvoDocumentReference
@@ -1293,3 +1304,18 @@ export interface ConvoInsert
 }
 
 export type BeforeCreateConversationExeCtx=(conversation:Conversation)=>void;
+
+export interface ConvoRoomState
+{
+    readonly conversations:Conversation[];
+    readonly lookup:Record<string,Conversation>;
+}
+
+export interface ConvoAgentDef
+{
+    name:string;
+    description?:string;
+    main:ConvoMessage;
+    capabilities:string[];
+    functions:ConvoMessage[];
+}

@@ -31,6 +31,16 @@ export const convoGlobalRef='convo';
 export const convoEnumFnName='enum';
 export const convoMetadataKey=Symbol('convoMetadataKey');
 export const convoCaptureMetadataTag='captureMetadata';
+export const defaultConversationName='default';
+
+export const convoMsgModifiers={
+    /**
+     * When applied to the function the function is used as the default function of an agent
+     */
+    agent:'agent',
+} as const;
+
+export const convoScopedModifiers=[convoMsgModifiers.agent]
 
 export const defaultConvoTask='default';
 
@@ -83,6 +93,11 @@ export const convoRoles={
      * Ends a parallel execution block
      */
     parallelEnd:'parallelEnd',
+
+    /**
+     * Ends the definition of an agent
+     */
+    agentEnd:'agentEnd',
 } as const;
 
 export const convoFunctions={
@@ -107,6 +122,11 @@ export const convoFunctions={
     describeScene:'describeScene',
 
     readDoc:'readDoc',
+
+    /**
+     * Returns an XML list of agents available to the current conversation.
+     */
+    getAgentList:'getAgentList',
 } as const;
 
 /**
@@ -530,6 +550,22 @@ export const convoTags={
      * whitespace is preserved.
      */
     preSpace:'preSpace',
+
+    /**
+     * Indicates a message is the system message used to give an LLM instructions on how to use
+     * agents
+     */
+    agentSystem:'agentSystem',
+
+    /**
+     * Defines capabilities for a message
+     */
+    cap:'cap',
+
+    /**
+     * Conversation ID
+     */
+    cid:'cid',
 
 } as const;
 

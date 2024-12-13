@@ -11,6 +11,7 @@ export * from './lib/ConvoLocalStorageCache';
 export * from './lib/ConvoLocalStorageGraphStore';
 export * from './lib/ConvoMemoryCache';
 export * from './lib/ConvoMemoryGraphStore';
+export * from './lib/ConvoRoom';
 export * from './lib/ConvoUserVfsCache';
 export * from './lib/ConvoVfsCache';
 export * from './lib/HttpConvoCompletionService';

@@ -1152,6 +1152,29 @@ export const defaultConvoVars={
 
     [convoFunctions.readDoc]:convoScopeFunctionReadDoc,
 
+    [convoFunctions.getAgentList]:createConvoScopeFunction((scope,ctx)=>{
+        const agents=ctx.convo.conversation?.agents;
+        if(!agents?.length){
+            return `<agentList>\n(no agents defined)\n</agentList>`
+        }
+        return `<agentList>\n${agents.map(a=>{
+
+            const out:string[]=[`<agent>\nName: ${a.name}\n`];
+            if(a.description){
+                out.push(`Description: ${a.description}\n\n`);
+            }
+            if(a.capabilities.length){
+                out.push('Capabilities:\n');
+                for(const cap of a.capabilities){
+                    out.push(`- ${cap}\n`);
+                }
+            }
+            out.push('</agent>');
+
+            return out.join('');
+        }).join('\n\n')}\n</agentList>`
+    }),
+
 
 
 } as const;
