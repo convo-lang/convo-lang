@@ -290,6 +290,8 @@ export const getConvoGraphEventString=(e:ConvoGraphMonitorEvent,usage?:ConvoToke
             }\nstate:${
                 JSON.stringify(e.traverser?.state??null,null,4)
             }${
+                e.node?.userData?`\nuserData:${JSON.stringify(e.node.userData,null,4)}`:''
+            }${
                 usage?`\nusage: ${convoUsageTokensToString(usage)}`:''
             }`
         )
