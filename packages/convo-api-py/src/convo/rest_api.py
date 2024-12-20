@@ -22,7 +22,7 @@ async def post_embed_text(data, request: Request):
 async def embed_documents(doc_request: DocumentEmbeddingRequest, request: Request):
     return await generate_document_embeddings(
         request.app.state.db,
-        request.app.state.ag,
+        request.app.state.ag if request.app.state.RUN_GRAPH_EMBED else None,
         request.app.state.open_ai_client,
         doc_request,
         request.app.state.graph_rag_config,
