@@ -7,6 +7,7 @@ topic=os.environ.get('TRANSCRIBE_TOPIC')
 broker=os.environ.get('KAFKA_BROKERS')
 cpu_only=os.environ.get('CPU_ONLY')
 docs=os.environ.get('DOCUMENT_PREFIX_PATH')
+converted=[]
 
 
 print(
@@ -48,6 +49,12 @@ for message in consumer:
     tmpOut='out/'+uuid.uuid4().hex
 
     print("transcribe ",format,src,'->',tmpOut,'->',dest,flush=True)
+
+    if src in converted:
+        print("Already converted, skipping",src,flush=True)
+        continue
+
+    converted.append(src)
 
     if not os.path.isdir('out'):
         os.mkdir('out')
