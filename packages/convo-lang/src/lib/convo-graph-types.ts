@@ -2,6 +2,7 @@ import { CancelToken, CodeParsingResult, Point } from "@iyio/common";
 import { BehaviorSubject, Observable } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
+import type { ConvoGraphCtrl } from "./ConvoGraphCtrl";
 import { ConvoMessage } from "./convo-types";
 
 export const allConvoGraphEntityTypeAry=['node','edge','input','source','traverser'] as const;
@@ -477,6 +478,7 @@ export interface CreateConvoTraverserOptions
         state:Record<string,any>|undefined,
         saveToStore:boolean
     )=>Partial<ConvoTraverser>);
+    initTraverser?:(tv:ConvoTraverser)=>void|Promise<void>;
 }
 
 export interface StartConvoTraversalOptions
@@ -488,6 +490,11 @@ export interface StartConvoTraversalOptions
      * with a `to` value of the string value.
      */
     edge?:ConvoEdge|string;
+
+    /**
+     * Predefined array of traverser that skips edges
+     */
+    traversers?:ConvoTraverser[];
 
     /**
      * Used to match and existing edge in the graph store
@@ -728,3 +735,5 @@ export interface ConvoStateVarProxy
 }
 
 export type ConvoStateVarProxyMap=Record<string,ConvoStateVarProxy|string>;
+
+export type ConvoGraphBeforeNextCallback=(tv:ConvoTraverser,group:ConvoTraverserGroup|undefined,ctrl:ConvoGraphCtrl)=>boolean|Promise<boolean>;

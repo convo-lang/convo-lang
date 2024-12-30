@@ -235,6 +235,11 @@ export class ConvoGraphViewCtrl
         }
     }
 
+    public deselect()
+    {
+        this._selected.next(null);
+    }
+
     public isSelected(entity:ConvoGraphEntityAny|null|undefined):boolean{
         const s=this.selected;
         if(!s || !entity){

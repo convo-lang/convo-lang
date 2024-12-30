@@ -3,7 +3,7 @@ import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, defaultConvoGraphUserDataVarName, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
-import { ConvoEdge, ConvoEdgePattern, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
+import { ConvoEdge, ConvoEdgePattern, ConvoGraphBeforeNextCallback, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
 import { addConvoUsageTokens, convoTags, createEmptyConvoTokenUsage, getConvoFnByTag, isConvoTokenUsageEmpty } from "./convo-lib";
 import { convoScript } from "./convo-template";
 import { ConvoFnCallInfo, ConvoTokenUsage } from "./convo-types";
@@ -15,6 +15,7 @@ export interface ConvoGraphCtrlOptions
     convoOptions?:ConversationOptions;
     maxConcurrentStepExe?:number;
     logEventsToConsole?:boolean;
+    beforeNext?:ConvoGraphBeforeNextCallback;
 }
 
 export class ConvoGraphCtrl
@@ -37,6 +38,8 @@ export class ConvoGraphCtrl
         }
     }
     private readonly logEventsToConsole:boolean;
+
+    private readonly beforeNext?:ConvoGraphBeforeNextCallback;
 
     private readonly defaultConvoOptions:ConversationOptions;
     private async getConvoOptionsAsync(tv:ConvoTraverser|undefined,initConvo?:string,defaultVarsOverride?:Record<string,any>):Promise<ConversationOptions>{
@@ -87,12 +90,14 @@ export class ConvoGraphCtrl
         convoOptions={},
         maxConcurrentStepExe=maxConvoGraphConcurrentStepExe,
         logEventsToConsole=false,
+        beforeNext,
     }:ConvoGraphCtrlOptions){
         this.store=store;
         this.defaultConvoOptions=convoOptions;
         this.maxConcurrentStepExe=Math.max(1,maxConcurrentStepExe);
         this.stepLock=new Lock(this.maxConcurrentStepExe);
         this.logEventsToConsole=logEventsToConsole;
+        this.beforeNext=beforeNext;
     }
 
     private readonly disposables=new DisposeContainer();
@@ -122,6 +127,7 @@ export class ConvoGraphCtrl
         state,
         saveToStore=false,
         cancel=new CancelToken(),
+        traversers:traversersOpt,
     }:StartConvoTraversalOptions):Promise<ConvoTraverserGroup>{
 
         if(typeof edge === 'string'){
@@ -131,23 +137,27 @@ export class ConvoGraphCtrl
                 from:''
             }
         }
-
-        let edges:ConvoEdge[];
-
-        if(edge){
-            edges=[edge];
-        }else if(edgePattern){
-            edges=await this.getEdgesAsync(edgePattern);
-        }else{
-            edges=[];
-        }
-
-        const traversersArrays=await Promise.all(edges.map((edge)=>
-            this.createTvAsync(edge,createTvOptions,payload,state,saveToStore)));
-
         const traversers:ConvoTraverser[]=[];
-        for(const ta of traversersArrays){
-            traversers.push(...ta);
+
+        if(traversersOpt){
+            traversers.push(...traversersOpt);
+        }else{
+            let edges:ConvoEdge[];
+
+            if(edge){
+                edges=[edge];
+            }else if(edgePattern){
+                edges=await this.getEdgesAsync(edgePattern);
+            }else{
+                edges=[];
+            }
+
+            const traversersArrays=await Promise.all(edges.map((edge)=>
+                this.createTvAsync(edge,createTvOptions,payload,state,saveToStore)));
+
+            for(const ta of traversersArrays){
+                traversers.push(...ta);
+            }
         }
 
         const first=traversers.find(t=>t.controlPath);
@@ -223,6 +233,8 @@ export class ConvoGraphCtrl
             }
         }
 
+        await options?.initTraverser?.(tv);
+
         if(this.hasListeners){
             this.triggerEvent({
                 type:'start-traversal',
@@ -265,7 +277,7 @@ export class ConvoGraphCtrl
                 })
             }
             if(tv.saveToStore){
-                this.saveTraverserAsync(tv);
+                await this.saveTraverserAsync(tv);
             }
             return undefined;
         }
@@ -306,13 +318,13 @@ export class ConvoGraphCtrl
         }
 
         if(tv.saveToStore){
-            this.saveTraverserAsync(tv);
+            await this.saveTraverserAsync(tv);
         }
 
         return targetNode;
     }
 
-    private async saveTraverserAsync(tv:ConvoTraverser){
+    public async saveTraverserAsync(tv:ConvoTraverser){
         applyConvoTraverserControlPath(tv);
         const putP=this.store.putTraverserAsync(tv);
         if(this.store.putTraverserProxiesAsync){
@@ -355,7 +367,11 @@ export class ConvoGraphCtrl
 
         await this.store.loadTraverserProxiesAsync?.(tv);
 
-        while((await this.nextAsync(tv,group))==='ready' && !group?.cancel.isCanceled){
+        while(
+            (!this.beforeNext || await this.beforeNext(tv,group,this)) &&
+            (await this.nextAsync(tv,group))==='ready' &&
+            !group?.cancel.isCanceled
+        ){
             // do nothing
         }
         return tv.exeState;
@@ -543,7 +559,7 @@ export class ConvoGraphCtrl
         });
 
         if(edges.length){
-            await Promise.all(edges.map((edge,i)=>{
+            await Promise.all(edges.map(async (edge,i)=>{
                 if(i===0 && !edge.loop){
                     if(edge.loop){
                         tv.exeState='stopped';
@@ -553,15 +569,19 @@ export class ConvoGraphCtrl
                             traverser:tv,
                             node,
                         })
+                        if(tv.saveToStore){
+                            await this.saveTraverserAsync(tv);
+                        }
                     }else{
                         if(edge.selectPath){
                             tv.payload=getValueByPath(tv.payload,edge.selectPath);
                         }
-                        return this.traverseEdgeAsync(tv,edge);
+                        await this.traverseEdgeAsync(tv,edge);
+                        return;
                     }
                 }
                 // create fork
-                return this.createTvAsync(
+                await this.createTvAsync(
                     edge,
                     group?.createTvOptions,
                     tv.payload,
@@ -579,6 +599,9 @@ export class ConvoGraphCtrl
                 traverser:tv,
                 node,
             })
+            if(tv.saveToStore){
+                await this.saveTraverserAsync(tv);
+            }
         }
 
         return tv.exeState;
