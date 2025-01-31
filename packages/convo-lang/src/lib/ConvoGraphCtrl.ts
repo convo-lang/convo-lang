@@ -67,6 +67,7 @@ export class ConvoGraphCtrl
                 sourceInput:tv?.payload,
                 workflow:tv?.state,
                 graphCtrl:this,
+                traverser:tv,
                 ...defaultVarsOverride
             }
         }
