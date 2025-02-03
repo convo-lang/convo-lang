@@ -1108,6 +1108,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
+                    case convoTags.hidden:
+                        msg.renderTarget='hidden';
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;

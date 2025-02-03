@@ -425,6 +425,11 @@ export const convoTags={
      */
     renderTarget:'renderTarget',
 
+    /**
+     * Sets the renderTarget of the message to "hidden"
+     */
+    hidden:'hidden',
+
     toolId:'toolId',
 
     /**
@@ -1808,4 +1813,42 @@ export const getFlattenConversationDisplayString=(flat:FlatConvoConversation,inc
     }
 
     return out.join('');
+}
+
+export interface ConversationSuggestions
+{
+    title?:string;
+    suggestions:string[];
+    messages:FlatConvoMessage[];
+}
+
+export const getLastConvoSuggestions=(messages:FlatConvoMessage[]):ConversationSuggestions|undefined=>{
+    const sug:FlatConvoMessage[]=[];
+    let title:string|undefined;
+    for(let i=messages.length-1;i>=0;i--){
+        const msg=messages[i];
+        if(!msg){
+            continue;
+        }
+
+        if(msg.isSuggestion){
+            sug.unshift(msg);
+            const t=msg.tags?.[convoTags.suggestionTitle];
+            if(t){
+                title=t;
+            }
+        }else if(sug.length){
+            break;
+        }
+    }
+
+    if(!sug.length){
+        return undefined;
+    }
+
+    return {
+        messages:sug,
+        suggestions:sug.map(s=>s.content??''),
+        title,
+    }
 }
