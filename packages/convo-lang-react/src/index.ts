@@ -6,6 +6,8 @@ export * from './lib/ConvoComponentRenderer';
 export * from './lib/MarkdownViewer';
 export * from './lib/MessageComponentRenderer';
 export * from './lib/MessagesSourceView';
+export * from './lib/MessagesView';
+export * from './lib/SuggestionsView';
 export * from './lib/convo-lang-react';
 export * from './lib/convo-lang-theme';
 export * from './lib/gen/Gen';

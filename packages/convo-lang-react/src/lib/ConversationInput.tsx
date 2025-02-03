@@ -1,6 +1,6 @@
 import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { Form, SlimButton } from "@iyio/react-common";
+import { Form, Image, SlimButton } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 import { Icon } from "./icon/Icon";
@@ -17,6 +17,14 @@ export interface ConversationInputProps
     min?:boolean;
     children?:any;
     noSubmitButton?:boolean;
+    unstyled?:boolean;
+    beforeInput?:any;
+    afterInput?:any;
+    imageUrl?:string;
+    imageAlt?:string;
+    imageClassName?:string;
+    imageSize?:string|number;
+    imageAr?:string|number
 }
 
 export function ConversationInput({
@@ -30,6 +38,14 @@ export function ConversationInput({
     min,
     children,
     noSubmitButton,
+    unstyled,
+    beforeInput,
+    afterInput,
+    imageUrl,
+    imageAlt='icon',
+    imageClassName,
+    imageSize='3rem',
+    imageAr='1',
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -68,14 +84,22 @@ export function ConversationInput({
             onSubmit={submit}
         >
 
+            {!!imageUrl && <Image className={imageClassName} alt={imageAlt} src={imageUrl} style={{
+                height:imageSize,
+                aspectRatio:imageAr,
+            }} />}
+            {beforeInput}
+
             <input
-                className={style.input({min},inputClassName)}
+                className={unstyled?inputClassName:style.input({min},inputClassName)}
                 placeholder={placeholder}
                 name={inputName}
                 type={inputType}
                 value={value}
                 onChange={e=>setValue(e.target.value)}
             />
+
+            {afterInput}
 
             {children}
 
@@ -90,6 +114,8 @@ const style=atDotCss({name:'ConversationInput',order:'framework',namespace:'iyio
         flex-direction:row;
         position:relative;
         margin:@@inputMargin;
+        align-items:center;
+        gap:0.5rem;
     }
     @.input{
         all:unset;

@@ -1,44 +1,74 @@
 import { ConversationUiCtrl, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
-import { ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
+import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
 import { ConversationStatusIndicator } from "./ConversationStatusIndicator";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
+export type ConvoMessageIconRenderer=(msg:FlatConvoMessage)=>string|any;
+
+interface RenderOptions
+{
+    ctrl:ConversationUiCtrl;
+    flat:FlatConvoConversation|null;
+    showSystemMessages:boolean;
+    showFunctions:boolean;
+    hideSuggestions:boolean;
+    rowClassName?:string;
+    ragRenderer?:ConvoRagRenderer;
+    assistantIcon?:string;
+    userIcon?:string;
+    assistantIconRender?:ConvoMessageIconRenderer;
+    userIconRender?:ConvoMessageIconRenderer;
+    iconSize?:string;
+    iconClassName?:string;
+    callRenderer?:(msg:FlatConvoMessage)=>any;
+}
+
 const renderResult=(
-    ctrl:ConversationUiCtrl,
-    flat:FlatConvoConversation,
-    result:ConvoMessageRenderResult,
     i:number,
-    showSystemMessages:boolean,
-    showFunctions:boolean,
-    rowClassName:string|undefined,
-    ragRenderer:ConvoRagRenderer|undefined
+    result:ConvoMessageRenderResult,
+    options:RenderOptions,
 ):any=>{
+    const {ctrl,flat}=options;
     if((typeof result !== 'object') || !result){
         return null;
     }
     if(result.component){
         return <Fragment key={i+'comp'}>{result.component}</Fragment>
     }
-    return renderMessage(ctrl,flat,{
+    return renderMessage(i,{
         role:result.role??'assistant',
         content:result.content
-    },i,showSystemMessages,showFunctions,rowClassName,ragRenderer)
+    },options)
 }
 
 const renderMessage=(
-    ctrl:ConversationUiCtrl,
-    flat:FlatConvoConversation,
-    m:FlatConvoMessage,
     i:number,
-    showSystemMessages:boolean,
-    showFunctions:boolean,
-    rowClassName:string|undefined,
-    ragRenderer:ConvoRagRenderer|undefined,
+    m:FlatConvoMessage,
+    {
+        ctrl,
+        flat,
+        showSystemMessages,
+        showFunctions,
+        hideSuggestions,
+        rowClassName,
+        ragRenderer,
+        assistantIcon,
+        userIcon,
+        assistantIconRender,
+        userIconRender,
+        iconSize,
+        iconClassName,
+        callRenderer
+    }:RenderOptions
 )=>{
+
+    if(!flat){
+        return null;
+    }
 
     const className=style.msg({user:m.role==='user',agent:m.role!=='user',suggestion:m.isSuggestion});
 
@@ -125,6 +155,14 @@ const renderMessage=(
                     </div>
                 </div>
             )
+        }else if(callRenderer && m.called){
+            return (
+                <div className={rowClassName} key={i+'fr'}>
+                    <div className={className}>
+                        {callRenderer(m)}
+                    </div>
+                </div>
+            )
         }
         return null;
     }
@@ -154,9 +192,12 @@ const renderMessage=(
                     </div>
                 </div>
             ))
-    }</Fragment>)
+        }</Fragment>)
 
     }else if(m.isSuggestion){
+        if(hideSuggestions){
+            return true;
+        }
         const isFirst=!flat.messages[i-1]?.isSuggestion;
         if(!isFirst){
             return null;
@@ -198,12 +239,33 @@ const renderMessage=(
     }else{
         return (
             <div className={rowClassName} key={i+'d'}>
-                <div className={className}>
-                    {m.content}
+                <div className={style.textMsg()}>
+                    {(m.isAssistant && (!!assistantIcon || assistantIconRender))?getMessageIcon(m,assistantIcon,assistantIconRender,iconSize,iconClassName):null}
+
+                    <div className={style.textMsgContent()}>
+                        <div className={className}>
+                            {m.content}
+                        </div>
+                    </div>
+                    {(m.isUser && (!!userIcon || userIconRender))?getMessageIcon(m,userIcon,userIconRender,iconSize,iconClassName):null}
                 </div>
             </div>
         )
     }
+}
+
+const getMessageIcon=(msg:FlatConvoMessage,icon:any,renderer:ConvoMessageIconRenderer|undefined,size:string|undefined,className:string|undefined):any=>{
+    if(renderer){
+        icon=renderer(msg);
+    }
+    if(typeof icon==='string'){
+        icon=<Image alt="icon" src={icon} className={className} style={{
+            width:size,
+            height:size,
+        }} />
+    }
+
+    return icon||null;
 }
 
 export interface MessagesViewProps
@@ -213,6 +275,14 @@ export interface MessagesViewProps
     ragRenderer?:ConvoRagRenderer;
     messageBottomPadding?:string;
     autoHeight?:boolean;
+    hideSuggestions?:boolean;
+    assistantIcon?:string;
+    userIcon?:string;
+    assistantIconRender?:ConvoMessageIconRenderer;
+    userIconRender?:ConvoMessageIconRenderer;
+    iconSize?:string;
+    iconClassName?:string;
+    callRenderer?:(msg:FlatConvoMessage)=>any;
 }
 
 export function MessagesView({
@@ -221,6 +291,14 @@ export function MessagesView({
     ragRenderer,
     messageBottomPadding='120px',
     autoHeight,
+    hideSuggestions=false,
+    assistantIcon,
+    userIcon,
+    assistantIconRender,
+    userIconRender,
+    iconClassName,
+    iconSize,
+    callRenderer
 }:MessagesViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl)
@@ -243,6 +321,13 @@ export function MessagesView({
         style.row({fixedWidth:theme.rowWidth!==undefined},theme.messageRowClassName)
     );
 
+    const options:RenderOptions={
+        ctrl,flat:flat??null,showSystemMessages,
+        showFunctions,hideSuggestions,rowClassName,ragRenderer,
+        assistantIcon,userIcon,assistantIconRender,userIconRender,iconClassName,iconSize,
+        callRenderer
+    }
+
     const mapped=messages.map((m,i)=>{
 
         const ctrlRendered=ctrl.renderMessage(m,i);
@@ -251,19 +336,19 @@ export function MessagesView({
         }
 
         if(ctrlRendered?.position==='replace'){
-            return renderResult(ctrl,flat,ctrlRendered,i,showSystemMessages,showFunctions,rowClassName,ragRenderer);
+            return renderResult(i,ctrlRendered,options);
         }
 
-        const rendered=renderMessage(ctrl,flat,m,i,showSystemMessages,showFunctions,rowClassName,ragRenderer);
+        const rendered=renderMessage(i,m,options);
         if(!ctrlRendered){
             return rendered;
         }
 
         return (
             <Fragment key={i+'j'}>
-                {ctrlRendered.position==='before' && renderResult(ctrl,flat,ctrlRendered,i,showSystemMessages,showFunctions,rowClassName,ragRenderer)}
+                {ctrlRendered.position==='before' && renderResult(i,ctrlRendered,options)}
                 {rendered}
-                {ctrlRendered.position==='after' && renderResult(ctrl,flat,ctrlRendered,i,showSystemMessages,showFunctions,rowClassName,ragRenderer)}
+                {ctrlRendered.position==='after' && renderResult(i,ctrlRendered,options)}
             </Fragment>
         )
 
@@ -437,5 +522,17 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         margin:0.5rem 0.5rem -0.5rem 0.5rem;
         opacity:0.5;
         font-size:0.9em;
+    }
+
+    /*------*/
+
+    @.textMsg{
+        display:flex;
+        gap:0.5rem;
+    }
+    @.textMsgContent{
+        display:flex;
+        flex-direction:column;
+        flex:1;
     }
 `});

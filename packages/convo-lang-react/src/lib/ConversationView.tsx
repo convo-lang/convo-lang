@@ -1,10 +1,12 @@
 import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
+import { BaseLayoutProps } from '@iyio/common';
 import { useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo } from "react";
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
-import { MessagesView } from "./MessagesView";
+import { MessagesView, MessagesViewProps } from "./MessagesView";
+import { SuggestionsView, SuggestionsViewProps } from './SuggestionsView';
 import { ConversationUiContext } from "./convo-lang-react";
 import { ConvoLangTheme, defaultDarkConvoLangTheme, defaultLightConvoLangTheme } from "./convo-lang-theme";
 
@@ -36,6 +38,9 @@ export interface ConversationViewProps
     template?:string;
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
     autoHeight?:boolean;
+    suggestionsLocation?:'inline'|'before-input'|'after-input';
+    messagesProps?:MessagesViewProps;
+    suggestionProps?:SuggestionsViewProps & BaseLayoutProps;
 }
 
 export function ConversationView({
@@ -65,6 +70,9 @@ export function ConversationView({
     appendTrigger,
     beforeCreateExeCtx,
     autoHeight,
+    suggestionsLocation='inline',
+    messagesProps,
+    suggestionProps,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -178,12 +186,18 @@ export function ConversationView({
             renderTarget={renderTarget}
             ragRenderer={ragRenderer}
             autoHeight={autoHeight}
+            hideSuggestions={suggestionsLocation!=='inline'}
+            {...messagesProps}
          />
     )
 
     useEffect(()=>{
         redirectMessagesView?.(messagesView);
     },[redirectMessagesView,messagesView]);
+
+    const suggestions=suggestionsLocation==='inline'?null:(
+        <SuggestionsView {...suggestionProps}/>
+    )
 
     return (
 
@@ -196,7 +210,11 @@ export function ConversationView({
                 {
                     (!showSource || showInputWithSource) &&
                     !noInput &&
-                    (renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} {...inputProps} />)
+                    <>
+                        {suggestionsLocation==='before-input' && suggestions}
+                        {renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} {...inputProps} />}
+                        {suggestionsLocation==='after-input' && suggestions}
+                    </>
                 }
 
             </div>
