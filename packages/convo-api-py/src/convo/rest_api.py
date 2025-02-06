@@ -3,6 +3,7 @@ import logging
 from convo.embeddings.convert_document import convert_document
 from convo.embeddings.embed import encode_text
 from convo.embeddings.embed_documents import generate_document_embeddings
+from convo.embeddings.graph.graph_retrieval import get_chunk_entity_neighbours
 from convo.embeddings.types import (
     DocumentConversionRequest,
     DocumentEmbeddingRequest,
@@ -33,3 +34,12 @@ async def embed_documents(doc_request: DocumentEmbeddingRequest, request: Reques
 @document_handler.post("/api/document-conversion")
 async def document_conversion(request: DocumentConversionRequest):
     return convert_document(request)
+
+
+@document_handler.get("/api/chunk_graph_neighbours")
+async def get_chunk_graph_neighbours(chunk: str, request: Request):
+    return await get_chunk_entity_neighbours(
+        request.app.state.ag,
+        request.app.state.graph_rag_config,
+        chunk,
+    )
