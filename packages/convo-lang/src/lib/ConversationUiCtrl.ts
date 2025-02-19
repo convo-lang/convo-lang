@@ -402,7 +402,11 @@ export class ConversationUiCtrl
             })
         }
         if(options.appendTemplate && this.template){
-            convo.append(this.template);
+            try{
+                convo.append(this.template);
+            }catch(ex){
+                console.error('Invalid convo template supplied to ConversationUiCtrl',ex);
+            }
         }
     }
 
