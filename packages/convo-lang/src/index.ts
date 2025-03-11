@@ -1,3 +1,5 @@
+export * from './lib/BaseOpenAiConvoCompletionService';
+export * from './lib/BaseOpenAiConvoConverter';
 export * from './lib/CallbackConvoCompletionService';
 export * from './lib/Conversation';
 export * from './lib/ConversationUiCtrl';
@@ -16,6 +18,7 @@ export * from './lib/ConvoUserVfsCache';
 export * from './lib/ConvoVfsCache';
 export * from './lib/HttpConvoCompletionService';
 export * from './lib/LocalStorageConvoDataStore';
+export * from './lib/convo-default-models';
 export * from './lib/convo-default-vars';
 export * from './lib/convo-from-scope';
 export * from './lib/convo-graph-converter';
@@ -41,4 +44,12 @@ export * from './lib/convo-types';
 export * from './lib/convo-value-conditions';
 export * from './lib/convo-zod';
 export * from './lib/convo.deps';
+export * from './lib/providers/anthropic-lib';
+export * from './lib/providers/anthropic-models';
+export * from './lib/providers/anthropic-params';
+export * from './lib/providers/anthropic-service';
+export * from './lib/providers/openai-lib';
+export * from './lib/providers/openai-models';
+export * from './lib/providers/openai-params';
+export * from './lib/providers/openai-service';
 
