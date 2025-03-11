@@ -2,7 +2,7 @@ import { getErrorMessage, getValueByAryPath, isPromise } from '@iyio/common';
 import { ZodObject, ZodType } from 'zod';
 import { ConvoError } from './ConvoError';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, convoFlowControllerKey, convoScopeFnKey } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
@@ -229,7 +229,40 @@ export class ConvoExecutionContext
     {
 
         if(fn.call){
-            const callee=(this.sharedVars[fn.name]?.[convoFlowControllerKey] as ConvoFlowController|undefined)?.sourceFn;
+            const v=this.sharedVars[fn.name];
+            const callee=(v?.[convoFlowControllerKey] as ConvoFlowController|undefined)?.sourceFn;
+
+            if(!callee && isConvoScopeFunction(v)){
+                args=await this.paramsToObjAsync(fn.params);
+                const paramValues:any[]=[];
+                const labels:Record<string,number>={};
+                for(const e in args){
+                    const value=args[e];
+                    labels[e]=paramValues.length;
+                    paramValues.push(value);
+                }
+                const scope:ConvoScope={
+                    i:0,
+                    s:{
+                        s:0,
+                        e:0,
+                        fn:fn.name,
+                    },
+                    vars:{
+                        [convoArgsName]:args,
+                    },
+                    paramValues,
+                    labels,
+                    [convoScopeFnKey]:v,
+                }
+                const r=v(scope,this);
+                const isP=isPromise(r);
+                return {
+                    scope,
+                    value:isP?undefined:r,
+                    valuePromise:isP?r:undefined,
+                }
+            }
             if(!callee){
                 throw new ConvoError(
                     'function-not-defined',

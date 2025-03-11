@@ -1131,7 +1131,7 @@ export class Conversation
         args:Record<string,any>={},
         options?:ConvoCompletionOptions
     ):Promise<any>{
-        const c=await this.tryCompleteAsync(options?.task,options,flat=>{
+        const c=await this.tryCompleteAsync(options?.task,{...options,returnOnCalled:true},flat=>{
             if(typeof fn === 'object'){
                 flat.exe.loadFunctions([{
                     fn,
