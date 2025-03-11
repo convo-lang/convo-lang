@@ -1,6 +1,6 @@
 import { UnsupportedError, asArray, dupDeleteUndefined, parseXml, zodTypeToJsonScheme } from "@iyio/common";
+import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
-import { parse as parseJson5 } from 'json5';
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
