@@ -1,7 +1,7 @@
 import { Conversation, ConversationOptions, ConvoConversationCache, ConvoDocOutput, ConvoDocPageResult, ConvoDocQuery, ConvoDocQueryResult, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement, ConvoLocalStorageCache, convoDocResultFormatVersion, convoScript, escapeConvoMessageContent, getConvoDocReaderAsync, getConvoSelectContentType, isConvoDocSelectMatch, isConvoDocSelectPerPage } from "@convo-lang/convo-lang";
 import { CancelToken, InternalOptions, Lock, Progress, ReadonlySubject, deepClone, dupDeleteUndefined, getFileName, getSortedObjectHash, joinPaths, minuteMs, readBlobAsDataUrlAsync } from '@iyio/common';
+import { parseJson5 } from '@iyio/json5';
 import { getVfsItemUrl, vfs } from '@iyio/vfs';
-import { parse as parseJson5 } from 'json5';
 import { BehaviorSubject } from 'rxjs';
 
 const lsKey='enableConvoDocRunnerLogging';

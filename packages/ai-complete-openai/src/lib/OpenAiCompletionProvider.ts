@@ -1,6 +1,6 @@
 import { AiCompletionFunctionCallError, AiCompletionMessage, AiCompletionMessageType, AiCompletionOption, AiCompletionProvider, AiCompletionRequest, AiCompletionResult, CompletionOptions, getLastNonCallAiCompleteMessage } from '@convo-lang/ai-complete';
 import { Lock, Scope, SecretManager, asType, delayAsync, deleteUndefined, parseMarkdownImages, secretManager, shortUuid, unused } from '@iyio/common';
-import { parse } from 'json5';
+import { parse } from '@iyio/json5';
 import OpenAIApi from 'openai';
 import { ImagesResponse } from 'openai/resources';
 import { ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
