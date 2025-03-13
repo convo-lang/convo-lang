@@ -91,7 +91,6 @@
         "date-fns-tz": "^2.0.0",
         "highlight.js": "^11.7.0",
         "html-to-image": "^1.11.11",
-        "json5": "^2.2.3",
         "markdown-it": "^14.1.0",
         "next": "^14.2.5",
         "ngrok": "^5.0.0-beta.2",

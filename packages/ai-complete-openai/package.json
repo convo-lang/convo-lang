@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/ai-complete-openai",
-    "version": "0.7.11",
+    "version": "0.7.12",
     "type": "commonjs",
     "sideEffects": false
 }
