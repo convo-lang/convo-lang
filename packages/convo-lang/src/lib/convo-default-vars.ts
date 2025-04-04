@@ -1,8 +1,9 @@
-import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
+import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
+import { ConvoForm } from "./convo-forms-types";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { createConvoSceneDescription } from "./convo-scene-lib";
@@ -1173,6 +1174,51 @@ export const defaultConvoVars={
 
             return out.join('');
         }).join('\n\n')}\n</agentList>`
+    }),
+
+    [convoFunctions.defineForm]:createConvoScopeFunction((scope,ctx)=>{
+        const form:ConvoForm=deepClone(scope.paramValues?.[0]);
+        if(!form){
+            return form;
+        }
+        if(ctx.getVar(convoVars.__formsEnabled)===undefined){
+            ctx.setVar(true,true,convoVars.__formsEnabled);
+        }
+        let formsAry:ConvoForm[]|undefined=ctx.getVar(convoVars.__forms);
+        if(!formsAry || !Array.isArray(formsAry)){
+            formsAry=[];
+            ctx.setVar(true,formsAry,convoVars.__forms);
+        }
+
+        if(!form.id){
+            form.id='form-'+(formsAry.length+1);
+        }
+
+        if(!form.items){
+            form.items=[];
+        }
+
+        for(let i=0;i<form.items.length;i++){
+            let item=form.items[i];
+            if(!item){
+                form.items.splice(i,1);
+                i--;
+                continue;
+            }
+            if(typeof item === 'string'){
+                item={
+                    id:'item-'+(i+1),
+                    type:'question',
+                    question:item,
+                }
+                form.items[i]=item;
+            }
+            if(!item.id){
+                item.id='item-'+(i+1);
+            }
+        }
+
+        formsAry.push(form);
     }),
 
 

@@ -112,6 +112,11 @@ export const convoFunctions={
      */
     enableRag:'enableRag',
 
+    /**
+     * Defines a form that a user can be guided through
+     */
+    defineForm:'defineForm',
+
     today:'today',
 
     uuid:'uuid',
@@ -247,6 +252,16 @@ export const convoVars={
      * Used by agents to define the voice they use
      */
     __voice:'__voice',
+
+    /**
+     * used to indicate that forms have been enabled
+     */
+    __formsEnabled:'__formsEnabled',
+
+    /**
+     * Default array of forms
+     */
+    __forms:'__forms',
 
 } as const;
 
@@ -620,6 +635,7 @@ export const allowedConvoDefinitionFunctions=[
     convoJsonArrayFnName,
     convoFunctions.getState,
     convoFunctions.enableRag,
+    convoFunctions.defineForm,
     convoFunctions.uuid,
     convoFunctions.shortUuid,
     convoFunctions.getVar,
@@ -651,6 +667,7 @@ export const allowedConvoDefinitionFunctions=[
     'dateTime',
     'encodeURI',
     'encodeURIComponent',
+
 ] as const;
 
 export const passthroughConvoInputType='FlatConvoConversation';

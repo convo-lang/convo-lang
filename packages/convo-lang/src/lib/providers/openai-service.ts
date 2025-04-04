@@ -20,6 +20,7 @@ export const createOpenAiConvoServiceFromScope=(scope:Scope):BaseOpenAiConvoComp
         inputType:convoOpenAiInputType,
         outputType:convoOpenAiOutputType,
         models:knownConvoOpenAiModels,
+        isFallback:true,
     });
 }
 export const createOpenAiConvoConverterFromScope=(scope:Scope):BaseOpenAiConvoConverter=>{

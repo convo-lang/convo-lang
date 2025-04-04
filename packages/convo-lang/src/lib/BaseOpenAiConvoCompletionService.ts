@@ -17,6 +17,7 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     headers?:Record<string,string>;
     updateRequest?:(requestBody:Record<string,any>,headers:Record<string,string|undefined>)=>void;
     completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
+    isFallback?:boolean;
 }
 
 export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
@@ -34,6 +35,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     private readonly apiKeyHeader:string;
     private readonly apiKeyHeaderValuePrefix?:string;
     private readonly headers:Record<string,string>;
+    private readonly isFallback:boolean;
     private readonly updateRequest?:(requestBody:Record<string,any>,headers:Record<string,string|undefined>)=>void;
     private readonly completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
 
@@ -46,6 +48,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         inputType,
         outputType,
         models,
+        isFallback=false,
         apiKeyHeader='Authorization',
         apiKeyHeaderValuePrefix='Bearer ',
         headers={
@@ -61,6 +64,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         this.secretsName=secretsName;
         this.inputType=inputType;
         this.outputType=outputType;
+        this.isFallback=isFallback;
         this.models=models;
         this.apiKeyHeader=apiKeyHeader;
         this.apiKeyHeaderValuePrefix=apiKeyHeaderValuePrefix??undefined;
@@ -72,7 +76,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
     {
         if(!model){
-            return true;
+            return this.isFallback;
         }
         return this.models.some(m=>m.name===model);
     }

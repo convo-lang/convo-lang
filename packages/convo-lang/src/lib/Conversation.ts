@@ -1,10 +1,11 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
+import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
 import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
@@ -23,7 +24,7 @@ export interface ConversationOptions
     assistantRoles?:string[];
     systemRoles?:string[];
     roleMap?:Record<string,string>;
-    completionService?:ConvoCompletionService<any,any>;
+    completionService?:ConvoCompletionService<any,any>|ConvoCompletionService<any,any>;
     converters?:ConvoConversationConverter<any,any>[];
     serviceCapabilities?:ConvoCapability[];
     capabilities?:ConvoCapability[];
@@ -270,7 +271,7 @@ export class Conversation
     public systemRoles:string[];
     public roleMap:Record<string,string>
 
-    private completionService?:ConvoCompletionService<any,any>;
+    private completionService?:ConvoCompletionService<any,any>|ConvoCompletionService<any,any>[];
 
     private converters:ConvoConversationConverter<any,any>[];
 
@@ -355,7 +356,7 @@ export class Conversation
             assistantRoles=['assistant'],
             systemRoles=['system'],
             roleMap={},
-            completionService=convoCompletionService.get(),
+            completionService=convoCompletionService.all(),
             converters=convoConversationConverterProvider.all(),
             capabilities=[],
             serviceCapabilities=[],
@@ -399,7 +400,11 @@ export class Conversation
         this.assistantRoles=[...assistantRoles];
         this.systemRoles=[...systemRoles];
         this.roleMap=roleMap;
-        this.completionService=completionService;
+        if(Array.isArray(completionService) && completionService.length===1){
+            this.completionService=completionService[0];
+        }else{
+            this.completionService=completionService;
+        }
         this.converters=converters;
         this.capabilities=[...capabilities];
         this.disableMessageCapabilities=disableMessageCapabilities;
@@ -1118,6 +1123,27 @@ export class Conversation
         return tags;
     }
 
+    public getCompletionService(flat:FlatConvoConversation,message?:FlatConvoMessage):ConvoCompletionService<any,any>|undefined{
+        if(!Array.isArray(this.completionService)){
+            return this.completionService;
+        }
+
+        if(!message){
+            message=getLastConvoMessageWithRole(flat.messages,'user')??flat.messages[flat.messages.length-1];
+        }
+        if(!message){
+            return this.completionService[0];
+        }
+        const model=message.tags?.[convoTags.responseModel];
+        for(const s of this.completionService){
+            if(s.canComplete(model,flat)){
+                return s;
+            }
+        }
+        return undefined;
+
+    }
+
     private setFlat(flat:FlatConvoConversation,dup=true){
         if(this.isDisposed){
             return;
@@ -1191,8 +1217,6 @@ export class Conversation
             this.append(appendOrOptions.append);
         }
 
-        const completionService=this.completionService;
-
         if(appendOrOptions?.debug){
             console.info('Conversation.completeAsync:\n',appendOrOptions.append)
         }
@@ -1200,7 +1224,7 @@ export class Conversation
         const result=await this.tryCompleteAsync(
             appendOrOptions?.task,
             appendOrOptions,
-            flat=>this.completeWithServiceAsync(flat,completionService),
+            flat=>this.completeWithServiceAsync(flat,this.getCompletionService(flat)),
         );
 
         if(appendOrOptions?.debug){
@@ -1393,7 +1417,7 @@ export class Conversation
             }
             clone.appendMsgsAry([msg])
             clone._convo.splice(0,clone._convo.length);
-            const cps=clone.completionService;
+            const cps=asArrayItem(clone.completionService);
             const messages:ConvoCompletionMessage[]=[];
             if(cps){
                 clone.completionService={
@@ -2549,6 +2573,27 @@ export class Conversation
             }
         }
 
+        if(exe.getVar(convoVars.__formsEnabled)){
+            const forms:ConvoForm[]|undefined=exe.getVar(convoVars.__forms);
+            if(forms && Array.isArray(forms)){
+                const systemMessage=messages.find(m=>m.role==='system');
+                const content=(
+                    `You are helping the user fill out the following form:\n<form>${JSON.stringify(forms[0],null,4)}</form>. Ask the user each question one at a time. After the user answers all of the questions display their answers in markdown format an summarize their responses`
+                )
+                if(systemMessage){
+                    systemMessage.content=(
+                        (systemMessage.content?systemMessage.content+'\n\n':'')+
+                        content
+                    )
+                }else{
+                    messages.unshift({
+                        role:'system',
+                        content
+                    })
+                }
+            }
+        }
+
 
         const shouldDebug=this.shouldDebug(exe);
         const debug=shouldDebug?(this.debug??this.debugToConversation):undefined;
@@ -3408,10 +3453,11 @@ export class Conversation
 
     public toModelFormat(flat:FlatConvoConversation):any
     {
-        if(!this.completionService){
+        const service=this.getCompletionService(flat);
+        if(!service){
             return undefined;
         }
-        return convertConvoInput(flat,this.completionService.inputType,this.converters);
+        return convertConvoInput(flat,service.inputType,this.converters);
     }
 
     public toModelFormatStr(flat:FlatConvoConversation):string

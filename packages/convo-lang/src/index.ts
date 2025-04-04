@@ -20,6 +20,8 @@ export * from './lib/HttpConvoCompletionService';
 export * from './lib/LocalStorageConvoDataStore';
 export * from './lib/convo-default-models';
 export * from './lib/convo-default-vars';
+export * from './lib/convo-forms-lib';
+export * from './lib/convo-forms-types';
 export * from './lib/convo-from-scope';
 export * from './lib/convo-graph-converter';
 export * from './lib/convo-graph-lib';
