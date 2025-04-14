@@ -1,9 +1,9 @@
 # Convo-Lang.
 Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
-developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
+developers. The goal of Convo-Lang is to simplify the development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
 
-Convo-Lang can be used in Javascript, Python, from the command line or directly in VSCode via the
+Convo-Lang can be used in Javascript, Python, from the command line, or directly in VSCode via the
 Convo-Lang extension. The core of Convo-Lang consists of 2 parts, the Convo-Lang language and the
 Conversation Engine.
 
@@ -17,7 +17,7 @@ level details of working with an LLM such as implementing the usages of tools.
 *@@static*
 ``` convo
 > system
-You are a prompt engineer learning Convo-Lang. Prompting will never be the same 🥹
+You are a prompt engineer learning Convo-Lang. Prompting will never be the same 🥹.
 ```
 
 ## Why Convo-Lang
@@ -25,10 +25,10 @@ Q. Why do we need another programming language when LLMs understand English?
 
 A. Well, The short answer is there's more to prompting than you may think.
 
-When using applications like ChatGTP, Grok or Gemini prompting typically involves writing a message
+When using applications like ChatGTP, Grok, or Gemini prompting typically involves writing a message
 or series of messages and sending them to an LLM and getting a response. This type of free form
 interaction with an LLM can be very useful in many situations and requires nothing more than the
-use of english. But the nature of this type of unstructured and unguided conversation does fit well
+use of english. But the nature of this type of unstructured and unguided conversation does not fit well
 inside the setting of a purposeful application.
 
 When building AI powered (agentic) applications more structure is needed.
@@ -54,7 +54,7 @@ This is amazing 🤩
 ## A Quick Comparison
 To demonstrate some of the advantages of Convo-Lang we will take a look at the same prompt in
 both the OpenAI standard and in Convo-Lang. The prompt instructs an agent to act as a funny dude
-and to always respond to the user with a joke and if the user likes a joke to call the likeJoke function.
+and to always respond to the user with a joke, and if the user likes a joke to call the `likeJoke` function.
 
 OpenAI Standard:
 ``` json
@@ -155,7 +155,7 @@ Convo-Lang execution flow:
 
 
 # Learning Time.
-Now that you have have a basic understanding of how Convo-Lang works its time to start your 
+Now that you have have a basic understanding of how Convo-Lang works it's time to start your 
 journey with the language and learn its ways 🥷. The following Convo-Lang tutorial is full of
 interactive snippets. We encourage you to try them all, the best way to learn is to do.
 
@@ -227,23 +227,23 @@ What are tags
 
 @suggestion
 > assistant
-What do you use variables
+How do you use variables
 ```
 
-Doc is purely written in Convo-Lang and uses the document you are reading right now as his knowledge
-base in combination with a few functions in integrate into the Convo-Lang website. Doc is a great
+Doc is written purely in Convo-Lang and uses the document you are reading right now as his knowledge
+base in combination with a few functions integrated into the Convo-Lang website. Doc is a great
 example of what can be done with Convo-Lang.
 
 ## Summary
 
 ## Conversations
 At the heart of Convo-Lang are Conversations. A Conversation is a collection
-of messages. Messages can either contain textual content, multi-modal content
+of messages. Messages can either contain textual content, multi-modal content,
 or executable statements.
 
 Conversations are managed by the Conversation Engine, which is a code interpreter
-that interpreters Convo-Lang scripts. It handles all of the complexities of sending messages between
-a user and an LLM, executing tool use / calling function and manages the internal state of a Conversation.
+that interprets Convo-Lang scripts. It handles all of the complexities of sending messages between
+a user and an LLM, executing tool use / calling function, and manages the internal state of a Conversation.
 
 Convo-Lang scripts are conversations written in the Convo-Lang syntax and stored in a file or memory.
 When integrating Convo-Lang into an application you will often store Convo-Lang scripts in strings
@@ -320,15 +320,15 @@ You can install the vscode extension by searching for "convo-lang" in the vscode
 **Coming Soon**
 
 ## Language Basics
-Convo-Lang consists of a few simple building blocks, Content Message, Functions, Top Level Statements,
+Convo-Lang consists of a few simple building blocks: Content Messages, Functions, Top Level Statements,
 Variables, Tags and Comments. By combining these building blocks Convo-Lang allows you to create
-interactive, multi-modal conversations between humans and LLMs. These conversations.
+interactive, multi-modal conversations between humans and LLMs.
 
 - Content Message - Textual and multi-modal messages shared between humans and LLMs
-- Comments - There are 2 type of comments in Convo-Lang, Document Comment and Coding Comments
+- Comments - There are 2 type of comments in Convo-Lang, Document Comments and Coding Comments
     - Documenting Comments - Used to document functions and data structures for LLMs. Documenting Comments start with a (`#`) character .
     - Coding Comments - Used to level comments about code or messages. LLMs are not aware of coding comments. Coding Comments start the (`//`)
-- Top Level Statements - Blocks of executable statements that can define variables, data structures and execute arbitrary code
+- Top Level Statements - Blocks of executable statements that can define variables, data structures, and execute arbitrary code
 - Variables - Variables store well define state information in a conversation
 - Functions - Functions or "Tools" that can be used by LLMs or other code in a conversation
 - Tags - Used to attach metadata to messages, functions and statements
@@ -398,7 +398,7 @@ This is a suggestion message
 
 
 ## Content Messages
-Content message represent textual and multi-modal messages shared between an LLM and a user.
+Content messages represent textual and multi-modal messages shared between an LLM and a user.
 
 Below is an example of a clown telling a jokes to a user.
 ``` convo
@@ -605,13 +605,13 @@ can be assigned to any variable type at any time.
 
 `undefined` - Undefined constant
 
-`enum` - A restricted set of strings or numbers. [read more](#enums)
+`enum` - A restricted set of strings or numbers [read more](#enums)
 
-`array` -  An array of values. [read more](#arrays)
+`array` -  An array of values [read more](#arrays)
 
 `map` - An object with key value pairs
 
-`struct` - A custom data structure. [read more](#structures)
+`struct` - A custom data structure [read more](#structures)
 
 Below is an example different variable types
 ``` convo
@@ -695,7 +695,7 @@ storeLocation="Cincinnati"
     // Here we print out a summary of the order 
     // including the storeLocation which comes from
     // the global scope
-    print('Order: time:{{orderTime}}] location:{{storeLocation}} - {{food}}')
+    print('Order: time:{{orderTime}} location:{{storeLocation}} - {{food}}')
 
     return('Success')
 )
@@ -707,7 +707,7 @@ Welcome to the {{storeLocation}} Crabby Patty
 ```
 
 ### Variable Assignment Order
-Depending on where at in a conversation a variable is accessed it can have different values, this
+Depending on where in a conversation a variable is accessed it can have different values, this
 is because variable assignment only effects messages following the assignment.
 
 ``` convo
@@ -742,7 +742,6 @@ the end of a conversation. They are most often used to injected the most update 
 into system messages. We will learn more about Edge Messages later in this tutorial.
 
 
-
 ### System Variables
 System variables are used to control the configuration of a conversation at run time through
 variable assignment. All system variables start with a double underscore `__` and using a double
@@ -754,27 +753,27 @@ underscore for user defined variables is prohibited.
 
 `__args` - A reference to the parameters passed the the current function as any object.
 
-`__return` - A reference to the last return value of a function called by a call message
+`__return` - A reference to the last return value of a function called by a call message.
 
-`__error` - A reference to the last error
+`__error` - A reference to the last error.
 
-`__cwd` - In environments that have access to the filesystem __cwd defines the current working directory.
+`__cwd` - In environments that have access to the filesystem `__cwd` defines the current working directory.
 
 `__debug` - When set to true debugging information will be added to conversations.
 
-`__model` - Sets the default model
+`__model` - Sets the default model.
 
-`__endpoint` - Sets the default completion endpoint
+`__endpoint` - Sets the default completion endpoint.
 
-`__userId` - Sets the default user id of the conversation
+`__userId` - Sets the default user id of the conversation.
 
-`__trackTime` - When set to true time tracking will be enabled.
+`__trackTime` - When set to true, time tracking will be enabled.
 
-`__trackTokenUsage` - When set to true token usage tracking will be enabled.
+`__trackTokenUsage` - When set to true, token usage tracking will be enabled.
 
-`__trackModel` - When set to true the model used as a completion provider will be tracked.
+`__trackModel` - When set to true, the model used as a completion provider will be tracked.
 
-`__visionSystemMessage` - When defined __visionSystemMessage will be injected into the system message of conversations with vision capabilities. __visionSystemMessage will override the default vision system message.
+`__visionSystemMessage` - When defined `__visionSystemMessage` will be injected into the system message of conversations with vision capabilities. `__visionSystemMessage` will override the default vision system message.
 
 `__visionServiceSystemMessage` - The default system message used for completing vision requests. Vision requests are typically completed in a separate conversation that supports vision messages. By default the system message of the conversation that triggered the vision request will be used.
 
@@ -782,17 +781,17 @@ underscore for user defined variables is prohibited.
 
 `__md` - A reference to markdown vars.
 
-`__rag` - Enables retrieval augmented generation (RAG). The value of the __rag can either be true, false or a number. The value indicates the number of rag results that should be sent to the LLM by default all rag message will be sent to the LLM. When setting the number of rag messages to a fixed number only the last N number of rag messages will be sent to the LLM. Setting __rag to a fixed number can help to reduce prompt size.
+`__rag` - Enables retrieval augmented generation (RAG). The value of the `__rag` can either be true, false or a number. The value indicates the number of rag results that should be sent to the LLM by default all rag message will be sent to the LLM. When setting the number of rag messages to a fixed number only the last N number of rag messages will be sent to the LLM. Setting `__rag` to a fixed number can help to reduce prompt size.
 
-`__ragParams` - object it is ignored.
+`__ragParams` - Object, it is ignored.
 
 `__ragTol` - The tolerance that determines if matched rag content should be included as contact.
 
-`__sceneCtrl` - A reference to a SceneCtrl that is capable of describing the current user interface as a scene the user is viewing.
+`__sceneCtrl` - A reference to a `SceneCtrl` that is capable of describing the current user interface as a scene the user is viewing.
 
-`__lastDescribedScene` - The last described scene added to the conversation
+`__lastDescribedScene` - The last described scene added to the conversation.
 
-`__voice` - Used by agents to define their voice
+`__voice` - Used by agents to define their voice.
 
 ## Functions
 Function messages define functions ( also known as tools ) that LLMs can call at runtime. Function
@@ -802,6 +801,7 @@ Conversation Engine. If a function does not define a body it will return the arg
 it is given as and object with key value paris matching the names an values of arguments passed. 
 
 Below is an example of an LLM using a `addNumbers` function to add numbers together.
+
 ``` convo
 # Adds 2 numbers together
 > addNumbers(
@@ -830,7 +830,7 @@ __return=4
 
 After the user asked what 2 plus 2 is the LLM called the `addNumbers` function using a function
 `call` message. Function call messages define the name of a function to call and the arguments
-to pass to the function. After the addNumbers function is called its return value is written as
+to pass to the function. After the `addNumbers` function is called its return value is written as
 a `result` message and stores the return value in the `__return` variable. Following the `result`
 message the LLM responds with a content message giving the result to the user in plain english.
 
@@ -906,7 +906,7 @@ The color of the triangle has been set to orange
 Tags are used in many ways in Convo-Lang and serve as a way to add metadata to messages and 
 code statements. Tags on the line just before the message or code statement they are tagging. Tags
 start with the `@` character followed by the name of the tag and optionally a value for the tag
-separated from it's name with a space character - `@tagName tagValue`.
+separated from its name with a space character - `@tagName tagValue`.
 
 The following show the use of several different tags and describes their usage.
 
@@ -957,8 +957,8 @@ How many planets are there in the solar system
 ### System Tags
 Below is a full list of system tags Convo-Lang uses.
 
-`@cache` - Enables caching for the message the tag is applied to. No value of a value of true will use
-  the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned a string
+`@cache` - Enables caching for the message the tag is applied to. No value or a value of true will use
+  the default prompt cache, which by default uses the `ConvoLocalStorageCache`. If assigned a string
   a cache with a matching type will be used.
 
 `@clear` - Clears all content messages that precede the messages with the exception of system
@@ -969,47 +969,47 @@ messages. If the value of "system" is given as the tags value system message wil
 `@disableAutoComplete` - When applied to a function the return value of the function will not be 
   used to generate a new assistant message.
 
-`@edge`  Used to indicate that a message should be evaluated at the edge of a conversation with 
+`@edge` - Used to indicate that a message should be evaluated at the edge of a conversation with 
   the latest state. @edge is most commonly used with system message to ensure that all injected values
   are updated with the latest state of the conversation.
 
 `@time` - Used to track the time messages are created.
 
-`@tokenUsage` - Used to track the number of tokens a message used
+`@tokenUsage` - Used to track the number of tokens a message used.
 
-`@model` - Used to track the model used to generate completions
+`@model` - Used to track the model used to generate completions.
 
-`@responseModel` - Sets the requested model to complete a message with
+`@responseModel` - Sets the requested model to complete a message with.
 
-`@endpoint` - Used to track the endpoint to generate completions
+`@endpoint` - Used to track the endpoint to generate completions.
 
-`@responseEndpoint` - Sets the requested endpoint to complete a message with
+`@responseEndpoint` - Sets the requested endpoint to complete a message with.
 
 `@responseFormat` - Sets the format as message should be responded to with.
 
-`@assign` - Causes the response of the tagged message to be assigned to a variable
+`@assign` - Causes the response of the tagged message to be assigned to a variable.
 
-`@json` - When used with a message the json tag is short and for `@responseFormat json`
+`@json` - When used with a message the json tag is short for `@responseFormat json`.
 
-`@format` - The format of a message
+`@format` - The format of a message.
 
-`@assignTo` - Used to assign the content or jsonValue of a message to a variable
+`@assignTo` - Used to assign the content or jsonValue of a message to a variable.
 
 `@capability` - Used to enable capabilities. The capability tag can only be used on the first 
   message of the conversation if used on any other message it is ignored. Multiple capability tags
   can be applied to a message and multiple capabilities can be specified by separating them with a comma.
 
-`@enableVision` - Shorthand for `@capability vision`
+`@enableVision` - Shorthand for `@capability vision`.
 
-`@task` - Sets the task a message is part of. By default messages are part of the "default" task
+`@task` - Sets the task a message is part of. By default messages are part of the "default" task.
 
-`@maxTaskMessageCount` - Sets the max number of non-system messages that should be included in a task completion
+`@maxTaskMessageCount` - Sets the max number of non-system messages that should be included in a task completion.
 
-`@taskTrigger` - Defines what triggers a task
+`@taskTrigger` - Defines what triggers a task.
 
-`@template` - Defines a message as a template
+`@template` - Defines a message as a template.
 
-`@sourceTemplate` - used to track the name of templates used to generate messages
+`@sourceTemplate` - Used to track the name of templates used to generate messages.
 
 `@component` - Used to mark a message as a component. The value can be "render" or "input". The default
                value is "render" if no value is given. When the "input" value is used the rendered component
@@ -1018,18 +1018,18 @@ messages. If the value of "system" is given as the tags value system message wil
 
 `@renderOnly` - When applied to a message the message should be rendered but not sent to LLMs
 
-`@condition` - When applied to a message the message is conditionally added to the flattened view of a
+`@condition` - When applied to a message, the message is conditionally added to the flattened view of a
                  conversation. When the condition is false the message will not be visible to the user or 
                  the LLM. [read more](#conditional-messages)
 
 `@renderTarget` - Controls where a message is rendered. By default messages are rendered in the default chat
                     view, but applications can define different render targets.
 
-`@toolId` - Used in combination with function calls to mark to return value of a function and its call message
+`@toolId` - Used in combination with function calls to mark the return value of a function and its call message.
 
-`@disableAutoScroll` - When applied to the last content or component messages auto scrolling will be disabled
+`@disableAutoScroll` - When applied to the last content or component messages auto scrolling will be disabled.
 
-`@markdown` - When applied to a message the content of the message will be parsed as markdown
+`@markdown` - When applied to a message the content of the message will be parsed as markdown.
 
 `@sourceUrl` - A URL to the source of the message. Typically used with RAG.
 
@@ -1043,11 +1043,11 @@ messages. If the value of "system" is given as the tags value system message wil
                 message content will still be used as the user messaged added to the conversation when clicked.
                 Suggestion message are render only and not seen by LLMs.
 
-`@suggestionTitle` - A title display above a group of suggestions
+`@suggestionTitle` - A title display above a group of suggestions.
 
 `@output` - Used to mark a function as a node output.
 
-`@errorCallback` - Used to mark a function as an error callback
+`@errorCallback` - Used to mark a function as an error callback.
 
 `@concat` - Causes a message to be concatenated with the previous message. Both the message the tag is
            attached to and the previous message must be content messages or the tag is ignored. 
@@ -1057,12 +1057,12 @@ messages. If the value of "system" is given as the tags value system message wil
          special meaning. If no name is given the special "required" value is used.
 - none: tells the LLM to not call any functions
 - required: tells the LLM it must call a function, any function.
-- auto: tells the LLM it can call a function respond with a text response. This is the default behaviour.
+- auto: tells the LLM it can call a function and respond with a text response. This is the default behaviour.
 
 
 `@eval` - Causes the message to be evaluated as code. The code should be contained in a markdown code block.
 
-`@userId` - Id of the user that created the message
+`@userId` - Id of the user that created the message.
 
 `@preSpace` - Causes all white space in a content message to be preserved. By define all content message
               whitespace is preserved.
@@ -1080,7 +1080,7 @@ Import sources can be http endpoints or custom named sources that are retired us
 registered import handlers. Import handlers allow application to use any type of logic to handle
 loading import sources.
 
-The following example includes 3 snippets of Convo-Lang. The first to are import sources and the
+The following example includes 3 snippets of Convo-Lang. The first two are import sources and the
 last is the conversation importing the first 2.
 
 *@@static*
@@ -1247,7 +1247,7 @@ from Biomass in this image
 
 ## JSON Mode
 It is often very useful for for you to have an LLM return responses as properly formatted JSON.
-JSON mode is enabled using the `@json`.
+JSON mode is enabled using the `@json` tag.
 
 ``` convo
 @json
@@ -1446,7 +1446,7 @@ you this time. Catch!  🎈
 
 ### Edge Messages
 An edge message is a message that is evaluated at the end or "edge" of a conversation. Typically
-variable assignment and other state changes have no effect the messages that follow them, but 
+variable assignment and other state changes have no effect on the messages that follow them, but 
 this is not the case with edge messages. Edge messages are evaluated after all variable assignment
 and state changes are complete regardless of the where the message is defined in a conversation.
 The `@edge` tag is used to mark messages as edge messages.
@@ -1544,63 +1544,63 @@ Hi, I'm {{name}} I'm {{div(ageInDays 365)}} years old
 
 ### Keywords
 
-`string` - String type identifier
+`string` - String type identifier.
 
-`number` - Number type identifier
+`number` - Number type identifier.
 
-`int` - Integer type identifier
+`int` - Integer type identifier.
 
-`time` - Time type identifier. The time type is represented as an integer timestamp
+`time` - Time type identifier. The time type is represented as an integer timestamp.
 
 `void` - Void type identifier.
 
 `boolean` - Boolean type identifier.
 
-`any` - Any time identifier
+`any` - Any time identifier.
 
-`true` - True constant
+`true` - True constant.
 
-`false` - False constant
+`false` - False constant.
 
-`null` - Null constant
+`null` - Null constant.
 
-`undefined` - Undefined constant
+`undefined` - Undefined constant.
 
-`enum` - Defines an enum
+`enum` - Defines an enum.
 
-`array` -  Array type identifier
+`array` -  Array type identifier.
 
-`object` - Map object type identifier
+`object` - Map object type identifier.
 
-`struct` - Used to define custom data structures
+`struct` - Used to define custom data structures.
 
-`if` - Defines an if statement
+`if` - Defines an if statement.
 
-`else` - Defines an else statement
+`else` - Defines an else statement.
 
-`elif` - Defines an else if statement
+`elif` - Defines an else if statement.
 
-`while` - defines a while loop
+`while` - defines a while loop.
 
-`break` - breaks out of loops and switches
+`break` - breaks out of loops and switches.
 
-`for` - Defines a for loop
+`for` - Defines a for loop.
 
-`foreach` - Defines a for each loop
+`foreach` - Defines a for each loop.
 
-`in` - create an iterator to be used by the foreach statement 
+`in` - create an iterator to be used by the foreach statement.
 
-`do` - Defines a do block. Do blocks allow you to group multiple statements together
+`do` - Defines a do block. Do blocks allow you to group multiple statements together.
 
-`then` - Defines a then block used with if statements
+`then` - Defines a then block used with if statements.
 
-`return` - returns a value from a function
+`return` - Returns a value from a function.
 
-`switch` -  defines a switch statement
+`switch` -  Defines a switch statement.
 
-`case` - defines a case in a switch statement
+`case` - Defines a case in a switch statement.
 
-`default` - defines the default case of a switch statement
+`default` - Defines the default case of a switch statement.
 
 `test` - Used in a switch statement to test for a dynamic case value.
 
@@ -1674,7 +1674,7 @@ var1: {{var1}}
 ```
 
 ### Arrays
-Arrays allow you to story multiple value in a single variable. Arrays can be created using the
+Arrays allow you to store multiple value in a single variable. Arrays can be created using the
 array function or using JSON style array, both result in the same data type.
 
 ``` convo
@@ -1707,7 +1707,7 @@ cart:
 
 ### Enums
 Enums allow you to define a type that can only be a value from a pre-define collection of values.
-Using enums with functions allows you to restrict an LLM to only passing the exact values
+Using enums with functions allows you to restrict an LLM to only pass the exact values
 you want for an argument.
 
 ``` convo
@@ -1897,10 +1897,10 @@ A good boy:
 ```
 
 #### describeStruct( type:Struct value:any )
-Returns the given value as a markdown formatted string
+Returns the given value as a markdown formatted string.
 
 #### is( ...value:any type:any )
-Checks if all of the parameters left of the last parameter are of the type of the last parameter
+Checks if all of the parameters left of the last parameter are of the type of the last parameter.
 
 *@@static*
 ``` convo
@@ -2087,7 +2087,7 @@ or( eq(1 3) eq(2 1) )
 ```
 
 #### not( ...values: any )
-Returns true if all given arguments are falsy.
+Returns true if all given arguments are falsey.
 
 *@@static*
 ``` convo
@@ -2137,7 +2137,7 @@ Returns true if a is less then or equal to b. ( a <= b )
 
 #### if( condition:any ), elif( condition: any ), then( ...statements )
 If condition is truthy then the statement directly after the if statement will be executed otherwise
-the statement directly after if is skipped
+the statement directly after if is skipped.
 
 *@@static*
 ``` convo
@@ -2158,7 +2158,7 @@ if( gte( age 21 ) ) then (
 
 #### while( condition:any )
 While condition is truthy then the statement directly after the while statement will be executed
-otherwise the statement directly after if is skipped and the while loop will exit.
+otherwise the statement directly after it is skipped and the while loop will exit.
 
 *@@static*
 ``` convo
@@ -2191,11 +2191,11 @@ print(total)
 ```
 
 #### in( value: array(any) )
-Iterates of the values of an array
+Iterates over the values of an array.
 
 
 #### break( ...values: any )
-Breaks out of loops either not arguments are passed or if any of the passed arguments are truthy
+Breaks out of loops either if no arguments are passed or if any of the passed arguments are truthy
 
 *@@static*
 ``` convo
@@ -2241,7 +2241,7 @@ print( add( 5 do(
 
 #### switch( value:any ...valueOrCase:any ), case( value:any ), test( condition:any ), default()
 Switch can be used as either and switch statement or a ternary. When the switch function has exactly
-3 arguments and non of the is a case or default statement then switch acts as a ternary. 
+3 arguments and non of them is a case or default statement then switch acts as a ternary. 
 
 *@@static*
 ``` convo
@@ -2313,7 +2313,7 @@ print( switch(false "yes" "no") )
 ```
 
 #### return( value:any )
-Returns a value from the current function
+Returns a value from the current function.
 
 *@@static*
 ``` convo
@@ -2348,40 +2348,40 @@ like 2023-12-08T21:05:08-01:00. Invalid date formats will fallback to using the 
 Formatting is done using date-fns - https://date-fns.org/v2.16.1/docs/format
 
 ### sleep( milliseconds:number )
-Suspends execution for the given number of milliseconds
+Suspends execution for the given number of milliseconds.
 
 ### rand( max?:int )
 Returns a random number. Is the max parameters is passed then a random whole number with a
 maximum of max will be returned otherwise a random number from 0 to 1 will be returned.
 
 ### httpGet( url:string )
-Performs an http GET request and returns the parsed JSON result. Results with a 404 status or a 
+Performs a http GET request and returns the parsed JSON result. Results with a 404 status or a 
 Content-Type not equal to application/json are returned as undefined.
 
 ### httpGetString( url: string )
-Performs an http GET request and returns the result as a string.
+Performs a http GET request and returns the result as a string.
 
 ### httpPost( url:string body:any )
-Performs an http POST request and returns the parsed JSON result. Results with a 404 status or a 
+Performs a http POST request and returns the parsed JSON result. Results with a 404 status or a 
 Content-Type not equal to application/json are returned as undefined.
 
 ### httpPatch( url:string body:any )
-Performs an http PATCH request and returns the parsed JSON result. Results with a 404 status or a 
+Performs a http PATCH request and returns the parsed JSON result. Results with a 404 status or a 
 Content-Type not equal to application/json are returned as undefined.
 
 ### httpPut( url:string body:any )
-Performs an http PUT request and returns the parsed JSON result. Results with a 404 status or a 
+Performs a http PUT request and returns the parsed JSON result. Results with a 404 status or a 
 Content-Type not equal to application/json are returned as undefined.
 
 ### httpDelete( url:string )
-Performs an http DELETE request and returns the parsed JSON result. Results with a 404 status or a 
+Performs a http DELETE request and returns the parsed JSON result. Results with a 404 status or a 
 Content-Type not equal to application/json are returned as undefined.
 
 ### encodeURI( value:string )
-Returns the value encoded as an URI
+Returns the value encoded as a URI
 
 ### encodeURIComponent( value:string )
-Returns the value encoded as an URI component
+Returns the value encoded as a URI component
 
 ### md( ...values:any[] )
 Concatenates all passed in values and formats the values as markdown. Recursive objects are limited
@@ -2615,7 +2615,6 @@ I want a pizza with bacon, onions and sausage
 
 ### Sandwich Assistant
 ``` convo
-> define
 // We use a define top level statement to define the agents name
 > define
 name="Ricky"
