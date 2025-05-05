@@ -404,7 +404,7 @@ export class OpenAiCompletionProvider implements AiCompletionProvider
                     role:'assistant',
                     id:shortUuid(),
                     type:'image',
-                    url:r.data[0]?.url,
+                    url:r.data?.[0]?.url,
                 },
                 confidence:1,
             }],
