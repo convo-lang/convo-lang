@@ -16,6 +16,7 @@ export const createConvoLangApiRoutes=({
     enableCaching=false,
     cacheQueryParam=enableCaching?'cache':undefined,
     cacheDir='cache',
+    onCompletion
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
 
     const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
@@ -64,20 +65,49 @@ export const createConvoLangApiRoutes=({
         {
             method:'POST',
             match:new RegExp(`${regPrefix}/completion$`),
-            handler:async ({
-                body,
-            })=>{
+            handler:async (ctx)=>{
+                const {
+                    body,
+                }=ctx;
                 const services=convoCompletionService.all();
 
                 const flat:FlatConvoConversation=body;
 
                 let service=services.find(s=>s.canComplete(flat.responseModel,flat));
 
-                return completeConvoUsingCompletionServiceAsync(
-                    flat,
-                    service,
-                    convoConversationConverterProvider.all()
-                );
+                try{
+                    const result=await completeConvoUsingCompletionServiceAsync(
+                        flat,
+                        service,
+                        convoConversationConverterProvider.all()
+                    );
+
+                    if(onCompletion){
+                        onCompletion({
+                            httpCtx:ctx,
+                            flat,
+                            completionService:service,
+                            result,
+                            success:true,
+                        })
+                    }
+
+                    return result;
+                }catch(error){
+
+                    if(onCompletion){
+                        onCompletion({
+                            httpCtx:ctx,
+                            flat,
+                            completionService:service,
+                            result:[],
+                            success:false,
+                            error,
+                        })
+                    }
+
+                    throw error;
+                }
             }
         },
 

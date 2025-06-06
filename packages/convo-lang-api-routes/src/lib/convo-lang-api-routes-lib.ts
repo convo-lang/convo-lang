@@ -1,6 +1,16 @@
-import { ConvoImageGenerator } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, ConvoCompletionService, ConvoImageGenerator, FlatConvoConversation } from "@convo-lang/convo-lang";
+import { HttpRequestContext } from "@iyio/node-common";
 
 export const defaultConvoLangFsRoot='./convo-lang'
+
+export interface ConvoCompletionRequestCtx{
+    httpCtx:HttpRequestContext;
+    flat:FlatConvoConversation;
+    completionService?:ConvoCompletionService<any,any>;
+    result:ConvoCompletionMessage[];
+    error?:any;
+    success:boolean;
+}
 
 export interface ConvoLangRouteOptionsBase
 {
@@ -59,6 +69,8 @@ export interface ConvoLangRouteOptions extends ConvoLangRouteOptionsBase
      * Callback used to generate images
      */
     imageGenCallback?:ConvoImageGenerator;
+
+    onCompletion?:(requestCtx:ConvoCompletionRequestCtx)=>void;
 }
 
 
