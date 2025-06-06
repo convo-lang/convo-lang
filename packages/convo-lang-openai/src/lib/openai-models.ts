@@ -328,15 +328,22 @@ export const openAiModels:ConvoModelInfo[]=[
         inputTokenPriceUsd:15,
     },
 
-    // dall-e
-    _image={
-        name:'dall-e-3',
+    // Image
+    {
+        name:'gpt-image-1',
         inputCapabilities:['text'],
         outputCapabilities:['image'],
         imagePriceUsd:0.04,
         imageLgPriceUsd:0.08,
         imageHdPriceUsd:0.08,
         imageLgHdPriceUsd:0.12,
+    },
+    _image={
+        name:'dall-e-3',
+        inputCapabilities:['text'],
+        outputCapabilities:['image'],
+        inputTokenPriceUsd:5,
+        outputTokenPriceUsd:40,
     },
     {
         name:'dall-e-2',
