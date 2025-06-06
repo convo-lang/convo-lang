@@ -121,6 +121,32 @@ export class ConversationUiCtrl
         this._showSystemMessages.next(value);
     }
 
+    /**
+     * If true function call results will be displayed to the user
+     */
+    private readonly _showResults:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get showResultsSubject():ReadonlySubject<boolean>{return this._showResults}
+    public get showResults(){return this._showResults.value}
+    public set showResults(value:boolean){
+        if(value==this._showResults.value){
+            return;
+        }
+        this._showResults.next(value);
+    }
+
+    private readonly _enabledInitMessage:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get enabledInitMessageSubject():ReadonlySubject<boolean>{return this._enabledInitMessage}
+    public get enabledInitMessage(){return this._enabledInitMessage.value}
+    public set enabledInitMessage(value:boolean){
+        if(value==this._enabledInitMessage.value){
+            return;
+        }
+        if(value && this.convo?.initMessageReady()){
+            this.convo.completeAsync();
+        }
+        this._enabledInitMessage.next(value);
+    }
+
     private readonly _showFunctions:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
     public get showFunctionsSubject():ReadonlySubject<boolean>{return this._showFunctions}
     /**
@@ -504,6 +530,9 @@ export class ConversationUiCtrl
             sub2.unsubscribe();
         }
         this._convo.next(convo);
+        if(this.enabledInitMessage && convo.initMessageReady()){
+            convo.completeAsync();
+        }
     }
 
 
@@ -573,6 +602,10 @@ export class ConversationUiCtrl
                     this.editorMode='code';
                     break;
 
+                case '/ui':
+                    this.showSource=false;
+                    break;
+
                 case '/vars':
                     this.showSource=this.editorMode==='vars'?!this.showSource:true;
                     this.editorMode='vars';
@@ -590,6 +623,10 @@ export class ConversationUiCtrl
 
                 case '/system':
                     this.showSystemMessages=!this.showSystemMessages;
+                    break;
+
+                case '/results':
+                    this.showResults=!this.showResults;
                     break;
 
                 case '/function':
@@ -658,11 +695,13 @@ export class ConversationUiCtrl
     {
         this.convo?.appendAssistantMessage(/*convo*/`
 /source     - Display convo script source
+/ui         - Display convo chat conversation ui
 /flat       - Display the convo as flat messages
 /vars       - Display all defined user variables
 /tree       - Displays the syntax tree
 /system     - Display system messages
 /function   - Display function messages
+/results    - Display function call results
 /model      - Display messages in the format of the current model
 /clear      - Clears all messages
 /help       - Prints this help message

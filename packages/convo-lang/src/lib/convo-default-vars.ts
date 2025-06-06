@@ -788,6 +788,27 @@ export const defaultConvoVars={
 
     }),
 
+    [convoFunctions.idx]:createConvoScopeFunction((scope,ctx)=>{
+        if(!scope.paramValues){
+            return undefined;
+        }
+        let value=scope.paramValues[0];
+        for(let i=1;i<scope.paramValues.length;i++){
+            value=value?.[ctx.getVar(scope.paramValues?.[1]??'',scope,'')];
+        }
+        return value;
+    }),
+
+    [convoFunctions.setDefault]:createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
+        const obj=mapFn(scope,ctx);
+        if(obj){
+            for(const e in obj){
+                ctx.setDefaultVarValue(obj[e],e);
+            }
+        }
+        return obj;
+    }),
+
     httpGet:createConvoScopeFunction(async scope=>{
         let url=scope.paramValues?.[0];
         let options=scope.paramValues?.[1];

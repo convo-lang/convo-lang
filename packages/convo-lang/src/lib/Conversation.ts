@@ -1,4 +1,5 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, dump, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
@@ -7,10 +8,10 @@ import { ConvoRoom } from "./ConvoRoom";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoVisionSystemMessage, escapeConvoMessageContent, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoTag, getFlatConvoTag, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -360,7 +361,7 @@ export class Conversation
             converters=convoConversationConverterProvider.all(),
             capabilities=[],
             serviceCapabilities=[],
-            maxAutoCompleteDepth=10,
+            maxAutoCompleteDepth=100,
             trackTime=false,
             trackTokens=false,
             trackModel=false,
@@ -462,6 +463,11 @@ export class Conversation
         }
 
         onConstructed?.(this);
+    }
+
+    public initMessageReady(){
+        const last=this.getLastMessage();
+        return last?.role===convoRoles.user && containsConvoTag(last.tags,convoTags.init)?true:false;
     }
 
     public addTask(task:ConvoTask):DisposeCallback{
@@ -1490,7 +1496,8 @@ export class Conversation
         templates?:ConvoMessageTemplate[],
         updateTaskCount=true,
         lastFnCall?:ConvoFnCallInfo,
-        appendBeforeReturn=''
+        appendBeforeReturn:(ConvoMessagePart|string)[]=[],
+        completeBeforeReturn:(ConvoPostCompletionMessage|string)[]=[]
     ):Promise<ConvoCompletion>{
 
         if(task===undefined){
@@ -1641,7 +1648,13 @@ export class Conversation
             let lastResultValue:any=undefined;
             let hasReturnValue=false;
 
-            for(const msg of completion){
+            for(let mi=0;mi<completion.length;mi++){
+
+                const msg=completion[mi];
+                if(!msg){
+                    continue;
+                }
+
 
                 let includeTokenUsage=(msg.inputTokens || msg.outputTokens || msg.tokenPrice)?true:false;
 
@@ -1663,11 +1676,32 @@ export class Conversation
                 }
 
                 if(msg.content){
+                    let transformResult:TransformFlatResult|undefined;
+                    if(flat.transforms && !msg.format){
+                        transformResult=await this.transformUsingFlatTransformersAsync(flat,msg,getCompletion);
+                    }
                     cMsg=msg;
-                    if(isDefaultTask){
-                        this.append(`${this.getPrefixTags({includeTokenUsage,msg})}${tagsCode}> ${this.getReversedMappedRole(msg.role)}\n${escapeConvoMessageContent(msg.content)}\n`);
+                    if(isDefaultTask && !transformResult?.removeMessage){
+                        this.append(`${
+                            this.getPrefixTags({includeTokenUsage,msg})
+                        }${
+                            transformResult?.hideMessage?`@${convoTags.hidden}\n`:''
+                        }${
+                            tagsCode
+                        }> ${
+                            this.getReversedMappedRole(msg.role)
+                        }\n${
+                            escapeConvoMessageContent(msg.content)
+                        }\n`);
                     }
                     includeTokenUsage=false;
+
+                    if(transformResult){
+                        this.writeTransformResult(transformResult);
+                        if(transformResult.transforms.length){
+                            completion.splice(mi+1,0,...transformResult.completions);
+                        }
+                    }
                 }
 
                 if(msg.assignTo){
@@ -1775,6 +1809,10 @@ export class Conversation
                     if(isDefaultTask){
                         this.setFlat(flat);
                     }
+                    const ac=flat.afterCall?.[msg.callFn];
+                    if(ac){
+                        completeBeforeReturn.push(...ac);
+                    }
 
                 }
 
@@ -1797,7 +1835,7 @@ export class Conversation
             }
 
             if(flat.queueRef && isSourceMessage){
-                appendBeforeReturn+=`> ${convoRoles.flush}\n> ${convoRoles.insertEnd}\n`;
+                appendBeforeReturn.push(`> ${convoRoles.flush}\n> ${convoRoles.insertEnd}\n`);
             }
 
             if(append.length){
@@ -1819,7 +1857,8 @@ export class Conversation
                     templates,
                     undefined,
                     lastFnCall,
-                    appendBeforeReturn
+                    appendBeforeReturn,
+                    completeBeforeReturn
                 );
             }
 
@@ -1827,7 +1866,7 @@ export class Conversation
                 this.writeTemplates(templates,flat);
             }
 
-            if(appendBeforeReturn){
+            if(appendBeforeReturn.length){
                 this.append(appendBeforeReturn,{disableAutoFlatten:true,throwOnError:true});
             }
 
@@ -1838,6 +1877,54 @@ export class Conversation
 
             if(flat.taskTriggers?.[convoTaskTriggers.onResponse]){
                 this.startSubTasks(flat,convoTaskTriggers.onResponse,getCompletion,autoCompleteDepth+1,additionalOptions);
+            }
+
+            if(completeBeforeReturn.length){
+                const parts:string[]=[];
+                for(const _cm of completeBeforeReturn){
+                    let cm=_cm;
+                    let content:string|undefined;
+                    if(typeof cm === 'string'){
+                        content=cm;
+                        cm={}
+                    }else if(cm.evalMessage){
+                        if(cm.evalMessage.content){
+                            content=cm.evalMessage.content;
+                        }else if(cm.evalMessage.statement){
+                            const flatMsg=this.flattenMsg(cm.evalMessage,false);
+                            await flattenMsgAsync(
+                                exe,
+                                cm.evalMessage.statement,
+                                flatMsg,
+                                false
+                            );
+                            content=flatMsg.content;
+                        }
+                    }
+                    if(content){
+                        parts.push(`${
+                            cm.hidden?`@${convoTags.hidden}\n`:''
+                        }${
+                            cm.createdAfterCalling?`@${convoTags.createdAfterCalling} ${cm.createdAfterCalling}\n`:''
+                        }> ${cm.evalRole??cm.evalMessage?.role??convoRoles.user}\n${escapeConvo(content)}`)
+                    }
+                }
+                this.append(parts,{disableAutoFlatten:true,throwOnError:true});
+                this._completeAsync(
+                    false,
+                    undefined,
+                    task,
+                    additionalOptions,
+                    getCompletion,
+                    autoCompleteDepth+1,
+                    undefined,
+                    undefined,
+                    templates,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined
+                )
             }
 
             if(flat.queueRef){
@@ -1873,6 +1960,228 @@ export class Conversation
                 this._activeTaskCount.next(this.activeTaskCount-1);
             }
         }
+    }
+
+    private async transformUsingFlatTransformersAsync(
+        flat:FlatConvoConversation,
+        msg:ConvoCompletionMessage,
+        getCompletion:ConvoFlatCompletionCallback
+    ):Promise<TransformFlatResult|undefined>{
+        if(!flat.transforms?.length){
+            return undefined;
+        }
+        let removeMessage=false;
+        let hideMessage=false;
+        let inputTokens=0;
+        let outputTokens=0;
+        let tokenPrice=0;
+
+        const transformSelections=flat.transforms.filter(t=>!t.required);
+        const selectedTransforms=flat.transforms.filter(t=>t.required);
+        if(transformSelections.length){
+            const forked=await this.flattenAsync(flat.exe,{
+                setCurrent:false,
+                initFlatMessages:flat.transformFilterMessages,
+                messages:flat.transformFilterMessages?.length?undefined:this.parseCode(dump(/*convo*/`
+                    > define
+                    TransformId=struct(
+                        # Id of the transform to select
+                        id:number
+                    )
+
+                    > system
+                    You are selecting the best transform to apply to user messages. Transforms are
+                    used to convert a users message into JSON data that can be used to display
+                    custom user interface components.
+
+                    Transform to select from:
+                    <transforms>
+
+                        ${transformSelections.map((t,i)=>/*convo*/`
+                        <transform>
+                            ID: ${i+1}
+                            Name: ${t.name}
+                            Description:
+                            <description>
+                                ${t.description??'No description provided'}
+                            </description>
+                        </transform>
+                        `).join('')}
+
+                        <transform>
+                            ID: ${transformSelections.length+1}
+                            Name: NONE
+                            Description:
+                            <description>
+                                No other transforms match. Do not transform the user message
+                            </description>
+                        </transform>
+
+                    </transforms>
+
+                    @json TransformId
+                    > user
+                    ${escapeConvo(msg.content??'')}
+                `,'Filter prompt')).result,
+                disableTransforms:true,
+            });
+
+            const completions=await getCompletion(forked);
+            for(const msg of completions){
+                inputTokens+=msg.inputTokens??0;
+                outputTokens+=msg.outputTokens??0;
+                tokenPrice+=msg.tokenPrice??0;
+            }
+            const lastMsg=completions[completions.length-1];
+            try{
+                const transformId:{id:number}=parseJson5(lastMsg?.content??'');
+                const selected=transformSelections[transformId.id-1];
+                if(selected){
+                    selectedTransforms.push(selected);
+                }
+            }catch(ex){
+                log.error('Transform filter last message not JSON',ex);
+            }
+        }
+
+        const transforms=await Promise.all(selectedTransforms.map<Promise<TransformCompletion>>(async transform=>{
+
+            const r=this.parseCode(/*convo*/`
+                ${transform.outputType?`@json ${transform.outputType}`:''}
+                > user
+                ${escapeConvo(msg.content??'')}
+            `);
+            if(!r.result){
+                throw new Error(`Unable to parse transform append message - ${r.error?.message}`);
+            }
+
+            const forked=await this.flattenAsync(flat.exe,{
+                setCurrent:false,
+                initFlatMessages:transform.messages,
+                messages:r.result,
+                disableTransforms:true,
+            });
+            const completions=await getCompletion(forked);
+            for(const msg of completions){
+                inputTokens+=msg.inputTokens??0;
+                outputTokens+=msg.outputTokens??0;
+                tokenPrice+=msg.tokenPrice??0;
+            }
+
+            const lastMsg=completions[completions.length-1];
+            const tags:ConvoTag[]=[{name:convoTags.createdByTransform,value:transform.name}];
+            let disableComponent=false;
+            let renderOnly=false;
+            for(const m of transform.messages){
+                if(m.tags){
+                    if((convoTags.transformHideSource in m.tags) && evalConvoTransformCondition(lastMsg?.content??'',m.tags[convoTags.transformHideSource])){
+                        hideMessage=true;
+                    }
+                    if((convoTags.transformRemoveSource in m.tags)  && evalConvoTransformCondition(lastMsg?.content??'',m.tags[convoTags.transformRemoveSource])){
+                        removeMessage=true;
+                    }
+                    if((convoTags.transformRenderOnly in m.tags)  && evalConvoTransformCondition(lastMsg?.content??'',m.tags[convoTags.transformRenderOnly])){
+                        renderOnly=true;
+                    }
+                    if(convoTags.transformComponentCondition in m.tags){
+                        disableComponent=!evalConvoTransformCondition(lastMsg?.content??'',m.tags[convoTags.transformComponentCondition]);
+                    }
+                    const passTags=getFlatConvoTagValues(convoTags.transformTag,m.tags);
+                    for(const t of passTags){
+                        const tag=parseConvoTransformTag(t);
+                        if(tag){
+                            tags.push(tag);
+                        }
+                    }
+                }
+            }
+            return {
+                tags,
+                transform,
+                completions,
+                disableComponent,
+                renderOnly,
+            }
+        }));
+
+        for(const transform of transforms){
+
+            const {disableComponent,tags,completions,renderOnly}=transform;
+
+
+            if(disableComponent){
+                tags.push({name:convoTags.disabled});
+            }else if(renderOnly && !containsConvoTag(tags,convoTags.renderOnly)){
+                tags.push({name:convoTags.renderOnly});
+            }
+
+            for(const m of completions){
+                if(tags.length){
+                    const mapped=convoTagsToMap(tags);
+                    if(!m.tags){
+                        m.tags={};
+                        for(const e in mapped){
+                            if(disableComponent && e===convoTags.component){
+                                continue;
+                            }
+                            m.tags[e]=mapped[e];
+                        }
+                    }
+                }
+            }
+        }
+
+        const allInputTokens=inputTokens;
+        const allOutputTokens=outputTokens;
+        const allTokenPrice=tokenPrice;
+
+        const completions:ConvoCompletionMessage[]=[];
+        for(let i=transforms.length-1;i>=0;i--){
+            const t=transforms[i];
+            if(t){
+                completions.push(...t.completions);
+                for(const msg of t.completions){
+                    inputTokens-=msg.inputTokens??0;
+                    outputTokens-=msg.outputTokens??0;
+                    tokenPrice-=msg.tokenPrice??0;
+                }
+            }
+        }
+
+        return {
+            hideMessage,
+            removeMessage,
+            transforms,
+            completions,
+            inputTokens,
+            outputTokens,
+            tokenPrice,
+            publicResult:{
+                inputTokens:allInputTokens,
+                outputTokens:allOutputTokens,
+                tokenPrice:allTokenPrice,
+                selectedTransforms:transforms.length?transforms.map(t=>t.transform.name):undefined,
+            }
+        };
+
+    }
+
+    private writeTransformResult(transformResult:TransformFlatResult){
+
+        if(transformResult.inputTokens || transformResult.outputTokens || transformResult.tokenPrice){
+            addConvoUsageTokens(this.usage,transformResult);
+            if(this._onTokenUsage){
+                this._onTokenUsage(convoPartialUsageTokensToUsage(transformResult));
+            }
+        }
+        this.append(
+            `@${convoTags.tokenUsage} ${convoUsageTokensToString(transformResult)
+            }\n> ${convoRoles.transformResult}\n\`\`\` json\n${
+                JSON.stringify(transformResult.publicResult,null,4)
+            }\n\`\`\``
+        ,{disableAutoFlatten:true});
+
+        return transformResult;
     }
 
     private writeTemplates(
@@ -2012,6 +2321,10 @@ export class Conversation
 
     public isUserMessage(msg:ConvoMessage|null|undefined):boolean{
         return (msg?.role && this.userRoles.includes(msg.role) && !msg.fn)?true:false;
+    }
+
+    public isContentMessage(msg:ConvoMessage|null|undefined){
+        return this.isUserMessage(msg) || this.isAssistantMessage(msg) || this.isSystemMessage(msg);
     }
 
     private flattenMsg(msg:ConvoMessage,setContent:boolean):FlatConvoMessage{
@@ -2187,12 +2500,15 @@ export class Conversation
             discardTemplates,
             threadFilter,
             toolChoice,
+            messages:messageOverride,
+            disableTransforms,
+            initFlatMessages,
         }:FlattenConvoOptions={}
     ):Promise<FlatConvoConversation>{
 
         const isDefaultTask=task===defaultConvoTask;
 
-        const messages:FlatConvoMessage[]=[];
+        const messages:FlatConvoMessage[]=initFlatMessages?[...initFlatMessages]:[];
         const edgePairs:{
             flat:FlatConvoMessage;
             msg:ConvoMessage;
@@ -2206,7 +2522,9 @@ export class Conversation
         };
         exe.setVar(true,mdVarCtx.vars,convoVars.__md);
         let sourceMessages=this._messages;
-        if(this.getStartOfConversation){
+        if(messageOverride){
+            sourceMessages=messageOverride;
+        }else if(this.getStartOfConversation){
             const start=this.getStartOfConversation();
             if(Array.isArray(start)){
                 sourceMessages=[...start,...sourceMessages];
@@ -2231,12 +2549,18 @@ export class Conversation
         let paraIndex=0;
         let inPara=false;
         let parallelMessages:ConvoMessage[]|undefined=undefined;
+        let afterCall:Record<string,(ConvoPostCompletionMessage|string)[]>|undefined=undefined;
         const parallelPairs:{msg:ConvoMessage,flat:FlatConvoMessage}[]=[];
 
         messagesLoop: for(let i=0;i<sourceMessages.length;i++){
             const msg=sourceMessages[i];
 
-            if(!msg || msg.role===convoRoles.nop || (msg.cid && msg.cid!==this.name)){
+            if( !msg ||
+                containsConvoTag(msg.tags,convoTags.disabled) ||
+                msg.role===convoRoles.nop ||
+                msg.role===convoRoles.transformResult ||
+                (msg.cid && msg.cid!==this.name)
+            ){
                 continue;
             }
 
@@ -2301,6 +2625,37 @@ export class Conversation
 
             if(threadFilter && !isConvoThreadFilterMatch(threadFilter,msg.tid)){
                 continue;
+            }
+
+            const ac=(this.isContentMessage(msg) || msg.fn) && getConvoTag(msg.tags,convoTags.afterCall)?.value?msg:undefined;
+            if(ac){
+                if(!afterCall){
+                    afterCall={}
+                }
+                const hidden=containsConvoTag(msg.tags,convoTags.afterCallHide);
+                const role=getConvoTag(msg.tags,convoTags.afterCallRole)?.value;
+                if(ac.fn){
+                    const v=getConvoTag(msg.tags,convoTags.afterCall)?.value;
+                    if(v){
+                        (afterCall[ac.fn.name]??(afterCall[ac.fn.name]=[])).push({
+                            content:v,
+                            createdAfterCalling:ac.fn.name,
+                            evalRole:role,
+                            hidden,
+                        });
+                    }
+                }else{
+                    const name=getConvoTag(msg.tags,convoTags.afterCall)?.value;
+                    if(name){
+                        (afterCall[name]??(afterCall[name]=[])).push({
+                            evalMessage:ac,
+                            createdAfterCalling:name,
+                            evalRole:role,
+                            hidden,
+                        });
+                        continue messagesLoop;
+                    }
+                }
             }
 
             const flat=this.flattenMsg(msg,false);
@@ -2391,6 +2746,10 @@ export class Conversation
                         flat.called=prev.fn;
                         flat.calledReturn=exe.getVarEx(convoResultReturnName,undefined,undefined,false);
                         flat.calledParams=exe.getConvoFunctionArgsValue(prev.fn);
+                        // if(prev.component){
+                        //     flat.component=prev.component;
+                        //     flat.componentIndex=componentIndex;
+                        // }
                         if(prev.tags){
                             flat.tags=flat.tags?{...convoTagsToMap(prev.tags),...flat.tags}:convoTagsToMap(prev.tags)
                         }
@@ -2713,7 +3072,7 @@ export class Conversation
             userId=userIdTagValue;
         }
 
-        const flat:FlatConvoConversation={
+        const flat:FlatConvoConversation=deleteUndefined({
             exe,
             vars:exe.getUserSharedVars(),
             messages,
@@ -2734,28 +3093,100 @@ export class Conversation
             queueRef,
             parallelMessages,
             apiKey:this.getDefaultApiKey()??undefined,
-        }
+            afterCall
+        });
 
+        let includeInTransforms:FlatConvoMessage[]|undefined;
         for(let i=0;i<messages.length;i++){
             const msg=messages[i];
             if(!msg){continue}
+
+            let removed=false;
 
             switch(msg.role){
 
                 case convoRoles.ragPrefix:
                     flat.ragPrefix=msg.content;
                     messages.splice(i,1);
+                    removed=true;
                     i--;
                     break;
 
                 case convoRoles.ragSuffix:
                     flat.ragSuffix=msg.content;
                     messages.splice(i,1);
+                    removed=true;
                     i--;
                     break;
 
             }
 
+            if(removed){
+                continue;
+            }
+
+            if(msg.tags && (convoTags.includeInTransforms in msg.tags)){
+                if(!includeInTransforms){
+                    includeInTransforms=[];
+                }
+                includeInTransforms.push(msg);
+            }
+
+            const hasTransformType=msg.tags && (convoTags.transform in msg.tags);
+            const transformGroup=msg.tags?.[convoTags.transformGroup]??(hasTransformType?defaultConvoTransformGroup:undefined);
+            if(hasTransformType && transformGroup && !disableTransforms){
+                messages.splice(i,1);
+                removed=true;
+                i--;
+
+                if(!flat.transforms){
+                    flat.transforms=[];
+                }
+                let transform=flat.transforms.find(t=>t.name===transformGroup);
+                if(!transform){
+                    transform={
+                        name:transformGroup,
+                        messages:[],
+                    }
+                    flat.transforms.push(transform);
+                }
+                const type=msg.tags?.[convoTags.transform];
+                if(type){
+                    transform.outputType=type;
+                }
+                const description=msg.tags?.[convoTags.transformDescription];
+                if(description){
+                    if(transform.description){
+                        transform.description+='\n\n'+description;
+                    }else{
+                        transform.description=description;
+                    }
+                }
+                if(msg.tags && (convoTags.transformRequired in msg.tags)){
+                    transform.required=true;
+                }
+                transform.messages.push(msg);
+            }else if(msg.tags && (convoTags.transformFilter in msg.tags)){
+                messages.splice(i,1);
+                removed=true;
+                i--;
+                if(!flat.transformFilterMessages){
+                    flat.transformFilterMessages=[];
+                }
+                flat.transformFilterMessages.push(msg);
+            }
+
+        }
+
+        if(includeInTransforms && flat.transforms){
+            for(const t of flat.transforms){
+                t.messages.splice(0,0,...includeInTransforms);
+            }
+        }
+
+        if(disableTransforms){
+            delete flat.transforms;
+            delete flat.transformFilterMessages;
         }
 
         if(setCurrent){
@@ -3524,3 +3955,26 @@ const secondPassRoles:(string|undefined)[]=[
     convoRoles.queue,
     convoRoles.flush,
 ]
+
+
+
+interface TransformFlatResult
+{
+    hideMessage:boolean;
+    removeMessage:boolean;
+    transforms:TransformCompletion[];
+    completions:ConvoCompletionMessage[];
+    inputTokens:number;
+    outputTokens:number;
+    tokenPrice:number;
+    publicResult:ConvoTransformResult;
+}
+
+interface TransformCompletion
+{
+    tags:ConvoTag[];
+    completions:ConvoCompletionMessage[];
+    transform:FlatConvoTransform;
+    disableComponent:boolean;
+    renderOnly:boolean;
+}

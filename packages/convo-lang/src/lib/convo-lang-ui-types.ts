@@ -77,7 +77,7 @@ export interface ConvoComponentRendererWithOptions
 export type ConvoComponentRenderer=ConvoComponentRenderFunction|ConvoComponentRendererWithOptions;
 
 
-export type ConvoMessageComponent=XmlNode;
+export type ConvoMessageComponent=XmlNode&{isJson?:boolean};
 
 export type ConvoRagRenderer=(msg:FlatConvoMessage,ctrl:ConversationUiCtrl)=>any;
 

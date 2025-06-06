@@ -51,6 +51,8 @@ export class ConvoExecutionContext
 
     public dynamicFunctionCallback:ConvoScopeFunction|undefined;
 
+    public defaultThrowOnUndefined=false;
+
     public constructor(convo?:Partial<ConvoGlobal>)
     {
         this.convo={
@@ -713,7 +715,7 @@ export class ConvoExecutionContext
         return this.getVarEx(statement.ref,statement.refPath,scope,throwUndefined);
     }
 
-    public getVarEx(name:string,path?:string[],scope?:ConvoScope,throwUndefined=true):any{
+    public getVarEx(name:string,path?:string[],scope?:ConvoScope,throwUndefined=this.defaultThrowOnUndefined):any{
         let value=scope?.vars[name]??this.sharedVars[name];
         if(value===undefined && (scope?!(name in scope.vars):true) && !(name in this.sharedVars)){
             if(throwUndefined){
@@ -787,13 +789,17 @@ export class ConvoExecutionContext
         if(path){
             let obj=vars[name];
             if(obj===undefined || obj===null){
-                setConvoScopeError(scope,`reference to undefined var for setting path - ${name}`);
+                if(this.defaultThrowOnUndefined){
+                    setConvoScopeError(scope,`reference to undefined var for setting path - ${name}`);
+                }
                 return value;
             }
             if(path.length>1){
                 obj=getValueByAryPath(obj,path,undefined,path.length-1);
                 if(obj===undefined || obj===null){
-                    setConvoScopeError(scope,`reference to undefined var at path - ${name}.${path.join('.')}`);
+                    if(this.defaultThrowOnUndefined){
+                        setConvoScopeError(scope,`reference to undefined var at path - ${name}.${path.join('.')}`);
+                    }
                     return value;
                 }
             }

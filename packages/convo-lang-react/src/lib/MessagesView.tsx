@@ -13,9 +13,10 @@ interface RenderOptions
 {
     ctrl:ConversationUiCtrl;
     flat:FlatConvoConversation|null;
-    showSystemMessages:boolean;
-    showFunctions:boolean;
-    hideSuggestions:boolean;
+    showSystemMessages?:boolean;
+    showFunctions?:boolean;
+    hideSuggestions?:boolean;
+    showResults?:boolean;
     rowClassName?:string;
     ragRenderer?:ConvoRagRenderer;
     assistantIcon?:string;
@@ -24,7 +25,7 @@ interface RenderOptions
     userIconRender?:ConvoMessageIconRenderer;
     iconSize?:string;
     iconClassName?:string;
-    callRenderer?:(msg:FlatConvoMessage)=>any;
+    callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
 }
 
 const renderResult=(
@@ -52,6 +53,7 @@ const renderMessage=(
         ctrl,
         flat,
         showSystemMessages,
+        showResults,
         showFunctions,
         hideSuggestions,
         rowClassName,
@@ -76,6 +78,7 @@ const renderMessage=(
         return (
             <MessageComponentRenderer
                 key={i+'comp'}
+                message={m}
                 ctx={{
                     id:i+'comp',
                     ctrl,
@@ -93,7 +96,10 @@ const renderMessage=(
     }
 
 
-    if(m.setVars && (m.role==='result' || showSystemMessages)){
+    if(m.role==='result'){
+        if(!m.setVars || (!showResults && !showFunctions)){
+            return null;
+        }
         const keys=Object.keys(m.setVars);
         aryRemoveWhere(keys,k=>k.startsWith('__'));
         if(!keys.length){
@@ -156,10 +162,14 @@ const renderMessage=(
                 </div>
             )
         }else if(callRenderer && m.called){
+            const callRendered=callRenderer(m,flat,ctrl);
+            if(callRendered===undefined || callRendered===null){
+                return null;
+            }
             return (
                 <div className={rowClassName} key={i+'fr'}>
                     <div className={className}>
-                        {callRenderer(m)}
+                        {callRendered}
                     </div>
                 </div>
             )
@@ -282,7 +292,7 @@ export interface MessagesViewProps
     userIconRender?:ConvoMessageIconRenderer;
     iconSize?:string;
     iconClassName?:string;
-    callRenderer?:(msg:FlatConvoMessage)=>any;
+    callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
 }
 
 export function MessagesView({
@@ -314,6 +324,7 @@ export function MessagesView({
     const currentTask=useSubject(ctrl?.currentTaskSubject);
 
     const showSystemMessages=useSubject(ctrl.showSystemMessagesSubject);
+    const showResults=useSubject(ctrl.showResultsSubject);
     const showFunctions=useSubject(ctrl.showFunctionsSubject);
 
     const rowClassName=(theme.messageRowUnstyled?
@@ -323,7 +334,7 @@ export function MessagesView({
 
     const options:RenderOptions={
         ctrl,flat:flat??null,showSystemMessages,
-        showFunctions,hideSuggestions,rowClassName,ragRenderer,
+        showFunctions,showResults,hideSuggestions,rowClassName,ragRenderer,
         assistantIcon,userIcon,assistantIconRender,userIconRender,iconClassName,iconSize,
         callRenderer
     }
@@ -340,6 +351,9 @@ export function MessagesView({
         }
 
         const rendered=renderMessage(i,m,options);
+        if(!rendered){
+            return null;
+        }
         if(!ctrlRendered){
             return rendered;
         }

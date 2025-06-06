@@ -1,6 +1,6 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageComponentMode, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoComponentTransform } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>';
@@ -1111,6 +1111,50 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     case convoTags.hidden:
                         msg.renderTarget='hidden';
                         break;
+
+                    case convoTags.transformComponent:{
+                        const parsed=parseConvoComponentTransform(tag.value);
+                        if(parsed){
+                            if(!msg.tags.some(t=>t.name===convoTags.transform)){
+                                msg.tags.push({
+                                    name:convoTags.transform,
+                                    value:parsed.propType,
+                                })
+                            }
+                            msg.tags.push({
+                                name:convoTags.transformTag,
+                                value:`${convoTags.component} ${parsed.componentName}`,
+                            })
+
+                            if(!msg.tags.some(t=>t.name===convoTags.transformHideSource)){
+                                msg.tags.push({
+                                    name:convoTags.transformHideSource,
+                                    value:parsed.condition,
+                                })
+                            }
+
+                            if(parsed.condition && !msg.tags.some(t=>t.name===convoTags.transformComponentCondition)){
+                                msg.tags.push({
+                                    name:convoTags.transformComponentCondition,
+                                    value:parsed.condition,
+                                })
+                            }
+
+                            if(!msg.tags.some(t=>t.name===convoTags.transformRenderOnly)){
+                                msg.tags.push({
+                                    name:convoTags.transformRenderOnly,
+                                })
+                            }
+
+                            if(!msg.tags.some(t=>t.name===convoTags.transformGroup)){
+                                msg.tags.push({
+                                    name:convoTags.transformGroup,
+                                    value:parsed.groupName||parsed.componentName,
+                                })
+                            }
+                        }
+                        break;
+                    }
 
                     default:
                         if(copyTagValues[tag.name] && tag.value){

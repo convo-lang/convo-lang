@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConvoComponentRenderFunction, ConvoComponentRendererContext, ConvoComponentRendererWithOptions, ConvoMessageComponent, FlatConvoMessage, parseConvoMessageComponents } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponentRenderFunction, ConvoComponentRendererContext, ConvoComponentRendererWithOptions, ConvoMessageComponent, FlatConvoMessage, convoTags, parseConvoMessageComponents } from "@convo-lang/convo-lang";
 import { objectToMarkdown } from "@iyio/common";
 import { useSubject } from "@iyio/react-common";
 import { Fragment, useMemo } from "react";
@@ -46,9 +46,10 @@ export function MessageComponentRenderer({
     const content=ctx?.message.content??message?.content;
     const id=ctx?.id??'_';
 
+    const defaultComponentName=message?.tags?.[convoTags.component];
     const components=useMemo<ConvoMessageComponent[]|undefined>(()=>{
-        return content?parseConvoMessageComponents(content):undefined;
-    },[content]);
+        return content?parseConvoMessageComponents(content,defaultComponentName):undefined;
+    },[content,defaultComponentName]);
 
     if(!ctx){
         return null;

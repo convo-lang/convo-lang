@@ -1,7 +1,7 @@
-import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps } from '@iyio/common';
-import { useShallowCompareItem, useSubject } from "@iyio/react-common";
+import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo } from "react";
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
@@ -41,6 +41,8 @@ export interface ConversationViewProps
     suggestionsLocation?:'inline'|'before-input'|'after-input';
     messagesProps?:MessagesViewProps;
     suggestionProps?:SuggestionsViewProps & BaseLayoutProps;
+    componentRenderers?:Record<string,ConvoComponentRenderer>;
+    enabledInitMessage?:boolean;
 }
 
 export function ConversationView({
@@ -73,6 +75,8 @@ export function ConversationView({
     suggestionsLocation='inline',
     messagesProps,
     suggestionProps,
+    componentRenderers,
+    enabledInitMessage,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -103,6 +107,29 @@ export function ConversationView({
             ctrl.defaultVars=defaultVars;
         }
     },[ctrl,defaultVars]);
+
+    const compRenderers=useDeepCompareItem(componentRenderers);
+    useEffect(()=>{
+        if(!compRenderers){
+            return;
+        }
+        for(const e in compRenderers){
+            const v=compRenderers[e];
+            if(!v){
+                continue;
+            }
+            ctrl.componentRenderers[e]=v;
+        }
+        return ()=>{
+            for(const e in compRenderers){
+                const v=compRenderers[e];
+                if(!v || ctrl.componentRenderers[e]!==v){
+                    continue;
+                }
+                delete ctrl.componentRenderers[e];
+            }
+        }
+    },[ctrl,compRenderers]);
 
     useEffect(()=>{
         if(content &&
@@ -163,6 +190,12 @@ export function ConversationView({
             ctrl.theme=t;
         }
     },[themeValue,ctrl]);
+
+    useEffect(()=>{
+        if(enabledInitMessage!==undefined){
+            ctrl.enabledInitMessage=enabledInitMessage;
+        }
+    },[ctrl,enabledInitMessage]);
 
     const theme=useSubject(ctrl.themeSubject);
 

@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, parseXml, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, dump, dupDeleteUndefined, getValueByPath, parseXml, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -85,6 +85,11 @@ export const convoRoles={
     nop:'nop',
 
     /**
+     * Used to track transform results including tokens used by transforms
+     */
+    transformResult:'transformResult',
+
+    /**
      * Starts a parallel execution block
      */
     parallel:'parallel',
@@ -124,9 +129,16 @@ export const convoFunctions={
 
     getVar:'getVar',
 
+    idx:'idx',
+
     describeScene:'describeScene',
 
     readDoc:'readDoc',
+
+    /**
+     * States the default value of a variable.
+     */
+    setDefault:'setDefault',
 
     /**
      * Returns an XML list of agents available to the current conversation.
@@ -281,6 +293,13 @@ export const defaultConvoRagTol=1.2;
 
 export const convoTags={
 
+
+    /**
+     * When applied to a user message and the message is the last message in a conversation the message
+     * is considered a conversation initializer.
+     */
+    init:'init',
+
     /**
      * Manually labels a message
      */
@@ -309,6 +328,30 @@ export const convoTags={
      * new assistant message.
      */
     disableAutoComplete:'disableAutoComplete',
+
+    /**
+     * When applied to a content message the message will be appended to the conversation after calling the
+     * function specified by the tag's value. When applied to a function message the content of the
+     * tag will be appended as a user message.
+     */
+    afterCall:'afterCall',
+
+    /**
+     * When used with the `afterCall` tag the appended message will be hidden from the user but
+     * visible to the LLM
+     */
+    afterCallHide:'afterCallHide',
+
+    /**
+     * When used with the `afterCall` tag the appended message will use the given role
+     */
+    afterCallRole:'afterCallRole',
+
+    /**
+     * Indicates a message was created by a afterCall tag
+     */
+    createdAfterCalling:'createdAfterCalling',
+
     /**
      * Used to indicate that a message should be evaluated at the edge of a conversation with the
      * latest state. @edge is most commonly used with system message to ensure that all injected values
@@ -468,7 +511,7 @@ export const convoTags={
      * conversation. When the condition is false the message will not be visible to the user
      * or the LLM.
      *
-     * @note The example below uses (at) instead of the at symbol because of a limitation of jsdoc.
+     * @note The example below uses (@) instead of the at symbol because of a limitation of jsdoc.
      *
      * The example below will only render and send the second system message to the LLM
      * @example
@@ -477,16 +520,21 @@ export const convoTags={
      * > define
      * animal = 'dog'
      *
-     * (at)condition animal frog
+     * (@)condition animal frog
      * > system
      * You are a frog and you like to hop around.
      *
-     * (at)condition animal dog
+     * (@)condition animal dog
      * > system
      * You are a dog and you like to eat dirt.
      * ```
      */
     condition:'condition',
+
+    /**
+     * When applied to a message the message is completely disregarded and removed from the conversation
+     */
+    disabled:'disabled',
 
     /**
      * A URL to the source of the message. Typically used with RAG.
@@ -587,6 +635,102 @@ export const convoTags={
      */
     cid:'cid',
 
+    /**
+     * Adds a message to a transform group. Transform groups are used to transform assistant output.
+     * The transform tags value can be the name of a type or empty. Transform groups are ran after all
+     * text responses from the assistant. Transform messages are not added to the flattened conversation.
+     */
+    transform:'transform',
+
+    /**
+     * Sets the name of the transform group a message will be added to when the transform tag is used.
+     */
+    transformGroup:'transformGroup',
+
+    /**
+     * If present on a transform message the source message processed will be hidden from the user
+     * but still visible to the LLM
+     */
+    transformHideSource:'transformHideSource',
+
+    /**
+     * If present on a transform message the source message processed will not be added to the
+     * conversation
+     */
+    transformRemoveSource:'transformRemoveSource',
+
+    /**
+     * If present the transformed message has the `renderOnly` tag applied to it causing it to be
+     * visible to the user but not the LLM.
+     */
+    transformRenderOnly:'transformRenderOnly',
+
+    /**
+     * A transform condition that will control if the component tag can be passed to the created message
+     */
+    transformComponentCondition:'transformComponentCondition',
+
+    /**
+     * Messages created by the transform will include the defined tag
+     * @example (@)transformTag renderTarget sideBar
+     */
+    transformTag:'transformTag',
+
+    /**
+     * A shortcut tag combines the `transform`, `transformTag`, `transformRenderOnly`, `transformComponentCondition`
+     * and `transformHideSource` tags to create a transform that renders a
+     * component based on the data structure of a named
+     * struct.
+     * @usage (@)transformComponent [groupName] {componentName} {propType} [?[!] condition]
+     *
+     * Renders the CarView component after every assistant message. The transform is using the default transform group.
+     * @example (@)transformComponent CarView CarProps
+     *
+     * Renders the CatPickerView component if the transformed message is a json object with the "type" key is set to cat.
+     * The transform is in the CatPicker transform group.
+     * @example (@)transformComponent CatPicker CatPickerView AnimalPrefs ? type cat
+     *
+     * Renders the AnimalsOtherThanPickerView component if the transformed message is a json object with the "type" key is NOT set to cat.
+     * The transform is in the default transform group.
+     * @example (@)transformComponent AnimalsOtherThanPickerView AnimalPrefs ?! type cat
+     */
+    transformComponent:'transformComponent',
+
+    /**
+     * Applied to messages created by a transform
+     */
+    createdByTransform:'createdByTransform',
+
+    /**
+     * When applied to a message the message will be included in all transform prompts. It is common
+     * to apply includeInTransforms to system messages
+     */
+    includeInTransforms:'includeInTransforms',
+
+    /**
+     * Describes what the result of the transform is
+     */
+    transformDescription:'transformDescription',
+
+    /**
+     * If applied to a transform message it will not be passed through a filter prompt
+     */
+    transformRequired:'transformRequired',
+
+    /**
+     * When applied to a message the transform filter will be used to select which transforms to
+     * to select. The default filter will list all transform groups and their descriptions to select
+     * the best fitting transform for the assistants response
+     */
+    transformFilter:'transformFilter',
+
+
+
+    /**
+     * Applied to transform output messages when overwritten by a transform with a higher priority
+     */
+    overwrittenByTransform:'overwrittenByTransform',
+
 } as const;
 
 export const convoTaskTriggers={
@@ -611,6 +755,8 @@ export const defaultConvoCacheType=globalThis.window?commonConvoCacheTypes.local
 export const convoDateFormat="yyyy-MM-dd'T'HH:mm:ssxxx";
 
 export const defaultConvoRenderTarget='default';
+
+export const defaultConvoTransformGroup='default';
 
 export const getConvoDateString=(date:Date|number=new Date()):string=>{
     return format(date,convoDateFormat);
@@ -639,6 +785,8 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.uuid,
     convoFunctions.shortUuid,
     convoFunctions.getVar,
+    convoFunctions.idx,
+    convoFunctions.setDefault,
     'setObjDefaults',
     'is',
     'and',
@@ -834,12 +982,14 @@ export const setConvoScopeError=(scope:ConvoScope|null|undefined,error:ConvoScop
 
 const notWord=/\W/g;
 const newline=/[\n\r]/g;
+const multiTagReg=/^(\w+)__\d+$/;
 
 export const convoTagMapToCode=(tagsMap:Record<string,string|undefined>,append='',tab=''):string=>{
     const out:string[]=[];
     for(const e in tagsMap){
         const v=tagsMap[e];
-        out.push(`${tab}@${e.replace(notWord,'_')}${v?' '+v.replace(newline,' '):''}`)
+        const nameMatch=multiTagReg.exec(e);
+        out.push(`${tab}@${(nameMatch?.[1]??e).replace(notWord,'_')}${v?' '+v.replace(newline,' '):''}`)
     }
     return out.join('\n')+append
 }
@@ -894,7 +1044,15 @@ export const getConvoFnByTag=(tag:string,messages:ConvoMessage[]|null|undefined,
 export const convoTagsToMap=(tags:ConvoTag[]):Record<string,string|undefined>=>{
     const map:Record<string,string|undefined>={};
     for(const t of tags){
-        map[t.name]=t.value;
+        if(t.name in map){
+            let i=2;
+            while(`${t.name}__${i}` in map){
+                i++;
+            }
+            map[`${t.name}__${i}`]=t.value;
+        }else{
+            map[t.name]=t.value;
+        }
     }
     return map;
 }
@@ -908,6 +1066,33 @@ export const mapToConvoTags=(map:Record<string,string|undefined>):ConvoTag[]=>{
         })
     }
     return tags;
+}
+
+export const getFlatConvoTagValues=(name:string,tags:Record<string,string|undefined>|null|undefined):string[]=>{
+    const values:string[]=[];
+    if(!tags || !(name in tags)){
+        return values;
+    }
+    values.push(tags[name]??'');
+    let i=2;
+    while(`${name}__${i}` in tags){
+        i++;
+        values.push(tags[`${name}__${i}`]??'');
+    }
+    return values;
+}
+
+
+const transformTagReg=/^\s*(\w+)(.*)/;
+export const parseConvoTransformTag=(value:string):ConvoTag|undefined=>{
+    const match=transformTagReg.exec(value);
+    if(!match){
+        return undefined;
+    }
+    return {
+        name:match[1]??'',
+        value:match[2]?.trim(),
+    }
 }
 
 export const createConvoMetadataForStatement=(statement:ConvoStatement):ConvoMetadata=>{
@@ -1196,14 +1381,32 @@ export const parseConvoUsageTokens=(str:string):ConvoTokenUsage=>{
     }
 }
 
-export const addConvoUsageTokens=(to:ConvoTokenUsage,from:Partial<ConvoTokenUsage>|string):void=>
+export const addConvoUsageTokens=(to:Partial<ConvoTokenUsage>,from:Partial<ConvoTokenUsage>|string):void=>
 {
     if(typeof from === 'string'){
         from=parseConvoUsageTokens(from);
     }
-    to.inputTokens+=from.inputTokens??0;
-    to.outputTokens+=from.outputTokens??0;
-    to.tokenPrice+=from.tokenPrice??0;
+    if(to.inputTokens===undefined){
+        if(from.inputTokens!==undefined){
+            to.inputTokens=from.inputTokens;
+        }
+    }else{
+        to.inputTokens+=from.inputTokens??0;
+    }
+    if(to.outputTokens===undefined){
+        if(from.outputTokens!==undefined){
+            to.outputTokens=from.outputTokens;
+        }
+    }else{
+        to.outputTokens+=from.outputTokens??0;
+    }
+    if(to.tokenPrice===undefined){
+        if(from.tokenPrice!==undefined){
+            to.tokenPrice=from.tokenPrice;
+        }
+    }else{
+        to.tokenPrice+=from.tokenPrice??0;
+    }
 }
 
 export const createEmptyConvoTokenUsage=():ConvoTokenUsage=>({
@@ -1868,4 +2071,59 @@ export const getLastConvoSuggestions=(messages:FlatConvoMessage[]):ConversationS
         suggestions:sug.map(s=>s.content??''),
         title,
     }
+}
+
+export const evalConvoTransformCondition=(transformContent:string,condition:string|null|undefined)=>{
+    if(!condition?.trim()){
+        return true;
+    }
+    try{
+        const parts=condition.trim().split(' ').filter(v=>v);
+        const not=parts[0]==='!';
+        if(not){
+            parts.shift();
+        }
+        const obj=JSON.parse(transformContent);
+        const v=getValueByPath(obj,parts[0]??'');
+        let cond:boolean;
+        if(parts.length<2){
+            cond=v?true:false;
+        }else{
+            cond=(v+'')===(parts[1]+'');
+        }
+        return not?!cond:cond;
+    }catch{
+        return false;
+    }
+}
+
+const transformComponentReg=/^(\w+)\s+(\w+)(\s+(\w+))?(\s+\?\s*(!?\s*.*))?$/;
+export interface ParseConvoComponentTransformResult
+{
+    componentName:string;
+    propType:string;
+    groupName?:string;
+    condition?:string;
+}
+/**
+ * Parses the value of the `transformComponent` tag
+ * @param value [groupName] {componentName} {propType} [?[!] condition]
+ */
+export const parseConvoComponentTransform=(value:string|null|undefined):ParseConvoComponentTransformResult|undefined=>{
+    if(!value){
+        return undefined;
+    }
+    const m=transformComponentReg.exec(value);
+    if(!m){
+        return undefined;
+    }
+    const hasGroup=m[4]?true:false;
+    const ni=hasGroup?2:1;
+    return dump({
+        componentName:m[ni]??'',
+        propType:m[ni+2]??'',
+        groupName:(hasGroup?m[1]:undefined)||undefined,
+        condition:m[6]?.trim()||undefined,
+    },'parsed transform',value);
+
 }

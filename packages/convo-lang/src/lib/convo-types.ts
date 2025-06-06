@@ -180,6 +180,15 @@ export interface ConvoMessagePart
     hidden?:boolean;
 }
 
+export interface ConvoPostCompletionMessage
+{
+    content?:string;
+    hidden?:boolean;
+    evalMessage?:ConvoMessage;
+    evalRole?:string;
+    createdAfterCalling?:string;
+}
+
 export interface ConvoStatement
 {
     /**
@@ -872,6 +881,15 @@ export interface ConvoCompletion
     task:string;
 }
 
+export interface FlatConvoTransform
+{
+    name:string;
+    description?:string;
+    required?:boolean;
+    messages:FlatConvoMessage[];
+    outputType?:string;
+}
+
 export interface FlatConvoConversation extends FlatConvoConversationBase
 {
     exe:ConvoExecutionContext;
@@ -892,6 +910,11 @@ export interface FlatConvoConversation extends FlatConvoConversationBase
      * If defined the debug function should be written to with debug info.
      */
     debug?:(...args:any[])=>void;
+
+    transforms?:FlatConvoTransform[];
+
+    transformFilterMessages?:FlatConvoMessage[];
+
 
 }
 
@@ -937,6 +960,8 @@ export interface FlatConvoConversationBase
      * Messages to execute in parallel.
      */
     parallelMessages?:ConvoMessage[];
+
+    afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
     apiKey?:string;
 }
@@ -1062,6 +1087,14 @@ export interface ConvoMessagePrefixOptions
     msg?:ConvoCompletionMessage;
 }
 
+export interface ConvoTransformResult
+{
+    inputTokens?:number;
+    outputTokens?:number;
+    tokenPrice?:number;
+    selectedTransforms?:string[];
+}
+
 export interface FlattenConvoOptions
 {
     /**
@@ -1081,6 +1114,15 @@ export interface FlattenConvoOptions
     threadFilter?:ConvoThreadFilter;
 
     toolChoice?:ConvoToolChoice;
+
+    /**
+     * Overrides the messages of the conversation
+     */
+    messages?:ConvoMessage[];
+
+    initFlatMessages?:FlatConvoMessage[];
+
+    disableTransforms?:boolean;
 }
 
 export interface ConvoSubTask
