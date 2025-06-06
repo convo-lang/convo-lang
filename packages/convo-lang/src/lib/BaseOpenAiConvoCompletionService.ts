@@ -128,8 +128,6 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
             )
         );
 
-        console.log('hio 👋 👋 👋 api response',JSON.stringify(r,null,4));
-
         if(!r){
             throw new NotFoundError();
         }
