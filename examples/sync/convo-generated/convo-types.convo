@@ -5,9 +5,7 @@ ExampleCompProps=struct(
     age?:number
 )
 
-defineComp({"name":"ExampleComp","propType":"ExampleCompProps"})
-
-# Fucking cool swag
+defineComp({"name":"ExampleComp","propType":"ExampleCompProps"})# Fucking cool swag
 Hat=struct(
     size:number
     style:string
