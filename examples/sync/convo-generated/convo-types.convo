@@ -1,0 +1,72 @@
+> define
+
+ExampleCompProps=struct(
+    name:string
+    age?:number
+)
+
+defineComp({"name":"ExampleComp","propType":"ExampleCompProps"})
+
+# Fucking cool swag
+Hat=struct(
+    size:number
+    style:string
+)
+
+# Some people man 🤷
+Person=struct(
+    age:number
+    job:string
+    name:string
+)
+
+# Example Interface
+ExampleInf=struct(
+    # Lots of characters
+    # cats of characters
+    # @poo bar
+    stringProp:string
+    numberProp:number
+    stringPropOp?:string
+    boolOp?:boolean
+    boolValue:boolean
+    nullProp:null
+    undefinedProp:undefined
+    unionProp:enum("abc" "123" "xyz")
+    unionPropOptional?:enum("abc" "xyz" 123 456)
+    aryStringProp:array(string)
+    aryNumberProp:array(number)
+    aryStringPropOp?:array(string)
+    aryNullProp:array(null)
+    aryUndefinedProp:array(undefined)
+    aryUnionProp:array(enum("abc" "123" "xyz"))
+    aryUnionPropOptional?:array(enum("abc" "xyz" 123 456))
+    objProp:struct(
+        # Obj name
+        # @example fire
+        name:string
+        height?:number
+        type:enum("cat" "dog" "car")
+    )
+    # This is a car
+    car?:struct(
+        name:string
+        topSpeed:number
+        isCompanyVehicle?:boolean
+    )
+    # For going fast
+    car2?:struct(
+        name:string
+        topSpeed:number
+        isCompanyVehicle?:boolean
+    )
+    carMatrix?:array(array(struct(
+        name:string
+        topSpeed:number
+        isCompanyVehicle?:boolean
+    )))
+    max:array(string)
+    pp:boolean
+    name:string
+)
+
