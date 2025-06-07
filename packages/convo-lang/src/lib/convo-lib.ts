@@ -122,6 +122,11 @@ export const convoFunctions={
      */
     defineForm:'defineForm',
 
+    /**
+     * Defines a component
+     */
+    defineComp:'defineComp',
+
     today:'today',
 
     uuid:'uuid',
@@ -274,6 +279,11 @@ export const convoVars={
      * Default array of forms
      */
     __forms:'__forms',
+
+    /**
+     * Array of ConvoComponentDef
+     */
+    __components:'__components',
 
 } as const;
 
@@ -782,6 +792,7 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.getState,
     convoFunctions.enableRag,
     convoFunctions.defineForm,
+    convoFunctions.defineComp,
     convoFunctions.uuid,
     convoFunctions.shortUuid,
     convoFunctions.getVar,

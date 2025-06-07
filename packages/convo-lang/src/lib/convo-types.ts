@@ -1249,6 +1249,12 @@ export interface ConvoImportResult
 
 export type ConvoImportHandler=(_import:ConvoImport)=>ConvoImportResult|null|undefined|Promise<ConvoImportResult|null|undefined>;
 
+export interface ConvoComponentDef
+{
+    name:string;
+    propType?:string;
+}
+
 export interface ConvoComponentMessageState
 {
     last?:FlatConvoMessage;
