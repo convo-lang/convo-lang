@@ -134,6 +134,16 @@ export interface ConvoCliOptions
      * The directory where generated synchronization output files are written
      */
     syncOut?:string;
+
+    /**
+     * A command line that can be ran in parallel with actions such as sync watching
+     */
+    spawn?:string;
+
+    /**
+     * Directory where to run the spawn command
+     */
+    spawnDir?:string;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

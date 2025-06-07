@@ -1,5 +1,5 @@
 import { CancelToken, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
-import { stopReadingStdIn } from "@iyio/node-common";
+import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { createConvoCliAsync } from "../lib/ConvoCli";
 import { ConvoCliOptions } from "../lib/convo-cli-types";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter";
@@ -9,6 +9,7 @@ const args=parseCliArgsT<Args>({
     args:process.argv,
     startIndex:2,
     defaultKey:'source',
+    restKey:'spawn',
     converter:{
         source:args=>args[0],
         inline:args=>args[0],
@@ -26,6 +27,8 @@ const args=parseCliArgsT<Args>({
         syncTsConfig:args=>args,
         syncWatch:args=>args.length?true:false,
         syncOut:args=>args[0],
+        spawn:args=>args.join(' '),
+        spawnDir:args=>args[0],
         printState:args=>args.length?true:false,
         printFlat:args=>args.length?true:false,
         printMessages:args=>args.length?true:false,
@@ -54,6 +57,14 @@ const main=async()=>{
 
     if(args.syncTsConfig?.length){
         toolPromises.push(convertConvoInterfacesAsync(args,cancel));
+    }
+
+    if(args.spawn){
+        toolPromises.push(spawnAsync({
+            cmd:args.spawn,
+            cwd:args.spawnDir,
+            cancel,
+        }))
     }
 
     await Promise.all(toolPromises);
