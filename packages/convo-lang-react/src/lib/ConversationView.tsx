@@ -1,8 +1,9 @@
 import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
-import { BaseLayoutProps } from '@iyio/common';
+import { BaseLayoutProps, deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo } from "react";
+import { Subscription } from 'rxjs';
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
 import { MessagesView, MessagesViewProps } from "./MessagesView";
@@ -43,6 +44,7 @@ export interface ConversationViewProps
     suggestionProps?:SuggestionsViewProps & BaseLayoutProps;
     componentRenderers?:Record<string,ConvoComponentRenderer>;
     enabledInitMessage?:boolean;
+    onVarsChange?:(vars:Record<string,any>)=>void;
 }
 
 export function ConversationView({
@@ -77,6 +79,7 @@ export function ConversationView({
     suggestionProps,
     componentRenderers,
     enabledInitMessage,
+    onVarsChange,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -91,6 +94,33 @@ export function ConversationView({
             ):ctrlOptions?.convoOptions?.completionService
         }
     }),[defaultCtrl,ctrlOptions,httpEndpoint,template]);
+
+    useEffect(()=>{
+        if(!ctrl || !onVarsChange){
+            return;
+        }
+        let m=true;
+        let flatSub:Subscription|undefined;
+        let prevVars:any=undefined;
+        const sub=ctrl.convoSubject.subscribe(c=>{
+            if(!m){
+                return;
+            }
+            flatSub?.unsubscribe();
+            flatSub=c?.flatSubject.subscribe(flat=>{
+                if(!m || !flat || deepCompare(flat.vars,prevVars)){
+                    return;
+                }
+                prevVars={...flat.vars};
+                onVarsChange(prevVars)
+            })
+        })
+        return ()=>{
+            m=false;
+            sub.unsubscribe();
+            flatSub?.unsubscribe();
+        }
+    },[ctrl,onVarsChange]);
 
     useEffect(()=>{
         if(externFunctions){
