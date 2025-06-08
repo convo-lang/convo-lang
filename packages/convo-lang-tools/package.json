@@ -2,7 +2,7 @@
     "name": "convo-lang-tools",
     "displayName": "convo-lang",
     "description": "A conversational language 🤓",
-    "version": "0.6.5",
+    "version": "0.7.18",
     "type": "commonjs",
     "sideEffects": false,
     "publisher": "IYIO",
