@@ -79,6 +79,12 @@
             "options": {
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --sync-ts-config examples/sync/tsconfig.json --sync-out examples/sync/convo-generated --sync-watch"
             }
+        },
+        "convert-nextjs-template": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --sync-ts-config ../convo-lang-nextjs-template/tsconfig.json --sync-out ../convo-lang-nextjs-template/convo-generated --sync-watch"
+            }
         }
     },
     "tags": []

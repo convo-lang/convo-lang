@@ -7,7 +7,7 @@ import { ConvoForm } from "./convo-forms-types";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { createConvoSceneDescription } from "./convo-scene-lib";
-import { ConvoComponentDef, ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
+import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod";
 import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc";
 
@@ -1241,22 +1241,6 @@ export const defaultConvoVars={
 
         formsAry.push(form);
     }),
-
-    [convoFunctions.defineComp]:createConvoScopeFunction((scope,ctx)=>{
-        const comp:ConvoComponentDef=deepClone(scope.paramValues?.[0]);
-        if(!comp){
-            return comp;
-        }
-        let components:ConvoComponentDef[]|undefined=ctx.getVar(convoVars.__components);
-        if(!components || !Array.isArray(components)){
-            components=[];
-            ctx.setVar(true,components,convoVars.__components);
-        }
-
-        components.push(comp);
-    }),
-
-
 
 } as const;
 

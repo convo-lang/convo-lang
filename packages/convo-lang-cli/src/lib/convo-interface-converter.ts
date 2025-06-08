@@ -1,9 +1,19 @@
-import { ConvoComponentDef, convoDescriptionToComment } from "@convo-lang/convo-lang";
+import { convoDescriptionToComment, escapeConvo, escapeConvoTagValue } from "@convo-lang/convo-lang";
 import { CancelToken, getDirectoryName, joinPaths, strHashBase64 } from "@iyio/common";
-import { pathExistsAsync, triggerNodeBreakpoint } from "@iyio/node-common";
+import { pathExistsAsync } from "@iyio/node-common";
 import { mkdir, realpath, watch, writeFile } from "fs/promises";
-import { JSDocTagInfo, Node, Project, SourceFile, Symbol, Type } from "ts-morph";
+import { relative } from "path";
+import { FunctionDeclaration, JSDocTagInfo, Node, Project, SourceFile, Symbol, Type } from "ts-morph";
 import { ConvoCliOptions } from "./convo-cli-types";
+
+interface Comp
+{
+    description:string;
+    name:string;
+    propsType:string;
+    instructions:string;
+    importStatement:string;
+}
 
 interface ProjectCtx{
     fullPath:string;
@@ -20,6 +30,7 @@ interface ProjectCtx{
     isScanning:boolean;
     scanRequested:boolean;
     refreshRequested:boolean;
+    comps:Comp[];
     log:(...msgs:any[])=>void;
 }
 
@@ -54,6 +65,7 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
         zodOut:[],
         tsOut:[],
         convoOut:[],
+        comps:[],
         cancel,
         isScanning:false,
         scanRequested:false,
@@ -80,6 +92,7 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
     project.tsOut.splice(0,project.tsOut.length);
     project.zodOut.splice(0,project.zodOut.length);
     project.convoOut.splice(0,project.convoOut.length);
+    project.comps.splice(0,project.comps.length);
 
     if(project.refreshRequested){
         project.refreshRequested=false;
@@ -96,18 +109,48 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
 
         const tsPath=joinPaths(project.out,'convo-binding-interfaces.ts');
         const zodPath=joinPaths(project.out,'convo-schemes.ts');
-        const convoPath=joinPaths(project.out,'convo-types.convo');
-        const convoTsPath=joinPaths(project.out,'convo-types.convo.ts');
+        const convoPath=joinPaths(project.out,'types.convo');
+        const convoCompPath=joinPaths(project.out,'comps.convo');
+        const convoTsPath=joinPaths(project.out,'convo.ts');
+        const convoTsCompPath=joinPaths(project.out,'convo-comp-reg.tsx');
 
+        project.comps.sort((a,b)=>a.name.localeCompare(b.name));
+        const convoCompSource=project.comps.map(c=>`@transformComponent ${c.name} ${c.name} ${c.propsType
+        }\n@convoDescription ${
+            escapeConvoTagValue(c.description)
+        }\n> system\n${
+            escapeConvo(c.instructions)
+        }`).join('\n\n');
         const convoSource='> define\n\n'+project.convoOut.join('');
-        const convoHash=strHashBase64(convoSource);
+
+        const convoTsSource=`export const convoTypes=/*convo*/\`\n${
+            convoSource.replace(tickReg,'\\`')
+        }\`;\n\nexport const convoComps=/*convo*/\`\n${
+            convoCompSource.replace(tickReg,'\\`')
+        }\`;\n`;
+
+        const convoTsCompSource=`${
+            project.comps.length?'import { ConvoComponentRenderer } from "@convo-lang/convo-lang";\n':'// no components found'
+        }${
+            project.comps.map(c=>c.importStatement).join('\n')
+        }\n\n// Components are generated using the convo-lang CLI which looks for components marked with the @convoComponent JSDoc tag\n\nexport const convoCompReg:Record<string,ConvoComponentRenderer>={\n${
+            project.comps.map(c=>`    ${c.name}:(comp,ctx)=><${c.name} {...({comp,ctx,ctrl:ctx.ctrl,convo:ctx.ctrl.convo,...comp.atts} as any)} />,`).join('\n')
+        }\n}\n`;
+
+        const convoHash=strHashBase64(convoSource+convoCompSource);
+
+        if(!await pathExistsAsync(project.out)){
+            await mkdir(project.out,{recursive:true});
+        }
         if(convoHash!==project.convoHash){
             project.convoHash=convoHash;
             await Promise.all([
                 writeFile(tsPath,project.tsOut.join('')),
                 writeFile(zodPath,`import { z } from "zod";\n\n${project.zodOut.join('')}`),
-                writeFile(convoTsPath,`export const convoTypes=/*convo*/\`\n${convoSource.replace(tickReg,'\\`')}\`;\n`),
+                writeFile(convoTsPath,convoTsSource),
+                writeFile(convoTsCompPath,convoTsCompSource),
                 writeFile(convoPath,convoSource),
+                writeFile(convoCompPath,convoCompSource||'> define\n// No components found'),
             ]);
         }
     }catch(ex){
@@ -142,6 +185,7 @@ const parseTags=(tags:JSDocTagInfo[]|undefined|null):Record<string,string>=>{
 }
 
 const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
+
     const exportMap=file.getExportedDeclarations();
     Array.from(exportMap.values()).forEach((c)=>{c.forEach((c)=>{
         const tags=parseTags(c.getSymbol()?.getJsDocTags());
@@ -153,11 +197,17 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
                     convertType(propsType,fn,project);
                 }
                 const name=fn.getName()??'';
-                const comp:ConvoComponentDef={
+                const desc=getDescription(fn.getSymbol())??'';
+                project.comps.push({
                     name,
-                    propType:propsType?.getSymbol()?.getName(),
-                }
-                project.convoOut.push(`defineComp(${JSON.stringify(comp)})`)
+                    propsType:propsType?.getSymbol()?.getName()??'',
+                    description:desc,
+                    instructions:(
+                        tags['convoComponent']||
+                        `Generates props for a component based on the following description:\n<description>${desc}</description>`
+                    ),
+                    importStatement:getImportStatement(name,fn,file,project),
+                })
             }
         }
         if('convoStruct' in tags){
@@ -165,6 +215,16 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
             convertType(type,file,project);
         }
     })});
+}
+
+const getImportStatement=(name:string,fn:FunctionDeclaration,file:SourceFile,project:ProjectCtx):string=>{
+    let relPath:string=file.getFilePath();
+    relPath=relative(project.outFullPath,relPath);
+    const i=relPath.lastIndexOf('.');
+    if(i!==-1){
+        relPath=relPath.substring(0,i);
+    }
+    return `import ${fn.isDefaultExport()?'':'{ '}${name}${fn.isDefaultExport()?'':' }'} from '${relPath}';`;
 }
 
 
@@ -177,7 +237,6 @@ const convertType=(type:Type,locationNode:Node,project:ProjectCtx)=>{
     project.zodOut.push(`export const ${typeName}ConvoBindingScheme=z.object({\n`);
     project.convoOut.push(`${typeName}=struct(\n`);
 
-    triggerNodeBreakpoint({disable:true})
     _convertType(type,locationNode,project,true,0,0,false);
 
     project.tsOut.push('}\n\n');
@@ -193,7 +252,7 @@ const _convertType=(
     depth:number,
     indentLevel:number,
     allowOptional:boolean
-):{optional:boolean,description?:string}=>{
+):{optional:boolean,ignored?:boolean,description?:string}=>{
 
     const {
         type:unwrappedType,
@@ -233,7 +292,7 @@ const _convertType=(
             `z.literal(${JSON.stringify(unionValues[0])})`:
             `z.union([${unionValues.map(v=>`z.literal(${JSON.stringify(v)})`).join(',')}])`;
     }else if(type.isClass()){
-        convoType='any';
+        return {optional:false,ignored:true}
     }else if(type.isString()){
         convoType='string';
     }else if(type.isNumber() || type.isBigInt()){
@@ -253,6 +312,12 @@ const _convertType=(
         }
         const props=type.getProperties();
         for(const propSym of props){
+
+             const tags=parseTags(propSym.getJsDocTags());
+             if('convoIgnore' in tags){
+                continue
+             }
+
             let propType=propSym.getTypeAtLocation(locationNode);
 
             let description=getDescription(propSym);
@@ -263,7 +328,12 @@ const _convertType=(
             let tsI=project.tsOut.length;
             let convoI=project.convoOut.length;
 
-            const {optional:propOpt,description:propDesc}=_convertType(propType,locationNode,project,false,depth+1,indentLevel+1,true);
+            const {optional:propOpt,description:propDesc,ignored}=_convertType(propType,locationNode,project,false,depth+1,indentLevel+1,true);
+
+            if(ignored){
+                project.zodOut.pop();
+                continue;
+            }
 
             if(!description && propDesc){
                 description=propDesc;
@@ -383,7 +453,7 @@ const writeTsConvoDescription=(
 const queueDelay=1000;
 const startDelay=2000;
 const queueIvs:Record<string,any>={};
-const defaultIgnore:(string|RegExp)[]=['node_modules','__pycache__','venv',/^\..*/];
+const defaultIgnore:(string|RegExp)[]=['node_modules','__pycache__','venv',/^\./];
 const watchProjectAsync=async (project:ProjectCtx)=>{
 
     console.log(`Watching ${project.fullPath} for changes`);
@@ -407,9 +477,18 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
 
             },queueDelay);
         }
-        for await (const evt of watcher){
+        watchLoop: for await (const evt of watcher){
             if(Date.now()-start<startDelay){
                 continue;
+            }
+
+            const parts=evt.filename.split(/[/\\]/);
+            for(const n of parts){
+                for(const i of defaultIgnore){
+                    if((typeof i === 'string')?i===n:i.test(n)){
+                        continue watchLoop;
+                    }
+                }
             }
 
             const fullPath=joinPaths(project.fullPath,evt.filename);
@@ -437,7 +516,6 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
                     })
                 }
             },queueDelay);
-            //
         }
     }catch(ex){
         if(!project.cancel.isCanceled){

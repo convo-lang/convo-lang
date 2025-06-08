@@ -122,11 +122,6 @@ export const convoFunctions={
      */
     defineForm:'defineForm',
 
-    /**
-     * Defines a component
-     */
-    defineComp:'defineComp',
-
     today:'today',
 
     uuid:'uuid',
@@ -792,7 +787,6 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.getState,
     convoFunctions.enableRag,
     convoFunctions.defineForm,
-    convoFunctions.defineComp,
     convoFunctions.uuid,
     convoFunctions.shortUuid,
     convoFunctions.getVar,
@@ -1642,7 +1636,7 @@ export const convoRagDocRefToMessage=(docs:ConvoDocumentReference|null|undefined
 }
 
 export const escapeConvoTagValue=(value:string):string=>{
-    return value.replace(/\s/g,' ');
+    return value.replace(/[\n\r\s]/g,' ');
 }
 
 export const convoMessageToString=(msg:ConvoMessage):string=>{
