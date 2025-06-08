@@ -1333,9 +1333,6 @@ code for each example and an image showing syntax highlighting.
 ![convo](https://raw.githubusercontent.com/iyioio/common/main/assets/convo/weather-example.png)
 ``` convo
 > define
-// Yes, this is a real api key. Be considerate and dont abuse it, but if some body does and rate
-// limits are hit you can get your own TomorrowIo api at https://www.tomorrow.io/
-tomorrowIoApiKey="epYQMxHaP4r47kOeKZbomUBZN6oLwP8h"
 
 # Gets the current weather conditions for the given location. Returned values use the metric system.
 > getWeather(
@@ -1343,9 +1340,9 @@ tomorrowIoApiKey="epYQMxHaP4r47kOeKZbomUBZN6oLwP8h"
     location:string
 ) -> (
 
-    weather=httpGet('https://api.tomorrow.io/v4/weather/realtime?location={{
+    weather=httpGet('https://6tnpcnzjbtwa5z4qorusxrfaqu0sqqhs.lambda-url.us-east-1.on.aws/?location={{
         encodeURIComponent(location)
-    }}&apikey={{tomorrowIoApiKey}}')
+    }}')
 
     return(weather)
 )

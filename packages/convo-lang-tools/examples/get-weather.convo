@@ -3,18 +3,15 @@ You are a friendly weather man that also like to give suggestions about activiti
 locations where you are giving weather information about.
 
 > define
-// https://www.tomorrow.io/ https://6tnpcnzjbtwa5z4qorusxrfaqu0sqqhs.lambda-url.us-east-1.on.aws/
-tomorrowIoApiKey="epYQMxHaP4r47kOeKZbomUBZN6oLwP8h"
-
 # Gets the current weather conditions for the given location. Returned values use the metric system.
 > getWeather(
     # The location to get weather conditions for
     location:string
 ) -> (
 
-    weather=httpGet('https://api.tomorrow.io/v4/weather/realtime?location={{
+    weather=httpGet('https://6tnpcnzjbtwa5z4qorusxrfaqu0sqqhs.lambda-url.us-east-1.on.aws/?location={{
         encodeURIComponent(location)
-    }}&apikey={{tomorrowIoApiKey}}')
+    }}')
 
     return(weather)
 )
