@@ -85,6 +85,12 @@
             "options": {
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --sync-ts-config ../convo-lang-nextjs-template/tsconfig.json --sync-out ../convo-lang-nextjs-template/convo-generated --sync-watch"
             }
+        },
+        "create-app": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --create-next-app --create-app-working-dir Documents/example-apps"
+            }
         }
     },
     "tags": []

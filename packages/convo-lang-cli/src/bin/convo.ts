@@ -3,6 +3,7 @@ import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { createConvoCliAsync } from "../lib/ConvoCli";
 import { ConvoCliOptions } from "../lib/convo-cli-types";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter";
+import { createNextAppAsync } from "../lib/create-next-app";
 
 type Args=ConvoCliOptions;
 const args=parseCliArgsT<Args>({
@@ -33,7 +34,9 @@ const args=parseCliArgsT<Args>({
         printFlat:args=>args.length?true:false,
         printMessages:args=>args.length?true:false,
         prefixOutput:args=>args.length?true:false,
-
+        createAppDir:args=>args[0],
+        createNextApp:args=>args.length?true:false,
+        createAppWorkingDir:args=>args[0],
     }
 }).parsed as Args;
 
@@ -43,6 +46,7 @@ const main=async()=>{
     let done=false;
     let shutdownIv:any;
     process.on('SIGINT',()=>{
+        stopReadingStdIn();
         console.log("Stopping Convo-Lang");
         cancel.cancelNow();
         shutdownIv=setTimeout(()=>{
@@ -57,6 +61,10 @@ const main=async()=>{
 
     if(args.syncTsConfig?.length){
         toolPromises.push(convertConvoInterfacesAsync(args,cancel));
+    }
+
+    if(args.createNextApp){
+        toolPromises.push(createNextAppAsync(args,cancel));
     }
 
     if(args.spawn){

@@ -144,6 +144,21 @@ export interface ConvoCliOptions
      * Directory where to run the spawn command
      */
     spawnDir?:string;
+
+    /**
+     * Creates a new next js app using the create-next-app npx command using the convo-lang-nextjs-template
+     */
+    createNextApp?:boolean;
+
+    /**
+     * The directory where apps will be created
+     */
+    createAppDir?:string;
+
+    /**
+     * The directory where the create app command will be ran
+     */
+    createAppWorkingDir?:string;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;
