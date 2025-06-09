@@ -22,11 +22,13 @@ export interface MarkdownViewerProps
 {
     markdown?:string|null;
     lazy?:boolean;
+    contentClassName?:string;
 }
 
 export function MarkdownViewer({
     markdown,
     lazy,
+    contentClassName,
     ...props
 }:MarkdownViewerProps & BaseLayoutProps){
 
@@ -67,7 +69,7 @@ export function MarkdownViewer({
     },[markdown,elem,show,lazy]);
 
     return (
-        <div ref={setElem} className={cn(style.root(null,null,props),markdownStyle.root())}/>
+        <div ref={setElem} className={cn(style.root(null,null,props),contentClassName??markdownStyle.root())}/>
     )
 
 }
@@ -76,6 +78,14 @@ const style=atDotCss({name:'MarkdownViewer',css:`
     @.root{
         display:flex;
         flex-direction:column;
+    }
+
+    @.root > *:last-child{
+        margin-bottom:0 !important;
+    }
+
+    @.root > *:first-child{
+        margin-top:0 !important;
     }
 `});
 
@@ -97,6 +107,16 @@ export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
     }
     @.root hr{
         width:100%;
+    }
+    @.root ul, @.root ol{
+        list-style-type:disc;
+        margin-left:1rem;
+        display:flex;
+        flex-direction:column;
+        gap:0.5rem;
+    }
+    @.root li{
+        margin:0;
     }
 `});
 

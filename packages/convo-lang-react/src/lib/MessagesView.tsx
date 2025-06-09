@@ -4,6 +4,7 @@ import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkd
 import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
 import { ConversationStatusIndicator } from "./ConversationStatusIndicator";
+import { MarkdownViewer } from "./MarkdownViewer";
 import { MessageComponentRenderer } from "./MessageComponentRenderer";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
@@ -26,6 +27,8 @@ interface RenderOptions
     iconSize?:string;
     iconClassName?:string;
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
+    enableMarkdown?:boolean;
+    markdownClassName?:string;
 }
 
 const renderResult=(
@@ -64,7 +67,9 @@ const renderMessage=(
         userIconRender,
         iconSize,
         iconClassName,
-        callRenderer
+        callRenderer,
+        enableMarkdown,
+        markdownClassName
     }:RenderOptions
 )=>{
 
@@ -198,7 +203,7 @@ const renderMessage=(
             ):(
                 <div className={rowClassName} key={pi}>
                     <div className={className}>
-                        {p.text}
+                        {enableMarkdown?<MarkdownViewer markdown={p.text} contentClassName={markdownClassName}/>:p.text}
                     </div>
                 </div>
             ))
@@ -254,7 +259,7 @@ const renderMessage=(
 
                     <div className={style.textMsgContent()}>
                         <div className={className}>
-                            {m.content}
+                            {enableMarkdown?<MarkdownViewer markdown={m.content} contentClassName={markdownClassName}/>:m.content}
                         </div>
                     </div>
                     {(m.isUser && (!!userIcon || userIconRender))?getMessageIcon(m,userIcon,userIconRender,iconSize,iconClassName):null}
@@ -293,6 +298,8 @@ export interface MessagesViewProps
     iconSize?:string;
     iconClassName?:string;
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
+    enableMarkdown?:boolean;
+    markdownClassName?:string;
 }
 
 export function MessagesView({
@@ -308,7 +315,9 @@ export function MessagesView({
     userIconRender,
     iconClassName,
     iconSize,
-    callRenderer
+    callRenderer,
+    enableMarkdown,
+    markdownClassName
 }:MessagesViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl)
@@ -336,7 +345,7 @@ export function MessagesView({
         ctrl,flat:flat??null,showSystemMessages,
         showFunctions,showResults,hideSuggestions,rowClassName,ragRenderer,
         assistantIcon,userIcon,assistantIconRender,userIconRender,iconClassName,iconSize,
-        callRenderer
+        callRenderer,enableMarkdown,markdownClassName
     }
 
     const mapped=messages.map((m,i)=>{

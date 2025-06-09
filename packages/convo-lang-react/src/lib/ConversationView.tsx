@@ -45,6 +45,8 @@ export interface ConversationViewProps
     componentRenderers?:Record<string,ConvoComponentRenderer>;
     enabledInitMessage?:boolean;
     onVarsChange?:(vars:Record<string,any>)=>void;
+    enableMarkdown?:boolean;
+    markdownClassName?:string;
 }
 
 export function ConversationView({
@@ -80,6 +82,8 @@ export function ConversationView({
     componentRenderers,
     enabledInitMessage,
     onVarsChange,
+    enableMarkdown,
+    markdownClassName,
 }:ConversationViewProps){
 
     const ctxCtrl=useContext(ConversationUiContext);
@@ -250,6 +254,8 @@ export function ConversationView({
             ragRenderer={ragRenderer}
             autoHeight={autoHeight}
             hideSuggestions={suggestionsLocation!=='inline'}
+            enableMarkdown={enableMarkdown}
+            markdownClassName={markdownClassName}
             {...messagesProps}
          />
     )
