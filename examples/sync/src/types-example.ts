@@ -11,7 +11,7 @@ interface Car{
 
 /**
  * Example Interface
- * @convoStruct
+ * @convoType
  */
 export interface ExampleInf extends BaseInf
 {

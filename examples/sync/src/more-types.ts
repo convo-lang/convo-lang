@@ -1,6 +1,6 @@
 /**
  * Fucking cool swag
- * @convoStruct
+ * @convoType
  */
 export interface Hat
 {

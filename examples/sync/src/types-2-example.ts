@@ -2,7 +2,7 @@ import { BaseInf } from "./common";
 
 /**
  * Some people man 🤷
- * @convoStruct
+ * @convoType
  */
 export interface Person extends BaseInf
 {

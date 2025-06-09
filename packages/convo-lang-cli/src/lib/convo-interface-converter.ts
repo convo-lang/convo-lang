@@ -6,6 +6,8 @@ import { relative } from "path";
 import { FunctionDeclaration, JSDocTagInfo, Node, Project, SourceFile, Symbol, Type } from "ts-morph";
 import { ConvoCliOptions } from "./convo-cli-types";
 
+const ignoreTypes=['ConvoComponentRendererContext']
+
 interface Comp
 {
     description:string;
@@ -32,6 +34,7 @@ interface ProjectCtx{
     refreshRequested:boolean;
     comps:Comp[];
     log:(...msgs:any[])=>void;
+    reloadPaths:string[];
 }
 
 export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:CancelToken)=>{
@@ -71,6 +74,7 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
         scanRequested:false,
         convoHash:'',
         refreshRequested:false,
+        reloadPaths:[],
         log:(...msgs:any[])=>console.log(...msgs),
     })));
 
@@ -88,6 +92,10 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
     }
 
     project.isScanning=true;
+
+    const reloads=project.reloadPaths;
+    project.reloadPaths=[];
+
     project.tsOut.splice(0,project.tsOut.length);
     project.zodOut.splice(0,project.zodOut.length);
     project.convoOut.splice(0,project.convoOut.length);
@@ -96,6 +104,10 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
     if(project.refreshRequested){
         project.refreshRequested=false;
         project.project=new Project({tsConfigFilePath:project.path})
+    }else if(reloads.length){
+        for(const p of reloads){
+            await project.project.getSourceFile(p)?.refreshFromFileSystem();
+        }
     }
 
     try{
@@ -201,7 +213,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
                 const desc=getDescription(fn.getSymbol())??'';
                 project.comps.push({
                     name,
-                    propsType:propsType?.getSymbol()?.getName()??'',
+                    propsType:getSymbol(propsType)?.getName()??'',
                     description:desc,
                     instructions:(
                         tags['convoComponent']||
@@ -211,7 +223,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
                 })
             }
         }
-        if('convoStruct' in tags){
+        if('convoType' in tags){
             const type=c.getType();
             convertType(type,file,project);
         }
@@ -228,22 +240,36 @@ const getImportStatement=(name:string,fn:FunctionDeclaration,file:SourceFile,pro
     return `import ${fn.isDefaultExport()?'':'{ '}${name}${fn.isDefaultExport()?'':' }'} from '${relPath}';`;
 }
 
+const getSymbol=(type:Type|undefined|null):Symbol|undefined=>{
+    return type?.getSymbol()??type?.getAliasSymbol();
+}
 
-const convertType=(type:Type,locationNode:Node,project:ProjectCtx)=>{
-    const sym=type.getSymbol();
+const convertType=(type:Type,locationNode:Node,project:ProjectCtx)=>{type.getAliasSymbol()
+    const sym=getSymbol(type);
     const description=getDescription(sym);
     writeTsConvoDescription(description,project,'');
     const typeName=sym?.getName();
-    project.tsOut.push(`export interface ${typeName}ConvoBinding{\n`);
-    project.zodOut.push(`export const ${typeName}ConvoBindingScheme=z.object({\n`);
-    project.convoOut.push(`${typeName}=struct(\n`);
+    const tsI=project.tsOut.length;
+    const convoI=project.convoOut.length;
+    const zodI=project.zodOut.length;
 
-    _convertType(type,locationNode,project,true,0,0,false);
+    const {noWrap}=_convertType(type,locationNode,project,true,0,0,false);
 
-    project.tsOut.push('}\n\n');
-    project.zodOut.push(`})${description?`.describe(${JSON.stringify(description)})`:''};\n\n`);
-    project.convoOut.push(')\n\n');
+    if(noWrap){
+        project.tsOut.splice(tsI,0,`export type ${typeName}ConvoBinding=`);
+        project.zodOut.splice(zodI,0,`export const ${typeName}ConvoBindingScheme=`);
+        project.convoOut.splice(convoI,0,`${typeName}=`);
+    }else{
+        project.tsOut.splice(tsI,0,`export interface ${typeName}ConvoBinding{\n`);
+        project.zodOut.splice(zodI,0,`export const ${typeName}ConvoBindingScheme=z.object({\n`);
+        project.convoOut.splice(convoI,0,`${typeName}=struct(\n`);
+    }
+
+    project.tsOut.push(`${noWrap?';':'}'}\n\n`);
+    project.zodOut.push(`${noWrap?'':'})'}${description?`.describe(${JSON.stringify(description)})`:''};\n\n`);
+    project.convoOut.push(`${noWrap?'':')'}\n\n`);
 }
+let maxDepth=10;
 
 const _convertType=(
     type:Type,
@@ -253,22 +279,28 @@ const _convertType=(
     depth:number,
     indentLevel:number,
     allowOptional:boolean
-):{optional:boolean,ignored?:boolean,description?:string}=>{
+):{optional:boolean,ignored?:boolean,description?:string,noWrap?:boolean}=>{
+
 
     const {
         type:unwrappedType,
         optional,
         isAny,
         unionValues,
-    }=unwrapType(type);
+    }=unwrapType(type,depth>maxDepth);
 
     type=unwrappedType;
+    const typeName=getSymbol(type)?.getName();
+    if(typeName && ignoreTypes.includes(typeName)){
+        return {optional:false,ignored:true}
+    }
 
     const tab='    '.repeat(indentLevel);
 
     let convoType:string|undefined;
     let tsType:string|undefined;
     let zType:string|undefined;
+    let noWrap=false;
 
     if(isAny || (optional && !allowOptional)){
         convoType='any';
@@ -287,6 +319,7 @@ const _convertType=(
 
         return {optional};
     }else if(unionValues){
+        noWrap=true;
         convoType=`enum(${unionValues.map(v=>JSON.stringify(v)).join(' ')})`;
         tsType=unionValues.map(v=>JSON.stringify(v)).join('|');
         zType=unionValues.length===1?
@@ -319,7 +352,7 @@ const _convertType=(
                 continue
              }
 
-            let propType=propSym.getTypeAtLocation(locationNode);
+            const propType=propSym.getTypeAtLocation(locationNode);
 
             let description=getDescription(propSym);
 
@@ -358,7 +391,7 @@ const _convertType=(
             project.zodOut.push(`${tab}})`);
             project.convoOut.push(`${tab})`);
         }
-        return {optional,description:getDescription(type.getSymbol())}
+        return {optional,description:getDescription(getSymbol(type))}
     }
 
     if(tsType===undefined){
@@ -373,7 +406,7 @@ const _convertType=(
     project.zodOut.push(zType);
 
 
-    return {optional};
+    return {optional,noWrap};
 }
 
 
@@ -385,9 +418,9 @@ const toJsDoc=(value:string,tab:string)=>{
     return `${tab}/**\n${tab} * ${value.replace(newlineReg,`\n${tab} * `)}\n${tab} */\n`;
 }
 
-const unwrapType=(type:Type):{type:Type,optional:boolean,unionValues?:any[],isAny?:boolean}=>{
+const unwrapType=(type:Type,forceAny:boolean):{type:Type,optional:boolean,unionValues?:any[],isAny?:boolean}=>{
     if(!type.isUnion()){
-        return {type,optional:false};
+        return {type,isAny:type.isAny() || forceAny,optional:false};
     }
     type.getNonNullableType
     const unionTypes=type.getUnionTypes();
@@ -412,11 +445,12 @@ const unwrapType=(type:Type):{type:Type,optional:boolean,unionValues?:any[],isAn
             unwrappedType=t;
         }
     }
+    const isAny=forceAny || (unwrappedType??type).isAny();
     return {
         type:unwrappedType??type,
         optional,
         unionValues:unionValues.length==0?undefined:unionValues,
-        isAny:unwrappedType && unionValues.length>0?true:false,
+        isAny:isAny || (unwrappedType && unionValues.length>0?true:false),
     }
 }
 
@@ -451,7 +485,7 @@ const writeTsConvoDescription=(
 }
 
 
-const queueDelay=1000;
+const queueDelay=300;
 const startDelay=2000;
 const queueIvs:Record<string,any>={};
 const defaultIgnore:(string|RegExp)[]=['node_modules','__pycache__','venv',/^\./];
@@ -468,13 +502,13 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
     })
 
     try{
+
         const queueProjectScan=()=>{
             clearTimeout(queueIvs[project.fullPath]);
             queueIvs[project.fullPath]=setTimeout(()=>{
                 if(project.cancel.isCanceled){
                     return;
                 }
-
                 scanProjectAsync(project,true);
 
             },queueDelay);
@@ -503,21 +537,17 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
             if(!file && !refresh){
                 continue;
             }
-            clearTimeout(queueIvs[project.fullPath]);
-            clearTimeout(queueIvs[fullPath]);
-            queueIvs[fullPath]=setTimeout(()=>{
-                if(project.cancel.isCanceled){
-                    return;
+            if(project.cancel.isCanceled){
+                return;
+            }
+            if(refresh){
+                project.refreshRequested=true;
+            }else{
+                if(!project.reloadPaths.includes(fullPath)){
+                    project.reloadPaths.push(fullPath);
                 }
-                if(refresh){
-                    project.refreshRequested=true;
-                    queueProjectScan();
-                }else{
-                    project.project.getSourceFile(fullPath)?.refreshFromFileSystem().then(()=>{
-                        queueProjectScan();
-                    })
-                }
-            },queueDelay);
+            }
+            queueProjectScan();
         }
     }catch(ex){
         if(!project.cancel.isCanceled){
