@@ -1,5 +1,5 @@
 import { convoDescriptionToComment, escapeConvo, escapeConvoTagValue } from "@convo-lang/convo-lang";
-import { CancelToken, getDirectoryName, joinPaths, strHashBase64 } from "@iyio/common";
+import { CancelToken, getDirectoryName, joinPaths, normalizePath, strHashBase64 } from "@iyio/common";
 import { pathExistsAsync } from "@iyio/node-common";
 import { mkdir, realpath, watch, writeFile } from "fs/promises";
 import { relative } from "path";
@@ -53,13 +53,13 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
     }
 
     const outFullPath=await realpath(syncOut);
-    const projects=await Promise.all(syncTsConfig.map<Promise<ProjectCtx>>(async p=>({
+    const projects=await Promise.all(syncTsConfig.map(p=>normalizePath(p)).map<Promise<ProjectCtx>>(async p=>({
         path:p,
         fullPath:await realpath(getDirectoryName(p),{encoding:'utf-8'}),
         project:new Project({
             tsConfigFilePath:p,
         }),
-        out:syncOut,
+        out:normalizePath(syncOut),
         outFullPath,
         options,
         zodOut:[],
@@ -454,6 +454,7 @@ const queueDelay=1000;
 const startDelay=2000;
 const queueIvs:Record<string,any>={};
 const defaultIgnore:(string|RegExp)[]=['node_modules','__pycache__','venv',/^\./];
+const extReg=/\.tsx?$/i
 const watchProjectAsync=async (project:ProjectCtx)=>{
 
     console.log(`Watching ${project.fullPath} for changes`);
@@ -478,7 +479,7 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
             },queueDelay);
         }
         watchLoop: for await (const evt of watcher){
-            if(Date.now()-start<startDelay){
+            if(Date.now()-start<startDelay || !extReg.test(evt.filename)){
                 continue;
             }
 
