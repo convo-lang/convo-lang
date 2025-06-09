@@ -82,7 +82,6 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
 }
 
 const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
-    project.log(`${project.refreshRequested?'Refresh':'Scan'} Project - ${project.path}`);
     if(project.isScanning){
         project.scanRequested=true;
         return;
@@ -130,12 +129,12 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         }\`;\n`;
 
         const convoTsCompSource=`${
-            project.comps.length?'import { ConvoComponentRenderer } from "@convo-lang/convo-lang";\n':'// no components found'
+            project.comps.length?'import { ConvoComponentRendererContext, ConvoMessageComponent } from "@convo-lang/convo-lang";\n':'// no components found'
         }${
             project.comps.map(c=>c.importStatement).join('\n')
-        }\n\n// Components are generated using the convo-lang CLI which looks for components marked with the @convoComponent JSDoc tag\n\nexport const convoCompReg:Record<string,ConvoComponentRenderer>={\n${
-            project.comps.map(c=>`    ${c.name}:(comp,ctx)=><${c.name} {...({comp,ctx,ctrl:ctx.ctrl,convo:ctx.ctrl.convo,...comp.atts} as any)} />,`).join('\n')
-        }\n}\n`;
+        }\n\n// Components are generated using the convo-lang CLI which looks for components marked with the @convoComponent JSDoc tag\n\nexport const convoCompReg={\n${
+            project.comps.map(c=>`    ${c.name}:(comp:ConvoMessageComponent,ctx:ConvoComponentRendererContext)=><${c.name} {...({comp,ctx,ctrl:ctx.ctrl,convo:ctx.ctrl.convo,...comp.atts} as any)} />,`).join('\n')
+        }\n} as const\n`;
 
         const convoHash=strHashBase64(convoSource+convoCompSource);
 
@@ -152,8 +151,10 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
                 writeFile(convoPath,convoSource),
                 writeFile(convoCompPath,convoCompSource||'> define\n// No components found'),
             ]);
+            project.log(`convo> sync complete - ${project.path}`);
         }
     }catch(ex){
+        project.log(`convo> sync failed - ${project.path}`,ex);
         if(!catchErrors){
             throw ex;
         }
