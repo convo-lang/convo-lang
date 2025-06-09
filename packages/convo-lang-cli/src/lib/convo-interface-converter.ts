@@ -127,7 +127,7 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
 
         project.comps.sort((a,b)=>a.name.localeCompare(b.name));
         const convoCompSource=project.comps.map(c=>`@transformComponent ${c.name} ${c.name} ${c.propsType
-        }\n@convoDescription ${
+        }\n@transformDescription ${
             escapeConvoTagValue(c.description)
         }\n> system\n${
             escapeConvo(c.instructions)
