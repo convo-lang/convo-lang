@@ -6,7 +6,20 @@ import { relative } from "path";
 import { FunctionDeclaration, JSDocTagInfo, Node, Project, SourceFile, Symbol, Type } from "ts-morph";
 import { ConvoCliOptions } from "./convo-cli-types";
 
-const ignoreTypes=['ConvoComponentRendererContext']
+const ignoreTypes=['ConvoComponentRendererContext'];
+const arrayTypeMap:Record<string,string>={
+    Int8Array:'number',
+    Uint8Array:'number',
+    Uint8ClampedArray:'number',
+    Int16Array:'number',
+    Uint16Array:'number',
+    Int32Array:'number',
+    Uint32Array:'number',
+    Float32Array:'number',
+    Float64Array:'number',
+    BigInt64Array:'number',
+    BigUint64Array:'number',
+}
 
 interface Comp
 {
@@ -15,6 +28,7 @@ interface Comp
     propsType:string;
     instructions:string;
     importStatement:string;
+    keepSource:boolean;
 }
 
 interface ProjectCtx{
@@ -121,23 +135,14 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         const tsPath=joinPaths(project.out,'convo-binding-interfaces.ts');
         const zodPath=joinPaths(project.out,'convo-schemes.ts');
         const convoPath=joinPaths(project.out,'types.convo');
-        const convoCompPath=joinPaths(project.out,'comps.convo');
         const convoTsPath=joinPaths(project.out,'convo.ts');
         const convoTsCompPath=joinPaths(project.out,'convo-comp-reg.tsx');
 
         project.comps.sort((a,b)=>a.name.localeCompare(b.name));
-        const convoCompSource=project.comps.map(c=>`@transformComponent ${c.name} ${c.name} ${c.propsType
-        }\n@transformDescription ${
-            escapeConvoTagValue(c.description)
-        }\n> system\n${
-            escapeConvo(c.instructions)
-        }`).join('\n\n');
         const convoSource='> define\n\n'+project.convoOut.join('');
 
         const convoTsSource=`export const convoTypes=/*convo*/\`\n${
             convoSource.replace(tickReg,'\\`')
-        }\`;\n\nexport const convoComps=/*convo*/\`\n${
-            convoCompSource.replace(tickReg,'\\`')
         }\`;\n`;
 
         const convoTsCompSource=`${
@@ -145,10 +150,22 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         }${
             project.comps.map(c=>c.importStatement).join('\n')
         }\n\n// Components are generated using the convo-lang CLI which looks for components marked with the @convoComponent JSDoc tag\n\nexport const convoCompReg={\n${
-            project.comps.map(c=>`    ${c.name}:(comp:ConvoMessageComponent,ctx:ConvoComponentRendererContext)=><${c.name} {...({comp,ctx,ctrl:ctx.ctrl,convo:ctx.ctrl.convo,...comp.atts} as any)} />,`).join('\n')
+            project.comps.map(c=>(
+                `    ${c.name}:{\n${
+                '        '}render:(comp:ConvoMessageComponent,ctx:ConvoComponentRendererContext)=><${c.name} {...({comp,ctx,ctrl:ctx.ctrl,convo:ctx.ctrl.convo,...comp.atts} as any)} />,\n${
+                '        '}convo:/*convo*/\`\n@transformComponent ${c.name} ${c.propsType
+                }\n@transformDescription ${
+                    escapeConvoTagValue(c.description)
+                }\n@transformOptional\n${
+                    c.keepSource?'@transformKeepSource\n':''
+                }> system\n${
+                    escapeConvo(c.instructions)
+                }\n\`\n${
+                '    }'},`
+            )).join('\n')
         }\n} as const\n`;
 
-        const convoHash=strHashBase64(convoSource+convoCompSource);
+        const convoHash=strHashBase64(convoSource+convoTsCompSource);
 
         if(!await pathExistsAsync(project.out)){
             await mkdir(project.out,{recursive:true});
@@ -161,7 +178,6 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
                 writeFile(convoTsPath,convoTsSource),
                 writeFile(convoTsCompPath,convoTsCompSource),
                 writeFile(convoPath,convoSource),
-                writeFile(convoCompPath,convoCompSource||'> define\n// No components found'),
             ]);
             project.log(`convo> sync complete - ${project.path}`);
         }
@@ -220,6 +236,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
                         `Generates props for a component based on the following description:\n<description>${desc}</description>`
                     ),
                     importStatement:getImportStatement(name,fn,file,project),
+                    keepSource:'convoKeepSource' in tags
                 })
             }
         }
@@ -241,7 +258,11 @@ const getImportStatement=(name:string,fn:FunctionDeclaration,file:SourceFile,pro
 }
 
 const getSymbol=(type:Type|undefined|null):Symbol|undefined=>{
-    return type?.getSymbol()??type?.getAliasSymbol();
+    const n=type?.getSymbol();
+    if(n && n.getName()!=='__type'){
+        return n;
+    }
+    return type?.getAliasSymbol();
 }
 
 const convertType=(type:Type,locationNode:Node,project:ProjectCtx)=>{type.getAliasSymbol()
@@ -300,10 +321,22 @@ const _convertType=(
     let convoType:string|undefined;
     let tsType:string|undefined;
     let zType:string|undefined;
-    let noWrap=false;
+    let noWrap=true;
 
     if(isAny || (optional && !allowOptional)){
         convoType='any';
+    }else if(typeName==='Record'){
+        project.tsOut.push(`Record<string,any>`);
+        project.convoOut.push(`object`);
+        project.zodOut.push(`z.record(z.string(),z.any())`);
+        return {optional};
+
+    }else if(typeName && arrayTypeMap[typeName]){
+        const t=arrayTypeMap[typeName]??'any';
+        project.tsOut.push(`${t}[]`);
+        project.convoOut.push(`array(${t})`);
+        project.zodOut.push(`z.${t}().array()`);
+        return {optional};
     }else if(type.isArray()){
 
         project.tsOut.push('(');
@@ -337,8 +370,13 @@ const _convertType=(
         convoType='null';
     }else if(type.isUndefined()){
         convoType='undefined';
+    }else if(type.isLiteral()){
+        const v=type.getLiteralValue();
+        convoType=`enum(${JSON.stringify(v)})`;
+        tsType=JSON.stringify(v);
+        zType=`z.literal(${JSON.stringify(v)})`;
     }else{
-
+        noWrap=false;
         if(!isRoot){
             project.tsOut.push(`{\n`);
             project.zodOut.push(`z.object({\n`);
@@ -410,7 +448,6 @@ const _convertType=(
 }
 
 
-const convoJsDocReg=/(^|\n)\s*@convo[^\r\n]*/g;
 const newlineReg=/\n/g;
 const commentReplace=/(^|\n|\r)\s*\/?\*+\/?[ \t]*/g;
 
@@ -422,7 +459,6 @@ const unwrapType=(type:Type,forceAny:boolean):{type:Type,optional:boolean,unionV
     if(!type.isUnion()){
         return {type,isAny:type.isAny() || forceAny,optional:false};
     }
-    type.getNonNullableType
     const unionTypes=type.getUnionTypes();
     let optional=false;
     let unwrappedType:Type|undefined;
@@ -454,6 +490,8 @@ const unwrapType=(type:Type,forceAny:boolean):{type:Type,optional:boolean,unionV
     }
 }
 
+const convoJsDocReg=/^\s*@convo/;
+const tagStartReg=/^\s*@/;
 
 const getDescription=(sym:Symbol|undefined|null):string|undefined=>{
     if(!sym){
@@ -464,8 +502,26 @@ const getDescription=(sym:Symbol|undefined|null):string|undefined=>{
         const txt=c.getText().replace(commentReplace,'\n').trim();
         description+=(description?'\n':'')+txt;
     }));
-    description=description.replace(convoJsDocReg,(_,s:string)=>s).trim();
-    return description||undefined;
+    const lines=description.split('\n');
+    let inConvo=false;
+    for(let i=0;i<lines.length;i++){
+        const line=lines[i]??'';
+        if(!inConvo){
+            if(convoJsDocReg.test(line)){
+                inConvo=true;
+                lines.splice(i,1);
+                i--;
+            }
+        }else{
+            if(tagStartReg.test(line) && !convoJsDocReg.test(line)){
+                inConvo=false;
+            }else{
+                lines.splice(i,1);
+                i--;
+            }
+        }
+    }
+    return lines.join('\n').trim()||undefined;
 }
 
 const writeTsConvoDescription=(

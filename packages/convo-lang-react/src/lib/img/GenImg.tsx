@@ -28,6 +28,7 @@ export interface GenImgProps
     loadingBorder?:string;
     genEndpoint?:string;
     disableCaching?:boolean;
+    onBlob?:(blob:Blob|null)=>void;
 }
 
 /**
@@ -61,12 +62,19 @@ export function GenImg({
     loadingBorder='1px solid #777777',
     genEndpoint='/api/convo-lang/image',
     disableCaching,
+    onBlob,
     ...props
 }:GenImgProps & BaseLayoutProps){
 
     const [loaded,setLoaded]=useState(false);
     const [srcUrl,setSrcUrl]=useState('');
     const [error,setError]=useState('');
+    const [blob,setBlob]=useState<Blob|null>(null);
+    useEffect(()=>{
+        if(onBlob){
+            onBlob(blob);
+        }
+    },[blob,onBlob]);
 
     const genMetadata=useGenMetadata();
 
@@ -86,6 +94,7 @@ export function GenImg({
     useEffect(()=>{
         setLoaded(false);
         setError('');
+        setBlob(null);
         if(!url){
             return;
         }
@@ -107,6 +116,7 @@ export function GenImg({
                     blobUrl=URL.createObjectURL(blob);
                     setSrcUrl(blobUrl);
                     setLoaded(true);
+                    setBlob(blob);
                 }catch(err){
                     console.error('Image load failed',err);
                     setError(getErrorMessage(err));

@@ -1161,6 +1161,20 @@ export const defaultConvoVars={
         return v===undefined?scope.paramValues?.[1]:v;
     }),
 
+    [convoFunctions.setVar]:createConvoScopeFunction((scope,ctx)=>{
+        const name=scope.paramValues?.[0];
+        if(typeof name !=='string'){
+            return undefined
+        }
+        const v=scope.paramValues?.[1];
+        if(name.includes('.')){
+            const parts=name.split('.');
+            ctx.setVar(true,v,parts.shift() as string,parts);
+        }else{
+            ctx.setVar(true,v,name);
+        }
+    }),
+
     [convoFunctions.describeScene]:createConvoScopeFunction((scope,ctx)=>{
         const ctrl=ctx.getVar(convoVars.__sceneCtrl);
         if(ctrl instanceof SceneCtrl){
@@ -1242,7 +1256,40 @@ export const defaultConvoVars={
         formsAry.push(form);
     }),
 
+    [convoFunctions.enableTransform]:createConvoScopeFunction((scope,ctx)=>{
+        if(!scope.paramValues){
+            return;
+        }
+        for(const t of scope.paramValues){
+            if(typeof t === 'string'){
+                enableTransform(t,ctx);
+            }else if(Array.isArray(t)){
+                for(const at of t){
+                    if(typeof at === 'string'){
+                        enableTransform(at,ctx);
+                    }
+                }
+            }
+        }
+    }),
+
+    [convoFunctions.enableAllTransforms]:createConvoScopeFunction((scope,ctx)=>{
+        enableTransform('all',ctx);
+    }),
+
 } as const;
+
+const enableTransform=(name:string,ctx:ConvoExecutionContext)=>{
+    let enabledList:string[]=ctx.getVar(convoVars.__explicitlyEnabledTransforms);
+    if(!Array.isArray(enabledList)){
+        enabledList=[]
+        ctx.setVar(true,enabledList,convoVars.__explicitlyEnabledTransforms);
+    }
+
+    if(!enabledList.includes(name)){
+        enabledList.push(name);
+    }
+}
 
 Object.freeze(defaultConvoVars);
 

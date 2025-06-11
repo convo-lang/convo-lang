@@ -78,6 +78,7 @@ const style=atDotCss({name:'MarkdownViewer',css:`
     @.root{
         display:flex;
         flex-direction:column;
+        white-space:normal;
     }
 
     @.root > *:last-child{
@@ -109,14 +110,18 @@ export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
         width:100%;
     }
     @.root ul, @.root ol{
-        list-style-type:disc;
-        margin-left:1rem;
-        display:flex;
-        flex-direction:column;
-        gap:0.5rem;
+        list-style-type:auto;
+        margin:revert;
+        padding:revert;
+
     }
-    @.root li{
-        margin:0;
+    @.root pre{
+        white-space:pre-wrap;
+    }
+    @.root code{
+        border:1px solid #ffffff44;
+        padding:1rem;
+        border-radius:4px;
     }
 `});
 

@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoMessageComponent, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, isMdConvoEnabledFor, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
 import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
@@ -27,7 +27,7 @@ interface RenderOptions
     iconSize?:string;
     iconClassName?:string;
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
-    enableMarkdown?:boolean;
+    enableMarkdown?:ConvoMarkdownEnableState;
     markdownClassName?:string;
 }
 
@@ -166,10 +166,36 @@ const renderMessage=(
                     </div>
                 </div>
             )
-        }else if(callRenderer && m.called){
-            const callRendered=callRenderer(m,flat,ctrl);
+        }else if(m.called){
+            let callRendered=callRenderer?.(m,flat,ctrl);
             if(callRendered===undefined || callRendered===null){
-                return null;
+                const compName=flat.messages.find(fm=>fm.fn && fm.fn.name===m.called?.name && !fm.called)?.tags?.[convoTags.renderer];
+                const compRenderer=compName?ctrl.componentRenderers[compName]:undefined;
+                if(!compRenderer){
+                    return null;
+                }
+                const ctx:ConvoComponentRendererContext={
+                    id:i+'comp',
+                    ctrl,
+                    convo:flat.conversation,
+                    flat,
+                    index:i,
+                    message:m,
+                    isUser:m.role==='user',
+                    className,
+                    rowClassName,
+                }
+
+                const comp:ConvoMessageComponent={
+                    name:'renderer',
+                    isJson:true,
+                    atts:{message:m,args:m.calledParams,returnValue:m.calledReturn},
+                }
+                callRendered=(typeof compRenderer === 'function')?compRenderer(comp,ctx):compRenderer.render(comp,ctx);
+
+                if(callRendered===undefined || callRendered===null){
+                    return null;
+                }
             }
             return (
                 <div className={rowClassName} key={i+'fr'}>
@@ -203,7 +229,9 @@ const renderMessage=(
             ):(
                 <div className={rowClassName} key={pi}>
                     <div className={className}>
-                        {enableMarkdown?<MarkdownViewer markdown={p.text} contentClassName={markdownClassName}/>:p.text}
+                        {(enableMarkdown && isMdConvoEnabledFor(m.isUser?'user':'assistant',enableMarkdown))?
+                            <MarkdownViewer markdown={p.text} contentClassName={markdownClassName}/>:p.text
+                        }
                     </div>
                 </div>
             ))
@@ -259,7 +287,9 @@ const renderMessage=(
 
                     <div className={style.textMsgContent()}>
                         <div className={className}>
-                            {enableMarkdown?<MarkdownViewer markdown={m.content} contentClassName={markdownClassName}/>:m.content}
+                            {(enableMarkdown && isMdConvoEnabledFor(m.isUser?'user':'assistant',enableMarkdown))?
+                                <MarkdownViewer markdown={m.content} contentClassName={markdownClassName}/>:m.content
+                            }
                         </div>
                     </div>
                     {(m.isUser && (!!userIcon || userIconRender))?getMessageIcon(m,userIcon,userIconRender,iconSize,iconClassName):null}
@@ -298,7 +328,7 @@ export interface MessagesViewProps
     iconSize?:string;
     iconClassName?:string;
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
-    enableMarkdown?:boolean;
+    enableMarkdown?:ConvoMarkdownEnableState;
     markdownClassName?:string;
 }
 

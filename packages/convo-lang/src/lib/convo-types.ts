@@ -888,6 +888,7 @@ export interface FlatConvoTransform
     required?:boolean;
     messages:FlatConvoMessage[];
     outputType?:string;
+    optional?:boolean;
 }
 
 export interface FlatConvoConversation extends FlatConvoConversationBase

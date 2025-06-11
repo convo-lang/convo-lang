@@ -9,6 +9,15 @@ export type ConvoEditorMode='code'|'vars'|'flat'|'tree'|'model';
 
 export type ConvoPromptMediaPurpose='preview'|'prompt';
 
+/**
+ * true - enables markdown for assistant messages
+ * false - disables markdown for all messages
+ * assistant - enables markdown for assistant messages
+ * user - enables markdown for user messages
+ * all - enables markdown for all messages
+ */
+export type ConvoMarkdownEnableState=boolean|'user'|'assistant'|'all';
+
 export interface ConvoPromptMedia
 {
     url?:string;
@@ -70,6 +79,10 @@ export type ConvoComponentRenderFunction=(
 
 export interface ConvoComponentRendererWithOptions
 {
+    /**
+     * Convo script to be injected into the prompt the component is being used with
+     */
+    convo?:string;
     doNotRenderInRow?:boolean;
     render:ConvoComponentRenderFunction;
 }

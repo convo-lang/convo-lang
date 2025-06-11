@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, dump, dupDeleteUndefined, getValueByPath, parseXml, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseXml, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -129,6 +129,8 @@ export const convoFunctions={
 
     getVar:'getVar',
 
+    setVar:'setVar',
+
     idx:'idx',
 
     describeScene:'describeScene',
@@ -144,6 +146,16 @@ export const convoFunctions={
      * Returns an XML list of agents available to the current conversation.
      */
     getAgentList:'getAgentList',
+
+    /**
+     * Explicitly enables a transform by name
+     */
+    enableTransform:'enableTransform',
+
+    /**
+     * Explicitly enables all transforms
+     */
+    enableAllTransforms:'enableAllTransforms',
 } as const;
 
 /**
@@ -276,9 +288,11 @@ export const convoVars={
     __forms:'__forms',
 
     /**
-     * Array of ConvoComponentDef
+     * Array of transforms names that have explicity been enabled. Transforms are enabled by default
+     * unless they have the `transformOptional` tag applied. Adding "all" to the list will explicity
+     * enable all components.
      */
-    __components:'__components',
+    __explicitlyEnabledTransforms:'__explicitlyEnabledTransforms',
 
 } as const;
 
@@ -659,6 +673,11 @@ export const convoTags={
     transformHideSource:'transformHideSource',
 
     /**
+     * Overrides `transformHideSource` and `transformRemoveSource`
+     */
+    transformKeepSource:'transformKeepSource',
+
+    /**
      * If present on a transform message the source message processed will not be added to the
      * conversation
      */
@@ -729,12 +748,27 @@ export const convoTags={
      */
     transformFilter:'transformFilter',
 
-
+    /**
+     * If applied to a transform message the transform must be explicity enabled applying the `enableTransform`
+     * tag to another message or calling the enableTransform function.
+     */
+    transformOptional:'transformOptional',
 
     /**
      * Applied to transform output messages when overwritten by a transform with a higher priority
      */
     overwrittenByTransform:'overwrittenByTransform',
+
+    /**
+     * Explicitly enables a transform. Transforms are enabled by default unless the transform has
+     * the `transformOptional` tag applied.
+     */
+    enableTransform:'enableTransform',
+
+    /**
+     * Defines a component to render a function result
+     */
+    renderer:'renderer'
 
 } as const;
 
@@ -790,8 +824,11 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.uuid,
     convoFunctions.shortUuid,
     convoFunctions.getVar,
+    convoFunctions.setVar,
     convoFunctions.idx,
     convoFunctions.setDefault,
+    convoFunctions.enableTransform,
+    convoFunctions.enableAllTransforms,
     'setObjDefaults',
     'is',
     'and',
@@ -1119,6 +1156,11 @@ export const getConvoMetadata=(value:any):ConvoMetadata|undefined=>{
     return value?.[convoMetadataKey];
 }
 
+export const getConvoStructPropertyCount=(value:any):number=>{
+    const metadata=getConvoMetadata(value);
+    return metadata?.properties?getObjKeyCount(metadata.properties):0;
+}
+
 export const convoLabeledScopeParamsToObj=(
     scope:ConvoScope
 ):Record<string,any>=>{
@@ -1218,6 +1260,10 @@ export interface EscapeConvoMessageContentOptions
 
 export const escapeConvo=(content:string|null|undefined,isStartOfMessage=true,options?:EscapeConvoMessageContentOptions):string=>{
     // todo escape tags at end of message
+
+    if(typeof content !== 'string'){
+        content=''+content;
+    }
 
     if(!content){
         return '';
@@ -2124,11 +2170,10 @@ export const parseConvoComponentTransform=(value:string|null|undefined):ParseCon
     }
     const hasGroup=m[4]?true:false;
     const ni=hasGroup?2:1;
-    return dump({
+    return {
         componentName:m[ni]??'',
-        propType:m[ni+2]??'',
-        groupName:(hasGroup?m[1]:undefined)||undefined,
+        propType:m[hasGroup?ni+2:2]??'',
+        groupName:(hasGroup?m[1]:m[ni])||undefined,
         condition:m[6]?.trim()||undefined,
-    },'parsed transform',value);
-
+    }
 }

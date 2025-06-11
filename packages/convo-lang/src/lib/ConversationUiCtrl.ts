@@ -583,6 +583,14 @@ export class ConversationUiCtrl
         return cmdReg.test(message);
     }
 
+    public appendDefineVars(vars:Record<string,any>){
+        return this.convo?.appendDefineVars(vars);
+    }
+
+    public appendDefineVar(name:string,value:any){
+        return this.convo?.appendDefineVar(name,value);
+    }
+
     public async appendUiMessageAsync(message:string):Promise<boolean|'command'>{
 
         if(this.isDisposed){

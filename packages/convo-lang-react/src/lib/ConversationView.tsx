@@ -1,4 +1,4 @@
-import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps, deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
@@ -36,6 +36,7 @@ export interface ConversationViewProps
     codeInputAutoScrollBehavior?:ScrollBehavior;
     messageBottomPadding?:string;
     httpEndpoint?:string;
+    templatePrefix?:string;
     template?:string;
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
     autoHeight?:boolean;
@@ -45,7 +46,8 @@ export interface ConversationViewProps
     componentRenderers?:Record<string,ConvoComponentRenderer>;
     enabledInitMessage?:boolean;
     onVarsChange?:(vars:Record<string,any>)=>void;
-    enableMarkdown?:boolean;
+    enableMarkdown?:ConvoMarkdownEnableState;
+    enableUserMarkdown?:boolean;
     markdownClassName?:string;
 }
 
@@ -72,6 +74,7 @@ export function ConversationView({
     codeInputAutoScrollBehavior,
     messageBottomPadding,
     httpEndpoint,
+    templatePrefix,
     template,
     appendTrigger,
     beforeCreateExeCtx,
@@ -86,18 +89,38 @@ export function ConversationView({
     markdownClassName,
 }:ConversationViewProps){
 
+    const compConvoAry:string[]=[];
+    if(componentRenderers){
+        const names=Object.keys(componentRenderers);
+        names.sort((a,b)=>a.localeCompare(b));
+        for(const name of names){
+            const r=componentRenderers[name];
+            if(!r || (typeof r !== 'object')){
+                continue;
+            }
+            if(r.convo){
+                compConvoAry.push(r.convo);
+            }
+        }
+    }
+    const compConvo=compConvoAry.join('\n\n');
+
     const ctxCtrl=useContext(ConversationUiContext);
     const defaultCtrl=ctrlProp??ctxCtrl;
     const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl({
         ...ctrlOptions,
-        template:template??ctrlOptions?.template,
+        template:(
+            (templatePrefix?templatePrefix+'\n\n':'')+
+            (compConvo?compConvo+'\n\n':'')+
+            (template??ctrlOptions?.template)
+        ),
         convoOptions:{
             ...ctrlOptions?.convoOptions,
             completionService:httpEndpoint?(
                 new HttpConvoCompletionService({endpoint:httpEndpoint})
             ):ctrlOptions?.convoOptions?.completionService
         }
-    }),[defaultCtrl,ctrlOptions,httpEndpoint,template]);
+    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){

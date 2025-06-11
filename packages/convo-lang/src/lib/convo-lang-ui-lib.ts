@@ -1,5 +1,5 @@
 import { parseXml } from "@iyio/common";
-import { ConvoMessageComponent, ConvoPromptMedia, ConvoPromptMediaPurpose, convoPromptImagePropKey } from "./convo-lang-ui-types";
+import { ConvoMarkdownEnableState, ConvoMessageComponent, ConvoPromptMedia, ConvoPromptMediaPurpose, convoPromptImagePropKey } from "./convo-lang-ui-types";
 
 export const getConvoPromptMediaUrl=(img:string|ConvoPromptMedia|null|undefined,purpose:ConvoPromptMediaPurpose):string|undefined=>{
     if(typeof img === 'string'){
@@ -25,5 +25,18 @@ export const parseConvoMessageComponents=(content:string,defaultComponentName?:s
         }]
     }else{
         return parseXml(content,{parseJsonAtts:true}).result;
+    }
+}
+
+export const isMdConvoEnabledFor=(role:'user'|'assistant'|'all',state:ConvoMarkdownEnableState):boolean=>{
+    if(state==='all'){
+        return true;
+    }
+    if(state===true || state==='assistant'){
+        return role==='assistant';
+    }else if(state==='user'){
+        return role==='user';
+    }else{
+        return false;
     }
 }
