@@ -71,10 +71,12 @@
     "dependencies": {
         "@iyio/at-dot-css": "^0.7.22",
         "@iyio/common": "^0.7.22",
+        "@iyio/json5": "^0.7.22",
         "@iyio/media-common": "^0.7.22",
         "@iyio/nextjs-common": "^0.7.22",
         "@iyio/node-common": "^0.7.22",
         "@iyio/nx-common": "^0.7.22",
+        "@iyio/pdf-viewer": "^0.7.22",
         "@iyio/react-common": "^0.7.22",
         "@iyio/syn-taxi": "^0.7.22",
         "@iyio/tmpl-common": "^0.7.22",
