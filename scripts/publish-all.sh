@@ -7,6 +7,9 @@ cd ".."
 
 
 # scripts/clear-nx-cache.sh
+# scripts/set-verions.sh
+
+# scripts/clear-nx-cache.sh
 
 # scripts/build-all.sh
 
