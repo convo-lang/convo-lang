@@ -624,6 +624,11 @@ export class ConversationUiCtrl
                     this.editorMode='flat';
                     break;
 
+                case '/text':
+                    this.showSource=this.editorMode==='text'?!this.showSource:true;
+                    this.editorMode='text';
+                    break;
+
                 case '/tree':
                     this.showSource=this.editorMode==='tree'?!this.showSource:true;
                     this.editorMode='tree';
@@ -705,6 +710,7 @@ export class ConversationUiCtrl
 /source     - Display convo script source
 /ui         - Display convo chat conversation ui
 /flat       - Display the convo as flat messages
+/text       - Display as convo script with all text content evaluated
 /vars       - Display all defined user variables
 /tree       - Displays the syntax tree
 /system     - Display system messages

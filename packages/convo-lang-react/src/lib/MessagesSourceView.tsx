@@ -1,7 +1,7 @@
 
 import { LazyCodeInput } from "@iyio/syn-taxi";
 
-import { ConversationUiCtrl, ConvoEditorMode, parseConvoCode } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoEditorMode, escapeConvoTagValue, parseConvoCode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { createJsonRefReplacer } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
@@ -31,7 +31,7 @@ export function MessagesSourceView({
 
     const convo=useConversation(_ctrl);
 
-    const flatConvo=useSubject((mode==='vars' || mode==='flat' || mode==='model')?convo?.flatSubject:undefined);
+    const flatConvo=useSubject((mode==='vars' || mode==='flat' || mode==='text' || mode==='model')?convo?.flatSubject:undefined);
 
     const theme=useConversationTheme(_ctrl);
 
@@ -69,7 +69,7 @@ export function MessagesSourceView({
         <LazyCodeInput
             lineNumbers
             fillScrollHeight
-            language={mode==='code'?'convo':'json'}
+            language={mode==='code' || mode==='text'?'convo':'json'}
             value={
                 mode==='vars'?
                     JSON.stringify(flatConvo?.exe.getUserSharedVars()??{},createJsonRefReplacer(),4)
@@ -79,6 +79,20 @@ export function MessagesSourceView({
                     JSON.stringify(convo?.messages??[],null,4)
                 :mode==='model'?
                     (flatConvo?(convo?.toModelFormatStr(flatConvo)??''):'')
+                :mode==='text'?
+                    (flatConvo?.messages.map(m=>{
+                        if(m.content===undefined){
+                            return null
+                        }
+                        let tagContent='';
+                        if(m.tags){
+                            for(const name in m.tags){
+                                const v=m.tags[name];
+                                tagContent+=`@${name}${v?` ${escapeConvoTagValue(v)}`:''}\n`
+                            }
+                        }
+                        return `${tagContent}> ${m.role}\n${m.content}`;
+                    }).filter(m=>m).join('\n\n')??'')
                 :
                     code
             }
