@@ -200,9 +200,6 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         });
         await Promise.all(convoFiles.map(file=>scanConvoFileAsync(file,project)));
 
-        console.log('hio 👋 👋 👋 CONVO FILES',convoFiles);
-
-
         const convoHash=strHashBase64(project.mods.map(m=>m.hashSrc).join('>'));
 
 
@@ -211,9 +208,16 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         }
         if(convoHash!==project.convoHash){
             project.convoHash=convoHash;
+            const prefix='@/';
+            const info=(
+                `export const convoPackagePaths=${JSON.stringify(project.mods.map(m=>prefix+m.name),null,4)} as const;${
+                '\n'}export type ConvoPackagePath=(typeof convoPackagePaths[number])|(string & {});`
+            )
+            const infoPath=joinPaths(project.out,'convoPackage.ts');
             const tsPath=joinPaths(project.out,'convoPackageModules.ts');
             const tsxPath=joinPaths(project.out,'convoPackageComponentModules.tsx');
             await Promise.all([
+                writeFile(infoPath,info),
                 writeFile(tsPath,modsToString(project.mods.filter(m=>!m.components),'convoPackageModules','@/')),
                 writeFile(tsxPath,modsToString(project.mods.filter(m=>m.components),'convoPackageComponentModules','@/')),
             ]);
@@ -403,10 +407,6 @@ const scanConvoFileAsync=async (fullPath:string,project:ProjectCtx)=>{
     const content=await readFileAsStringAsync(fullPath);
 
     let relPath=relative(project.fullPath,fullPath);
-    const i=relPath.lastIndexOf('.');
-    if(i!==-1){
-        relPath=relPath.substring(0,i);
-    }
 
     const mod:Mod={
         name:relPath,
@@ -468,12 +468,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
         return;
     }
 
-    let relPath:string=file.getFilePath();
-    relPath=relative(project.fullPath,relPath);
-    const i=relPath.lastIndexOf('.');
-    if(i!==-1){
-        relPath=relPath.substring(0,i);
-    }
+    const relPath=relative(project.fullPath,file.getFilePath());
 
     const mod:Mod={
         name:relPath,

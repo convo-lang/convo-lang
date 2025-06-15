@@ -55,6 +55,8 @@ export interface ConversationViewProps
      */
     modules?:ConvoModule[];
     modulesRefreshKey?:string|number;
+
+    imports?:string|string[];
 }
 
 export function ConversationView({
@@ -95,10 +97,12 @@ export function ConversationView({
     markdownClassName,
     modules,
     modulesRefreshKey,
+    imports
 }:ConversationViewProps){
 
     const refs=useRef({modules});
     refs.current.modules=modules;
+    const importStr=Array.isArray(imports)?imports.join(';'):imports;
 
     const compConvoAry:string[]=[];
     if(componentRenderers){
@@ -122,6 +126,7 @@ export function ConversationView({
         ...ctrlOptions,
         template:(
             (templatePrefix?templatePrefix+'\n\n':'')+
+            (importStr?importStr.split(';').map(i=>`@import ${i}`).join('\n')+'\n\n':'')+
             (compConvo?compConvo+'\n\n':'')+
             (template??ctrlOptions?.template)
         ),
@@ -135,7 +140,7 @@ export function ConversationView({
                 new HttpConvoCompletionService({endpoint:httpEndpoint})
             ):ctrlOptions?.convoOptions?.completionService
         }
-    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey]);
+    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){
