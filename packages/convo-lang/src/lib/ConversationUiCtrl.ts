@@ -611,9 +611,9 @@ export class ConversationUiCtrl
                     this.editorMode='code';
                     break;
 
-                case '/source-x':
-                    this.showSource=this.editorMode==='code-extended'?!this.showSource:true;
-                    this.editorMode='code-extended';
+                case '/imports ':
+                    this.showSource=this.editorMode==='imports'?!this.showSource:true;
+                    this.editorMode='imports';
                     break;
 
                 case '/modules':
@@ -719,8 +719,8 @@ export class ConversationUiCtrl
     {
         this.convo?.appendAssistantMessage(/*convo*/`
 /source     - Display convo script source
-/source-x   - Display convo script source and imported sources
-/modules    - Display registered modules
+/imports    - Display convo script source and imported modules
+/modules    - Display convo script source and registered modules
 /ui         - Display convo chat conversation ui
 /flat       - Display the convo as flat messages
 /text       - Display as convo script with all text content evaluated

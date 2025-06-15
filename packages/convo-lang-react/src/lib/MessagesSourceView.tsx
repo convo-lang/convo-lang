@@ -69,7 +69,7 @@ export function MessagesSourceView({
         <LazyCodeInput
             lineNumbers
             fillScrollHeight
-            language={mode==='code' || mode==='code-extended' || mode==='modules' || mode==='text'?'convo':'json'}
+            language={mode==='code' || mode==='imports' || mode==='modules' || mode==='text'?'convo':'json'}
             value={
                 mode==='vars'?
                     JSON.stringify(flatConvo?.exe.getUserSharedVars()??{},createJsonRefReplacer(),4)
@@ -93,7 +93,7 @@ export function MessagesSourceView({
                         }
                         return `${tagContent}> ${m.role}\n${m.content}`;
                     }).filter(m=>m).join('\n\n')??'')
-                :mode==='code-extended'?
+                :mode==='imports'?
                     `${convo?.getDebuggingImportCode()}\n\n> define\n${getConvoDebugLabelComment('source')}\n\n${code}`
                 :mode==='modules'?
                     (convo?.getDebuggingModulesCode()??'')

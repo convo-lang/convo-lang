@@ -5,7 +5,7 @@ export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
 
 /**
  * code - Show full code of conversation
- * code-extended - Show full code plus imports of conversation
+ * imports - Show full code plus imports of conversation
  * modules - Show registered modules
  * vars - Show evaluated variable values
  * flat - Show flat json structure
@@ -13,7 +13,7 @@ export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
  * tree - Show syntax tree
  * model - Show JSON model that will be sent to LLM
  */
-export type ConvoEditorMode='code'|'code-extended'|'modules'|'vars'|'flat'|'text'|'tree'|'model';
+export type ConvoEditorMode='code'|'imports'|'modules'|'vars'|'flat'|'text'|'tree'|'model';
 
 export type ConvoPromptMediaPurpose='preview'|'prompt';
 
