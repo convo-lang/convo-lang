@@ -41,6 +41,50 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
 
+## Quick Start with NextJS
+You can use the `npx convo --create-next-app` command to quickly get started building AI Agents powered
+by Convo-Lang in a NextJS project
+
+**Step 1:** Create project using convo CLI
+``` sh
+npx convo --create-next-app
+```
+
+**Step 1:** Open newly created project in VSCode or your favorite editor
+``` sh
+# Open project directory
+cd {NEWLY_CREATED_PROJECT_NAME}
+
+# Open Code Editor
+code .
+# -or-
+vim .
+# -or-
+# Use GUI
+```
+
+**Step 3:** Copy example env file to `.env.development` 
+``` sh
+cp example.env.development .env.development
+```
+
+**Step 4:** Add your OpenAI API key to `.env.development` 
+``` conf
+OPENAI_API_KEY={YOUR_OPEN_AI_API_KEY}
+```
+
+**Step 5:** Start the NextJS server
+``` sh
+npm run dev
+```
+
+**Step 6:** Start modifying example agent prompts in any of the example pages
+- pages/index.tsx: Routing agent that opens requested agent
+- pages/agent/todo-list.tsx: Todo list agent that can manage a todo list
+- pages/agent/video-dude.tsx: A video player agent that plays the best YouTube videos
+- pages/agent/weather.tsx: A weather man agent that can tell you the weather anywhere in the world
+
+
 ## VSCode extension
 You will also probably want to install the vscode extension for syntax highlighting and other
 developer niceties. You can install the vscode extension by searching for "convo-lang" in the
@@ -156,7 +200,9 @@ https://github.com/convo-lang/convo-lang-node-example
 
 
 
-## Using convo-lang in a NextJs project
+## Using convo-lang in a existing NextJs project
+Follow the step below to you Convo-Lang in an existing NextJS project
+
 
 Install packages:
 ``` sh
@@ -187,7 +233,7 @@ export default handler;
 
 ```
 
-The code below create a fully functional chat interface with a website assistant agent
+The code below creates a fully functional chat interface with a website assistant agent
 ``` tsx
 import { ConversationView } from "@convo-lang/convo-lang-react";
 import { NextJsBaseLayoutView } from "@iyio/nextjs-common";
