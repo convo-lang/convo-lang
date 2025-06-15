@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoMessageComponent, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, isMdConvoEnabledFor, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, isMdConvoEnabledFor, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
 import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
@@ -170,11 +170,11 @@ const renderMessage=(
             let callRendered=callRenderer?.(m,flat,ctrl);
             if(callRendered===undefined || callRendered===null){
                 const compName=flat.messages.find(fm=>fm.fn && fm.fn.name===m.called?.name && !fm.called)?.tags?.[convoTags.renderer];
-                const compRenderer=compName?ctrl.componentRenderers[compName]:undefined;
+                const compRenderer=compName?ctrl.componentRenderers[compName]??ctrl.convo?.components[compName]?.renderer:undefined;
                 if(!compRenderer){
                     return null;
                 }
-                const ctx:ConvoComponentRendererContext={
+                const ctx:ConvoComponentRendererContext={// todo - merge with component renderer above, MAYBE?
                     id:i+'comp',
                     ctrl,
                     convo:flat.conversation,
@@ -186,7 +186,7 @@ const renderMessage=(
                     rowClassName,
                 }
 
-                const comp:ConvoMessageComponent={
+                const comp:ConvoComponent={
                     name:'renderer',
                     isJson:true,
                     atts:{message:m,args:m.calledParams,returnValue:m.calledReturn},

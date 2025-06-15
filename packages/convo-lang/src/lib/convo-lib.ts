@@ -1,10 +1,10 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseXml, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoComponent, ConvoComponentMode, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoComponentMode } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -769,6 +769,45 @@ export const convoTags={
      * Defines a component to render a function result
      */
     renderer:'renderer'
+
+} as const;
+
+/**
+ * JSDoc tags can be used in combination with the Convo-Lang CLI to import types, components and
+ * functions from TypeScript.
+ */
+export const convoJsDocTags={
+    /**
+     * Marks a function or class as a convo component
+     */
+    convoComponent:'convoComponent',
+
+    /**
+     * When used with a component the source message that gets transform into the component should be
+     * kept visible in the conversation
+     */
+    convoKeepSource:'convoKeepSource',
+
+    /**
+     * Used to ignore properties in a type
+     */
+    convoIgnore:'convoIgnore',
+
+    /**
+     * Marks a interface or type as a type to define in convo
+     */
+    convoType:'convoType',
+
+    /**
+     * Marks a function as a function to define in convo
+     */
+    convoFn:'convoFn',
+
+    /**
+     * Used with the convoFn tag to mark a function as local. When a function is local it is not
+     * exposed to the LLM but can be called from convo scripts.
+     */
+    convoLocal:'convoLocal'
 
 } as const;
 
@@ -1733,66 +1772,6 @@ export const isConvoThreadFilterMatch=(filter:ConvoThreadFilter,tid:string|undef
     }
 }
 
-/**
- * Finds the component type of a message.
- */
-export const getConvoMessageComponentMode=(content:string|null|undefined):ConvoComponentMode|undefined=>{
-    const types=(content?/^\s*```([^\n]*).*```\s*$/s.exec(content):null)?.[1]?.trim().split(' ');
-    if(!types){
-        return undefined;
-    }
-    const last=types[types.length-1];
-    return isConvoComponentMode(last)?last:undefined;
-}
-
-const convoComponentCacheKey=Symbol('convoComponentCacheKey');
-
-/**
- * Parses message content as a convo component. Components are written in xml.
- * @param content string content to parse
- */
-export const parseConvoComponent=(content:string|null|undefined):ConvoComponent|undefined=>{
-
-    if(!content){
-        return undefined;
-    }
-
-    const codeBlockMatch=/^\s*```[^\n]*(.*)```\s*$/s.exec(content);
-    if(codeBlockMatch?.[1]){
-        content=codeBlockMatch[1];
-    }
-
-    const xml=parseXml(content,{parseJsonAtts:true,stopOnFirstNode:true});
-
-    if(xml.error){
-        console.error('convo component parsing failed',xml.error);
-    }
-
-    return xml.result?.[0];
-
-
-
-}
-/**
- * Parses message content as a convo component. Components are written in xml. The parsed component
- * is cached and stored on the message using a private symbol.
- * @param msg The message to parse
- */
-export const getConvoMessageComponent=(msg:FlatConvoMessage|null|undefined):ConvoComponent|undefined=>{
-    if(!msg?.content){
-        return undefined;
-    }
-    const cached=(msg as any)[convoComponentCacheKey];
-    if(cached){
-        return cached;
-    }
-
-    const comp=parseConvoComponent(msg.content);
-    if(comp){
-        (msg as any)[convoComponentCacheKey]=comp;
-    }
-    return comp;
-}
 
 export const mergeConvoOptions=(source:ConversationOptions|null|undefined,...overrides:(ConversationOptions|null|undefined)[]):ConversationOptions=>{
     if(!overrides?.length){
@@ -2148,32 +2127,10 @@ export const evalConvoTransformCondition=(transformContent:string,condition:stri
     }
 }
 
-const transformComponentReg=/^(\w+)\s+(\w+)(\s+(\w+))?(\s+\?\s*(!?\s*.*))?$/;
-export interface ParseConvoComponentTransformResult
-{
-    componentName:string;
-    propType:string;
-    groupName?:string;
-    condition?:string;
-}
-/**
- * Parses the value of the `transformComponent` tag
- * @param value [groupName] {componentName} {propType} [?[!] condition]
- */
-export const parseConvoComponentTransform=(value:string|null|undefined):ParseConvoComponentTransformResult|undefined=>{
-    if(!value){
-        return undefined;
-    }
-    const m=transformComponentReg.exec(value);
-    if(!m){
-        return undefined;
-    }
-    const hasGroup=m[4]?true:false;
-    const ni=hasGroup?2:1;
-    return {
-        componentName:m[ni]??'',
-        propType:m[hasGroup?ni+2:2]??'',
-        groupName:(hasGroup?m[1]:m[ni])||undefined,
-        condition:m[6]?.trim()||undefined,
-    }
+export const getConvoDebugLabelComment=(label:string)=>{
+    label=label.replace(/[\s\n\r]+/g,' ');
+    const pad='///////////////////';
+    const l=label.length+2;
+    const gap='/'.repeat(l);
+    return `  ${pad}${gap}${pad}\n ${pad} ${label} ${pad}\n${pad}${gap}${pad}`
 }

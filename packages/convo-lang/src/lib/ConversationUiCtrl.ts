@@ -3,8 +3,9 @@ import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
+import { ConvoComponentRenderer } from "./convo-component-types";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
-import { ConvoComponentRenderer, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
+import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
 import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
 import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types";
 
@@ -610,6 +611,16 @@ export class ConversationUiCtrl
                     this.editorMode='code';
                     break;
 
+                case '/source-x':
+                    this.showSource=this.editorMode==='code-extended'?!this.showSource:true;
+                    this.editorMode='code-extended';
+                    break;
+
+                case '/modules':
+                    this.showSource=this.editorMode==='modules'?!this.showSource:true;
+                    this.editorMode='modules';
+                    break;
+
                 case '/ui':
                     this.showSource=false;
                     break;
@@ -708,6 +719,8 @@ export class ConversationUiCtrl
     {
         this.convo?.appendAssistantMessage(/*convo*/`
 /source     - Display convo script source
+/source-x   - Display convo script source and imported sources
+/modules    - Display registered modules
 /ui         - Display convo chat conversation ui
 /flat       - Display the convo as flat messages
 /text       - Display as convo script with all text content evaluated

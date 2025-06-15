@@ -3,8 +3,9 @@ import { ZodEnum, ZodObject, z } from 'zod';
 import { CallbackConvoCompletionService } from './CallbackConvoCompletionService';
 import { Conversation } from "./Conversation";
 import { ConvoError } from './ConvoError';
+import { ConvoComponent } from './convo-component-types';
 import { getConvoMetadata } from './convo-lib';
-import { ConvoComponent, ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
+import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
 
 describe('convo',()=>{
 

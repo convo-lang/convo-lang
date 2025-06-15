@@ -1,8 +1,8 @@
-import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps, deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
-import { useContext, useEffect, useMemo } from "react";
+import { useContext, useEffect, useMemo, useRef } from "react";
 import { Subscription } from 'rxjs';
 import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
@@ -49,6 +49,12 @@ export interface ConversationViewProps
     enableMarkdown?:ConvoMarkdownEnableState;
     enableUserMarkdown?:boolean;
     markdownClassName?:string;
+    /**
+     * Modules to register with conversation. The value of modules is cached and must be refreshed
+     * using the modulesRefreshKey for changes to be reflected
+     */
+    modules?:ConvoModule[];
+    modulesRefreshKey?:string|number;
 }
 
 export function ConversationView({
@@ -87,7 +93,12 @@ export function ConversationView({
     onVarsChange,
     enableMarkdown,
     markdownClassName,
+    modules,
+    modulesRefreshKey,
 }:ConversationViewProps){
+
+    const refs=useRef({modules});
+    refs.current.modules=modules;
 
     const compConvoAry:string[]=[];
     if(componentRenderers){
@@ -116,11 +127,15 @@ export function ConversationView({
         ),
         convoOptions:{
             ...ctrlOptions?.convoOptions,
+            modules:[
+                ...(ctrlOptions?.convoOptions?.modules??[]),
+                ...(refs.current.modules??[]),
+            ],
             completionService:httpEndpoint?(
                 new HttpConvoCompletionService({endpoint:httpEndpoint})
             ):ctrlOptions?.convoOptions?.completionService
         }
-    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix]);
+    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){

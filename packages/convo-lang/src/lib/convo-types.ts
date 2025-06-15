@@ -1,8 +1,8 @@
-import { CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress, XmlNode } from '@iyio/common';
-import { BehaviorSubject } from 'rxjs';
+import { AnyFunction, CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress } from '@iyio/common';
 import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
 import type { ConvoExecutionContext } from './ConvoExecutionContext';
+import { ConvoComponentDef } from './convo-component-types';
 
 export type ConvoMessageType='text'|'function';
 
@@ -1233,55 +1233,51 @@ export interface ConvoImport
     ignoreContent:boolean;
 }
 
-export interface ConvoImportResult
+export interface ConvoModule
 {
     name:string;
+
+    /**
+     * Source URI where the module was imported from
+     */
+    uri?:string;
+
     /**
      * Convo to be inserted before the import
      */
     convo?:string;
 
-
     /**
      * A type or set of types that will be converted to a convo type and imported
      */
     type?:ConvoTypeDef|ConvoTypeDef[];
+
+    /**
+     * Zod schemes that map to type defined in the convo property
+     */
+    typeSchemes?:Record<string,ZodType>;
+
+    /**
+     * extern functions to be added to the conversation
+     */
+    externFunctions?:Record<string,AnyFunction>;
+
+    /**
+     * extern functions to be added to the conversation
+     */
+    externScopeFunctions?:Record<string,ConvoScopeFunction>;
+
+    functionParamSchemes?:Record<string,ZodType[]>;
+
+    /**
+     * components to be added to the conversation
+     */
+    components?:Record<string,ConvoComponentDef>;
 }
 
-export type ConvoImportHandler=(_import:ConvoImport)=>ConvoImportResult|null|undefined|Promise<ConvoImportResult|null|undefined>;
+export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|null|undefined|Promise<ConvoModule|ConvoModule[]|null|undefined>;
 
-export interface ConvoComponentMessageState
-{
-    last?:FlatConvoMessage;
-    all:FlatConvoMessage[];
-    flat:FlatConvoConversation;
-    convo:Conversation;
-}
 
-export type ConvoComponentMessagesCallback=((state:ConvoComponentMessageState)=>void)|BehaviorSubject<ConvoComponentMessageState|null>;
-
-export interface ConvoComponentCompletionCtx
-{
-    message:FlatConvoMessage;
-    flat:FlatConvoConversation;
-    convo:Conversation;
-    component:ConvoComponent;
-    submit:(submission:ConvoComponentSubmission)=>void;
-}
-export type ConvoComponentCompletionHandler=(ctx:ConvoComponentCompletionCtx)=>void;
-
-export interface ConvoComponentSubmission
-{
-    data?:any;
-    messages?:ConvoCompletionMessage[];
-}
-
-export interface ConvoComponentSubmissionWithIndex extends ConvoComponentSubmission
-{
-    componentIndex:number;
-}
-
-export type ConvoComponent=XmlNode;
 
 export interface ConvoParsingOptions extends CodeParsingOptions
 {

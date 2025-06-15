@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConvoComponentRenderFunction, ConvoComponentRendererContext, ConvoComponentRendererWithOptions, ConvoMessageComponent, FlatConvoMessage, convoTags, parseConvoMessageComponents } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponent, ConvoComponentRenderFunction, ConvoComponentRendererContext, ConvoComponentRendererWithOptions, FlatConvoMessage, convoTags, parseConvoMessageComponents } from "@convo-lang/convo-lang";
 import { objectToMarkdown } from "@iyio/common";
 import { useSubject } from "@iyio/react-common";
 import { Fragment, useMemo } from "react";
@@ -47,7 +47,7 @@ export function MessageComponentRenderer({
     const id=ctx?.id??'_';
 
     const defaultComponentName=message?.tags?.[convoTags.component];
-    const components=useMemo<ConvoMessageComponent[]|undefined>(()=>{
+    const components=useMemo<ConvoComponent[]|undefined>(()=>{
         return content?parseConvoMessageComponents(content,defaultComponentName):undefined;
     },[content,defaultComponentName]);
 
@@ -58,7 +58,7 @@ export function MessageComponentRenderer({
     return (
         <>
             {components?.map((c,i)=>{
-                const renderer=ctx.ctrl.componentRenderers[c.name];
+                const renderer=ctx.ctrl.componentRenderers[c.name]??ctx.ctrl.convo?.components[c.name]?.renderer;
                 let fn:ConvoComponentRenderFunction|undefined;
                 let options:ConvoComponentRendererWithOptions|undefined;
                 if(typeof renderer === 'function'){

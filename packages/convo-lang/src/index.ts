@@ -18,6 +18,8 @@ export * from './lib/ConvoUserVfsCache';
 export * from './lib/ConvoVfsCache';
 export * from './lib/HttpConvoCompletionService';
 export * from './lib/LocalStorageConvoDataStore';
+export * from './lib/convo-component-lib';
+export * from './lib/convo-component-types';
 export * from './lib/convo-default-models';
 export * from './lib/convo-default-vars';
 export * from './lib/convo-forms-lib';

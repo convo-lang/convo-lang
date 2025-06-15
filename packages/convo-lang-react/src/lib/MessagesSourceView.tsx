@@ -1,7 +1,7 @@
 
 import { LazyCodeInput } from "@iyio/syn-taxi";
 
-import { ConversationUiCtrl, ConvoEditorMode, escapeConvoTagValue, parseConvoCode } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoEditorMode, escapeConvoTagValue, getConvoDebugLabelComment, parseConvoCode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { createJsonRefReplacer } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
@@ -69,7 +69,7 @@ export function MessagesSourceView({
         <LazyCodeInput
             lineNumbers
             fillScrollHeight
-            language={mode==='code' || mode==='text'?'convo':'json'}
+            language={mode==='code' || mode==='code-extended' || mode==='modules' || mode==='text'?'convo':'json'}
             value={
                 mode==='vars'?
                     JSON.stringify(flatConvo?.exe.getUserSharedVars()??{},createJsonRefReplacer(),4)
@@ -93,6 +93,10 @@ export function MessagesSourceView({
                         }
                         return `${tagContent}> ${m.role}\n${m.content}`;
                     }).filter(m=>m).join('\n\n')??'')
+                :mode==='code-extended'?
+                    `${convo?.getDebuggingImportCode()}\n\n> define\n${getConvoDebugLabelComment('source')}\n\n${code}`
+                :mode==='modules'?
+                    (convo?.getDebuggingModulesCode()??'')
                 :
                     code
             }

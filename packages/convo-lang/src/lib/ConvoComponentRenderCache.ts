@@ -1,5 +1,7 @@
-import { parseConvoComponent } from "./convo-lib";
-import { ConvoComponent, FlatConvoMessage } from "./convo-types";
+import { parseConvoComponent } from "./convo-component-lib";
+import { ConvoComponent } from "./convo-component-types";
+import { FlatConvoMessage } from "./convo-types";
+
 
 export class ConvoComponentRenderCache
 {

@@ -1,17 +1,19 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getObjKeyCount, isClassInstanceObject, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
+import { getConvoMessageComponent } from "./convo-component-lib";
+import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoMessageComponent, getConvoStructPropertyCount, getConvoTag, getFlatConvoTag, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoTag, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -140,6 +142,14 @@ export interface ConversationOptions
     externFunctions?:Record<string,AnyFunction>;
 
     externScopeFunctions?:Record<string,ConvoScopeFunction>;
+
+    components?:Record<string,ConvoComponentDef>;
+
+    /**
+     * Array of modules that can be imported. The modules are not automatically imported, they have
+     * to be imported to take effect.
+     */
+    modules?:ConvoModule[];
 
     /**
      * Called each time the conversation is flattened allowing dynamic messages to be inserted
@@ -282,6 +292,14 @@ export class Conversation
 
     public readonly externFunctions:Record<string,ConvoScopeFunction>={};
 
+    public readonly components:Record<string,ConvoComponentDef>;
+
+    /**
+     * Array of modules that can be imported. The modules are not automatically imported, they have
+     * to be imported to take effect.
+     */
+    public readonly modules:ConvoModule[];
+
     /**
      * The default capabilities of the conversation. Additional capabilities can be enabled by
      * the first and last message of the conversation as long a disableMessageCapabilities is not
@@ -379,6 +397,7 @@ export class Conversation
             onComponentMessages,
             componentCompletionCallback,
             externFunctions,
+            components,
             externScopeFunctions,
             getStartOfConversation,
             cache,
@@ -386,6 +405,7 @@ export class Conversation
             logFlatCached=false,
             usage=createEmptyConvoTokenUsage(),
             beforeCreateExeCtx,
+            modules,
         }=options;
         this.name=name;
         this.usage=usage;
@@ -443,6 +463,9 @@ export class Conversation
                 this.watchComponentMessages(onComponentMessages);
             }
         }
+
+        this.components={...components};
+        this.modules=modules?[...modules]:[];
 
         if(externFunctions){
             for(const e in externFunctions){
@@ -683,7 +706,9 @@ export class Conversation
             beforeCreateExeCtx:this.beforeCreateExeCtx,
             ...options,
             defaultVars:{...this.defaultVars,...options?.defaultVars},
-            externFunctions:{...this.externFunctions,...options?.externFunctions},
+            externScopeFunctions:{...this.externFunctions},
+            components:{...this.components},
+            modules:[...this.modules],
         }
     }
 
@@ -712,6 +737,10 @@ export class Conversation
             for(const agent of this.agents){
                 conversation.agents.push(agent);
             }
+        }
+
+        for(const name in this.importedModules){
+            conversation.importedModules[name]=this.importedModules[name] as ConvoModule;
         }
 
         conversation.appendMessageObject(messages,{disableAutoFlatten:true,appendCode:options?.cloneConvoString});
@@ -2433,6 +2462,9 @@ export class Conversation
 
     private importMessages:ConvoMessage[]=[];
 
+    /**
+     * Called when an import message is found
+     */
     private async loadImportsAsync(msg:ConvoMessage):Promise<void>
     {
         if(this.importMessages.includes(msg) || !msg.tags){
@@ -2474,24 +2506,102 @@ export class Conversation
             }
 
         }
-        const system=modifiers.includes(convoImportModifiers.system);
-        const ignoreContent=modifiers.includes(convoImportModifiers.ignoreContent);
+        if(!name){
+            throw new Error(`Invalid import - @import ${modifiers.join(' ')}`)
+        }
 
-        const result=await handler({
-            name,
-            modifiers,
-            system,
-            ignoreContent,
-        });
-        if(!result){
+        const imports:ConvoModule[]=[];
+
+        const reg=name.includes('*')?starStringToRegex(name):undefined;
+        for(const mod of this.modules){
+            if(reg?reg.test(mod.name):mod.name===name){
+                imports.push(mod);
+            }
+        }
+
+        if(!imports.length){
+            const system=modifiers.includes(convoImportModifiers.system);
+            const ignoreContent=modifiers.includes(convoImportModifiers.ignoreContent);
+
+            const result=await handler({
+                name,
+                modifiers,
+                system,
+                ignoreContent,
+            });
+            if(result){
+                if(Array.isArray(result)){
+                    imports.push(...result)
+                }else{
+                    imports.push(result);
+                }
+            }
+        }
+
+        if(!imports.length){
             throw new Error(`Convo import (${name}) not found`)
         }
-        let convo=result.convo??'';
 
-        if(result.type){
+        const messages:ConvoMessage[]=[];
+        for(const i of imports){
+            if(!this.importedModules[i.name]){
+                messages.push(...this.registerModule(i));
+            }
+        }
+        return messages;
+    }
+
+    public readonly importedModules:Record<string,ConvoModule>={};
+
+    private registerModule(module:ConvoModule,importStatement:ConvoImport={
+        name:module.name,
+        modifiers:[],
+        system:false,
+        ignoreContent:false,
+    },insertIndex?:number){
+
+        if(this.importedModules[module.name]){
+            throw new Error(`ConvoModule already registered by name - ${module.name}`);
+        }
+
+        this.importedModules[module.name]=module;
+
+        if(module.components){
+            for(const name in module.components){
+                const comp=module.components[name];
+                if(!comp){
+                    continue;
+                }
+                this.components[name]=comp;
+            }
+        }
+
+        if(module.externFunctions){
+            for(const name in module.externFunctions){
+                const fn=module.externFunctions[name];
+                if(!fn){
+                    continue;
+                }
+                this.implementExternFunction(name,fn);
+            }
+        }
+
+        if(module.externScopeFunctions){
+            for(const name in module.externFunctions){
+                const fn=module.externScopeFunctions[name];
+                if(!fn){
+                    continue;
+                }
+                this.externFunctions[name]=fn;
+            }
+        }
+
+        let convo=module.convo??'';
+
+        if(module.type){
             convo=(
                 '> define\n'+
-                asArray(result.type).map(t=>`${t.name} = ${schemeToConvoTypeString(t.type)}`).join('\n')+
+                asArray(module.type).map(t=>`${t.name} = ${schemeToConvoTypeString(t.type)}`).join('\n')+
                 '\n\n'+
                 convo
             );
@@ -2506,6 +2616,8 @@ export class Conversation
         if(r.error){
             throw r.error;
         }
+
+        const {system,ignoreContent}=importStatement;
 
         if(r.result){
             if(system || ignoreContent){
@@ -2522,7 +2634,7 @@ export class Conversation
 
                 }
             }
-            this.appendMsgsAry(r.result,index);
+            this.appendMsgsAry(r.result,insertIndex);
         }
 
         return r.result??[];
@@ -4002,6 +4114,53 @@ export class Conversation
         if(this._onTokenUsage){
             this._onTokenUsage(convoPartialUsageTokensToUsage(usage));
         }
+    }
+
+    public getDebuggingImportCode(){
+        const source:string[]=[];
+        for(const name in this.importedModules){
+            const mod=this.importedModules[name];
+            if(!mod){
+                continue;
+            }
+            const m={...mod};
+            delete m.convo;
+            source.push(`> define\n${getConvoDebugLabelComment(`import ${name}`)}\n\nmoduleInfo=${JSON.stringify(m,debugReplacer,4)}\n\n${mod.convo??''}\n\n\n\n\n`)
+        }
+        return source.join('')+'\n\n\n\n\n';
+    }
+
+    public getDebuggingModulesCode(){
+        const source:string[]=[];
+        source.push(`> define\n${getConvoDebugLabelComment('registered modules')}\n\nregisteredModules=${JSON.stringify(this.modules.map(mod=>({
+            name:mod.name,
+            imported:this.importedModules[mod.name]?true:false,
+            convoLength:mod.convo?.length??0,
+            componentCount:getObjKeyCount(mod.components),
+            functionCount:getObjKeyCount(mod.externFunctions)+getObjKeyCount(mod.externScopeFunctions),
+            typeCount:getObjKeyCount(mod.typeSchemes),
+        })),null,4)}\n\n\n\n\n`)
+        for(const mod of this.modules){
+            if(!mod){
+                continue;
+            }
+            const m={
+                imported:this.importedModules[mod.name]?true:false,
+                ...mod
+            };
+            delete m.convo;
+            source.push(`> define\n${getConvoDebugLabelComment(`module ${mod.name}`)}\n\nmoduleInfo=${JSON.stringify(m,debugReplacer,4)}\n\n${mod.convo??''}\n\n\n\n\n`)
+        }
+        return source.join('')+'\n\n\n\n\n';
+    }
+}
+
+const debugReplacer=(key:string,value:any)=>{
+    if(isClassInstanceObject(value)){
+        const name=Object.getPrototypeOf(value)?.constructor?.name;
+        return `[[${name||value}]]`
+    }else{
+        return value;
     }
 }
 

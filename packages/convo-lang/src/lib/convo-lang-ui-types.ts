@@ -1,11 +1,19 @@
-import { XmlNode } from "@iyio/common";
-import { Conversation } from "./Conversation";
 import { ConversationUiCtrl } from "./ConversationUiCtrl";
-import { ConvoCompletionOptions, ConvoMessagePrefixOptions, FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import { ConvoCompletionOptions, ConvoMessagePrefixOptions, FlatConvoMessage } from "./convo-types";
 
 export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
 
-export type ConvoEditorMode='code'|'vars'|'flat'|'tree'|'model';
+/**
+ * code - Show full code of conversation
+ * code-extended - Show full code plus imports of conversation
+ * modules - Show registered modules
+ * vars - Show evaluated variable values
+ * flat - Show flat json structure
+ * text - Show as code with all text content evaluated
+ * tree - Show syntax tree
+ * model - Show JSON model that will be sent to LLM
+ */
+export type ConvoEditorMode='code'|'code-extended'|'modules'|'vars'|'flat'|'text'|'tree'|'model';
 
 export type ConvoPromptMediaPurpose='preview'|'prompt';
 
@@ -59,38 +67,6 @@ export interface RenderedConvoMessage
     position?:RenderedConvoMessagePosition;
 }
 
-export interface ConvoComponentRendererContext
-{
-    id:string;
-    ctrl:ConversationUiCtrl;
-    convo:Conversation;
-    flat:FlatConvoConversation;
-    message:FlatConvoMessage;
-    isUser:boolean;
-    index:number;
-    className?:string;
-    rowClassName?:string;
-}
-
-export type ConvoComponentRenderFunction=(
-    component:ConvoMessageComponent,
-    renderCtx:ConvoComponentRendererContext
-)=>any;
-
-export interface ConvoComponentRendererWithOptions
-{
-    /**
-     * Convo script to be injected into the prompt the component is being used with
-     */
-    convo?:string;
-    doNotRenderInRow?:boolean;
-    render:ConvoComponentRenderFunction;
-}
-
-export type ConvoComponentRenderer=ConvoComponentRenderFunction|ConvoComponentRendererWithOptions;
-
-
-export type ConvoMessageComponent=XmlNode&{isJson?:boolean};
 
 export type ConvoRagRenderer=(msg:FlatConvoMessage,ctrl:ConversationUiCtrl)=>any;
 
