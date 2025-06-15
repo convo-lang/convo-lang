@@ -86,7 +86,17 @@ console.log(publishMap);
         if(dryRun){
             console.log(`Dry run, skipping real publish`)
         }else{
-            execSync(`npx nx run ${name}:publish --ver ${pkg.version} --tag latest`);
+            try{
+                execSync(`npx nx run ${name}:publish --ver ${pkg.version} --tag latest`);
+            }catch(ex){
+                const decoder=new TextDecoder("utf-8");
+                let output='';
+                try{
+                    output+=decoder.decode(ex.stdout.buffer)+'\n\n';
+                }catch{}
+                console.error('npm publish failed',output);
+                process.exit(1);
+            }
         }
 
     }
