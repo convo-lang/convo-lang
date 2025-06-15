@@ -308,6 +308,49 @@ The follow NPM packages are available for TypeScript/JavaScript integration
   in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
+### Create NextJS App
+You can use the `npx convo --create-next-app` command to quickly get started building AI Agents powered
+by Convo-Lang in a NextJS project
+
+**Step 1:** Create project using convo CLI
+``` sh
+npx convo --create-next-app
+```
+
+**Step 1:** Open newly created project in VSCode or your favorite editor
+``` sh
+# Open project directory
+cd {NEWLY_CREATED_PROJECT_NAME}
+
+# Open Code Editor
+code .
+# -or-
+vim .
+# -or-
+# Use GUI
+```
+
+**Step 3:** Copy example env file to `.env.development` 
+``` sh
+cp example.env.development .env.development
+```
+
+**Step 4:** Add your OpenAI API key to `.env.development` 
+``` conf
+OPENAI_API_KEY={YOUR_OPEN_AI_API_KEY}
+```
+
+**Step 5:** Start the NextJS server
+``` sh
+npm run dev
+```
+
+**Step 6:** Start modifying example agent prompts in any of the example pages
+- pages/index.tsx: Routing agent that opens requested agent
+- pages/agent/todo-list.tsx: Todo list agent that can manage a todo list
+- pages/agent/video-dude.tsx: A video player agent that plays the best YouTube videos
+- pages/agent/weather.tsx: A weather man agent that can tell you the weather anywhere in the world
+
 ### VSCode Extension
 To help you develop Convo-Lang application faster and easier we provide a VSCode extension that gives
 you Convo-Lang syntax highlighting and allows you to execute Convo-Lang scripts directly in VSCode.
@@ -957,6 +1000,8 @@ How many planets are there in the solar system
 ### System Tags
 Below is a full list of system tags Convo-Lang uses.
 
+`@import` - Allows you to import external convo-lang scripts. [read more](#imports)
+
 `@cache` - Enables caching for the message the tag is applied to. No value of a value of true will use
   the default prompt cached which by default uses the `ConvoLocalStorageCache`. If assigned a string
   a cache with a matching type will be used.
@@ -1067,7 +1112,68 @@ messages. If the value of "system" is given as the tags value system message wil
 `@preSpace` - Causes all white space in a content message to be preserved. By define all content message
               whitespace is preserved.
 
-`@import` - Allows you to import external convo-lang scripts. [read more](#imports)
+`@init` - 
+     When applied to a user message and the message is the last message in a conversation the message
+     is considered a conversation initializer.
+
+`@transform` -
+    Adds a message to a transform group. Transform groups are used to transform assistant output.
+    The transform tags value can be the name of a type or empty. Transform groups are ran after all
+    text responses from the assistant. Transform messages are not added to the flattened conversation.
+
+`@transformGroup` - Sets the name of the transform group a message will be added to when the transform tag is used.
+
+`@transformHideSource` - 
+    If present on a transform message the source message processed will be hidden from the user
+    but still visible to the LLM
+
+`@transformKeepSource` - Overrides `transformHideSource` and `transformRemoveSource`
+
+`@transformRemoveSource` - 
+    If present on a transform message the source message processed will not be added to the
+    conversation
+
+`@transformRenderOnly` - 
+    If present the transformed message has the `renderOnly` tag applied to it causing it to be
+    visible to the user but not the LLM.
+
+`@transformComponentCondition` - A transform condition that will control if the component tag can be passed to the created message
+
+`@transformTag` - Messages created by the transform will include the defined tag
+
+`@transformComponent` - 
+    A shortcut tag combines the `transform`, `transformTag`, `transformRenderOnly`, `transformComponentCondition`
+    and `transformHideSource` tags to create a transform that renders a
+    component based on the data structure of a named
+    struct.
+
+`@createdByTransform` - Applied to messages created by a transform
+
+`@includeInTransforms` - 
+    When applied to a message the message will be included in all transform prompts. It is common
+    to apply includeInTransforms to system messages
+
+`@transformDescription` - Describes what the result of the transform is
+
+`@transformRequired` - If applied to a transform message it will not be passed through a filter prompt
+
+`@transformFilter` - 
+    When applied to a message the transform filter will be used to select which transforms to
+    to select. The default filter will list all transform groups and their descriptions to select
+    the best fitting transform for the assistants response
+
+`@transformOptional` - 
+    If applied to a transform message the transform must be explicitly enabled applying the `enableTransform`
+    tag to another message or calling the enableTransform function.
+
+`@overwrittenByTransform` - Applied to transform output messages when overwritten by a transform with a higher priority
+
+`@enableTransform` - 
+    Explicitly enables a transform. Transforms are enabled by default unless the transform has
+    the `transformOptional` tag applied.
+
+`@renderer` - Defines a component to render a function result
+
 
 ## Imports
 Imports allow external Convo-Lang sources to be imported into the current conversation. Imports can
@@ -1301,6 +1407,22 @@ What is the biggest planet in our solar system
     "numberOfMoons": 79
 }
 ```
+
+## Message Transformers
+Message transforms allow content returned by an LLM to be transformed into structured data and 
+optionally have that structured data rendered by custom component when using the `ConversationView`.
+
+**Transformer Steps**
+1. A prompt is evaluated to determine the most fitting transformer to use or if a transformer should
+be used at all.
+
+2. If a transformer is found to be a good fit for the returned LLM content the transformer is ran
+and the content is transformed into the target type of the transformer
+
+3. If the transformer specifies a render component the transformed data will be rendered as a custom
+component
+
+Transformers are defined using tags
 
 ## Caching
 **(Documentation coming soon)**
