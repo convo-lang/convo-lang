@@ -65,6 +65,26 @@ export function MessagesSourceView({
         ctrl.replaceAndCompleteAsync(code);
     },[ctrl]);
 
+    const [asyncCodeValue,setAsyncCodeValue]=useState('');
+    useEffect(()=>{
+        if(mode!=='model' || !flatConvo || !convo){
+            setAsyncCodeValue('');
+            return;
+        }
+        let m=true;
+        (async ()=>{
+            try{
+                const value=await convo.toModelFormatStrAsync(flatConvo);
+                if(m){
+                    setAsyncCodeValue(value);
+                }
+            }catch{}
+        })();
+        return ()=>{
+            m=false;
+        }
+    },[mode,flatConvo,convo]);
+
     const codeInput=(
         <LazyCodeInput
             lineNumbers
@@ -78,7 +98,7 @@ export function MessagesSourceView({
                 :mode==='tree'?
                     JSON.stringify(convo?.messages??[],null,4)
                 :mode==='model'?
-                    (flatConvo?(convo?.toModelFormatStr(flatConvo)??''):'')
+                    (flatConvo?(asyncCodeValue):'')
                 :mode==='text'?
                     (flatConvo?.messages.map(m=>{
                         if(m.content===undefined){

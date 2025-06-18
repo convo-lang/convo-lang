@@ -1,10 +1,10 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -43,6 +43,8 @@ export const convoMsgModifiers={
 export const convoScopedModifiers=[convoMsgModifiers.agent]
 
 export const defaultConvoTask='default';
+
+export const convoAnyModelName='__any__';
 
 export const convoRoles={
     user:'user',
@@ -1586,12 +1588,60 @@ export const parseConvoJsonOrStringMessage=(content:string|null|undefined,return
     }
 }
 
-export const parseConvoJsonMessage=(json:string):any=>{
-    return parseJson5(json
-        .replace(/^\s*`+\s*\w*/,'')
-        .replace(/`+\s*$/,'')
-        .trim()
-    );
+const jsonBlockReg=/(^|\n)```[^\n]*\n[ \t]*[\{\[]]/;
+const blockEndReg=/\n[ \t]*```/
+const formatNumberReg=/:\s*([\d.,\$]*[\d.])(\s*,?\s*[}\r\n])/g;
+const notNumberChars=/[^\d.]/g
+const bracketOpen=/\s*[\{\[]/
+
+export const parseConvoJsonMessage=(json:string,expectArray?:boolean):any=>{
+    let value:any;
+    try{
+        value=parseJson5(json);
+    }catch(ex){
+
+        json=json.replace(formatNumberReg,(_,number:string,end:string)=>':'+number.replace(notNumberChars,'')+end);
+        let parsed=false;
+
+        // search for json markdown block
+        const match=jsonBlockReg.exec(json);
+        if(match){
+            json=json.substring(match.index+match[0].length-1);
+            const endMatch=blockEndReg.exec(json);
+            if(endMatch){
+                json=json.substring(0,endMatch.index);
+            }
+            try{
+                value=parseJson5(json);
+                parsed=true;
+            }catch{}
+        }
+
+
+
+        if(!parsed){
+            const lines=json.split('\n');
+            lines: for(let i=0;i<lines.length;i++){
+                const line=lines[i] as string;
+                if(bracketOpen.test(line)){
+                    for(let e=lines.length;e>i;e--){
+                        try{
+                            value=parseJson5(lines.slice(i,e).join('\n'));
+                            break lines;
+                        }catch{}
+                    }
+                }
+            }
+        }
+    }
+
+    if(expectArray && !Array.isArray(value) && value && (typeof value === 'object')){
+        for(const e in value){
+            return value[e];
+        }
+    }
+
+    return value;
 }
 
 const danglingReg=/[\r\n^](\s*>\s*user\s*)$/;
@@ -1840,6 +1890,7 @@ export interface CreateTextConvoCompletionMessageOptions
     models?:ConvoModelInfo[];
     inputTokens?:number;
     outputTokens?:number;
+    tokenPrice?:number;
     tags?:Record<string,string|undefined>;
     defaults?:ConvoCompletionMessage;
 }
@@ -1851,6 +1902,7 @@ export const createTextConvoCompletionMessage=({
     models,
     inputTokens,
     outputTokens,
+    tokenPrice,
     defaults,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
 
@@ -1866,12 +1918,16 @@ export const createTextConvoCompletionMessage=({
         assignTo:lastContentMessage?.responseAssignTo,
         endpoint:flat.responseEndpoint,
         model,
-        ...(models && calculateConvoTokenUsage(
+        ...((models && tokenPrice===undefined)?calculateConvoTokenUsage(
             model,
             models,
             inputTokens,
-            outputTokens
-        )),
+            outputTokens,
+        ):{
+            inputTokens,
+            outputTokens,
+            tokenPrice,
+        }),
         ...(defaults && dupDeleteUndefined(defaults))
     }
 }
@@ -1887,6 +1943,7 @@ export interface CreateFunctionCallConvoCompletionMessageOptions
     models?:ConvoModelInfo[];
     inputTokens?:number;
     outputTokens?:number;
+    tokenPrice?:number;
     defaults?:ConvoCompletionMessage;
 }
 export const createFunctionCallConvoCompletionMessage=({
@@ -1898,6 +1955,7 @@ export const createFunctionCallConvoCompletionMessage=({
     models,
     inputTokens,
     outputTokens,
+    tokenPrice,
     defaults,
 }:CreateFunctionCallConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     return {
@@ -1906,12 +1964,20 @@ export const createFunctionCallConvoCompletionMessage=({
         tags:toolId?{toolId}:undefined,
         endpoint:flat.responseEndpoint,
         model,
-        ...(models && calculateConvoTokenUsage(
-            model,
-            models,
-            inputTokens,
-            outputTokens
-        )),
+        ...((models && tokenPrice===undefined)?
+            calculateConvoTokenUsage(
+                model,
+                models,
+                inputTokens,
+                outputTokens
+            )
+        :
+            {
+                inputTokens,
+                outputTokens,
+                tokenPrice
+            }
+        ),
         ...(defaults && dupDeleteUndefined(defaults))
     };
 }
@@ -1964,13 +2030,25 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
 
 export interface NormalizedFlatMessageListOptions
 {
+    /**
+     * Disables all processing of messages
+     */
     disableAll?:boolean;
+
+    /**
+     * If true rag messages will not be added to user message content
+     */
     disableRag?:boolean;
+
+    /**
+     * If true all system messages should be merged into a single message
+     */
+    mergeSystemMessages?:boolean;
 }
 
 export const getNormalizedFlatMessageList=(
     flat:FlatConvoConversationBase,
-    options?:NormalizedFlatMessageListOptions
+    options:NormalizedFlatMessageListOptions={}
 ):FlatConvoMessage[]=>{
 
     if(options?.disableAll){
@@ -1978,12 +2056,16 @@ export const getNormalizedFlatMessageList=(
     }
 
     const messages=[...flat.messages];
+    let firstSystemMessage:FlatConvoMessage|undefined;
 
 
     let lastContentMessage:FlatConvoMessage|undefined;
     let lastContentMessageI=0;
 
-    const disableRag=options?.disableRag;
+    const {
+        disableRag,
+        mergeSystemMessages
+    }=options;
 
     for(let i=0;i<messages.length;i++){
         let msg=messages[i];
@@ -2017,6 +2099,21 @@ export const getNormalizedFlatMessageList=(
         if(msg.content!==undefined){
             lastContentMessage=msg;
             lastContentMessageI=i;
+        }
+
+        if(msg.role==='system'){
+            if(!firstSystemMessage){
+                firstSystemMessage=msg;
+            }else if(mergeSystemMessages){
+                if(firstSystemMessage.content===undefined){
+                    firstSystemMessage.content='';
+                }
+                if(msg.content){
+                    firstSystemMessage.content+='\n\n'+msg.content;
+                }
+                messages.splice(i,1);
+                i--;
+            }
         }
 
     }
@@ -2133,4 +2230,35 @@ export const getConvoDebugLabelComment=(label:string)=>{
     const l=label.length+2;
     const gap='/'.repeat(l);
     return `  ${pad}${gap}${pad}\n ${pad} ${label} ${pad}\n${pad}${gap}${pad}`
+}
+
+export const isConvoModelAliasMatch=(name:string,alias:ConvoModelAlias):boolean=>{
+    if(alias.name && starStringTestCached(alias,alias.name,name)){
+        return true;
+    }
+
+    if(alias.pattern){
+        const reg=parseRegexCached(alias,alias.pattern,alias.patternFlags);
+        if(reg.test(name)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export const insertSystemMessageIntoFlatConvo=(msg:string,flat:FlatConvoConversation)=>{
+    const flatMsg:FlatConvoMessage={
+        role:'system',
+        isSystem:true,
+        content:msg,
+    }
+    for(let i=0;i<flat.messages.length;i++){
+        const m=flat.messages[i];
+        if(m?.role==='system'){
+            flat.messages.splice(i+1,0,flatMsg);
+            return;
+        }
+    }
+    flat.messages.unshift(flatMsg);
 }

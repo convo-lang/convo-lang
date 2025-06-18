@@ -643,7 +643,7 @@ describe('convo',()=>{
         expect(executeConvoFunction(fn,{value:8})).toBe(8);
 
         try{
-            executeConvoFunction(fn,{value:'3'});
+            executeConvoFunction(fn,{value:'tree'});
             throw new Error('Arg validation should have throw an error')
         }catch(ex){
             if(ex instanceof ConvoError){
@@ -653,6 +653,31 @@ describe('convo',()=>{
             }
 
         }
+
+    })
+
+
+
+    it('should coerce function args',async ()=>{
+
+        const convo=parse(1,/*convo*/`
+            > testFn(
+                value: number
+            ) -> (
+                return( value )
+            )
+        `);
+
+        const fn=convo.result?.[0]?.fn;
+
+        expect(fn).not.toBeUndefined();
+        if(!fn){
+            return;
+        }
+
+        expect(executeConvoFunction(fn,{value:8})).toBe(8);
+
+        executeConvoFunction(fn,{value:'3'});
 
     })
 

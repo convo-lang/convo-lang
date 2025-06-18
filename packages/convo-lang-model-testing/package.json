@@ -1,0 +1,10 @@
+{
+    "name": "@convo-lang/convo-lang-model-testing",
+    "version": "0.7.22",
+    "type": "commonjs",
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
+}

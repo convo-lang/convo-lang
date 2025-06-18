@@ -1,0 +1,32 @@
+{
+    "name": "convo-lang-model-testing",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "packages/convo-lang-model-testing/src",
+    "projectType": "library",
+    "targets": {
+        "build": {
+            "executor": "@iyio/nx-common:lib-builder",
+            "outputs": ["{options.outputPath}"],
+            "options": {
+                "outputPath": "dist/packages/convo-lang-model-testing",
+                "main": "packages/convo-lang-model-testing/src/index.ts",
+                "tsConfig": "packages/convo-lang-model-testing/tsconfig.lib.json",
+                "assets": ["packages/convo-lang-model-testing/*.md"]
+            }
+        },
+        "publish": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node tools/scripts/publish.mjs convo-lang-model-testing {args.ver} {args.tag}"
+            },
+            "dependsOn": ["build"]
+        },
+        "test-models": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-model-testing/tsconfig.lib.json packages/convo-lang-model-testing/src/bin/test-models.ts $@"
+            }
+        }
+    },
+    "tags": []
+}

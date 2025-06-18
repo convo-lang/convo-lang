@@ -1,4 +1,4 @@
-import { getErrorMessage, getValueByAryPath, isPromise } from '@iyio/common';
+import { getErrorMessage, getValueByAryPath, isPromise, zodCoerceObject } from '@iyio/common';
 import { ZodObject, ZodType } from 'zod';
 import { ConvoError } from './ConvoError';
 import { defaultConvoVars } from "./convo-default-vars";
@@ -149,13 +149,18 @@ export class ConvoExecutionContext
         }
 
         const scheme=this.getConvoFunctionArgsScheme(fn);
-        const parsed=scheme.safeParse(args);
+        let parsed=scheme.safeParse(args);
         if(parsed.success===false){
-            throw new ConvoError(
-                'invalid-args',
-                {fn},
-                `Invalid args passed to convo function. fn = ${fn.name}, message = ${parsed.error.message}`
-            );
+            const r=zodCoerceObject(scheme,args);
+            if(r.result){
+                parsed={data:r.result,success:true};
+            }else{
+                throw new ConvoError(
+                    'invalid-args',
+                    {fn},
+                    `Invalid args passed to convo function. fn = ${fn.name}, message = ${parsed.error.message}`
+                );
+            }
         }
 
         args=parsed.data;
@@ -266,6 +271,7 @@ export class ConvoExecutionContext
                 }
             }
             if(!callee){
+                // add exception for "responseWithText" function
                 throw new ConvoError(
                     'function-not-defined',
                     {fn},

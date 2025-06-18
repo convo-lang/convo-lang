@@ -6,7 +6,8 @@ let chatModel:ConvoModelInfo;
 export const knownConvoAnthropicModels:ConvoModelInfo[]=[
     chatModel={
         name:'claude-3-7-sonnet-20250219',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],

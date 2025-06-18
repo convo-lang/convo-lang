@@ -14,7 +14,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // o1
     {
         name:'o1-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -23,7 +23,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'o1-preview-2024-09-12',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -34,7 +34,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // o1-mini
     {
         name:'o1-mini',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -43,7 +43,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'o1-mini-2024-09-12',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -54,7 +54,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-4o-realtime
     {
         name:'gpt-4o-realtime-preview-2024-10-01',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','audio'],
         outputCapabilities:['text','audio'],
@@ -65,7 +65,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-realtime-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','audio'],
         outputCapabilities:['text','audio'],
@@ -78,7 +78,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-4o
     _chat=_vision={
         name:'gpt-4o',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -87,7 +87,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-2024-08-06',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -96,7 +96,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-2024-05-13',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -105,7 +105,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-audio-preview-2024-10-01',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -116,7 +116,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-audio-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -127,7 +127,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'chatgpt-4o-latest',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -138,7 +138,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-4o-mini
     {
         name:'gpt-4o-mini',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -147,7 +147,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4o-mini-2024-07-18',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -158,7 +158,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-4-turbo
     {
         name:'gpt-4-turbo',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -167,7 +167,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4-turbo-2024-04-09',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -176,7 +176,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4-turbo-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -187,7 +187,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-4
     {
         name:'gpt-4-1106-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -196,7 +196,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4-0125-preview',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -205,7 +205,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:8192,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -214,7 +214,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-4-0613',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:8192,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -225,7 +225,7 @@ export const openAiModels:ConvoModelInfo[]=[
     // gpt-3.5-turbo
     {
         name:'gpt-3.5-turbo-instruct',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:4096,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -234,7 +234,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-3.5-turbo-instruct-0914',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:4096,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -243,7 +243,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-3.5-turbo-16k',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -252,7 +252,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-3.5-turbo-1106',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -261,7 +261,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-3.5-turbo-0125',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -270,7 +270,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
     {
         name:'gpt-3.5-turbo',
-        functionCallingSupport:true,
+        supportsFunctionCalling:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],

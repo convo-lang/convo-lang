@@ -731,6 +731,9 @@ export interface FlatConvoMessage
      */
     userId?:string;
 
+    /**
+     * Use "json" for json mode
+     */
     responseFormat?:string;
     responseFormatTypeName?:string;
     responseFormatIsArray?:boolean;
@@ -820,11 +823,22 @@ export interface ConvoCompletionService<TInput,TOutput>
 
     outputType:string;
 
+    /**
+     * Called after checking for model matches and can be used to decide if the completion service
+     * can handle the conversation based on the state of the conversation. If the service
+     * does not define any models canComplete will always be called for every unique model.
+     */
     canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean;
 
     completeConvoAsync(input:TInput,flat:FlatConvoConversationBase):Promise<TOutput>
 
     getModelsAsync?:()=>Promise<ConvoModelInfo[]|undefined>;
+}
+
+export interface ConvoCompletionServiceAndModel
+{
+    service:ConvoCompletionService<any,any>;
+    model?:ConvoModelInfo;
 }
 
 export interface ConvoConversationConverter<TInput,TOutput>
@@ -930,6 +944,8 @@ export interface FlatConvoConversationBase
     messages:FlatConvoMessage[];
     capabilities:ConvoCapability[];
 
+    hiddenSource?:string;
+
 
     ragMode?:ConvoRagMode;
     ragPrefix?:string;
@@ -941,6 +957,8 @@ export interface FlatConvoConversationBase
      * The model the conversation has been requested to be completed with.
      */
     responseModel?:string;
+
+    model?:ConvoModelInfo;
 
     /**
      * The endpoint the conversation has been requested to be completed with.
@@ -961,6 +979,23 @@ export interface FlatConvoConversationBase
      * Messages to execute in parallel.
      */
     parallelMessages?:ConvoMessage[];
+
+    /**
+     * The max number of tokens that should be returned by the LLM
+     */
+    maxTokens?:number;
+
+    /**
+     * The likelihood of the model selecting higher-probability options while generating a response.
+     * A lower value makes the model more likely to choose higher-probability options, while a
+     * higher value makes the model more likely to choose lower-probability options.
+     */
+    temperature?:number;
+
+    /**
+     * The percentage of most-likely candidates that the model considers for the next token.
+     */
+    topP?:number;
 
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
@@ -1290,13 +1325,39 @@ export interface ParsedContentJsonOrString
     isJson:boolean;
 }
 
+export interface ConvoModelAlias
+{
+    /**
+     * Name can contain wildcards (*).
+     */
+    name?:string;
+    pattern?:string|RegExp;
+    patternFlags?:string;
+    /**
+     * Used when picking between multiple models with matching names or aliases
+     */
+    priority?:number;
+}
+
 export type ConvoModelCapability='text'|'image'|'audio'|'video'|'embedding';
 export interface ConvoModelInfo
 {
+    /**
+     * The full name of the model. This will often include a vendor prefix. Use the `aliases` property
+     * to define shorter alias names or matching patters
+     */
     name:string;
+    /**
+     * Used when picking between multiple models with matching names or aliases
+     */
+    priority?:number;
+    aliases?:ConvoModelAlias[];
+    /**
+     * If true the model is the default for it's completion service
+     */
+    isServiceDefault?:boolean;
     version?:string;
     description?:string;
-    functionCallingSupport?:boolean;
     contextWindowSize?:number;
     inputCapabilities?:ConvoModelCapability[];
     outputCapabilities?:ConvoModelCapability[];
@@ -1313,6 +1374,82 @@ export interface ConvoModelInfo
     imageLgPriceUsd?:number;
     imageHdPriceUsd?:number;
     imageLgHdPriceUsd?:number;
+
+    supportsChat?:boolean;
+
+    /**
+     * If true the model natively support function calling
+     */
+    supportsFunctionCalling?:boolean;
+
+    /**
+     * If true a hidden "respondWithText" function will be added to the list of functions for the
+     * model when functions are being used. This allows models that always response with a function
+     * call to response with text. When the respondWithText function is called the call with be
+     * treated as a text response.
+     */
+    enableRespondWithTextFunction?:boolean;
+
+    /**
+     * Source convo code used in place of default when enableRespondWithTextFunction is true
+     */
+    respondWithTextFunctionSource?:string;
+
+    noSystemMessageSupport?:boolean;
+
+    supportsJsonMode?:boolean;
+
+    /**
+     * If true functions set to the LLM converter will be pre filtered to match user tool choice.
+     */
+    filterToolChoice?:boolean;
+
+    /**
+     * If true all functions should be disabled when json mode is enabled. This can prevent models
+     * that always try calling functions from calling a function instead of return json.
+     */
+    jsonModeDisableFunctions?:boolean;
+
+    /**
+     * If true no JSON instructions will be added to JSON mode messages.
+     */
+    jsonModeDisableInstructions?:boolean;
+
+    /**
+     * JSON mode instructions that will override the default instructions
+     */
+    jsonModeInstructions?:string;
+
+
+    /**
+     * JSON instructions added before the default JSON instructions
+     */
+    jsonModeInstructionsPrefix?:string;
+
+    /**
+     * JSON instructions added after the default JSON instructions
+     */
+    jsonModeInstructionsSuffix?:string;
+
+    /**
+     * If true JSON instructions will include instructions to wrap return JSON in a markdown code
+     * block and to not include any pre or post-amble
+     */
+    jsonModeInstructWrapInCodeBlock?:boolean;
+
+    /**
+     * If true JSON mode will be implemented using a `respondWithJSON` function. When a message
+     * is using JSON mode and jsonImplementAsFunction is true the only function that will be
+     * exposed to the LLM will be the `responseWithJSON` function.
+     */
+    jsonModeImplementAsFunction?:boolean;
+
+    /**
+     * Convo source code that will override the default source code of the responseWithJSON function.
+     * The value `__TYPE__` will be replaced with the type in convo format that should be
+     * responded with.
+     */
+    respondWithJSONFunctionSource?:string;
 }
 
 export type ConvoStartOfConversationCallback=()=>string|ConvoMessage[]|undefined|null;
@@ -1357,4 +1494,10 @@ export interface ConvoAgentDef
     main:ConvoMessage;
     capabilities:string[];
     functions:ConvoMessage[];
+}
+
+export interface SimulatedConvoFunctionCall
+{
+    functionName:string;
+    parameters:Record<string,any>;
 }

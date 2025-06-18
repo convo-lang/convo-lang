@@ -56,4 +56,7 @@ export * from './lib/providers/openai-lib';
 export * from './lib/providers/openai-models';
 export * from './lib/providers/openai-params';
 export * from './lib/providers/openai-service';
+export * from './lib/testing/ConvoModelTestManager';
+export * from './lib/testing/ConvoModelTester';
+export * from './lib/testing/convo-testing-types';
 
