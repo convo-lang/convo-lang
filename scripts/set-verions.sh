@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
+source ./config.sh
+cd ..
 
 VERSION=$1
 
