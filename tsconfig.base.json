@@ -34,20 +34,23 @@
             "@convo-lang/convo-lang-api-routes": [
                 "packages/convo-lang-api-routes/src/index.ts"
             ],
+            "@convo-lang/convo-lang-bedrock": [
+                "packages/convo-lang-bedrock/src/index.ts"
+            ],
             "@convo-lang/convo-lang-cli": [
                 "packages/convo-lang-cli/src/index.ts"
             ],
-            "@convo-lang/convo-lang-pdf": [
-                "packages/convo-lang-pdf/src/index.ts"
+            "@convo-lang/convo-lang-doc-query": [
+                "packages/convo-lang-doc-query/src/index.ts"
             ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],
+            "@convo-lang/convo-lang-pdf": [
+                "packages/convo-lang-pdf/src/index.ts"
+            ],
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
-            ],
-            "@convo-lang/convo-lang-doc-query": [
-                "packages/convo-lang-doc-query/src/index.ts"
             ]
         }
     },
