@@ -1,4 +1,4 @@
-import { ConvoModelInfo, convoCompletionService, convoConversationConverterProvider } from "@convo-lang/convo-lang";
+import { ConvoModelInfo, convoAnyModelName, convoCompletionService, convoConversationConverterProvider } from "@convo-lang/convo-lang";
 import { InternalOptions, ReadonlySubject, pushBehaviorSubjectAry } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { ConvoModelTester } from "./ConvoModelTester";
@@ -10,6 +10,7 @@ export interface ConvoModelTestManagerOptions
     parallel?:boolean;
     printUpdates?:boolean;
     verbose?:boolean;
+    defaultModel?:boolean;
 }
 
 export class ConvoModelTestManager
@@ -26,12 +27,15 @@ export class ConvoModelTestManager
         parallel=false,
         printUpdates=false,
         verbose=false,
+        defaultModel=false,
     }:ConvoModelTestManagerOptions){
+
         this.options={
             models,
             parallel,
             printUpdates,
             verbose,
+            defaultModel,
         }
 
         if(printUpdates){
@@ -115,10 +119,15 @@ export class ConvoModelTestManager
 
         try{
 
+            const models=[...this.options.models];
+            if(this.options.defaultModel){
+                models.push({name:convoAnyModelName});
+            }
+
             if(this.options.parallel){
-                await Promise.all(this.options.models.map(testModelAsync));
+                await Promise.all(models.map(testModelAsync));
             }else{
-                for(const model of this.options.models){
+                for(const model of models){
                     await testModelAsync(model);
                 }
             }

@@ -84,6 +84,7 @@ export const openAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(2.5),
         outputTokenPriceUsd:m(10),
+        isServiceDefault:true,
     },
     {
         name:'gpt-4o-2024-08-06',

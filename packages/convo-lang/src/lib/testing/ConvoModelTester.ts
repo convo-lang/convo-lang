@@ -1,4 +1,4 @@
-import { Conversation, ConversationOptions } from '@convo-lang/convo-lang';
+import { Conversation, ConversationOptions, convoAnyModelName } from '@convo-lang/convo-lang';
 import { InternalOptions, ReadonlySubject, createJsonRefReplacer, getErrorMessage, pushBehaviorSubjectAry } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { BehaviorSubject } from 'rxjs';
@@ -91,9 +91,11 @@ export class ConvoModelTester
             ...convoOptions
         });
 
-        if(!this.options.skipDefineModel){
-            convo.append(`> define\n__model=${JSON.stringify(this.options.model)}\n__debug=true`);
+        if(!this.options.skipDefineModel && this.options.model!==convoAnyModelName){
+            convo.append(`> define\n__model=${JSON.stringify(this.options.model)}`);
         }
+
+        convo.append(`> define\n__debug=true\n__trackModel=true`);
 
         if(this.options.initConvo){
             convo.append(this.options.initConvo);
