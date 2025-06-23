@@ -1,6 +1,6 @@
 import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/ai-complete-openai';
-import { Conversation, ConvoScope, convoCapabilitiesParams, convoVars, createConversationFromScope, parseConvoCode } from "@convo-lang/convo-lang";
-import { openaiConvoModule } from '@convo-lang/convo-lang-openai';
+import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, parseConvoCode } from "@convo-lang/convo-lang";
+import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { EnvParams, createJsonRefReplacer, deleteUndefined, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
@@ -72,10 +72,12 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
             [openAiVisionModelParam.typeName]:config.visionModel,
             [openAiSecretsParam.typeName]:config.secrets,
             [convoCapabilitiesParams.typeName]:config.capabilities,
+            [convoDefaultModelParam.typeName]:'gpt-4o',
         }) as Record<string,string>);
 
         reg.use(nodeCommonModule);
-        reg.use(openaiConvoModule);
+        reg.use(convoOpenAiModule);
+        reg.use(convoBedrockModule);
     })
     await rootScope.getInitPromise();
     return config;

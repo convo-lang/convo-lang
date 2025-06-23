@@ -404,7 +404,9 @@ following contents. Remember to replace the API key with your OpenAI api key.
         "openAiChatModel":"gpt-4o",
         "openAiVisionModel":"gpt-4o",
         "openAiAudioModel":"whisper-1",
-        "openAiImageModel":"dall-e-3"
+        "openAiImageModel":"dall-e-3",
+
+        "awsBedrockProfile":"{optional - AWS profile to use for Bedrock models}"
     }
 }
 ```
