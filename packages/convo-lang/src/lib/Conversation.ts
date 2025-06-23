@@ -16,7 +16,7 @@ import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
 import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
-import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
+import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
 
@@ -177,6 +177,8 @@ export interface ConversationOptions
     logFlatCached?:boolean;
 
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx;
+
+    defaultModel?:string|null;
 }
 
 export class Conversation
@@ -362,6 +364,8 @@ export class Conversation
      */
     public logFlatCached:boolean;
 
+    public defaultModel?:string;
+
     /**
      * Sub conversations
      */
@@ -378,6 +382,7 @@ export class Conversation
             roleMap={},
             completionService=convoCompletionService.all(),
             converters=convoConversationConverterProvider.all(),
+            defaultModel=convoDefaultModelParam.get(),
             capabilities=[],
             serviceCapabilities=[],
             maxAutoCompleteDepth=100,
@@ -429,6 +434,7 @@ export class Conversation
         }
         this.converters=converters;
         this.capabilities=[...capabilities];
+        this.defaultModel=defaultModel??undefined;
         this.disableMessageCapabilities=disableMessageCapabilities;
         this.serviceCapabilities=serviceCapabilities;
         this.maxAutoCompleteDepth=maxAutoCompleteDepth;
@@ -1264,7 +1270,8 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
-                return await this.completeWithServiceAsync(flat,await getConvoCompletionServiceAsync(flat,this.completionService?asArray(this.completionService):[],true,this.modelServiceMap))
+                return await this.completeWithServiceAsync(flat,await getConvoCompletionServiceAsync(
+                    flat,this.completionService?asArray(this.completionService):[],true,this.modelServiceMap))
             },
         );
 
@@ -3223,22 +3230,27 @@ export class Conversation
         );
 
 
-        let responseModel:string|undefined=exe.getVar(convoVars.__model);
+        const lastUserMsg=getLastConvoMessageWithRole(messages,'user');
         let responseEndpoint:string|undefined=exe.getVar(convoVars.__endpoint);
         let userId:string|undefined=exe.getVar(convoVars.__userId);
+
+        let responseModel:string|undefined=exe.getVar(convoVars.__model);
         if(typeof responseModel !== 'string'){
             responseModel=undefined;
         }
+        const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel];
+        if(modelTagValue){
+            responseModel=modelTagValue;
+        }
+        if(!responseModel){
+            responseModel=this.defaultModel;
+        }
+
         if(typeof responseEndpoint !== 'string'){
             responseEndpoint=undefined;
         }
         if(typeof userId !== 'string'){
             userId=undefined;
-        }
-        const lastUserMsg=getLastConvoMessageWithRole(messages,'user');
-        const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel];
-        if(modelTagValue){
-            responseModel=modelTagValue;
         }
         const endpointTagValue=lastUserMsg?.tags?.[convoTags.responseEndpoint];
         if(endpointTagValue){

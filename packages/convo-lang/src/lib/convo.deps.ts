@@ -11,6 +11,8 @@ export const convoConversationConverterProvider=defineProvider<ConvoConversation
 
 export const convoCapabilitiesParams=defineStringParam('convoCapabilities');
 
+export const convoDefaultModelParam=defineStringParam('convoDefaultModel');
+
 export const convoGraphStore=defineService<ConvoGraphStore>('ConvoGraphStore');
 
 export const convoCacheService=defineService<ConvoConversationCache>('convoCacheService',()=>globalThis.window?new ConvoLocalStorageCache():new ConvoVfsCache());
