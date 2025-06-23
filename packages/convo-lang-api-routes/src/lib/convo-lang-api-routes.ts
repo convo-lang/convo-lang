@@ -1,9 +1,10 @@
-import { Conversation, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix } from '@convo-lang/convo-lang';
+import { Conversation, ConvoCompletionServiceAndModel, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
 import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
 import { createImageGenRoute } from './createImageGenRoute';
 
+const modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={}
 
 export const createConvoLangApiRoutes=({
     prefix=defaultConvoHttpEndpointPrefix,
@@ -73,7 +74,7 @@ export const createConvoLangApiRoutes=({
 
                 const flat:FlatConvoConversation=body;
 
-                let service=services.find(s=>s.canComplete(flat.responseModel,flat));
+                const service=(await getConvoCompletionServicesForModelAsync(flat.responseModel??convoAnyModelName,services,modelServiceMap))?.[0]?.service;
 
                 try{
                     const result=await completeConvoUsingCompletionServiceAsync(

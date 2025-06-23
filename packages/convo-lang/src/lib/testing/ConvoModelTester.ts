@@ -12,6 +12,7 @@ export interface ConvoModelTesterOptions
     initConvo?:string;
     convoOptions?:ConversationOptions;
     manager?:ConvoModelTestManager;
+    tests?:string[];
 }
 
 export class ConvoModelTester
@@ -21,7 +22,7 @@ export class ConvoModelTester
     public get testResultsSubject():ReadonlySubject<ConvoModelTestResult[]>{return this._testResults}
     public get testResults(){return this._testResults.value}
 
-    private readonly options:InternalOptions<ConvoModelTesterOptions,'initConvo'|'manager'>;
+    private readonly options:InternalOptions<ConvoModelTesterOptions,'initConvo'|'manager'|'tests'>;
 
     public constructor({
         initConvo,
@@ -29,13 +30,15 @@ export class ConvoModelTester
         model,
         skipDefineModel=false,
         manager,
+        tests,
     }:ConvoModelTesterOptions){
         this.options={
             initConvo,
             convoOptions,
             model,
             skipDefineModel,
-            manager
+            manager,
+            tests,
         }
     }
 
@@ -54,7 +57,11 @@ export class ConvoModelTester
                 names.push(e.substring(5))
             }
         }
-        return names;
+        if(this.options.tests){
+            return names.filter(t=>this.options.tests?.includes(t))
+        }else{
+            return names;
+        }
     }
 
     private readonly createDebugger=(output:string[])=>(...values:any[])=>{
@@ -224,6 +231,7 @@ export class ConvoModelTester
     {
         return this.runTestAsync({
             name:'sayHi',
+            description:'Test to see if a simple message of hi completes',
             format:null,
             expectedRoles:['assistant']
         },/*convo*/`
@@ -238,6 +246,7 @@ hi
     {
         return this.runTestAsync({
             name:'jsonArray',
+            description:'Test JSON mode for returning an array',
             format:'json',
             isJsonArray:true,
         },/*convo*/`
@@ -260,6 +269,7 @@ List the planets in our solar system
     {
         return this.runTestAsync({
             name:'callAddNumbers',
+            description:'Calls a functions to add numbers',
             callFunction:'addNumbers',
             returnValue:19,
         },/*convo*/`
@@ -278,10 +288,27 @@ Add 7 plus 12 by calling the addNumbers function
         `)
     }
 
+    public test_assistantFirst=()=>
+    {
+        return this.runTestAsync({
+            name:'assistantFirst',
+            description:'Starts a conversation with an assistant message first',
+        },/*convo*/`
+
+> assistant
+How can I help you?
+
+> user
+What color is the sky on a sunny day?
+
+        `)
+    }
+
 }
 
 interface TestOptions{
     name:string;
+    description:string;
     format?:string|null;
     expectedRoles?:(string|null|undefined)[];
     convoOptions?:ConversationOptions;

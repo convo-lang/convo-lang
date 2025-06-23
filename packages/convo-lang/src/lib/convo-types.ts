@@ -1405,6 +1405,28 @@ export interface ConvoModelInfo
     filterToolChoice?:boolean;
 
     /**
+     * If defined the model requires that the first message in a conversation be of the specified role.
+     * For example some models require the first message to be a "user" message. If a conversation
+     * starts with a message with a different role then a message with the specified role will
+     * automatically be inserted at the start of the conversation. Use the `requiredFirstMessageRoleContent`
+     * property to control the content of the message inserted.
+     */
+    requiredFirstMessageRole?:string;
+
+    /**
+     * Used with `requiredFirstMessageRole` to set the content of the first role required message
+     * @default "You can start the conversation"
+     */
+    requiredFirstMessageRoleContent?:string;
+
+    /**
+     * List of roles used to determine if a role required message should be inserted at the start
+     * of the conversation.
+     * @default ["assistant","user"]
+     */
+    requiredFirstMessageRoleList?:string[];
+
+    /**
      * If true all functions should be disabled when json mode is enabled. This can prevent models
      * that always try calling functions from calling a function instead of return json.
      */

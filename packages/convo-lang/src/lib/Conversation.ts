@@ -1,20 +1,21 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getObjKeyCount, isClassInstanceObject, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex, uuid, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getObjKeyCount, isClassInstanceObject, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
+import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync } from "./convo-completion-lib";
 import { getConvoMessageComponent } from "./convo-component-lib";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { addConvoUsageTokens, completeConvoUsingCompletionServiceAsync, containsConvoTag, convertConvoInput, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoTag, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { addConvoUsageTokens, containsConvoTag, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, formatConvoContentSpace, formatConvoMessage, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoTag, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoModelInfo, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, SimulatedConvoFunctionCall, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
-import { convoTypeToJsonScheme, schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoRagMode } from "./convo-types";
+import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
@@ -1176,63 +1177,12 @@ export class Conversation
 
     private readonly modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
-    public async getCompletionServicesForModelAsync(model=convoAnyModelName):Promise<ConvoCompletionServiceAndModel[]>
-    {
-        const services=this.completionService?asArray(this.completionService):[];
 
-        const cached=this.modelServiceMap[model];
-        if(cached){
-            return cached;
-        }
-
-        const matches:{priority:number,service:ConvoCompletionServiceAndModel}[]=[];
-        for(const s of services){
-            const models=await s.getModelsAsync?.();
-            if(!models){
-                matches.push({priority:Number.MIN_SAFE_INTEGER,service:{service:s}});
-                continue;
-            }
-            let hasMatch=false;
-            for(const m of models){
-                if(m.name===model){
-                    matches.push({priority:m.priority??0,service:{service:s,model:m}});
-                    hasMatch=true;
-                }
-                if(m.aliases){
-                    for(const a of m.aliases){
-                        if(isConvoModelAliasMatch(model,a)){
-                            matches.push({priority:a.priority??0,service:{service:s,model:m}});
-                            hasMatch=true;
-                        }
-                    }
-                }
-            }
-            if(!hasMatch){
-                const m=models.find(m=>m.isServiceDefault);
-                if(m){
-                    matches.push({priority:Number.MIN_SAFE_INTEGER,service:{service:s,model:m}});
-                }
-            }
-        }
-        matches.sort((a,b)=>b.priority-a.priority);
-        return this.modelServiceMap[model]=matches.map(m=>m.service);
-    }
-
-    public async getCompletionServiceAsync(flat:FlatConvoConversation,updateTargetModel=false):Promise<ConvoCompletionServiceAndModel|undefined>{
-        const services=await this.getCompletionServicesForModelAsync(flat.responseModel);
-        for(const s of services){
-            if(s.service?.canComplete(s.model?.name??flat.responseModel??convoAnyModelName,flat)){
-                if(updateTargetModel && s.model){
-                    flat.responseModel=s.model.name;
-                    flat.model=s.model;
-                }
-                return s;
-            }
-        }
-        return undefined;
+    public async getCompletionServiceAsync(flat:FlatConvoConversation):Promise<ConvoCompletionServiceAndModel|undefined>{
+        const services=await getConvoCompletionServicesForModelAsync(flat.responseModel??convoAnyModelName,this.completionService?asArray(this.completionService):[],this.modelServiceMap);
+        return services[0];
 
     }
-
     private setFlat(flat:FlatConvoConversation,dup=true){
         if(this.isDisposed){
             return;
@@ -1314,7 +1264,7 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
-                return await this.completeWithServiceAsync(flat,await this.getCompletionServiceAsync(flat,true))
+                return await this.completeWithServiceAsync(flat,await getConvoCompletionServiceAsync(flat,this.completionService?asArray(this.completionService):[],true,this.modelServiceMap))
             },
         );
 
@@ -1368,7 +1318,7 @@ export class Conversation
 
         let configInputResult:ModelConfigurationToInputResult|undefined;
         if(serviceAndModel.model){
-            configInputResult=await this.applyModelConfigurationToInputAsync(serviceAndModel.model,flat);
+            configInputResult=await applyConvoModelConfigurationToInputAsync(serviceAndModel.model,flat,this);
         }
 
         let messages:ConvoCompletionMessage[];
@@ -1387,7 +1337,7 @@ export class Conversation
         this.debug?.('Completion message',messages);
 
         if(serviceAndModel.model && configInputResult){
-            this.applyModelConfigurationToOutput(serviceAndModel.model,flat,messages,configInputResult);
+            applyConvoModelConfigurationToOutput(serviceAndModel.model,flat,messages,configInputResult);
         }
 
         if(cache?.cachedResponse){
@@ -1396,280 +1346,6 @@ export class Conversation
 
         return messages;
 
-    }
-
-    private async applyModelConfigurationToInputAsync(
-        model:ConvoModelInfo,
-        flat:FlatConvoConversation
-    ):Promise<ModelConfigurationToInputResult>{
-
-        const lastMsg=getLastConvoMessageWithRole(flat.messages,'user');
-        const jsonMode=lastMsg?.responseFormat==='json';
-        let hasFunctions=false;
-        let fnSystem:string[]|undefined;
-
-        for(let i=0;i<flat.messages.length;i++){
-            const msg=flat.messages[i];
-            if(!msg){
-                continue;
-            }
-            if( jsonMode &&
-                (model.jsonModeDisableFunctions || model.jsonModeImplementAsFunction) &&
-                msg?.fn &&
-                !msg.called
-            ){
-                flat.messages.splice(i,1);
-                i--;
-                continue;
-            }
-            if(msg.responseFormat==='json'){
-                this.applyJsonModeToMessage(msg,model,flat);
-            }
-            if(msg.fn && !msg.called){
-                hasFunctions=true;
-            }
-            if(!model.supportsFunctionCalling){
-                if(msg.fn && !msg.called){
-                    if(!fnSystem){
-                        fnSystem=[];
-                    }
-                    fnSystem.push(`<function>\nName: ${
-                        msg.fn.name
-                    }\nDescription: ${
-                        msg.fn.description??''
-                    }\nParameters JSON Scheme: ${
-                        JSON.stringify((msg._fnParams??(msg.fnParams?(zodTypeToJsonScheme(msg.fnParams)??{}):{})))
-                    }\n</function>\n`);
-                    flat.messages.splice(i,1);
-                    i--;
-                }else if(msg.called){
-                    const updated={...msg};
-                    flat.messages[i]=updated;
-                    delete updated.called;
-                    updated.role='assistant';
-                    const fnCall:SimulatedConvoFunctionCall={
-                        functionName:msg.called.name,
-                        parameters:msg.calledParams??{}
-                    }
-                    updated.content=JSON.stringify(fnCall,null,4);
-
-                    const resultMsg:FlatConvoMessage={
-                        role:'user',
-                        content:(
-                            `The return value of calling ${msg.called.name} is:\`\`\` json\n${
-                                msg.calledReturn===undefined?'undefined':JSON.stringify(msg.calledReturn,null,4)
-                            }\n\`\`\``
-                        )
-                    }
-
-                    flat.messages.splice(i+1,0,resultMsg);
-
-                }
-            }
-        }
-
-        if(fnSystem){
-
-            fnSystem.unshift(
-                '## Function Calling\nYou can call functions when responding to the user if any of the '+
-                'functions relate to the user\'s message.\n\n<callable-functions>\n'
-            )
-
-            fnSystem.push(`</callable-functions>
-
-To call a function respond with a JSON object with 2 properties, "functionName" and "parameters".
-The value of parameters property should conform to the function parameter JSON scheme.
-
-For example to call a function named "openFolder" with a user asks to open the folder named "My Documents"
-you would respond with the following JSON object.
-
-<call-function>
-{
-    "functionName":"openFolder",
-    "parameters":{
-        "folderName":"My Documents"
-    }
-}
-</call-function>
-`
-            );
-
-            insertSystemMessageIntoFlatConvo(fnSystem.join(''),flat);
-        }
-
-        if(!jsonMode && model.enableRespondWithTextFunction && flat.messages.some(m=>m.fn)){
-            await this.flattenSourceAsync({
-                appendTo:flat,
-                passExe:true,
-                cacheName:'responseWithTextFunction',
-                convo:model.respondWithTextFunctionSource??/*convo*/`
-
-# You can call this function if no other functions match the user's message
-> respondWithText(
-    # Message to response with
-    text: string
-)
-                `
-            })
-        }
-
-        if(jsonMode && model.jsonModeImplementAsFunction){
-            const isAry=lastMsg?.responseFormatIsArray;
-            const convoType=`${isAry?'array(':''}${lastMsg?.responseFormatTypeName??'any'}${isAry?')':''}`;
-            await this.flattenSourceAsync({
-                appendTo:flat,
-                passExe:true,
-                cacheName:'respondWithJSONFunction_'+convoType,
-                convo:model.respondWithJSONFunctionSource?.replace('__TYPE__',convoType)??/*convo*/`
-
-# You can call this function to return JSON values to the user
-> respondWithJSON(
-    # JSON object. Do not serialize the value.
-    value: ${convoType}
-)
-                `
-            });
-
-        }
-
-        return {lastMsg,jsonMode,hasFunctions}
-    }
-
-    private applyModelConfigurationToOutput(
-        model:ConvoModelInfo,
-        flat:FlatConvoConversation,
-        output:ConvoCompletionMessage[],
-        {
-            lastMsg,
-            jsonMode,
-            hasFunctions,
-        }:ModelConfigurationToInputResult,
-    ){
-        for(let i=0;i<output.length;i++){
-            const msg=output[i];
-            if(!msg){
-                continue;
-            }
-
-            if(hasFunctions && !model.supportsFunctionCalling && msg.content && msg.content.includes('"functionName"')){
-                try{
-                    let content=msg.content;
-                    if(content.includes('<call')){
-                        content=content.replace(/<\/?call-?function\/?>/g,'');
-                    }
-                    const call:SimulatedConvoFunctionCall=parseConvoJsonMessage(content);
-                    if(call.functionName && call.parameters){
-                        output[i]=createFunctionCallConvoCompletionMessage({
-                            flat,
-                            callFn:call.functionName,
-                            callParams:call.parameters,
-                            toolId:uuid(),
-                            model:model.name,
-                            inputTokens:msg?.inputTokens,
-                            outputTokens:msg?.outputTokens,
-                            tokenPrice:msg.tokenPrice,
-                        })
-                    }
-                }catch{}
-            }
-
-            if(model.enableRespondWithTextFunction && msg.callFn==='respondWithText'){
-                output[i]=createTextConvoCompletionMessage({
-                    flat,
-                    role:msg.role??'assistant',
-                    content:msg.callParams?.text,
-                    model:msg.model??convoAnyModelName,
-                    inputTokens:msg.inputTokens,
-                    outputTokens:msg.outputTokens,
-                    tokenPrice:msg.tokenPrice,
-                })
-            }
-
-            if(model.jsonModeImplementAsFunction && jsonMode){
-                if(msg.callFn==='respondWithJSON'){
-                    let paramValue=msg.callParams?.value??null;
-                    if( lastMsg?.responseFormatTypeName &&
-                        lastMsg?.responseFormatTypeName!=='string' &&
-                        (typeof paramValue === 'string')
-                    ){
-                        paramValue=parseJson5(paramValue)
-                    }
-                    output[i]=createTextConvoCompletionMessage({
-                        flat,
-                        role:msg.role??'assistant',
-                        content:JSON.stringify(paramValue),
-                        model:msg.model??convoAnyModelName,
-                        inputTokens:msg.inputTokens,
-                        outputTokens:msg.outputTokens,
-                        tokenPrice:msg.tokenPrice,
-                        defaults:{
-                            format:'json',
-                            formatTypeName:lastMsg?.responseFormatTypeName,
-                            formatIsArray:lastMsg?.responseFormatIsArray,
-                        }
-                    })
-                }else{
-                    output.splice(i,1);
-                    i--;
-                }
-            }
-        }
-    }
-
-    private applyJsonModeToMessage(msg:FlatConvoMessage,model:ConvoModelInfo,flat:FlatConvoConversation)
-    {
-        if(msg.responseFormat!=='json' || model.jsonModeInstructions){
-            return;
-        }
-
-        if(!msg.suffix){
-            msg.suffix='\n\n';
-        }
-
-        if(model.jsonModeInstructions){
-            msg.suffix=model.jsonModeInstructions
-        }else if(model.jsonModeImplementAsFunction){
-            msg.suffix='Call the respondWithJSON function';
-        }else if(msg.responseFormatTypeName){
-            const type=flat.exe.getVar(msg.responseFormatTypeName);
-
-            let scheme=convoTypeToJsonScheme(type);
-
-            if(!scheme){
-                throw new ConvoError('invalid-message-response-scheme',{},`${msg.responseFormatTypeName} does not point to a convo type object `);
-            }
-
-            if(msg.responseFormatIsArray){
-                scheme={
-                    type:'object',
-                    required:['values'],
-                    properties:{
-                        values:{
-                            type:'array',
-                            items:scheme
-                        }
-                    }
-                }
-            }
-
-            msg.suffix+=`\n\nReturn a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} that conforms to the following JSON Schema:\n${
-                JSON.stringify(scheme)
-            }`;
-        }else{
-            msg.suffix+=`\n\nReturn a well formatted JSON ${msg.responseFormatIsArray?'array':'object'}.`;
-        }
-
-        if(model.jsonModeInstructWrapInCodeBlock){
-            msg.suffix+='\n\nWrap the generated JSON in a markdown json code fence and do not include any pre or post-amble.'
-        }
-
-        if(model.jsonModeInstructionsPrefix){
-            msg.suffix=`${model.jsonModeInstructionsPrefix}\n\n${msg.suffix}`;
-        }
-
-        if(model.jsonModeInstructionsSuffix){
-            msg.suffix=`${msg.suffix}\n\n${model.jsonModeInstructionsSuffix}`;
-        }
     }
 
     /**
@@ -2702,19 +2378,19 @@ you would respond with the following JSON object.
         return flatExe;
     }
 
-    public isSystemMessage(msg:ConvoMessage|null|undefined):boolean{
+    public isSystemMessage(msg:ConvoMessage|FlatConvoMessage|null|undefined):boolean{
         return (msg?.role && this.systemRoles.includes(msg.role) && !msg.fn)?true:false;
     }
 
-    public isAssistantMessage(msg:ConvoMessage|null|undefined):boolean{
+    public isAssistantMessage(msg:ConvoMessage|FlatConvoMessage|null|undefined):boolean{
         return (msg?.role && this.assistantRoles.includes(msg.role) && !msg.fn)?true:false;
     }
 
-    public isUserMessage(msg:ConvoMessage|null|undefined):boolean{
+    public isUserMessage(msg:ConvoMessage|FlatConvoMessage|null|undefined):boolean{
         return (msg?.role && this.userRoles.includes(msg.role) && !msg.fn)?true:false;
     }
 
-    public isContentMessage(msg:ConvoMessage|null|undefined){
+    public isContentMessage(msg:ConvoMessage|FlatConvoMessage|null|undefined){
         return this.isUserMessage(msg) || this.isAssistantMessage(msg) || this.isSystemMessage(msg);
     }
 
@@ -2961,7 +2637,7 @@ you would respond with the following JSON object.
         return r.result??[];
     }
 
-    private async flattenSourceAsync({
+    public async flattenSourceAsync({
         appendTo,convo,cacheName,options,passExe
     }:FlattenSourceOptions){
         const cached=cacheName?flattenSourceCache[cacheName]:undefined;
@@ -4397,7 +4073,7 @@ you would respond with the following JSON object.
 
     public async toModelFormatAsync(flat:FlatConvoConversation):Promise<any>
     {
-        const service=await this.getCompletionServiceAsync(flat,false);
+        const service=await this.getCompletionServiceAsync(flat);
         if(!service){
             return undefined;
         }

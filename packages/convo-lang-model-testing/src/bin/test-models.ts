@@ -13,6 +13,7 @@ interface Args
     anthropic?:boolean;
     oneAtTime?:boolean;
     defaultModel?:boolean;
+    testName?:string[];
     v?:boolean;
 }
 const args=parseCliArgsT<Args>({
@@ -27,6 +28,7 @@ const args=parseCliArgsT<Args>({
         anthropic:args=>args.length?true:false,
         oneAtTime:args=>args.length?true:false,
         defaultModel:args=>args.length?true:false,
+        testName:args=>args,
         v:args=>args.length?true:false,
 
     }
@@ -47,6 +49,7 @@ const main=async ({
     oneAtTime,
     v:verbose,
     defaultModel,
+    testName,
 }:Args)=>{
 
     if(verbose){
@@ -121,6 +124,7 @@ const main=async ({
         printUpdates:true,
         verbose,
         defaultModel,
+        tests:testName
     });
 
     await manager.runTestAsync();

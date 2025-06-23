@@ -11,12 +11,13 @@ export interface ConvoModelTestManagerOptions
     printUpdates?:boolean;
     verbose?:boolean;
     defaultModel?:boolean;
+    tests?:string[];
 }
 
 export class ConvoModelTestManager
 {
 
-    private readonly options:InternalOptions<ConvoModelTestManagerOptions>;
+    private readonly options:InternalOptions<ConvoModelTestManagerOptions,'tests'>;
 
     private readonly _testResults:BehaviorSubject<ConvoModelTestResult[]>=new BehaviorSubject<ConvoModelTestResult[]>([]);
     public get testResultsSubject():ReadonlySubject<ConvoModelTestResult[]>{return this._testResults}
@@ -28,6 +29,7 @@ export class ConvoModelTestManager
         printUpdates=false,
         verbose=false,
         defaultModel=false,
+        tests,
     }:ConvoModelTestManagerOptions){
 
         this.options={
@@ -36,6 +38,7 @@ export class ConvoModelTestManager
             printUpdates,
             verbose,
             defaultModel,
+            tests,
         }
 
         if(printUpdates){
@@ -104,6 +107,7 @@ export class ConvoModelTestManager
             const tester=new ConvoModelTester({
                 manager:this,
                 model:model.name,
+                tests:this.options.tests,
                 convoOptions:{
                     completionService:convoCompletionService.all(),
                     converters:convoConversationConverterProvider.all(),

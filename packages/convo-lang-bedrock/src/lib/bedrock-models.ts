@@ -12,6 +12,7 @@ export const bedrockAnthropicModels:ConvoModelInfo[]=[
     {
         name:'us.anthropic.claude-3-haiku-20240307-v1:0',
         ...anthropicDefaults,
+        requiredFirstMessageRole:'user',
     },
     {
         name:'us.anthropic.claude-3-5-haiku-20241022-v1:0',
@@ -32,6 +33,7 @@ export const bedrockAnthropicModels:ConvoModelInfo[]=[
     {
         name:'us.anthropic.claude-opus-4-20250514-v1:0',
         ...anthropicDefaults,
+        requiredFirstMessageRole:'user',
     },
     {
         name:'us.anthropic.claude-sonnet-4-20250514-v1:0',
@@ -45,6 +47,7 @@ export const bedrockDeepSeekModels:ConvoModelInfo[]=[
         name:'us.deepseek.r1-v1:0',
         supportsChat:true,
         aliases:[{name:'deepseek'}],
+        requiredFirstMessageRole:'user',
     },
 ]
 
@@ -54,6 +57,7 @@ export const bedrockMistralModels:ConvoModelInfo[]=[
         supportsChat:true,
         aliases:[{name:'mistral'}],
         supportsFunctionCalling:true,
+        requiredFirstMessageRole:'user',
     },
 ]
 
@@ -65,6 +69,7 @@ const llamaDefaults:Partial<ConvoModelInfo>={
     //jsonModeDisableFunctions:true,
     jsonModeImplementAsFunction:true,
     filterToolChoice:true,
+    requiredFirstMessageRole:'user',
 }
 
 const llamaSmallDefaults:Partial<ConvoModelInfo>={
@@ -74,6 +79,7 @@ const llamaSmallDefaults:Partial<ConvoModelInfo>={
     jsonModeInstructWrapInCodeBlock:true,
     jsonModeDisableFunctions:true,
     filterToolChoice:true,
+    requiredFirstMessageRole:'user',
 }
 
 
@@ -124,16 +130,20 @@ export const bedrockLlamaModels:ConvoModelInfo[]=[
     },
 ];
 
-export const bedrockNovoModels:ConvoModelInfo[]=[
+const novaDefaults:Partial<ConvoModelInfo>={
+    supportsChat:true,
+    supportsFunctionCalling:true,
+    requiredFirstMessageRole:'user',
+}
+
+export const bedrockNovaModels:ConvoModelInfo[]=[
     {
         name:'us.amazon.nova-lite-v1:0',
-        supportsChat:true,
-        supportsFunctionCalling:true,
+        ...novaDefaults,
     },
     {
         name:'us.amazon.nova-micro-v1:0',
-        supportsChat:true,
-        supportsFunctionCalling:true,
+        ...novaDefaults,
     },
     {
         name:'us.amazon.nova-pro-v1:0',
@@ -141,8 +151,7 @@ export const bedrockNovoModels:ConvoModelInfo[]=[
             {name:'novo'},
             {name:'aws'},
         ],
-        supportsChat:true,
-        supportsFunctionCalling:true,
+        ...novaDefaults,
     },
 ]
 
@@ -151,6 +160,6 @@ export const bedrockModels:ConvoModelInfo[]=[
     ...bedrockDeepSeekModels,
     ...bedrockLlamaModels,
     ...bedrockMistralModels,
-    ...bedrockNovoModels,
+    ...bedrockNovaModels,
 ]
 

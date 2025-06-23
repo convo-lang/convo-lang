@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoConversationConverter, ConvoConversion, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -905,86 +905,6 @@ export const passthroughConvoInputType='FlatConvoConversation';
 
 export const passthroughConvoOutputType='ConvoCompletionMessageAry';
 
-export const convertConvoInput=(
-    flat:FlatConvoConversation,
-    inputType:string,
-    converters:ConvoConversationConverter<any,any>[]
-):ConvoConversion<any>=>{
-    for(const converter of converters){
-        if(converter.supportedInputTypes.includes(inputType)){
-            return {
-                success:true,
-                converter,
-                result:converter.convertConvoToInput(flat,inputType),
-            }
-        }
-    }
-    return {
-        success:false
-    }
-}
-
-export const convertConvoOutput=(
-    output:any,
-    outputType:string,
-    input:any,
-    inputType:string,
-    converters:ConvoConversationConverter<any,any>[],
-    flat:FlatConvoConversation
-):ConvoConversion<any>=>{
-    for(const converter of converters){
-        if(converter.supportedOutputTypes.includes(outputType)){
-            return {
-                success:true,
-                converter,
-                result:converter.convertOutputToConvo(output,outputType,input,inputType,flat),
-            }
-        }
-    }
-    return {
-        success:false
-    }
-}
-
-export const requireConvertConvoInput=(
-    flat:FlatConvoConversation,
-    inputType:string,
-    converters:ConvoConversationConverter<any,any>[]
-):any=>{
-    const r=convertConvoInput(flat,inputType,converters);
-    if(!r.success){
-        throw new Error(`No convo converter found for input type - ${inputType}`);
-    }
-    return r.result;
-}
-
-export const requireConvertConvoOutput=(
-    output:any,
-    outputType:string,
-    input:any,
-    inputType:string,
-    converters:ConvoConversationConverter<any,any>[],
-    flat:FlatConvoConversation
-):ConvoCompletionMessage[]=>{
-    const r=convertConvoOutput(output,outputType,input,inputType,converters,flat);
-    if(!r.success){
-        throw new Error(`No convo converter found for output type - ${outputType}`);
-    }
-    return r.result;
-}
-
-export const completeConvoUsingCompletionServiceAsync=async (
-    flat:FlatConvoConversation,
-    service:ConvoCompletionService<any,any>|null|undefined,
-    converters:ConvoConversationConverter<any,any>[]
-):Promise<ConvoCompletionMessage[]>=>{
-    if(!service){
-        return [];
-    }
-    const input=requireConvertConvoInput(flat,service.inputType,converters);
-    const r=await service.completeConvoAsync(input,flat);
-    return requireConvertConvoOutput(r,service.outputType,input,service.inputType,converters,flat);
-}
 
 export const createOptionalConvoValue=(value:any):OptionalConvoValue=>{
     return {
