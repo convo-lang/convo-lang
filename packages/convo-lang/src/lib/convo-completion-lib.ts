@@ -2,7 +2,7 @@ import { uuid, zodTypeToJsonScheme } from "@iyio/common"
 import { parseJson5 } from "@iyio/json5"
 import { Conversation } from "./Conversation"
 import { ConvoError } from "./ConvoError"
-import { convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
+import { convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
 import { ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
 import { convoTypeToJsonScheme } from "./convo-zod"
 
@@ -241,7 +241,8 @@ export const applyConvoModelConfigurationToInputAsync=async (
             if(msg.role!==model.requiredFirstMessageRole){
                 const msg:FlatConvoMessage={
                     role:model.requiredFirstMessageRole??'user',
-                    content:model.requiredFirstMessageRoleContent??'You can start the conversation'
+                    content:model.requiredFirstMessageRoleContent??'You can start the conversation',
+                    tags:{[convoTags.hidden]:''}
                 }
                 if(convo.isUserMessage(msg)){
                     msg.isUser=true;
