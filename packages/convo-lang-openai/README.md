@@ -11,6 +11,8 @@ A Conversational Language
 
 **NPM** - [https://www.npmjs.com/package/@convo-lang/convo-lang](https://www.npmjs.com/package/@convo-lang/convo-lang)
 
+**VSCode Extension** - [https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools](https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools)
+
 
 ## What is Convo-Lang?
 Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
@@ -33,6 +35,7 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 - @convo-lang/convo-lang - Contains the Convo-Lang Conversation Engine, and a Typescript/Javascript library to use Convo-Lang in your application.
 - @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
 - @convo-lang/convo-lang-openai - Conversation adapter for OpenAI.
+- @convo-lang/convo-lang-bedrock - Conversation adapter for AWS Bedrock.
 - @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
 - @convo-lang/convo-vfs - Used to integrate Convo-Lang into virtual file systems.
 - @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
@@ -41,12 +44,110 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
 
+## Quick Start with NextJS
+You can use the `npx convo --create-next-app` command to quickly get started building AI Agents powered
+by Convo-Lang in a NextJS project
+
+**Step 1:** Create project using convo CLI
+``` sh
+npx convo --create-next-app
+```
+
+**Step 1:** Open newly created project in VSCode or your favorite editor
+``` sh
+# Open project directory
+cd {NEWLY_CREATED_PROJECT_NAME}
+
+# Open Code Editor
+code .
+# -or-
+vim .
+# -or-
+# Use GUI
+```
+
+**Step 3:** Copy example env file to `.env.development` 
+``` sh
+cp example.env.development .env.development
+```
+
+**Step 4:** Add your OpenAI API key to `.env.development` 
+``` conf
+OPENAI_API_KEY={YOUR_OPEN_AI_API_KEY}
+```
+
+**Step 5:** Start the NextJS server
+``` sh
+npm run dev
+```
+
+**Step 6:** Start modifying example agent prompts in any of the example pages
+- pages/index.tsx: Routing agent that opens requested agent
+- pages/agent/todo-list.tsx: Todo list agent that can manage a todo list
+- pages/agent/video-dude.tsx: A video player agent that plays the best YouTube videos
+- pages/agent/weather.tsx: A weather man agent that can tell you the weather anywhere in the world
+
+
+## Model Provider Support
+
+- OpenAI - https://platform.openai.com/docs/models
+  - chatgpt-4o-latest
+  - gpt-3.5-turbo
+  - gpt-3.5-turbo-0125
+  - gpt-3.5-turbo-1106
+  - gpt-3.5-turbo-16k
+  - gpt-4
+  - gpt-4-0125-preview
+  - gpt-4-0613
+  - gpt-4-1106-preview
+  - gpt-4-turbo
+  - gpt-4-turbo-2024-04-09
+  - gpt-4-turbo-preview
+  - gpt-4o
+  - gpt-4o-2024-05-13
+  - gpt-4o-2024-08-06
+  - gpt-4o-mini
+  - gpt-4o-mini-2024-07-18
+  - o1-mini
+  - o1-mini-2024-09-12
+  - o1-preview
+  - o1-preview-2024-09-12
+
+- OpenAI Chat Completions Compatible APIs
+  - LM Studio - https://lmstudio.ai/docs/app/api/endpoints/openai
+  - Ollama - https://ollama.com/blog/openai-compatibility
+  - Llama.cpp - https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+
+- AWS Bedrock - https://aws.amazon.com/bedrock/
+  - us.amazon.nova-lite-v1:0
+  - us.amazon.nova-micro-v1:0
+  - us.amazon.nova-pro-v1:0
+  - us.anthropic.claude-3-5-haiku-20241022-v1:0
+  - us.anthropic.claude-3-5-sonnet-20240620-v1:0
+  - us.anthropic.claude-3-5-sonnet-20241022-v2:0
+  - us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  - us.anthropic.claude-3-haiku-20240307-v1:0
+  - us.anthropic.claude-opus-4-20250514-v1:0
+  - us.anthropic.claude-sonnet-4-20250514-v1:0
+  - us.deepseek.r1-v1:0
+  - us.meta.llama3-1-70b-instruct-v1:0
+  - us.meta.llama3-1-8b-instruct-v1:0
+  - us.meta.llama3-2-11b-instruct-v1:0
+  - us.meta.llama3-2-1b-instruct-v1:0
+  - us.meta.llama3-2-3b-instruct-v1:0
+  - us.meta.llama3-2-90b-instruct-v1:0
+  - us.meta.llama3-3-70b-instruct-v1:0
+  - us.meta.llama4-maverick-17b-instruct-v1:0
+  - us.meta.llama4-scout-17b-instruct-v1:0
+  - us.mistral.pixtral-large-2502-v1:0
+
+
 ## VSCode extension
 You will also probably want to install the vscode extension for syntax highlighting and other
 developer niceties. You can install the vscode extension by searching for "convo-lang" in the
 vscode extension tab.
 
-https://marketplace.visualstudio.com/items?itemName=IYIO.convo-lang-tools 
+https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools 
 
 
 ## Using Convo-Lang
@@ -156,7 +257,9 @@ https://github.com/convo-lang/convo-lang-node-example
 
 
 
-## Using convo-lang in a NextJs project
+## Using convo-lang in a existing NextJs project
+Follow the step below to you Convo-Lang in an existing NextJS project
+
 
 Install packages:
 ``` sh
@@ -187,7 +290,7 @@ export default handler;
 
 ```
 
-The code below create a fully functional chat interface with a website assistant agent
+The code below creates a fully functional chat interface with a website assistant agent
 ``` tsx
 import { ConversationView } from "@convo-lang/convo-lang-react";
 import { NextJsBaseLayoutView } from "@iyio/nextjs-common";

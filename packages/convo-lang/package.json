@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang",
-    "version": "0.7.24",
+    "version": "0.7.25",
     "type": "commonjs",
     "sideEffects": false,
     "license": "Apache-2.0",
