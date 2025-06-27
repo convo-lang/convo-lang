@@ -2945,7 +2945,7 @@ export class Conversation
                     flat.fn=msg.fn;
                     flat.fnParams=exe.getConvoFunctionArgsScheme(msg.fn);
                 }
-            }else if(containsConvoTag(msg.tags,convoTags.edge)){
+            }else if(containsConvoTag(msg.tags,convoTags.edge) && msg.statement){
                 flat.edge=true;
                 edgePairs.push({flat,msg:msg,shouldParseMd,setMdVars});
 
