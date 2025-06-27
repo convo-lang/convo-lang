@@ -97,7 +97,7 @@ export function ConversationView({
     markdownClassName,
     modules,
     modulesRefreshKey,
-    imports
+    imports,
 }:ConversationViewProps){
 
     const refs=useRef({modules});

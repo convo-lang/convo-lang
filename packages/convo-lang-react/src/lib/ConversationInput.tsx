@@ -24,7 +24,9 @@ export interface ConversationInputProps
     imageAlt?:string;
     imageClassName?:string;
     imageSize?:string|number;
-    imageAr?:string|number
+    imageAr?:string|number;
+    autoFocus?:boolean|number;
+    autoFocusDelayMs?:number;
 }
 
 export function ConversationInput({
@@ -46,6 +48,8 @@ export function ConversationInput({
     imageClassName,
     imageSize='3rem',
     imageAr='1',
+    autoFocus,
+    autoFocusDelayMs=30
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -62,6 +66,20 @@ export function ConversationInput({
 
     const refs=useRef({submit});
     refs.current.submit=submit;
+
+    const [input,setInput]=useState<HTMLInputElement|null>(null);
+    useEffect(()=>{
+        if(!input || !autoFocus){
+            return;
+        }
+        const iv=setTimeout(()=>{
+            input.focus();
+        },autoFocusDelayMs);
+        return ()=>{
+            clearInterval(iv);
+        }
+
+    },[input,autoFocus,autoFocusDelayMs]);
 
     useEffect(()=>{
         if(submitTrigger!==undefined){
@@ -91,6 +109,7 @@ export function ConversationInput({
             {beforeInput}
 
             <input
+                ref={setInput}
                 className={unstyled?inputClassName:style.input({min},inputClassName)}
                 placeholder={placeholder}
                 name={inputName}
