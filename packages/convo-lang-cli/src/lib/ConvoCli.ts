@@ -1,5 +1,4 @@
-import { openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/ai-complete-openai';
-import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, parseConvoCode } from "@convo-lang/convo-lang";
+import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { EnvParams, createJsonRefReplacer, deleteUndefined, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';

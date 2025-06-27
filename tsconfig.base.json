@@ -19,12 +19,6 @@
         "skipDefaultLibCheck": true,
         "baseUrl": ".",
         "paths": {
-            "@convo-lang/ai-complete": [
-                "packages/ai-complete/src/index.ts"
-            ],
-            "@convo-lang/ai-complete-openai": [
-                "packages/ai-complete-openai/src/index.ts"
-            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
