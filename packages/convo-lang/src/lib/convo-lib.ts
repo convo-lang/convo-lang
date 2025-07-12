@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -2181,4 +2181,22 @@ export const insertSystemMessageIntoFlatConvo=(msg:string,flat:FlatConvoConversa
         }
     }
     flat.messages.unshift(flatMsg);
+}
+
+
+const serviceModelCache:Record<string,ConvoModelInfo[]>={};
+export const getConvoCompletionServiceModelsAsync=async (service:ConvoCompletionService<any,any>,disableCache=service.disableModelInfoCaching):Promise<ConvoModelInfo[]>=>{
+    const cached=disableCache?undefined:serviceModelCache[service.serviceId];
+    if(cached){
+        return cached;
+    }
+    if(!service.getModelsAsync){
+        return [];
+    }
+
+    const models=(await service.getModelsAsync())??[];
+    if(!disableCache){
+        serviceModelCache[service.serviceId]=models;
+    }
+    return models;
 }

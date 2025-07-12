@@ -1,5 +1,5 @@
 import { ContentBlock, ConversationRole, ConverseCommandInput, ConverseCommandOutput, Message, SystemContentBlock, Tool, ToolChoice } from "@aws-sdk/client-bedrock-runtime";
-import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { deleteUndefined, log, parseMarkdownImages, uuid, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { convoBedrockInputType, convoBedrockOutputType, defaultBedrockModel } from "./bedrock-lib";
@@ -143,7 +143,7 @@ export class BedrockConvoConverter implements ConvoConversationConverter<Convers
         }
     }
 
-    public convertConvoToInput(flat:FlatConvoConversation,inputType:string):ConverseCommandInput{
+    public convertConvoToInput(flat:FlatConvoConversationBase,inputType:string):ConverseCommandInput{
 
         const messages=getNormalizedFlatMessageList(flat,{
             mergeSystemMessages:true,

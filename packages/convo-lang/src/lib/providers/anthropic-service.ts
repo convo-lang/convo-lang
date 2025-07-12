@@ -13,6 +13,7 @@ export const convoAnthropicModule=(scope:ScopeRegistration)=>{
 
 export const createAnthropicConvoServiceFromScope=(scope:Scope):BaseOpenAiConvoCompletionService=>{
     return new BaseOpenAiConvoCompletionService({
+        serviceId:'anthropic',
         apiKey:scope.to(anthropicApiKeyParam).get(),
         apiBaseUrl:scope.to(anthropicBaseUrlParam).get(),
         completionsEndpoint:'/v1/messages',

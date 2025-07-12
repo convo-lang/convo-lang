@@ -32,6 +32,7 @@ export interface OpenAiConvoCompletionServiceOptions extends OpenAiModels
 
 export class OpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
 {
+    public readonly serviceId='open-ai';
 
     public static fromScope(scope:Scope){
         return new OpenAiConvoCompletionService({

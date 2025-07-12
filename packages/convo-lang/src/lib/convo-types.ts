@@ -819,6 +819,8 @@ export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
 export interface ConvoCompletionService<TInput,TOutput>
 {
 
+    serviceId:string;
+
     inputType:string;
 
     outputType:string;
@@ -832,7 +834,18 @@ export interface ConvoCompletionService<TInput,TOutput>
 
     completeConvoAsync(input:TInput,flat:FlatConvoConversationBase):Promise<TOutput>
 
-    getModelsAsync?:()=>Promise<ConvoModelInfo[]|undefined>;
+    getModelsAsync?():Promise<ConvoModelInfo[]|undefined>;
+
+    /**
+     * If true models return from getModelsAsync will not be cached.
+     */
+    disableModelInfoCaching?:boolean;
+
+    /**
+     * Used to relay message formatting. This is primarily used by the HttpConvoCompletionService
+     * to convert message using converters server side.
+     */
+    relayConvertConvoToInputAsync?(flat:FlatConvoConversationBase,inputType:string):Promise<TInput>;
 }
 
 export interface ConvoCompletionServiceAndModel
@@ -905,6 +918,12 @@ export interface FlatConvoTransform
     optional?:boolean;
 }
 
+export interface ConvoQueueRef
+{
+    label:string;
+    index:number;
+}
+
 export interface FlatConvoConversation extends FlatConvoConversationBase
 {
     exe:ConvoExecutionContext;
@@ -921,22 +940,11 @@ export interface FlatConvoConversation extends FlatConvoConversationBase
 
     markdownVars:Record<string,ConvoMarkdownLine|string>;
 
-    /**
-     * If defined the debug function should be written to with debug info.
-     */
-    debug?:(...args:any[])=>void;
-
     transforms?:FlatConvoTransform[];
 
     transformFilterMessages?:FlatConvoMessage[];
 
 
-}
-
-export interface ConvoQueueRef
-{
-    label:string;
-    index:number;
 }
 
 export interface FlatConvoConversationBase
@@ -1000,6 +1008,11 @@ export interface FlatConvoConversationBase
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
     apiKey?:string;
+
+    /**
+     * If defined the debug function should be written to with debug info.
+     */
+    debug?:(...args:any[])=>void;
 }
 
 export interface ConvoExecuteResult
@@ -1522,4 +1535,10 @@ export interface SimulatedConvoFunctionCall
 {
     functionName:string;
     parameters:Record<string,any>;
+}
+
+export interface ConvoHttpToInputRequest
+{
+    flat:FlatConvoConversationBase;
+    inputType:string;
 }

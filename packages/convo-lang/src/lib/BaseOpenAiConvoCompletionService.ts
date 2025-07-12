@@ -18,11 +18,12 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     updateRequest?:(requestBody:Record<string,any>,headers:Record<string,string|undefined>)=>void;
     completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
     isFallback?:boolean;
+    serviceId:string;
 }
 
 export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
 {
-
+    public readonly serviceId:string;
     public readonly inputType:string;
     public readonly outputType:string;
 
@@ -54,9 +55,11 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         headers={
             'Content-Type':'application/json'
         },
+        serviceId,
         completeAsync,
         updateRequest,
     }:BaseOpenAiConvoCompletionServiceOptions){
+        this.serviceId=serviceId;
         this.apiKey=apiKey;
         this.apiBaseUrl=apiBaseUrl;
         this.completionsEndpoint=completionsEndpoint;

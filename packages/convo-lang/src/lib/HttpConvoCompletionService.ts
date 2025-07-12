@@ -1,6 +1,6 @@
-import { Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
+import { NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
-import { ConvoCompletionMessage, ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types";
+import { ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types";
 import { convoCompletionService } from "./convo.deps";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -37,6 +37,8 @@ export interface HttpConvoCompletionServiceOptions
  */
 export class HttpConvoCompletionService implements ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>
 {
+
+    public readonly serviceId='http';
 
     public static fromScope(scope:Scope){
         const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
@@ -102,5 +104,17 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
     public getModelsAsync():Promise<ConvoModelInfo[]|undefined>
     {
         return httpClient().getAsync<ConvoModelInfo[]>(joinPaths(this.getEndpoint(),'/models'));
+    }
+
+    public async relayConvertConvoToInput?(flat:FlatConvoConversationBase,inputType:string):Promise<FlatConvoConversationBase>{
+        const request:ConvoHttpToInputRequest={
+            flat:getSerializableFlatConvoConversation(flat),
+            inputType
+        };
+        const r=await httpClient().postAsync<FlatConvoConversationBase>(joinPaths(this.getEndpoint(),'/convert'),request);
+        if(!r){
+            throw new NotFoundError();
+        }
+        return r;
     }
 }

@@ -13,6 +13,7 @@ export const convoOpenAiModule=(scope:ScopeRegistration)=>{
 
 export const createOpenAiConvoServiceFromScope=(scope:Scope):BaseOpenAiConvoCompletionService=>{
     return new BaseOpenAiConvoCompletionService({
+        serviceId:'open-ai',
         apiKey:scope.to(openAiApiKeyParam).get(),
         apiBaseUrl:scope.to(openAiBaseUrlParam).get(),
         secretManager:scope.to(secretManager).get(),

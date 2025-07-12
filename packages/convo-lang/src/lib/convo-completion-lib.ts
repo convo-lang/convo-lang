@@ -2,12 +2,12 @@ import { uuid, zodTypeToJsonScheme } from "@iyio/common"
 import { parseJson5 } from "@iyio/json5"
 import { Conversation } from "./Conversation"
 import { ConvoError } from "./ConvoError"
-import { convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
-import { ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
+import { convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
+import { ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
 import { convoTypeToJsonScheme } from "./convo-zod"
 
 export const convertConvoInput=(
-    flat:FlatConvoConversation,
+    flat:FlatConvoConversationBase,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[]
 ):ConvoConversion<any>=>{
@@ -31,7 +31,7 @@ export const convertConvoOutput=(
     input:any,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[],
-    flat:FlatConvoConversation
+    flat:FlatConvoConversationBase
 ):ConvoConversion<any>=>{
     for(const converter of converters){
         if(converter.supportedOutputTypes.includes(outputType)){
@@ -120,8 +120,8 @@ export const getConvoCompletionServicesForModelAsync=async (
 
     const matches:{priority:number,service:ConvoCompletionServiceAndModel}[]=[];
     for(const s of services){
-        const models=await s.getModelsAsync?.();
-        if(!models){
+        const models=await getConvoCompletionServiceModelsAsync(s);
+        if(!models.length){
             matches.push({priority:Number.MIN_SAFE_INTEGER,service:{service:s}});
             continue;
         }

@@ -242,6 +242,28 @@ hi
         `)
     }
 
+    public test_jsonSchema=()=>
+    {
+        return this.runTestAsync({
+            name:'jsonSchema',
+            description:'Test JSON mode using a schema',
+            format:'json',
+        },/*convo*/`
+
+> define
+Car=struct(
+    name: string
+    topSpeedMPH: number
+    color: string
+)
+
+@json Car
+> user
+A fast red car
+
+        `)
+    }
+
     public test_jsonArray=()=>
     {
         return this.runTestAsync({

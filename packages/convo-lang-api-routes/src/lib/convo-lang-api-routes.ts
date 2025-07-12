@@ -1,4 +1,4 @@
-import { Conversation, ConvoCompletionServiceAndModel, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
+import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
 import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
@@ -52,8 +52,8 @@ export const createConvoLangApiRoutes=({
                     if(!s.getModelsAsync){
                         continue;
                     }
-                    const ms=await s.getModelsAsync();
-                    if(ms){
+                    const ms=await getConvoCompletionServiceModelsAsync(s);
+                    if(ms.length){
                         models.push(...ms);
                     }
                 }
@@ -135,6 +135,19 @@ export const createConvoLangApiRoutes=({
                 await conversation.completeAsync(body);
 
                 return conversation.convo.substring(l);
+            }
+        },
+
+        {
+            method:'POST',
+            match:new RegExp(`${regPrefix}/convert$`),
+            handler:({
+                body,
+            })=>{
+
+                const request:ConvoHttpToInputRequest=body;
+
+                return convertConvoInput(request.flat,request.inputType,convoConversationConverterProvider.all());
             }
         },
     ];

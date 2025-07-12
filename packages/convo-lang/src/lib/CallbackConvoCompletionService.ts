@@ -4,6 +4,8 @@ import { ConvoCompletionMessage, ConvoCompletionService, FlatConvoConversation, 
 export class CallbackConvoCompletionService implements ConvoCompletionService<FlatConvoConversation,ConvoCompletionMessage[]>
 {
 
+    public readonly serviceId='callback';
+
     public readonly inputType=passthroughConvoInputType;
 
     public readonly outputType=passthroughConvoOutputType;

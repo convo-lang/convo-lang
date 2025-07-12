@@ -13,6 +13,7 @@ export interface BedrockConvoCompletionServiceOptions
 
 export class BedrockConvoCompletionService implements ConvoCompletionService<ConverseCommandInput,ConverseCommandOutput>
 {
+    public readonly serviceId='bedrock';
 
     public static fromScope(scope:Scope){
         return new BedrockConvoCompletionService({
