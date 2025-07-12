@@ -309,12 +309,12 @@ The follow NPM packages are available for TypeScript/JavaScript integration
   In most cases, you will not install this package but instead install the vscode convo-lang extension.
 
 ### Create NextJS App
-You can use the `npx convo --create-next-app` command to quickly get started building AI Agents powered
+You can use the `npx @convo-lang/convo-lang-cli --create-next-app` command to quickly get started building AI Agents powered
 by Convo-Lang in a NextJS project
 
 **Step 1:** Create project using convo CLI
 ``` sh
-npx convo --create-next-app
+npx @convo-lang/convo-lang-cli --create-next-app
 ```
 
 **Step 1:** Open newly created project in VSCode or your favorite editor

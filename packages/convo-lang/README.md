@@ -45,12 +45,12 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 
 
 ## Quick Start with NextJS
-You can use the `npx convo --create-next-app` command to quickly get started building AI Agents powered
+You can use the `npx @convo-lang/convo-lang-cli --create-next-app` command to quickly get started building AI Agents powered
 by Convo-Lang in a NextJS project
 
 **Step 1:** Create project using convo CLI
 ``` sh
-npx convo --create-next-app
+npx @convo-lang/convo-lang-cli --create-next-app
 ```
 
 **Step 1:** Open newly created project in VSCode or your favorite editor
