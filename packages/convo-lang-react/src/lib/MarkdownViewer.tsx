@@ -23,12 +23,16 @@ export interface MarkdownViewerProps
     markdown?:string|null;
     lazy?:boolean;
     contentClassName?:string;
+    disableImages?:boolean;
+    disableLinks?:boolean;
 }
 
 export function MarkdownViewer({
     markdown,
     lazy,
     contentClassName,
+    disableImages,
+    disableLinks,
     ...props
 }:MarkdownViewerProps & BaseLayoutProps){
 
@@ -49,15 +53,22 @@ export function MarkdownViewer({
 
         getMdAsync().then(md=>{
             if(m){
+                let renderer=md;
+                if(disableImages){
+                    renderer=(renderer as any).disable('image');
+                }
+                if(disableLinks){
+                    renderer=(renderer as any).disable('link');
+                }
                 const match=mdBlock.exec(markdown);
                 if(match){
                     let m=markdown.substring(match[0].length).trim();
                     if(m.endsWith('```')){
                         m=m.substring(0,m.length-3);
                     }
-                    elem.innerHTML=md.render(m);
+                    elem.innerHTML=renderer.render(m);
                 }else{
-                    elem.innerHTML=md.render(markdown);
+                    elem.innerHTML=renderer.render(markdown);
                 }
             }
         })
@@ -66,7 +77,7 @@ export function MarkdownViewer({
             m=false;
         }
 
-    },[markdown,elem,show,lazy]);
+    },[markdown,elem,show,lazy,disableImages,disableLinks]);
 
     return (
         <div ref={setElem} className={cn(style.root(null,null,props),contentClassName??markdownStyle.root())}/>
