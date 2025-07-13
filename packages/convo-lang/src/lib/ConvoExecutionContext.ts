@@ -1,8 +1,10 @@
 import { getErrorMessage, getValueByAryPath, isPromise, zodCoerceObject } from '@iyio/common';
 import { ZodObject, ZodType } from 'zod';
+import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { parseConvoPromptString } from './convo-parser';
 import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, convoFlowControllerKey, convoScopeFnKey } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
@@ -47,13 +49,19 @@ export class ConvoExecutionContext
 
     public readonly convo:ConvoGlobal;
 
+    private readonly parentConvo?:Conversation;
+
     public print:ConvoPrintFunction=defaultConvoPrintFunction;
 
     public dynamicFunctionCallback:ConvoScopeFunction|undefined;
 
     public defaultThrowOnUndefined=false;
 
-    public constructor(convo?:Partial<ConvoGlobal>)
+    public disableInlinePrompts=false;
+
+    public maxInlinePromptDepth=10;
+
+    public constructor(convo?:Partial<ConvoGlobal>,parentConvo?:Conversation)
     {
         this.convo={
             ...convo,
@@ -63,6 +71,7 @@ export class ConvoExecutionContext
             })
         }
         this.sharedVars={...defaultConvoVars,[convoGlobalRef]:this.convo}
+        this.parentConvo=parentConvo;
     }
 
     public getUserSharedVars(){
@@ -591,7 +600,9 @@ export class ConvoExecutionContext
                     }else{
                         value=fn(scope,this);
                     }
-
+                    if(statement.prompt && value && (typeof value ==='string')){
+                        value=this.executePromptAsync(statement,value);
+                    }
                 }
             }
             if(scope.r){
@@ -616,6 +627,23 @@ export class ConvoExecutionContext
 
         }else if(statement.ref){
             value=this.getVarEx(statement.ref,statement.refPath,scope);
+        }else if(statement.prompt){
+            if(this.disableInlinePrompts){
+                setConvoScopeError(scope,{
+                    message:`Inline prompts not allowed in current content. Inline prompts can not be used in content messages or top level statements`,
+                    statement,
+                });
+                return scope;
+            }
+            if(typeof statement.value === 'string'){
+                value=this.executePromptAsync(statement);
+            }else{
+                setConvoScopeError(scope,{
+                    message:`Prompt statement expected value to be string`,
+                    statement,
+                });
+                return scope;
+            }
         }else{
             value=statement.value;
         }
@@ -644,6 +672,45 @@ export class ConvoExecutionContext
         }
 
         return scope;
+    }
+
+    private async executePromptAsync(statement:ConvoStatement,content?:string)
+    {
+        if(this.parentConvo && this.parentConvo.childDepth>this.maxInlinePromptDepth){
+            throw new Error('Max inline prompt depth reached');
+        }
+
+        let prompt=statement.prompt;
+        if(!prompt?.messages){
+            if(!content){
+                content=statement.value;
+            }
+            if(typeof content !== 'string'){
+                throw new Error('Unable to create runtime prompt with non string value');
+            }
+            const {error,prompt:p}=parseConvoPromptString(content);
+            if(error){
+                throw new Error(`Failed to parse runtime prompt string - ${error}`);
+            }
+            prompt=p;
+        }
+        const options:ConversationOptions={disableAutoFlatten:true}
+        const sub=(
+            this.parentConvo?.clone({
+                empty:!prompt?.extend,
+                systemOnly:prompt?.systemOnly,
+                noFunctions:prompt?.noFunctions,
+                last:prompt?.last,
+                dropLast:prompt?.dropLast,
+                dropUntilContent:true,
+            },options)??
+            new Conversation(options)
+        );
+        if(prompt?.messages?.length){
+            sub.appendMessageObject(prompt.messages);
+        }
+        const r=await sub.completeAsync();
+        return r.message?.content;
     }
 
 

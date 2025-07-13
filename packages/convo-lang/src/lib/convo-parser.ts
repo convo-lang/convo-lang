@@ -1,16 +1,16 @@
-import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown } from '@iyio/common';
+import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoStatementPrompt, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
-type StringType='"'|"'"|'---'|'>';
+type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
 const topLevelMessageReg=/(>)\s*(do|result|define|debug|end)/gs;
 const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
 
-const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
+const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
 const spaceIndex=1;
 const ccIndex=3;
 const labelIndex=5;
@@ -26,6 +26,8 @@ const numberReg=/^-?[.\d]/;
 const singleStringReg=/\{\{|'/gs;
 const doubleStringReg=/"/gs;
 const heredocStringReg=/-{3,}/gs;
+const promptStringReg=/\{\{|\?{3,}/gs;
+const embedStringReg=/\{\{|={3,}/gs;
 const msgStringReg=/(\{\{|[\n\r]\s*>|$)/gs;
 
 const heredocOpening=/^([^\n])*\n(\s*)/;
@@ -155,6 +157,14 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
             case '>':
                 stringEndReg=msgStringReg;
+                break;
+
+            case '???':
+                stringEndReg=promptStringReg;
+                break;
+
+            case '===':
+                stringEndReg=embedStringReg;
                 break;
         }
     }
@@ -467,9 +477,20 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         if(isMsgString){
                             removeBackslashes(strStatement.params);
+                        }else if(inString==='???'){
+                            strStatement.prompt={}
                         }
                     }else{
                         strStatement.value=content;
+                        if(inString==='???'){
+                            const {error:err,updatedContent,prompt}=parseConvoPromptString(content);
+                            if(err){
+                                error=err;
+                                break parsingLoop;
+                            }
+                            strStatement.prompt=prompt;
+                            strStatement.value=updatedContent;
+                        }
                     }
                 }
                 index=nextIndex;
@@ -756,6 +777,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 openString(val,statement);
             }else if(val?.startsWith('---')){
                 openString('---',statement);
+            }else if(val?.startsWith('???')){
+                openString('???',statement);
+            }else if(val?.startsWith('===')){
+                openString('===',statement);
             }else if(val && numberReg.test(val)){// number
                 statement.value=Number(val);
             }else if(convoValueConstants.includes(val as ConvoValueConstant)){
@@ -1226,5 +1251,40 @@ const removeBackslashes=(params:ConvoStatement[])=>{
             s.value=s.value.substring(0,s.value.length-1);
         }
 
+    }
+}
+
+const optionsSplit=/[, \t]+/;
+const promptStringParamsReg=/^\s*\(([^)]*)\)/s;
+const lastReg=/last\s*:\s*(\d+)/;
+const dropLastReg=/dropLast\s*:\s*(\d+)/;
+export const parseConvoPromptString=(
+    content:string,
+):{prompt?:ConvoStatementPrompt,updatedContent:string,error?:string}=>{
+    const paramsMatch=promptStringParamsReg.exec(content);
+    const opStr=paramsMatch?.[1];
+    const options=opStr?.split(optionsSplit).map(v=>v.trim());
+    if(paramsMatch){
+        content=content.substring(paramsMatch[0].length+1).trim();
+    }else{
+        content=content.trim();
+    }
+    const messages=parseConvoCode(content,{...options,startIndex:0});
+    if(!messages.result || messages.error){
+        return {
+            error:`Failed to parse prompt string - ${messages.error?.message}:${messages.error?.line}`,
+            updatedContent:content
+        }
+    }
+    return {
+        prompt:{
+            extend:options?.includes('extend'),
+            systemOnly:options?.includes('systemOnly'),
+            noFunctions:options?.includes('noFunctions'),
+            last:opStr?safeParseNumberOrUndefined(lastReg.exec(opStr)?.[1]):undefined,
+            dropLast:opStr?safeParseNumberOrUndefined(dropLastReg.exec(opStr)?.[1]):undefined,
+            messages:messages.result,
+        },
+        updatedContent:content,
     }
 }

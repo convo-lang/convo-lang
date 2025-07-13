@@ -298,6 +298,41 @@ export interface ConvoStatement
      * If true the statement has pipe statements in it's args.
      */
     _hasPipes?:boolean;
+
+    /**
+     * Used with prompt strings and indicates the string is a prompt to be completed
+     */
+    prompt?:ConvoStatementPrompt;
+}
+
+export interface ConvoStatementPrompt
+{
+    /**
+     * If true the prompt should extend the current conversation
+     */
+    extend?:boolean;
+    /**
+     * When extends is true and system is true only system messages will be extended
+     */
+    systemOnly?:boolean;
+
+    /**
+     * Prevents functions from being extended in to the cloned conversation.
+     */
+    noFunctions?:boolean;
+
+    /**
+     * Causes only the last N number of message to be cloned
+     */
+    last?:number;
+
+    dropLast?:number;
+
+    /**
+     * If undefined the prompt messages will be parsed at runtime. If a prompt string has dynamic
+     * statements it will have to be parsed at runtime.
+     */
+    messages?:ConvoMessage[];
 }
 
 export interface ConvoMessageAndOptStatement
@@ -1223,6 +1258,10 @@ export interface CloneConversationOptions
     noFunctions?:boolean;
     cloneConvoString?:boolean;
     removeAgents?:boolean;
+    last?:number;
+    dropLast?:number;
+    dropUntilContent?:boolean;
+    empty?:boolean;
 }
 
 export interface ConvoDocumentReference

@@ -1801,6 +1801,16 @@ export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):Flat
     return undefined;
 }
 
+export const getLastCalledConvoMessage=(messages:ConvoMessage[],startIndex=messages.length-1):ConvoMessage|undefined=>{
+    for(let i=startIndex;i>=0;i--){
+        const msg=messages[i];
+        if(msg && msg.fn?.call){
+            return msg;
+        }
+    }
+    return undefined;
+}
+
 export interface CreateTextConvoCompletionMessageOptions
 {
     flat:FlatConvoConversationBase;
