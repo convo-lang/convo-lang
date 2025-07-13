@@ -7,7 +7,7 @@ import { ConvoComponent } from './convo-component-types';
 import { getConvoMetadata } from './convo-lib';
 import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
 
-describe('convo',()=>{
+describe('conversation',()=>{
 
     it('should complete',async ()=>{
 
