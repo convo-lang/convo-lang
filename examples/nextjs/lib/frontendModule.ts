@@ -22,9 +22,6 @@ export const frontendModule=(reg:ScopeRegistration)=>{
     reg.addFactory(convoDocReaderFactory,convoPdfDocReaderFactory);
     //reg.implementService(convoCacheService,()=>new ConvoUserVfsCache())
 
-    reg.addFactory(convoDocReaderFactory,convoPdfDocReaderFactory);
-    //reg.implementService(convoCacheService,()=>new ConvoUserVfsCache());
-
     reg.use(convoHttpRelayModule);
 
     reg.use(nextJsModule);
