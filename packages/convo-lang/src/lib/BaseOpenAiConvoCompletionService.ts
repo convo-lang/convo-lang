@@ -19,6 +19,7 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
     isFallback?:boolean;
     serviceId:string;
+    /** Whether to log HTTP requests and responses for debugging purposes */
     logRequests?:boolean;
 }
 

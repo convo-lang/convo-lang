@@ -12,7 +12,13 @@ export type ConvoValueConstant=(typeof convoValueConstants)[number];
 export const convoNonFuncKeywords=['in'] as const;
 export type ConvoNonFuncKeyword=(typeof convoNonFuncKeywords)[number];
 
+/**
+ * Reserved role names in Convo-Lang that have special meaning and cannot be used as custom roles.
+ * These roles are used for system functionality like function calls, execution blocks, and debugging.
+ */
 export const convoReservedRoles=['call','do','result','define','debug','end','trigger'] as const;
+
+/** Union type of all reserved role names */
 export type ConvoReservedRole=(typeof convoReservedRoles)[number];
 
 
@@ -82,6 +88,7 @@ export interface ConvoMessage
     description?:string;
     statement?:ConvoStatement;
     fn?:ConvoFunction;
+    /** Message triggers that will be evaluated when this function is defined */
     messageTriggers?:ConvoMessageTrigger[];
     tags?:ConvoTag[];
     markdown?:MarkdownLine[];
@@ -1051,6 +1058,7 @@ export interface FlatConvoConversationBase
 
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
+    /** Array of message triggers that will be automatically evaluated for applicable messages */
     messageTriggers?:ConvoMessageTrigger[];
 
     apiKey?:string;
@@ -1594,11 +1602,24 @@ export interface ConvoHttpToInputRequest
     inputType:string;
 }
 
+/**
+ * Defines the action type for message triggers that determine how trigger function results 
+ * are applied to content messages.
+ */
 export type ConvoMessageTriggerAction='replace'|'replaceForModel'|'append'|'prepend'|'prefix'|'suffix';
+
+/**
+ * Configuration for message triggers that allow functions to be automatically called
+ * when messages with specific roles are added to conversations.
+ */
 export interface ConvoMessageTrigger
 {
+    /** The message role that triggers this function call */
     role:string;
+    /** The name of the function to call when triggered */
     fnName:string;
+    /** How the function result should be applied to the message */
     action:ConvoMessageTriggerAction;
+    /** Optional condition that must be true for the trigger to fire */
     condition?:string;
 }

@@ -932,6 +932,13 @@ export class ConvoExecutionContext
         }
     }
 
+    /**
+     * Gets built-in type aliases by name. Used to provide predefined types
+     * that are commonly used in Convo-Lang but not explicitly defined in user code.
+     *
+     * @param name - The name of the type alias to retrieve
+     * @returns The type definition, or undefined if the alias doesn't exist
+     */
     public getVarAlias(name:string)
     {
         switch(name){

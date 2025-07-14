@@ -2137,6 +2137,10 @@ export const getNormalizedFlatMessageList=(
 
 /**
  * Merges "replace", "append" and "prepend" messages with their corresponding content messages.
+ * This function processes a list of flat conversation messages and applies content modification
+ * operations (replace, append, prepend) to their target content messages.
+ * 
+ * @param messages - Array of flat conversation messages to process in-place
  */
 export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
 
@@ -2339,6 +2343,16 @@ export const getConvoCompletionServiceModelsAsync=async (service:ConvoCompletion
 }
 
 const triggerReg=/^\s*(replaceForModel|replace|append|prepend|prefix|suffix)\s*(.*)/;
+
+/**
+ * Parses a message trigger tag value to extract the trigger action and optional condition.
+ * Supports syntax like "replace condition" or "append" where the condition is optional.
+ * 
+ * @param fnName - The name of the function to be called by the trigger
+ * @param role - The message role that will trigger this function
+ * @param tagValue - The tag value containing action and optional condition
+ * @returns Parsed ConvoMessageTrigger object, or undefined if parsing fails
+ */
 export const parseConvoMessageTrigger=(fnName:string,role:string,tagValue:string):ConvoMessageTrigger|undefined=>{
     const match=triggerReg.exec(tagValue);
     if(!match){
@@ -2353,6 +2367,14 @@ export const parseConvoMessageTrigger=(fnName:string,role:string,tagValue:string
 
 }
 
+/**
+ * Appends a value to the prefix of a flat conversation message.
+ * If a prefix already exists, the new value is concatenated with optional separation.
+ * 
+ * @param msg - The flat conversation message to modify
+ * @param value - The string value to append to the prefix
+ * @param sep - Whether to add separator (double newlines) between existing and new content
+ */
 export const appendFlatConvoMessagePrefix=(msg:FlatConvoMessage,value:string,sep=true)=>{
     if(msg.prefix){
         msg.prefix+=(sep?'\n\n':'')+value;
@@ -2360,6 +2382,15 @@ export const appendFlatConvoMessagePrefix=(msg:FlatConvoMessage,value:string,sep
         msg.prefix=value;
     }
 }
+
+/**
+ * Appends a value to the suffix of a flat conversation message.
+ * If a suffix already exists, the new value is concatenated with optional separation.
+ * 
+ * @param msg - The flat conversation message to modify
+ * @param value - The string value to append to the suffix
+ * @param sep - Whether to add separator (double newlines) between existing and new content
+ */
 export const appendFlatConvoMessageSuffix=(msg:FlatConvoMessage,value:string,sep=true)=>{
     if(msg.suffix){
         msg.suffix+=(sep?'\n\n':'')+value;

@@ -182,6 +182,7 @@ export interface ConversationOptions
 
     childDepth?:number;
 
+    /** When true, message triggers will not be evaluated automatically */
     disableTriggers?:boolean;
 }
 
@@ -3737,10 +3738,21 @@ export class Conversation
         this.appendArgsAsComment('debug',args);
     }
 
+    /**
+     * Logs trigger execution information to the conversation as trigger role comments.
+     * Used for tracking trigger evaluation and execution.
+     */
     public readonly triggerToConversation=(...args:any[])=>{
         this.appendArgsAsComment('trigger',args);
     }
 
+    /**
+     * Appends arguments as formatted comments to the conversation with the specified role.
+     * Used for debugging and logging execution information.
+     *
+     * @param role - The role to use for the comment message
+     * @param args - Arguments to format and append as comments
+     */
     public appendArgsAsComment(role:string,args:any[]){
         if(!args.length){
             return;
