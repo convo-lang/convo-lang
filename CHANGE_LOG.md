@@ -1,6 +1,13 @@
 ## Change Log
 
-### v0.7.27 (Latest)
+### v0.7.28
+- **Message Triggers**: Added onUser and onAssistant message triggers for automatic function execution
+- **Performance**: Added cached parsing for Convo-Lang code with `parseConvoType` and `parseConvoCached` functions
+- **Content Merging**: Enhanced message merging with prefix/suffix/append/prepend/replace/replaceForModel roles
+- **Type System**: Added TrueFalse built-in type alias for boolean prompts
+
+### v0.7.27
+- **Inline Prompts**: Added support for inline prompts in functions using the
 - **Features**: Added serviceId to ConvoCompletionService for better service identification
 - **Performance**: Added model info caching to improve completion performance
 - **API**: The http completion service can now relay messages to its host
