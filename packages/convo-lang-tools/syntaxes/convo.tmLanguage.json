@@ -96,7 +96,7 @@
             "patterns":[{"include":"#lineExpression"}]
         },
         "topLevelStatements":{
-            "begin": "^\\s*(>)\\s*(do|result|define|debug|end)",
+            "begin": "^\\s*(>)\\s*(do|result|define|debug|trigger|end)",
             "end": "(?=\\s*>)",
             "beginCaptures": {
                 "1":{
@@ -114,7 +114,7 @@
             ]
         },
         "controlFlowStatements":{
-            "match": "^\\s*(>)\\s*(parallelEnd|parallel|insertEnd|queue|flush)",
+            "match": "^\\s*(>)\\s*(parallelEnd|parallel|insertEnd|agentEnd|queue|flush)",
             "captures": {
                 "1":{
                     "name":"keyword.control"
@@ -159,22 +159,25 @@
             }
         },
         "function":{
-            "begin": "^\\s*(>)\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
+            "begin": "^\\s*(>)\\s*(agent|on|public)?\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
             "end": "\\)",
             "beginCaptures": {
                 "1":{
                     "name":"keyword.control"
                 },
                 "2":{
-                    "name":"storage.modifier"
+                    "name":"keyword.control"
                 },
                 "3":{
-                    "name":"support.function"
+                    "name":"storage.modifier"
                 },
                 "4":{
-                    "name":"entity.name.type"
+                    "name":"support.function"
                 },
                 "5":{
+                    "name":"entity.name.type"
+                },
+                "6":{
                     "name":"keyword.control"
                 }
             },
@@ -279,6 +282,8 @@
                 {"include":"#comment"},
                 {"include":"#tag"},
                 {"include":"#heredoc"},
+                {"include":"#stringPrompt"},
+                {"include":"#stringEmbed"},
                 {"include":"#stringDq"},
                 {"include":"#stringSq"},
                 {"include":"#pipe"},
@@ -296,6 +301,8 @@
                 {"include":"#comment"},
                 {"include":"#tag"},
                 {"include":"#heredoc"},
+                {"include":"#stringPrompt"},
+                {"include":"#stringEmbed"},
                 {"include":"#stringDq"},
                 {"include":"#stringSq"},
                 {"include":"#pipe"},
@@ -339,6 +346,38 @@
                     "name":"variable"
                 }
             }
+        },
+        "stringPrompt":{
+            "begin":"(\\?\\?\\?)\\s*((\\()([^)]*)(\\)))?",
+            "end":"\\?\\?\\?",
+            "beginCaptures":{
+                "1":{"name":"constant.character.escape"},
+                "3":{"name":"constant.character.escape"},
+                "4":{"name":"variable"},
+                "5":{"name":"constant.character.escape"}
+            },
+            "endCaptures":{
+                "0":{"name":"constant.character.escape"}
+            },
+            "patterns": [
+                {"include":"#expression"}
+            ]
+        },
+        "stringEmbed":{
+            "begin":"(===)\\s*((\\()([^)]*)(\\)))?",
+            "end":"===",
+            "beginCaptures":{
+                "1":{"name":"string"},
+                "3":{"name":"constant.character.escape"},
+                "4":{"name":"variable"},
+                "5":{"name":"constant.character.escape"}
+            },
+            "endCaptures":{
+                "0":{"name":"string"}
+            },
+            "patterns": [
+                {"include":"#expression"}
+            ]
         },
         "stringDq":{
             "begin":"\"",
@@ -384,11 +423,38 @@
             }
         },
         "xml":{
-            "match":"(</?)([\\w-]+)(>)",
+            "match":"(</?)([\\w-]+)([^>]*?)(/?>)",
             "captures":{
                 "1":{"name":"entity.name.type"},
                 "2":{"name":"entity.name.type"},
-                "3":{"name":"entity.name.type"}
+                "3":{
+                    "patterns": [
+                        {"include": "#xmlAttDbl"},
+                        {"include": "#xmlAttSingle"},
+                        {"include": "#xmlAtt"}
+                    ]
+                },
+                "4":{"name":"entity.name.type"}
+            }
+        },
+        "xmlAtt":{
+            "match":"\\w+",
+            "captures":{
+                "0":{"name":"variable"}
+            }
+        },
+        "xmlAttDbl":{
+            "match":"(\\w+)\\s*=\\s*(\"[^\"]*\")",
+            "captures":{
+                "1":{"name":"variable"},
+                "2":{"name":"string"}
+            }
+        },
+        "xmlAttSingle":{
+            "match":"(\\w+)\\s*=\\s*('[^']*')",
+            "captures":{
+                "1":{"name":"variable"},
+                "2":{"name":"string"}
             }
         },
         "stringBackslash":{
