@@ -19,6 +19,7 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
     isFallback?:boolean;
     serviceId:string;
+    logRequests?:boolean;
 }
 
 export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
@@ -37,6 +38,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     private readonly apiKeyHeaderValuePrefix?:string;
     private readonly headers:Record<string,string>;
     private readonly isFallback:boolean;
+    private readonly logRequests:boolean;
     private readonly updateRequest?:(requestBody:Record<string,any>,headers:Record<string,string|undefined>)=>void;
     private readonly completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
 
@@ -56,6 +58,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
             'Content-Type':'application/json'
         },
         serviceId,
+        logRequests=false,
         completeAsync,
         updateRequest,
     }:BaseOpenAiConvoCompletionServiceOptions){
@@ -71,6 +74,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         this.models=models;
         this.apiKeyHeader=apiKeyHeader;
         this.apiKeyHeaderValuePrefix=apiKeyHeaderValuePrefix??undefined;
+        this.logRequests=logRequests;
         this.completeAsync=completeAsync;
         this.headers=headers;
         this.updateRequest=updateRequest;
@@ -126,7 +130,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
                 {
                     headers,
                     readErrors:true,
-                    log:true
+                    log:this.logRequests
                 }
             )
         );

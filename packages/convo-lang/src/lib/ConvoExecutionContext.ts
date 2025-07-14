@@ -1,7 +1,9 @@
 import { getErrorMessage, getValueByAryPath, isPromise, zodCoerceObject } from '@iyio/common';
+import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
+import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { parseConvoPromptString } from './convo-parser';
@@ -694,9 +696,10 @@ export class ConvoExecutionContext
             }
             prompt=p;
         }
-        const options:ConversationOptions={disableAutoFlatten:true}
+        const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true}
         const sub=(
             this.parentConvo?.clone({
+                isTrigger:true,
                 empty:!prompt?.extend,
                 systemOnly:prompt?.systemOnly,
                 noFunctions:prompt?.noFunctions,
@@ -710,7 +713,19 @@ export class ConvoExecutionContext
             sub.appendMessageObject(prompt.messages);
         }
         const r=await sub.completeAsync();
-        return r.message?.content;
+        let value:any;
+        if(r.message?.format==='json'){
+            value=parseJson5(r.message.content??'');
+            if(r.message.formatTypeName==='TrueFalse'){
+                value=value?.isTrue;
+            }
+        }else{
+            value=r.message?.content;
+        }
+        if(prompt?.not){
+            value=!value;
+        }
+        return value;
     }
 
 
@@ -797,7 +812,11 @@ export class ConvoExecutionContext
         }else if(path){
             value=getValueByAryPath(value,path);
         }
-        return value;
+        if(!path && value===undefined){
+            return this.getVarAlias(name);
+        }else{
+            return value;
+        }
     }
 
     public getVar(nameOrPath:string,scope?:ConvoScope|null,defaultValue?:any):any{
@@ -911,6 +930,24 @@ export class ConvoExecutionContext
                 this.sharedVars[e]=otherExec.sharedVars[e];
             }
         }
+    }
+
+    public getVarAlias(name:string)
+    {
+        switch(name){
+            case 'TrueFalse':
+                return parseConvoType('TrueFalse',/*convo*/`
+                    > define
+                    TrueFalse=struct(
+                        isTrue:boolean
+                    )
+                `);
+
+            default:
+                return undefined;
+
+        }
+
     }
 
 }

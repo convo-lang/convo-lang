@@ -2,7 +2,7 @@ import { uuid, zodTypeToJsonScheme } from "@iyio/common"
 import { parseJson5 } from "@iyio/json5"
 import { Conversation } from "./Conversation"
 import { ConvoError } from "./ConvoError"
-import { convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
+import { appendFlatConvoMessageSuffix, convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
 import { ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
 import { convoTypeToJsonScheme } from "./convo-zod"
 
@@ -412,14 +412,10 @@ const applyJsonModeToMessage=(msg:FlatConvoMessage,model:ConvoModelInfo,flat:Fla
         return;
     }
 
-    if(!msg.suffix){
-        msg.suffix='\n\n';
-    }
-
     if(model.jsonModeInstructions){
-        msg.suffix=model.jsonModeInstructions
+        appendFlatConvoMessageSuffix(msg,model.jsonModeInstructions)
     }else if(model.jsonModeImplementAsFunction){
-        msg.suffix='Call the respondWithJSON function';
+        appendFlatConvoMessageSuffix(msg,'Call the respondWithJSON function');
     }else if(msg.responseFormatTypeName){
         const type=flat.exe.getVar(msg.responseFormatTypeName);
 
@@ -442,15 +438,15 @@ const applyJsonModeToMessage=(msg:FlatConvoMessage,model:ConvoModelInfo,flat:Fla
             }
         }
 
-        msg.suffix+=`\n\nReturn a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} that conforms to the following JSON Schema:\n${
+        appendFlatConvoMessageSuffix(msg,`Return a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} that conforms to the following JSON Schema:\n${
             JSON.stringify(scheme)
-        }`;
+        }`);
     }else{
-        msg.suffix+=`\n\nReturn a well formatted JSON ${msg.responseFormatIsArray?'array':'object'}.`;
+        appendFlatConvoMessageSuffix(msg,`Return a well formatted JSON ${msg.responseFormatIsArray?'array':'object'}.`);
     }
 
     if(model.jsonModeInstructWrapInCodeBlock){
-        msg.suffix+='\n\nWrap the generated JSON in a markdown json code fence and do not include any pre or post-amble.'
+        appendFlatConvoMessageSuffix(msg,'Wrap the generated JSON in a markdown json code fence and do not include any pre or post-amble.');
     }
 
     if(model.jsonModeInstructionsPrefix){

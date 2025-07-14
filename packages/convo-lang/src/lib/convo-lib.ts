@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMessageTrigger, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -49,6 +49,43 @@ export const convoAnyModelName='__any__';
 export const convoRoles={
     user:'user',
     assistant:'assistant',
+
+    /**
+     * Used to add a prefix to the previous content message. Prefixes are not seen by the user.
+     */
+    prefix:'prefix',
+
+    /**
+     * Used to add a suffix to the previous content message. Suffixes are not seen by the user.
+     */
+    suffix:'suffix',
+
+    /**
+     * Appends content to the previous content message
+     */
+    append:'append',
+
+    /**
+     * Prepends content to the previous content message
+     */
+    prepend:'prepend',
+
+    /**
+     * Used to replace the content of the previous content message
+     */
+    replace:'replace',
+
+    /**
+     * Used to replace the content of the previous content message before sending to an LLM. The
+     * user will continue to see the previous content message.
+     */
+    replaceForModel:'replaceForModel',
+
+    /**
+     * Used to display message evaluated by triggers
+     */
+    trigger:'trigger',
+
     rag:'rag',
     /**
      * Used to define a prefix to add to rag messages
@@ -351,6 +388,26 @@ export const convoTags={
     disableAutoComplete:'disableAutoComplete',
 
     /**
+     * When applied to a function the function will be called after user messages are appended. The
+     * return value of the function will either replace the content of the user message or be set
+     * as the messages prefix or suffix. If the function return false, null or undefined it is
+     * ignored and the next function with a onUser is used if defined.
+     *
+     * @usage (@)onUser [replace|prefix|suffix] [condition]
+     */
+    onUser:'onUser',
+
+    /**
+     * When applied to a function the function will be called after assistant messages are appended. The
+     * return value of the function will either replace the content of the assistant message or be set
+     * as the messages prefix or suffix. If the function return false, null or undefined it is
+     * ignored and the next function with a onAssistant is used if defined.
+     *
+     * @usage (@)onAssistant [replace|prefix|suffix] [condition]
+     */
+    onAssistant:'onAssistant',
+
+    /**
      * When applied to a content message the message will be appended to the conversation after calling the
      * function specified by the tag's value. When applied to a function message the content of the
      * tag will be appended as a user message.
@@ -375,7 +432,7 @@ export const convoTags={
 
     /**
      * Used to indicate that a message should be evaluated at the edge of a conversation with the
-     * latest state. @edge is most commonly used with system message to ensure that all injected values
+     * latest state. (@)edge is most commonly used with system message to ensure that all injected values
      * are updated with the latest state of the conversation.
      */
     edge:'edge',
@@ -1976,6 +2033,9 @@ export interface NormalizedFlatMessageListOptions
     mergeSystemMessages?:boolean;
 }
 
+/**
+ * Normalizes flat messages before sending to LLMs. This function is typically used by converter.
+ */
 export const getNormalizedFlatMessageList=(
     flat:FlatConvoConversationBase,
     options:NormalizedFlatMessageListOptions={}
@@ -2004,10 +2064,10 @@ export const getNormalizedFlatMessageList=(
         if(msg.prefix || msg.suffix){
             msg={...msg}
             messages[i]=msg;
-            msg.content=`${msg.prefix??''}${msg.content??''}${msg.suffix??''}`
+            msg.content=`${msg.prefix?msg.prefix+'\n\n':''}${msg.content??''}${msg.suffix?'\n\n'+msg.suffix:''}`
         }
 
-        if(msg.role==='rag' && !disableRag){
+        if(msg.role===convoRoles.rag && !disableRag){
 
             if(!lastContentMessage?.content){
                 continue;
@@ -2023,6 +2083,29 @@ export const getNormalizedFlatMessageList=(
             lastContentMessage={...lastContentMessage};
             messages[lastContentMessageI]=lastContentMessage;
             lastContentMessage.content+='\n\n'+content;
+            continue;
+        }
+
+        if(msg.role===convoRoles.prefix || msg.role===convoRoles.suffix || msg.role===convoRoles.replaceForModel){
+            messages.splice(i,1);
+            i--;
+            if(!lastContentMessage){
+                continue;
+            }
+            lastContentMessage={...lastContentMessage};
+            messages[lastContentMessageI]=lastContentMessage;
+            switch(msg.role){
+                case convoRoles.replaceForModel:
+                    lastContentMessage.content=msg.content;
+                    break;
+                case convoRoles.prefix:
+                    lastContentMessage.content=`${msg.content}\n\n${lastContentMessage.content}`;
+                    break;
+                case convoRoles.suffix:
+                    lastContentMessage.content=`${lastContentMessage.content}\n\n${msg.content}`;
+                    break;
+            }
+
             continue;
         }
 
@@ -2050,6 +2133,50 @@ export const getNormalizedFlatMessageList=(
 
 
     return messages;
+}
+
+/**
+ * Merges "replace", "append" and "prepend" messages with their corresponding content messages.
+ */
+export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
+
+
+    let lastContentMessage:FlatConvoMessage|undefined;
+    let lastContentMessageI=0;
+
+    for(let i=0;i<messages.length;i++){
+        let msg=messages[i];
+        if(!msg){continue}
+
+        if(msg.role===convoRoles.prepend || msg.role===convoRoles.append || msg.role===convoRoles.replace){
+            messages.splice(i,1);
+            i--;
+            if(!lastContentMessage){
+                continue;
+            }
+            lastContentMessage={...lastContentMessage};
+            messages[lastContentMessageI]=lastContentMessage;
+            switch(msg.role){
+                case convoRoles.replace:
+                    lastContentMessage.content=msg.content;
+                    break;
+                case convoRoles.prepend:
+                    lastContentMessage.content=`${msg.content}\n\n${lastContentMessage.content}`;
+                    break;
+                case convoRoles.append:
+                    lastContentMessage.content=`${lastContentMessage.content}\n\n${msg.content}`;
+                    break;
+            }
+
+            continue;
+        }
+
+        if(msg.content!==undefined){
+            lastContentMessage=msg;
+            lastContentMessageI=i;
+        }
+
+    }
 }
 
 const jsonReg=/json/i;
@@ -2209,4 +2336,34 @@ export const getConvoCompletionServiceModelsAsync=async (service:ConvoCompletion
         serviceModelCache[service.serviceId]=models;
     }
     return models;
+}
+
+const triggerReg=/^\s*(replaceForModel|replace|append|prepend|prefix|suffix)\s*(.*)/;
+export const parseConvoMessageTrigger=(fnName:string,role:string,tagValue:string):ConvoMessageTrigger|undefined=>{
+    const match=triggerReg.exec(tagValue);
+    if(!match){
+        return undefined;
+    }
+    return {
+        role,
+        action:match[1] as any,
+        fnName,
+        condition:match[2]?.trim()||undefined
+    }
+
+}
+
+export const appendFlatConvoMessagePrefix=(msg:FlatConvoMessage,value:string,sep=true)=>{
+    if(msg.prefix){
+        msg.prefix+=(sep?'\n\n':'')+value;
+    }else{
+        msg.prefix=value;
+    }
+}
+export const appendFlatConvoMessageSuffix=(msg:FlatConvoMessage,value:string,sep=true)=>{
+    if(msg.suffix){
+        msg.suffix+=(sep?'\n\n':'')+value;
+    }else{
+        msg.suffix=value;
+    }
 }

@@ -1,13 +1,13 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoStatementPrompt, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
-const topLevelMessageReg=/(>)\s*(do|result|define|debug|end)/gs;
+const topLevelMessageReg=/(>)\s*(do|result|define|debug|trigger|end)/gs;
 const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
@@ -1138,6 +1138,23 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         msg.renderTarget='hidden';
                         break;
 
+                    case convoTags.onUser:
+                    case convoTags.onAssistant:
+                        if(tag.value && msg.fn){
+                            const trigger=parseConvoMessageTrigger(
+                                msg.fn.name,
+                                tag.name===convoTags.onAssistant?convoRoles.assistant:convoRoles.user,
+                                tag.value
+                            );
+                            if(trigger){
+                                if(!msg.messageTriggers){
+                                    msg.messageTriggers=[];
+                                }
+                                msg.messageTriggers.push(trigger);
+                            }
+                        }
+                        break;
+
                     case convoTags.transformComponent:{
                         const parsed=parseConvoComponentTransform(tag.value);
                         if(parsed){
@@ -1276,6 +1293,17 @@ export const parseConvoPromptString=(
             updatedContent:content
         }
     }
+    const bool=options?.includes('boolean');
+    const boolNot=options?.includes('!boolean');
+    if(bool || boolNot){
+        const last=messages.result[messages.result.length-1];
+        if(last){
+            if(!last.tags){
+                last.tags=[];
+            }
+            last.tags.push({name:'json',value:'TrueFalse'})
+        }
+    }
     return {
         prompt:{
             extend:options?.includes('extend'),
@@ -1283,6 +1311,7 @@ export const parseConvoPromptString=(
             noFunctions:options?.includes('noFunctions'),
             last:opStr?safeParseNumberOrUndefined(lastReg.exec(opStr)?.[1]):undefined,
             dropLast:opStr?safeParseNumberOrUndefined(dropLastReg.exec(opStr)?.[1]):undefined,
+            not:boolNot,
             messages:messages.result,
         },
         updatedContent:content,

@@ -12,7 +12,7 @@ export type ConvoValueConstant=(typeof convoValueConstants)[number];
 export const convoNonFuncKeywords=['in'] as const;
 export type ConvoNonFuncKeyword=(typeof convoNonFuncKeywords)[number];
 
-export const convoReservedRoles=['call','do','result','define','debug','end'] as const;
+export const convoReservedRoles=['call','do','result','define','debug','end','trigger'] as const;
 export type ConvoReservedRole=(typeof convoReservedRoles)[number];
 
 
@@ -82,6 +82,7 @@ export interface ConvoMessage
     description?:string;
     statement?:ConvoStatement;
     fn?:ConvoFunction;
+    messageTriggers?:ConvoMessageTrigger[];
     tags?:ConvoTag[];
     markdown?:MarkdownLine[];
 
@@ -326,7 +327,15 @@ export interface ConvoStatementPrompt
      */
     last?:number;
 
+    /**
+     * Drops the last N number of messages from the cloned conversation
+     */
     dropLast?:number;
+
+    /**
+     * If true the return value of the prompt should have the not (!) operator applied
+     */
+    not?:boolean;
 
     /**
      * If undefined the prompt messages will be parsed at runtime. If a prompt string has dynamic
@@ -1042,6 +1051,8 @@ export interface FlatConvoConversationBase
 
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
+    messageTriggers?:ConvoMessageTrigger[];
+
     apiKey?:string;
 
     /**
@@ -1262,6 +1273,7 @@ export interface CloneConversationOptions
     dropLast?:number;
     dropUntilContent?:boolean;
     empty?:boolean;
+    isTrigger?:boolean;
 }
 
 export interface ConvoDocumentReference
@@ -1580,4 +1592,13 @@ export interface ConvoHttpToInputRequest
 {
     flat:FlatConvoConversationBase;
     inputType:string;
+}
+
+export type ConvoMessageTriggerAction='replace'|'replaceForModel'|'append'|'prepend'|'prefix'|'suffix';
+export interface ConvoMessageTrigger
+{
+    role:string;
+    fnName:string;
+    action:ConvoMessageTriggerAction;
+    condition?:string;
 }
