@@ -945,6 +945,18 @@ The color of the triangle has been set to orange
 
 ```
 
+## Inline Prompts
+Inline prompts allow to execute convo-lang prompts directly in a function. The prompt can also
+optionally extend the current conversation that called the function.
+
+**More documentation coming soon**
+
+## Message Triggers
+Message triggers allow you to execution function when messages are appended to a conversation and
+can optionally replace or added to message content.
+
+**More documentation coming soon**
+
 ## Tags
 Tags are used in many ways in Convo-Lang and serve as a way to add metadata to messages and 
 code statements. Tags on the line just before the message or code statement they are tagging. Tags
@@ -1728,7 +1740,7 @@ Hi, I'm {{name}} I'm {{div(ageInDays 365)}} years old
 
 
 ### Strings
-There are 3 types of string in convo.
+There are 4 types of string in convo.
 
 #### ( " ) Double Quote
 Double quote strings are the simplest strings in convo, they start and end with a double 
@@ -1770,6 +1782,20 @@ var1: {{var1}}
 var2: {{var2}}
 
 var3: {{var3}}
+```
+
+#### Embed Strings
+Embed strings are functionally identical to single quote string, allowing embedded statements, but
+their contents are highlighted as Convo-Lang. This is helpful for building convo-lang prompts
+allowing you to verify the convo-lang syntax in a string.
+
+``` convo
+> promptBuilder(name:string) -> (
+    ===
+    > user
+    Hello my name is {{name}}
+    ===
+)
 ```
 
 #### Heredoc
