@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-cli",
-    "version": "0.7.27",
+    "version": "0.7.28",
     "type": "commonjs",
     "sideEffects": false,
     "bin": {
