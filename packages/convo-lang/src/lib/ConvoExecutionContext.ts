@@ -63,6 +63,8 @@ export class ConvoExecutionContext
 
     public maxInlinePromptDepth=10;
 
+    public isReadonly=0;
+
     public constructor(convo?:Partial<ConvoGlobal>,parentConvo?:Conversation)
     {
         this.convo={
@@ -866,6 +868,16 @@ export class ConvoExecutionContext
         if(name in defaultConvoVars){
             setConvoScopeError(scope,`Overriding builtin var not allowed - ${name}`);
             return value;
+        }
+
+        if(this.isReadonly){
+            const msg=`Current context is readonly. Unable to set ${name}`;
+            if(scope){
+                setConvoScopeError(scope,msg);
+                return value;
+            }else{
+                throw new Error(msg);
+            }
         }
 
         const vars=(

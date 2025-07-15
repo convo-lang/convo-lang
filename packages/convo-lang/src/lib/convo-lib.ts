@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
+import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMessageTrigger, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
@@ -85,6 +86,11 @@ export const convoRoles={
      * Used to display message evaluated by triggers
      */
     trigger:'trigger',
+
+    /**
+     * Used to set variables set by triggers
+     */
+    triggerResult:'triggerResult',
 
     rag:'rag',
     /**
@@ -865,6 +871,8 @@ export const convoTags={
 
 } as const;
 
+export const convoDynamicTags:string[]=[convoTags.condition,convoTags.disabled];
+
 /**
  * JSDoc tags can be used in combination with the Convo-Lang CLI to import types, components and
  * functions from TypeScript.
@@ -1135,20 +1143,58 @@ export const getConvoFnByTag=(tag:string,messages:ConvoMessage[]|null|undefined,
     return getConvoFnMessageByTag(tag,messages,startIndex)?.fn;
 }
 
-export const convoTagsToMap=(tags:ConvoTag[]):Record<string,string|undefined>=>{
+export const convoTagsToMap=(tags:ConvoTag[],exe:ConvoExecutionContext):Record<string,string|undefined>=>{
     const map:Record<string,string|undefined>={};
     for(const t of tags){
-        if(t.name in map){
+        let name=t.name;
+        if(name in map){
             let i=2;
             while(`${t.name}__${i}` in map){
                 i++;
             }
-            map[`${t.name}__${i}`]=t.value;
+            name=`${t.name}__${i}`;
+        }
+
+        if(t.statement){
+            const values=evalConvoTagStatement(t,exe);
+            let value:any;
+            if(values.length===1){
+                let value=values[0];
+                if(value && typeof value === 'object'){
+                    value=JSON.stringify(value);
+                }
+            }else{
+                value=JSON.stringify(value);
+            }
+            if(value===false || value===null || value===undefined){
+                map[name]=undefined;
+            }else{
+                map[name]=value+'';
+            }
         }else{
-            map[t.name]=t.value;
+            map[name]=t.value;
         }
     }
     return map;
+}
+
+export const evalConvoTagStatement=(tag:ConvoTag,exe:ConvoExecutionContext):any[]=>{
+    if(!tag.statement?.length){
+        return [];
+    }
+    exe.isReadonly++;
+    try{
+        const values=tag.statement.map(s=>{
+            const r=exe.executeStatement(s);
+            if(r.valuePromise){
+                throw new Error('Tag value statements are not allowed to return promises');
+            }
+            return r.value;
+        });
+        return values;
+    }finally{
+        exe.isReadonly--;
+    }
 }
 
 export const mapToConvoTags=(map:Record<string,string|undefined>):ConvoTag[]=>{

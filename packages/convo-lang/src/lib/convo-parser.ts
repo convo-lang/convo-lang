@@ -1,7 +1,7 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoStatementPrompt, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
@@ -33,7 +33,7 @@ const msgStringReg=/(\{\{|[\n\r]\s*>|$)/gs;
 const heredocOpening=/^([^\n])*\n(\s*)/;
 const hereDocReplace=/\n(\s*)/g;
 
-const tagReg=/(\w+)\s*=?(.*)/
+const tagReg=/(\w+)\s*(=)?(.*)/
 
 const space=/\s/;
 const allSpace=/^\s$/;
@@ -220,16 +220,32 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         index=newline;
     }
 
-    const takeTag=()=>{
+    const takeTag=():boolean=>{
         index++;
         const newline=code.indexOf('\n',index);
         const tag=tagReg.exec(code.substring(index,newline).trim());
         if(tag){
             debug?.('TAG',tag);
-            const v=tag[2]?.trim()
-            tags.push({name:tag[1]??'',value:v?v:undefined});
+            let v=tag[3]?.trim();
+            const tagObj:ConvoTag={name:tag[1]??''};
+            if(tag[2] && convoDynamicTags.includes(tagObj.name)){
+                if(!convoDynamicTags.includes(tagObj.name)){
+                    error=`Only ${convoDynamicTags.join(', ')} are allowed to have dynamic expressions`
+                    return false;
+                }
+                const r=parseConvoCode(`> do\n${v}`);
+                if(r.error){
+                    error=r.error.message;
+                    return false;
+                }
+                tagObj.statement=r.result?.[0]?.fn?.body;
+            }else{
+                tagObj.value=v;
+            }
+            tags.push(tagObj);
         }
         index=newline;
+        return true;
     }
 
     const addStatement=(s:ConvoStatement)=>{
@@ -530,7 +546,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 continue;
             }else if(cc==='@'){
                 index+=spaceLength;
-                takeTag();
+                if(!takeTag()){
+                    break parsingLoop;
+                }
                 continue;
             }else if(cc==='<<'){
                 const last=stack[stack.length-1];
@@ -981,7 +999,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 index++;
                 takeComment(true);
             }else if(char==='@'){
-                takeTag();
+                if(!takeTag()){
+                    break parsingLoop;
+                }
             }else if(space.test(char) || char===';' || char===','){
                 index++;
             }else{

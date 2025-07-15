@@ -28,6 +28,7 @@ export interface ConvoTag
 {
     name:string;
     value?:string;
+    statement?:ConvoStatement[];
 }
 
 export type ConvoErrorType=(
