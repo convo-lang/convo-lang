@@ -5,7 +5,7 @@ import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { parseConvoPromptString } from './convo-parser';
 import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, convoFlowControllerKey, convoScopeFnKey } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
@@ -676,6 +676,8 @@ export class ConvoExecutionContext
         return scope;
     }
 
+    private lastTriggerConversation?:Conversation;
+
     private async executePromptAsync(statement:ConvoStatement,content?:string)
     {
         if(this.parentConvo && this.parentConvo.childDepth>this.maxInlinePromptDepth){
@@ -697,18 +699,16 @@ export class ConvoExecutionContext
             prompt=p;
         }
         const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true}
-        const sub=(
-            this.parentConvo?.clone({
-                isTrigger:true,
-                empty:!prompt?.extend,
-                systemOnly:prompt?.systemOnly,
-                noFunctions:prompt?.noFunctions,
-                last:prompt?.last,
-                dropLast:prompt?.dropLast,
-                dropUntilContent:true,
-            },options)??
-            new Conversation(options)
-        );
+        const sub=((prompt?.continue && this.lastTriggerConversation)?
+            this.lastTriggerConversation
+        :
+            (this.parentConvo?.clone({triggerPrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)??new Conversation(options))
+        )
+
+        if(prompt?.continue || prompt?.extend){
+            this.lastTriggerConversation=sub;
+        }
+
         if(prompt?.messages?.length){
             sub.appendMessageObject(prompt.messages);
         }

@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -333,6 +333,11 @@ export const convoVars={
      */
     __explicitlyEnabledTransforms:'__explicitlyEnabledTransforms',
 
+    /**
+     * Name of the currently executing trigger
+     */
+    __trigger:'__trigger'
+
 } as const;
 
 export const convoImportModifiers={
@@ -349,6 +354,33 @@ export const convoImportModifiers={
 
 export const defaultConvoRagTol=1.2;
 
+export const convoEvents={
+
+    /**
+     * Occurs when a user message is added to a conversation
+     *
+     * Functions listening to the `user` event will be called after user messages are
+     * appended. The return value of the function will either replaces the content of the user
+     * message or will be set as the messages prefix or suffix. If the function return false, null or
+     * undefined it is ignored and the next function listening to the `user` event will be called.
+     *
+     * @usage (@)on user [replace|append|prepend|prefix|suffix] [condition]
+     */
+    user:'user',
+
+    /**
+     * Occurs when an assistant message is added to a conversation.
+     *
+     * Functions listening to the `assistant` event will be called after assistant messages are
+     * appended. The return value of the function will either replaces the content of the assistant
+     * message or will be set as the messages prefix or suffix. If the function return false, null or
+     * undefined it is ignored and the next function listening to the `assistant` event will be called.
+     *
+     * @usage (@)on assistant [replace|append|prepend|prefix|suffix] [condition]
+     */
+    assistant:'assistant',
+} as const;
+
 export const convoTags={
 
 
@@ -357,6 +389,11 @@ export const convoTags={
      * is considered a conversation initializer.
      */
     init:'init',
+
+    /**
+     * Defines an event listener for a message
+     */
+    on:'on',
 
     /**
      * Manually labels a message
@@ -388,24 +425,21 @@ export const convoTags={
     disableAutoComplete:'disableAutoComplete',
 
     /**
-     * When applied to a function the function will be called after user messages are appended. The
-     * return value of the function will either replace the content of the user message or be set
-     * as the messages prefix or suffix. If the function return false, null or undefined it is
-     * ignored and the next function with a onUser is used if defined.
-     *
-     * @usage (@)onUser [replace|prefix|suffix] [condition]
+     * Disables triggers on the message the tag is applied to.
      */
-    onUser:'onUser',
+    disableTriggers:'disableTriggers',
 
     /**
-     * When applied to a function the function will be called after assistant messages are appended. The
-     * return value of the function will either replace the content of the assistant message or be set
-     * as the messages prefix or suffix. If the function return false, null or undefined it is
-     * ignored and the next function with a onAssistant is used if defined.
-     *
-     * @usage (@)onAssistant [replace|prefix|suffix] [condition]
+     * Forces a message to be included in triggers. If the tag defines a value the value will be used
+     * to match which trigger the message is included in.
      */
-    onAssistant:'onAssistant',
+    includeInTriggers:'includeInTriggers',
+
+    /**
+     * Excludes a message from being included in triggers. If the tag defines a value the value will
+     * be used to match the trigger it is excluded from.
+     */
+    excludeFromTriggers:'excludeFromTriggers',
 
     /**
      * When applied to a content message the message will be appended to the conversation after calling the
@@ -1679,10 +1713,10 @@ export const parseConvoBooleanTag=(value:string|null|undefined)=>{
     if(!value){
         return true;
     }
-    return Boolean(value);
+    return parseBoolean(value);
 }
 
-export const getFlatConvoTag=(message:FlatConvoMessage|null|undefined,tagName:string)=>{
+export const getFlatConvoTagBoolean=(message:FlatConvoMessage|ConvoCompletionMessage|null|undefined,tagName:string)=>{
     if(!message?.tags || !(tagName in message.tags)){
         return false;
     }
@@ -1693,7 +1727,7 @@ export const shouldDisableConvoAutoScroll=(messages:FlatConvoMessage[]):boolean=
     for(let i=messages.length-1;i>=0;i--){
         const m=messages[i];
         if(m && (m.content!==undefined || m.component!==undefined)){
-            return getFlatConvoTag(m,convoTags.disableAutoScroll);
+            return getFlatConvoTagBoolean(m,convoTags.disableAutoScroll);
         }
     }
     return false;
@@ -2139,7 +2173,7 @@ export const getNormalizedFlatMessageList=(
  * Merges "replace", "append" and "prepend" messages with their corresponding content messages.
  * This function processes a list of flat conversation messages and applies content modification
  * operations (replace, append, prepend) to their target content messages.
- * 
+ *
  * @param messages - Array of flat conversation messages to process in-place
  */
 export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
@@ -2347,7 +2381,7 @@ const triggerReg=/^\s*(replaceForModel|replace|append|prepend|prefix|suffix)\s*(
 /**
  * Parses a message trigger tag value to extract the trigger action and optional condition.
  * Supports syntax like "replace condition" or "append" where the condition is optional.
- * 
+ *
  * @param fnName - The name of the function to be called by the trigger
  * @param role - The message role that will trigger this function
  * @param tagValue - The tag value containing action and optional condition
@@ -2370,7 +2404,7 @@ export const parseConvoMessageTrigger=(fnName:string,role:string,tagValue:string
 /**
  * Appends a value to the prefix of a flat conversation message.
  * If a prefix already exists, the new value is concatenated with optional separation.
- * 
+ *
  * @param msg - The flat conversation message to modify
  * @param value - The string value to append to the prefix
  * @param sep - Whether to add separator (double newlines) between existing and new content
@@ -2386,7 +2420,7 @@ export const appendFlatConvoMessagePrefix=(msg:FlatConvoMessage,value:string,sep
 /**
  * Appends a value to the suffix of a flat conversation message.
  * If a suffix already exists, the new value is concatenated with optional separation.
- * 
+ *
  * @param msg - The flat conversation message to modify
  * @param value - The string value to append to the suffix
  * @param sep - Whether to add separator (double newlines) between existing and new content

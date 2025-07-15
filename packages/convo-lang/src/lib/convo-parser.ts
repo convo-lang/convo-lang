@@ -1,13 +1,13 @@
 import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoStatementPrompt, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
-const topLevelMessageReg=/(>)\s*(do|result|define|debug|trigger|end)/gs;
+const topLevelMessageReg=/(>)\s*(do|triggerResult|result|define|debug|trigger|end)/gs;
 const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
@@ -1138,19 +1138,30 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         msg.renderTarget='hidden';
                         break;
 
-                    case convoTags.onUser:
-                    case convoTags.onAssistant:
-                        if(tag.value && msg.fn){
-                            const trigger=parseConvoMessageTrigger(
-                                msg.fn.name,
-                                tag.name===convoTags.onAssistant?convoRoles.assistant:convoRoles.user,
-                                tag.value
-                            );
-                            if(trigger){
-                                if(!msg.messageTriggers){
-                                    msg.messageTriggers=[];
-                                }
-                                msg.messageTriggers.push(trigger);
+                    case convoTags.on:
+                        if(tag.value){
+                            const i=tag.value.indexOf(' ');
+                            const name=i===-1?tag.value:tag.value.substring(0,i);
+                            const content=i===-1?'':tag.value.substring(i+1).trim();
+                            switch(name){
+
+                                case convoEvents.user:
+                                case convoEvents.assistant:
+                                    if(msg.fn){
+                                         const trigger=parseConvoMessageTrigger(
+                                            msg.fn.name,
+                                            name===convoEvents.assistant?convoRoles.assistant:convoRoles.user,
+                                            content
+                                        );
+                                        if(trigger){
+                                            if(!msg.messageTriggers){
+                                                msg.messageTriggers=[];
+                                            }
+                                            msg.messageTriggers.push(trigger);
+                                        }
+                                    }
+                                    break;
+
                             }
                         }
                         break;
@@ -1275,6 +1286,8 @@ const optionsSplit=/[, \t]+/;
 const promptStringParamsReg=/^\s*\(([^)]*)\)/s;
 const lastReg=/last\s*:\s*(\d+)/;
 const dropLastReg=/dropLast\s*:\s*(\d+)/;
+const hasMsgReg=/(^|\n)\s*>/
+const jsonReg=/json\s*:\s*(\w+)/
 export const parseConvoPromptString=(
     content:string,
 ):{prompt?:ConvoStatementPrompt,updatedContent:string,error?:string}=>{
@@ -1286,6 +1299,13 @@ export const parseConvoPromptString=(
     }else{
         content=content.trim();
     }
+    if(!hasMsgReg.test(content)){
+        content=`> prompt\n${content}`;
+    }
+    const jsonType=opStr?jsonReg.exec(opStr)?.[1]:undefined;
+    if(jsonType){
+        content=`@json ${jsonType}\n${content}`
+    }
     const messages=parseConvoCode(content,{...options,startIndex:0});
     if(!messages.result || messages.error){
         return {
@@ -1293,6 +1313,7 @@ export const parseConvoPromptString=(
             updatedContent:content
         }
     }
+
     const bool=options?.includes('boolean');
     const boolNot=options?.includes('!boolean');
     if(bool || boolNot){
@@ -1306,9 +1327,10 @@ export const parseConvoPromptString=(
     }
     return {
         prompt:{
-            extend:options?.includes('extend'),
-            systemOnly:options?.includes('systemOnly'),
-            noFunctions:options?.includes('noFunctions'),
+            extend:options?.includes('extend') || options?.includes('*'),
+            continue:options?.includes('continue') || options?.includes('+'),
+            system:options?.includes('system'),
+            functions:options?.includes('functions'),
             last:opStr?safeParseNumberOrUndefined(lastReg.exec(opStr)?.[1]):undefined,
             dropLast:opStr?safeParseNumberOrUndefined(dropLastReg.exec(opStr)?.[1]):undefined,
             not:boolNot,

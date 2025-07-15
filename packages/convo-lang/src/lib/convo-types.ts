@@ -316,18 +316,26 @@ export interface ConvoStatement
 export interface ConvoStatementPrompt
 {
     /**
-     * If true the prompt should extend the current conversation
+     * If true the prompt should extend the current conversation. Only content based and top level
+     * messages are included. Use the `system` and `functions` properties to include functions and
+     * system messages. The (@)includeWithTriggers add individual messages
      */
     extend?:boolean;
+
+    /**
+     * If true the prompt will continue the last extended prompt of extend the current conversation
+     */
+    continue?:boolean;
+
     /**
      * When extends is true and system is true only system messages will be extended
      */
-    systemOnly?:boolean;
+    system?:boolean;
 
     /**
      * Prevents functions from being extended in to the cloned conversation.
      */
-    noFunctions?:boolean;
+    functions?:boolean;
 
     /**
      * Causes only the last N number of message to be cloned
@@ -1281,7 +1289,8 @@ export interface CloneConversationOptions
     dropLast?:number;
     dropUntilContent?:boolean;
     empty?:boolean;
-    isTrigger?:boolean;
+    triggerName?:string;
+    triggerPrompt?:ConvoStatementPrompt;
 }
 
 export interface ConvoDocumentReference
@@ -1603,8 +1612,15 @@ export interface ConvoHttpToInputRequest
 }
 
 /**
- * Defines the action type for message triggers that determine how trigger function results 
+ * Defines the action type for message triggers that determine how trigger function results
  * are applied to content messages.
+ *
+ * - replace: Replaces the content of a message.
+ * - replaceForModel: Replaces the content of a message but only for the LLM. User will see the original content.
+ * - append: Appends text to the content of a message that is visible to the user.
+ * - prepend: Prepends text to the content of a message that is visible to the user.
+ * - prefix: Adds text to the prefix of a message that is not visible to the user.
+ * - suffix: Adds text to the suffix of a message that is not visible to the user.
  */
 export type ConvoMessageTriggerAction='replace'|'replaceForModel'|'append'|'prepend'|'prefix'|'suffix';
 
