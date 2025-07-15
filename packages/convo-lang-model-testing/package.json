@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-model-testing",
-    "version": "0.7.28",
+    "version": "0.7.29",
     "type": "commonjs",
     "sideEffects": false,
     "repository": {
