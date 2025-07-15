@@ -96,7 +96,7 @@
             "patterns":[{"include":"#lineExpression"}]
         },
         "topLevelStatements":{
-            "begin": "^\\s*(>)\\s*(do|result|define|debug|trigger|end)",
+            "begin": "^\\s*(>)\\s*(do|triggerResult|result|define|debug|trigger|end)",
             "end": "(?=\\s*>)",
             "beginCaptures": {
                 "1":{
@@ -264,17 +264,19 @@
             ]
         },
         "tag":{
-            "match":"^\\s*(@)\\s*(\\w*)\\s*=?(.*)",
+            "_match":"^\\s*(@)(on\\s+(\\w+)|\\s*\\w*)\\s*(=(.*)|(.*))",
+            "match":"^\\s*(@)((on\\s+(\\w+)\\s*=?(.*))|((condition|disabled)\\s*(=\\s*(.*)))|((\\w+)\\s*=?\\s*(.*)))",
             "captures":{
-                "1":{
-                    "name":"entity.name.tag"
-                },
-                "2":{
-                    "name":"entity.name.tag"
-                },
-                "3":{
-                    "name":"string"
-                }
+                "1":{"name":"entity.name.tag"},
+                "3":{"name":"entity.name.tag"},
+                "4":{"name":"entity.name.type"},
+                "5":{"name":"string"},
+
+                "7":{"name":"entity.name.tag"},
+                "9":{"patterns": [{"include":"#lineExpression"}]},
+
+                "11":{"name":"entity.name.tag"},
+                "12":{"name":"string"}
             }
         },
         "lineExpression":{
@@ -353,7 +355,11 @@
             "beginCaptures":{
                 "1":{"name":"constant.character.escape"},
                 "3":{"name":"constant.character.escape"},
-                "4":{"name":"variable"},
+                "4":{
+                    "patterns": [
+                        {"include":"#stringPromptMods"}
+                    ]
+                },
                 "5":{"name":"constant.character.escape"}
             },
             "endCaptures":{
@@ -362,6 +368,15 @@
             "patterns": [
                 {"include":"#expression"}
             ]
+        },
+        "stringPromptMods":{
+            "match":"((\\+|\\*|!|extend|continue)|(boolean)|((\\w+)\\s*:\\s*(\\w+)))|(system|functions|)",
+            "captures":{
+                "2":{"name":"storage.modifier"},
+                "3":{"name":"entity.name.type"},
+                "5":{"name":"variable"},
+                "6":{"name":"entity.name.type"}
+            }
         },
         "stringEmbed":{
             "begin":"(===)\\s*((\\()([^)]*)(\\)))?",
