@@ -432,6 +432,15 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
 
+### v0.7.29
+- **Inline Prompts**: Added "continue" inline prompt modifier for continuing conversations
+- **Inline Prompts**: Added short symbols for extend and continue inline prompts
+- **Inline Prompts**: Enhanced message inclusion rules - inline prompts now only include user and assistant messages by default
+- **Inline Prompts**: Added json:{Type} modifier support for adding @json tags to inline prompts
+- **Inline Prompts**: Auto-assign prompt role when no role is defined for inline prompts
+- **Events**: Added @on tag for defining events, replacing onUser and onAssistant tags
+- **Conditions**: Enhanced condition and disabled tags to support dynamic expressions
+
 ### v0.7.28
 - **Message Triggers**: Added onUser and onAssistant message triggers for automatic function execution
 - **Performance**: Added cached parsing for Convo-Lang code with `parseConvoType` and `parseConvoCached` functions
