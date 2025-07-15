@@ -226,7 +226,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         const tag=tagReg.exec(code.substring(index,newline).trim());
         if(tag){
             debug?.('TAG',tag);
-            let v=tag[3]?.trim();
+            let v=tag[3]?.trim()||undefined;
             const tagObj:ConvoTag={name:tag[1]??''};
             if(tag[2] && convoDynamicTags.includes(tagObj.name)){
                 if(!convoDynamicTags.includes(tagObj.name)){
