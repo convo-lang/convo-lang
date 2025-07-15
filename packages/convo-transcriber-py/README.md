@@ -432,6 +432,9 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
 
+### v0.7.30
+- **Bug Fix**: Restored empty tag value back to undefined
+
 ### v0.7.29
 - **Inline Prompts**: Added "continue" inline prompt modifier for continuing conversations
 - **Inline Prompts**: Added short symbols for extend and continue inline prompts
