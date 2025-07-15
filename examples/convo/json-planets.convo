@@ -1,0 +1,60 @@
+> define
+
+Planet = struct(
+    name:string
+    milesFromSun:number
+    moonCount:number
+)
+
+@json Planet[]
+> user
+List the planets in our solar system
+
+@tokenUsage 214 / 268 / $0.010179999999999998
+@format json
+> assistant
+[
+    {
+        "name": "Mercury",
+        "milesFromSun": 35980000,
+        "moonCount": 0
+    },
+    {
+        "name": "Venus",
+        "milesFromSun": 67240000,
+        "moonCount": 0
+    },
+    {
+        "name": "Earth",
+        "milesFromSun": 92960000,
+        "moonCount": 1
+    },
+    {
+        "name": "Mars",
+        "milesFromSun": 141600000,
+        "moonCount": 2
+    },
+    {
+        "name": "Jupiter",
+        "milesFromSun": 483800000,
+        "moonCount": 79
+    },
+    {
+        "name": "Saturn",
+        "milesFromSun": 890800000,
+        "moonCount": 83
+    },
+    {
+        "name": "Uranus",
+        "milesFromSun": 1784000000,
+        "moonCount": 27
+    },
+    {
+        "name": "Neptune",
+        "milesFromSun": 2795000000,
+        "moonCount": 14
+    }
+]
+
+
+> user

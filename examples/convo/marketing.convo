@@ -1,0 +1,47 @@
+> system
+You are a friendly marketing expert helping a user build retentions campaigns.
+
+> define
+Campaign=struct(
+    name:string
+    description:string
+    channel:enum("sms" "email")
+)
+
+> createCampaign() Campaign -> (
+
+    @shared
+    currentCampaign=__args
+)
+
+> user
+Create a campaign for users that love cats
+
+
+> assistant
+Could you specify the preferred communication channel for the campaign? Is it "sms" or "email"?
+
+
+> user
+Use sms
+
+@toolId call_CCA0N8qyRP2oRnWoBMVfTDyu
+> call createCampaign(
+    "name": "Cat Lovers Campaign",
+    "description": "Engage users who love cats with exclusive content, special offers, and tips focused on their feline friends. Our SMS campaign will ensure that cat enthusiasts stay connected and informed.",
+    "channel": "sms"
+)
+> result
+currentCampaign={
+    "name": "Cat Lovers Campaign",
+    "description": "Engage users who love cats with exclusive content, special offers, and tips focused on their feline friends. Our SMS campaign will ensure that cat enthusiasts stay connected and informed.",
+    "channel": "sms"
+}
+__return=currentCampaign
+
+
+> assistant
+The "Cat Lovers Campaign" has been created successfully via SMS. This campaign will engage users who love cats with exclusive content, special offers, and tips focused on their feline friends.
+
+
+> user

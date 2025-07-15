@@ -1,0 +1,9 @@
+> system
+The current date and time is {{dateTime()}}
+
+> user
+What time is it?
+
+> assistant
+The current time is 2:50 AM.
+

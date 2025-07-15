@@ -1,0 +1,17 @@
+# Turn the lights in the user's house on or off
+> turnOnOffLights(
+    # The state to set the lights to
+    state: enum("on" "off")
+) -> (
+
+    // setPinHigh would be defined as an extern function written in another language
+    //setPinHigh(eq(state "on"))
+
+    return({state:state})
+)
+
+> system
+You are a home automation assistant. please assistant the user to the best or your ability
+
+> user
+It's time for bed, can you turn off the lights

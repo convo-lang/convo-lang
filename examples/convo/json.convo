@@ -1,0 +1,37 @@
+> define
+Person = struct(
+    name:string
+    age:number
+    personality:string
+)
+
+@json Person[]
+> user
+List 4 funny people
+
+
+@format json
+> assistant
+[
+    {
+        "name": "Jim Carrey",
+        "age": 61,
+        "personality": "Energetic and zany"
+    },
+    {
+        "name": "Tina Fey",
+        "age": 53,
+        "personality": "Witty and sharp"
+    },
+    {
+        "name": "Kevin Hart",
+        "age": 44,
+        "personality": "High-energy and charismatic"
+    },
+    {
+        "name": "Sarah Silverman",
+        "age": 52,
+        "personality": "Edgy and bold"
+    }
+]
+

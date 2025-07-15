@@ -1,0 +1,41 @@
+// (Caution) this script is capable to running shell command on you machine.
+// (Note) Before commands are ran you will be prompted to allow access to run the command and
+//        be given a preview of the command
+
+> define
+computerType="MacBook pro"
+
+# Runs a command in a bash shell
+> runCommand(
+    # the command to run
+    command:enum('openLesson' 'scheduleSession')
+
+    # For openLesson value will be the name of the less and for scheduleSession value will be the
+    # time the session should be scheduled. Date values should be formatted as ISO time values.
+    value:string
+) -> (
+    print(__args)
+
+    return({
+        result:'success'
+    })
+)
+
+> system
+You are a friendly assistant. Always respond with the runCommand function.
+
+today date is 2023-11-10
+
+> user
+Joe has the follow avaibilities in his calendar
+
+2023-11-11T14:00:00
+2023-11-12T16:00:00
+
+And Matt as the follow avaibilities in his calendar
+
+2023-11-18T07:00:00
+2023-11-12T16:00:00
+
+> user
+Schedule a session for Joe and Matt given their avaibilities

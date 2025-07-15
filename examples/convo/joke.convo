@@ -1,0 +1,7 @@
+> define
+__trackTime=true
+__trackTokenUsage=true
+__trackModel=true
+
+> user
+Tell me a joke about airplanes
