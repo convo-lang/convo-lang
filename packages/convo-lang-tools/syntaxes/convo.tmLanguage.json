@@ -107,7 +107,7 @@
                 }
             },
             "patterns": [
-                {"include":"#comment"},
+                {"include":"#bodyComment"},
                 {"include":"#tag"},
                 {"include":"#functionCall"},
                 {"include":"#paramLineExpression"}
@@ -159,7 +159,7 @@
             }
         },
         "function":{
-            "begin": "^\\s*(>)\\s*(agent|on|public)?\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
+            "begin": "^\\s*(>)\\s*(agent|public|local)?\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
             "end": "\\)",
             "beginCaptures": {
                 "1":{
@@ -187,7 +187,7 @@
                 }
             },
             "patterns": [
-                {"include":"#comment"},
+                {"include":"#bodyComment"},
                 {"include":"#tag"},
                 {"include":"#functionCall"},
                 {"include":"#paramLineExpression"}
@@ -201,7 +201,7 @@
                     "name":"entity.name.type"
                 },
                 "2":{
-                    "name":"keyword.operator"
+                    "name":"keyword.control"
                 },
                 "3":{
                     "name":"entity.name.type"
@@ -216,39 +216,122 @@
                 }
             },
             "patterns": [
-                {"include":"#comment"},
+                {"include":"#bodyComment"},
                 {"include":"#tag"},
                 {"include":"#functionCall"},
                 {"include":"#lineExpression"}
             ]
         },
         "functionCall":{
-            "begin":"(\\w+)\\s*(\\()",
+            "patterns": [
+                { "include": "#functionCallSystem"},
+                { "include": "#functionCallOperator"},
+                { "include": "#functionCallLogic"},
+                { "include": "#functionCallType"},
+                { "include": "#functionCallDefault"}
+            ]
+        },
+        "functionCallSystem":{
+            "begin":"(elif|if|else|while|break|foreach|for|in|do|then|fn|return|case|default|switch|test)\\s*(\\()",
             "end":"\\)",
             "beginCaptures": {
                 "1":{
-                    "name":"support.function",
-                    "patterns":[
-                        {"include":"#operators"},
-                        {"include":"#typeFunctions"},
-                        {"include":"#logicOperators"},
-                        {"include":"#systemFunctions"}
-                    ]
+                    "name":"keyword.control"
                 },
                 "2":{
-                    "name":"meta.parameters"
+                    "name":"keyword.control"
                 }
             },
             "endCaptures":{
                 "0":{
-                    "name":"meta.parameters"
+                    "name":"keyword.control"
                 }
             },
             "patterns": [
                 { "include": "#lineExpression" }
             ]
         },
-        "comment":{
+        "functionCallOperator":{
+            "begin":"(lt|lte|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"constant.character.escape"
+                },
+                "2":{
+                    "name":"constant.character.escape"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"constant.character.escape"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallType":{
+            "begin":"(enum|struct|array)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"keyword.control"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallLogic":{
+            "begin":"(and|or)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword"
+                },
+                "2":{
+                    "name":"keyword"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"keyword"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallDefault":{
+            "begin":"(\\w+)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"support.function"
+                },
+                "2":{
+                    "name":"support.function"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"support.function"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "bodyComment":{
             "patterns":[
                 {
                     "match":"#.*",
@@ -263,25 +346,60 @@
                 }
             ]
         },
+        "comment":{
+            "patterns":[
+                {
+                    "match":"^\\s*#.*",
+                    "name":"comment"
+                },
+                {
+                    "match":"^\\s*//.*",
+                    "name":"emphasis",
+                    "captures":{
+                        "0":{"name":"comment"}
+                    }
+                }
+            ]
+        },
         "tag":{
-            "_match":"^\\s*(@)(on\\s+(\\w+)|\\s*\\w*)\\s*(=(.*)|(.*))",
-            "match":"^\\s*(@)((on\\s+(\\w+)\\s*=?(.*))|((condition|disabled)\\s*(=\\s*(.*)))|((\\w+)\\s*=?\\s*(.*)))",
+            "match":"^\\s*(@)((on\\s+(.*))|(json\\s+(.*))|((condition|disabled)\\s*(=\\s*(.*)))|((\\w+)\\s*=?\\s*(.*)))",
             "captures":{
                 "1":{"name":"entity.name.tag"},
                 "3":{"name":"entity.name.tag"},
-                "4":{"name":"entity.name.type"},
-                "5":{"name":"string"},
+                "4":{"patterns": [{"include":"#tagEvent"}]},
 
-                "7":{"name":"entity.name.tag"},
-                "9":{"patterns": [{"include":"#lineExpression"}]},
+                "5":{"name":"entity.name.tag"},
+                "6":{"name": "entity.name.type"},
 
-                "11":{"name":"entity.name.tag"},
-                "12":{"name":"string"}
+                "8":{"name":"entity.name.tag"},
+                "10":{"patterns": [{"include":"#lineExpression"}]},
+
+                "12":{"name":"entity.name.tag"},
+                "13":{"name":"string"}
             }
+        },
+        "tagEvent":{
+            "match":"((user[\\s$]|assistant[\\s$])|\\w+)\\s*((=(.*))|(.*))?",
+            "captures":{
+                "1":{"name":"string"},
+                "2":{"name":"entity.name.type"},
+
+                "5":{"patterns": [{"include":"#lineExpression"}]},
+                "6":{"name":"invalid.illegal"}
+            }
+        },
+
+        "tagEventFallback":{
+            "match":"(\\w+)(.*)?",
+            "captures":{
+                "1":{"name":"entity.name.type"},
+                "2":{"name":"string"}
+            }
+
         },
         "lineExpression":{
             "patterns":[
-                {"include":"#comment"},
+                {"include":"#bodyComment"},
                 {"include":"#tag"},
                 {"include":"#heredoc"},
                 {"include":"#stringPrompt"},
@@ -300,7 +418,7 @@
         },
         "paramLineExpression":{
             "patterns":[
-                {"include":"#comment"},
+                {"include":"#bodyComment"},
                 {"include":"#tag"},
                 {"include":"#heredoc"},
                 {"include":"#stringPrompt"},
@@ -357,7 +475,7 @@
                 "3":{"name":"constant.character.escape"},
                 "4":{
                     "patterns": [
-                        {"include":"#stringPromptMods"}
+                        {"include":"#stringMods"}
                     ]
                 },
                 "5":{"name":"constant.character.escape"}
@@ -369,30 +487,45 @@
                 {"include":"#expression"}
             ]
         },
-        "stringPromptMods":{
-            "match":"((\\+|\\*|!|extend|continue)|(boolean)|((\\w+)\\s*:\\s*(\\w+)))|(system|functions|)",
-            "captures":{
-                "2":{"name":"storage.modifier"},
-                "3":{"name":"entity.name.type"},
-                "5":{"name":"variable"},
-                "6":{"name":"entity.name.type"}
-            }
-        },
         "stringEmbed":{
             "begin":"(===)\\s*((\\()([^)]*)(\\)))?",
             "end":"===",
             "beginCaptures":{
-                "1":{"name":"string"},
+                "1":{"name":"constant.character.escape"},
                 "3":{"name":"constant.character.escape"},
-                "4":{"name":"variable"},
+                "4":{
+                    "patterns": [
+                        {"include":"#stringMods"}
+                    ]
+                },
                 "5":{"name":"constant.character.escape"}
             },
             "endCaptures":{
-                "0":{"name":"string"}
+                "0":{"name":"constant.character.escape"}
             },
             "patterns": [
                 {"include":"#expression"}
             ]
+        },
+        "stringMods":{
+            "match":"(((task)\\s*:(.*))|(\\+|\\*)|(system|functions|transforms|replace|replaceForModel|append|prepend|prefix|suffix|respond)|(boolean)|((\\w+)\\s*:\\s*(\\w+\\[?\\]?))|(/\\w+)|((\\w+)\\s*=)|(>>)|(!))",
+            "captures":{
+
+                "3":{"name":"variable"},
+                "4":{"name":"comment"},
+
+                "5":{"name":"keyword.control"},
+                "6":{"name":"keyword.modifier"},
+                "7":{"name":"keyword.modifier"},
+                "9":{"name":"entity.name.type"},
+                "10":{"name":"entity.name.type"},
+                "11":{"name":"keyword.modifier"},
+                "13":{"name":"variable"},
+
+                "14":{"name":"keyword.control"},
+
+                "15":{"name":"keyword.modifier"}
+            }
         },
         "stringDq":{
             "begin":"\"",
