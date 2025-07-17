@@ -957,6 +957,76 @@ can optionally replace or added to message content.
 
 **More documentation coming soon**
 
+## Custom Thinking models
+Using Inline Prompts and Message Triggers you can implement custom thinking algorithms using any
+LLM and even mix models using more specialized LLMs for specific tasks.
+
+This example interviews the user based on a list of topics and dive into each topic
+``` convo
+
+
+> define
+Answer=struct(
+    topic:string
+    question:string
+    answer:string
+)
+
+answers=[]
+
+@edge
+> system
+You are interviewing a user on several topics.
+
+Interview Topics:
+- Location
+- Hobbies
+- Personality
+
+Current Answers:
+<answers>
+{{answers}}
+</answers>
+
+
+@on user suffix
+> local onAnswer(content:string) -> (
+
+    if( ??? (+!boolean /m)
+        Did the user answer a question?
+    ??? ) return(false)
+
+    ??? (+ answer=json:Answer /m task:Saving answer)
+        Convert the user's answer to an Answer object
+    ???
+
+    answers = aryAdd(answers answer)
+
+    switch(
+        ??? (+ boolean /m task:Reviewing)
+        Has the user given enough detail about the topic of {{answer.topic}} for you to have a
+        full understanding of their relation with the topic? The user should have answered at least
+        3 questions about the topic.
+        ???
+
+        === (suffix /m)
+        Move on to the next topic
+        ===
+
+        === (suffix /m)
+        Dive deeper into the users last answer by asking them a related question
+        ===
+    )
+)
+
+@disableTriggers
+@init
+@hidden
+> user
+Ask the first question
+
+```
+
 ## Tags
 Tags are used in many ways in Convo-Lang and serve as a way to add metadata to messages and 
 code statements. Tags on the line just before the message or code statement they are tagging. Tags
