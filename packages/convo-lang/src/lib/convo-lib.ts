@@ -5,7 +5,8 @@ import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageTemplate, ConvoMessageTrigger, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker } from "./convo-types";
+import { convoSystemMessages } from "./convo-system-messages";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoReservedRoles, convoScopeFunctionMarker, isConvoMessageModification, isConvoMessageModificationAction } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -50,6 +51,7 @@ export const convoAnyModelName='__any__';
 export const convoRoles={
     user:'user',
     assistant:'assistant',
+    system:'system',
 
     /**
      * Used to add a prefix to the previous content message. Prefixes are not seen by the user.
@@ -867,7 +869,18 @@ export const convoTags={
     /**
      * Defines a component to render a function result
      */
-    renderer:'renderer'
+    renderer:'renderer',
+
+    /**
+     * Indicates a message is a standard system message. Standard system messages are used to
+     * implement common patterns such as the moderator pattern.
+     */
+    stdSystem:'stdSystem',
+
+    /**
+     * Prevents a message from accepting modifiers and allows modifiers to flow through the message
+     */
+    disableModifiers:'disableModifiers',
 
 } as const;
 
@@ -1135,6 +1148,43 @@ export const getConvoFnMessageByTag=(tag:string,messages:ConvoMessage[]|null|und
                 return msg;
             }
         }
+    }
+    return undefined;
+}
+
+export interface FindConvoMessageOptions
+{
+    tag?:string;
+    tagValue?:string;
+    role?:string;
+    startIndex?:number;
+}
+export const findConvoMessage=(messages:ConvoMessage[]|null|undefined,{
+    tag,
+    tagValue,
+    role,
+    startIndex=0,
+}:FindConvoMessageOptions):ConvoMessage|undefined=>{
+    if(!messages){
+        return undefined;
+    }
+    for(let i=startIndex;i<messages.length;i++){
+        const msg=messages[i];
+        if(!msg || !msg.tags || (role!==undefined && msg.role!==role)){
+            continue;
+        }
+        if(tag!==undefined){
+            for(const t of msg.tags){
+                if( t.name===tag &&
+                    (tagValue===undefined?true:t.value===tagValue)
+                ){
+                    return msg;
+                }
+            }
+            continue;
+        }
+
+        return msg;
     }
     return undefined;
 }
@@ -1931,7 +1981,7 @@ export const getLastConvoMessageWithRole=<T extends ConvoMessage|FlatConvoMessag
 export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
     for(let i=messages.length-1;i>=0;i--){
         const msg=messages[i];
-        if(msg && !msg.called){
+        if(msg && !msg.called && !isConvoMessageModificationAction(msg.role) && msg.role!==convoRoles.system){
             return msg;
         }
     }
@@ -1972,7 +2022,6 @@ export const createTextConvoCompletionMessage=({
     tokenPrice,
     defaults,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
-
     const lastContentMessage=getLastNonCalledConvoFlatMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
 
@@ -2141,6 +2190,13 @@ export const getNormalizedFlatMessageList=(
         let msg=messages[i];
         if(!msg){continue}
 
+        if(msg.modelContent){
+            msg={...msg}
+            messages[i]=msg;
+            msg.content=msg.modelContent;
+            delete msg.modelContent;
+        }
+
         if(msg.prefix || msg.suffix){
             msg={...msg}
             messages[i]=msg;
@@ -2163,29 +2219,6 @@ export const getNormalizedFlatMessageList=(
             lastContentMessage={...lastContentMessage};
             messages[lastContentMessageI]=lastContentMessage;
             lastContentMessage.content+='\n\n'+content;
-            continue;
-        }
-
-        if(msg.role===convoRoles.prefix || msg.role===convoRoles.suffix || msg.role===convoRoles.replaceForModel){
-            messages.splice(i,1);
-            i--;
-            if(!lastContentMessage){
-                continue;
-            }
-            lastContentMessage={...lastContentMessage};
-            messages[lastContentMessageI]=lastContentMessage;
-            switch(msg.role){
-                case convoRoles.replaceForModel:
-                    lastContentMessage.content=msg.content;
-                    break;
-                case convoRoles.prefix:
-                    lastContentMessage.content=`${msg.content}\n\n${lastContentMessage.content}`;
-                    break;
-                case convoRoles.suffix:
-                    lastContentMessage.content=`${lastContentMessage.content}\n\n${msg.content}`;
-                    break;
-            }
-
             continue;
         }
 
@@ -2232,7 +2265,7 @@ export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
         let msg=messages[i];
         if(!msg){continue}
 
-        if(msg.role===convoRoles.prepend || msg.role===convoRoles.append || msg.role===convoRoles.replace){
+        if(isConvoMessageModification(msg.role)){
             messages.splice(i,1);
             i--;
             if(!lastContentMessage){
@@ -2240,9 +2273,13 @@ export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
             }
             lastContentMessage={...lastContentMessage};
             messages[lastContentMessageI]=lastContentMessage;
+
             switch(msg.role){
                 case convoRoles.replace:
                     lastContentMessage.content=msg.content;
+                    break;
+                case convoRoles.replaceForModel:
+                    lastContentMessage.modelContent=msg.content;
                     break;
                 case convoRoles.prepend:
                     lastContentMessage.content=`${msg.content}\n\n${lastContentMessage.content}`;
@@ -2250,12 +2287,18 @@ export const mergeConvoFlatContentMessages=(messages:FlatConvoMessage[])=>{
                 case convoRoles.append:
                     lastContentMessage.content=`${lastContentMessage.content}\n\n${msg.content}`;
                     break;
+                case convoRoles.prefix:
+                    lastContentMessage.prefix=`${lastContentMessage.prefix?`${lastContentMessage.prefix}\n\n`:''}${msg.content}`;
+                    break;
+                case convoRoles.suffix:
+                    lastContentMessage.suffix=`${lastContentMessage.suffix?`${lastContentMessage.suffix}\n\n`:''}${msg.content}`;
+                    break;
             }
 
             continue;
         }
 
-        if(msg.content!==undefined){
+        if(msg.content!==undefined && !(msg.tags && (convoTags.disableModifiers in msg.tags))){
             lastContentMessage=msg;
             lastContentMessageI=i;
         }
@@ -2422,29 +2465,9 @@ export const getConvoCompletionServiceModelsAsync=async (service:ConvoCompletion
     return models;
 }
 
-const triggerReg=/^\s*(replaceForModel|replace|append|prepend|prefix|suffix)\s*(.*)/;
-
-/**
- * Parses a message trigger tag value to extract the trigger action and optional condition.
- * Supports syntax like "replace condition" or "append" where the condition is optional.
- *
- * @param fnName - The name of the function to be called by the trigger
- * @param role - The message role that will trigger this function
- * @param tagValue - The tag value containing action and optional condition
- * @returns Parsed ConvoMessageTrigger object, or undefined if parsing fails
- */
-export const parseConvoMessageTrigger=(fnName:string,role:string,tagValue:string):ConvoMessageTrigger|undefined=>{
-    const match=triggerReg.exec(tagValue);
-    if(!match){
-        return undefined;
-    }
-    return {
-        role,
-        action:match[1] as any,
-        fnName,
-        condition:match[2]?.trim()||undefined
-    }
-
+const modeFindReg=/(^| |\t)(replaceForModel|replace|append|prepend|prefix|suffix|respond)($| |\t)/;
+export const getConvoMessageModificationAction=(str:string):ConvoMessageModificationAction|undefined=>{
+    return modeFindReg.exec(str)?.[2] as any;
 }
 
 /**
@@ -2477,4 +2500,46 @@ export const appendFlatConvoMessageSuffix=(msg:FlatConvoMessage,value:string,sep
     }else{
         msg.suffix=value;
     }
+}
+
+/**
+ * Converts a flat convo message to a completion message
+ */
+export const convertFlatConvoMessageToCompletionMessage=(msg:FlatConvoMessage):ConvoCompletionMessage=>({
+    role:msg.role,
+    content:msg.content,
+    callFn:msg.called?.name,
+    callParams:msg.calledParams,
+    model:msg.responseModel,
+    format:msg.responseFormat,
+    endpoint:msg.responseEndpoint,
+    formatTypeName:msg.responseFormatTypeName,
+    assignTo:msg.responseAssignTo,
+    tags:msg.tags?{...msg.tags}:undefined,
+})
+
+export const getConvoSystemMessage=(type:StandardConvoSystemMessage)=>{
+    const content=convoSystemMessages[type];
+    if(!content){
+        throw new Error(`Invalid standard convo system message - ${type}`)
+    }
+
+    return `@${
+        convoTags.stdSystem} ${type
+    }\n@${
+        convoTags.includeInTriggers
+    }\n@${
+        convoTags.disableModifiers
+    }\n${content.trim()}`
+}
+
+const flatConvoMsgCachedJsonKey=Symbol('flatConvoMsgCachedJsonKey')
+export const getFlatConvoMessageCachedJsonValue=(msg:FlatConvoMessage|null|undefined):any=>{
+    return (msg as any)?.[flatConvoMsgCachedJsonKey];
+}
+export const setFlatConvoMessageCachedJsonValue=(msg:FlatConvoMessage|null|undefined,value:any):any=>{
+    if(msg){
+        (msg as any)[flatConvoMsgCachedJsonKey]=value;
+    }
+    return value;
 }

@@ -1,8 +1,8 @@
-import { CodeParser, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
+import { CodeParser, CodeParsingResult, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoStatementSource, getConvoTag, isValidConvoIdentifier, parseConvoBooleanTag, parseConvoMessageTrigger } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoStatementPrompt, ConvoTag, ConvoValueConstant, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
+import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, ConvoStatementPrompt as InlineConvoPrompt, StandardConvoSystemMessage, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
@@ -26,8 +26,8 @@ const numberReg=/^-?[.\d]/;
 const singleStringReg=/\{\{|'/gs;
 const doubleStringReg=/"/gs;
 const heredocStringReg=/-{3,}/gs;
-const promptStringReg=/\{\{|\?{3,}/gs;
-const embedStringReg=/\{\{|={3,}/gs;
+const promptStringReg=/\?\?\?/gs;
+const embedStringReg=/\{\{|===/gs;
 const msgStringReg=/(\{\{|[\n\r]\s*>|$)/gs;
 
 const heredocOpening=/^([^\n])*\n(\s*)/;
@@ -389,16 +389,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 }
             }
 
-            const assignTag=getConvoTag(currentMessage.tags,convoTags.assignTo);
-            if(assignTag?.value){
-                if(!isValidConvoIdentifier(assignTag.value)){
-                    index=startIndex;
-                    error='Invalid assign var name';
-                    return false;
-                }
-                currentMessage.assignTo=assignTag.value;
-            }
-
             if(currentMessage.statement){
                 currentMessage.statement.e=index;
             }
@@ -493,20 +483,21 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         if(isMsgString){
                             removeBackslashes(strStatement.params);
-                        }else if(inString==='???'){
-                            strStatement.prompt={}
                         }
                     }else{
                         strStatement.value=content;
-                        if(inString==='???'){
-                            const {error:err,updatedContent,prompt}=parseConvoPromptString(content);
-                            if(err){
-                                error=err;
-                                break parsingLoop;
-                            }
-                            strStatement.prompt=prompt;
-                            strStatement.value=updatedContent;
+                    }
+                    const isStatic=inString==='===';
+                    if(inString==='???' || isStatic){
+                        const prompt=parseInlineConvoPrompt(strStatement,{isStatic:isStatic,applyToStatement:isStatic});
+                        if(prompt.error || !prompt.result){
+                            error=prompt.error?.message??'Inline prompt to parsed by inline parser';
+                            index+=prompt.endIndex;
+                            break parsingLoop;
                         }
+                        strStatement.prompt=prompt.result;
+                        delete strStatement.fn;
+                        delete strStatement.params;
                     }
                 }
                 index=nextIndex;
@@ -1159,29 +1150,24 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         break;
 
                     case convoTags.on:
-                        if(tag.value){
+                        if(tag.value && msg.fn){
                             const i=tag.value.indexOf(' ');
                             const name=i===-1?tag.value:tag.value.substring(0,i);
                             const content=i===-1?'':tag.value.substring(i+1).trim();
-                            switch(name){
-
-                                case convoEvents.user:
-                                case convoEvents.assistant:
-                                    if(msg.fn){
-                                         const trigger=parseConvoMessageTrigger(
-                                            msg.fn.name,
-                                            name===convoEvents.assistant?convoRoles.assistant:convoRoles.user,
-                                            content
-                                        );
-                                        if(trigger){
-                                            if(!msg.messageTriggers){
-                                                msg.messageTriggers=[];
-                                            }
-                                            msg.messageTriggers.push(trigger);
-                                        }
-                                    }
-                                    break;
-
+                            const trigger=parseConvoMessageTrigger(
+                                name,
+                                msg.fn.name,
+                                content,
+                                name===convoEvents.assistant?convoRoles.assistant:name===convoRoles.user?convoRoles.user:undefined,
+                            );
+                            if(trigger.error){
+                                error=`Failed to parse trigger condition for message ${msg.fn.name} - ${trigger.error.message}`;
+                                break finalPass;
+                            }else if(trigger.result){
+                                if(!msg.messageTriggers){
+                                    msg.messageTriggers=[];
+                                }
+                                msg.messageTriggers.push(trigger.result);
                             }
                         }
                         break;
@@ -1302,60 +1288,186 @@ const removeBackslashes=(params:ConvoStatement[])=>{
     }
 }
 
-const optionsSplit=/[, \t]+/;
+/**
+ * Parses a message trigger tag value to extract the trigger action and optional condition.
+ * Supports syntax like "replace condition" or "append" where the condition is optional.
+ *
+ * @param eventName - Name of the event the trigger will listen to
+ * @param fnName - The name of the function to be called by the trigger
+ * @param condition - string condition. Should start with a `=` character or the condition will be ignored
+ * @param role - The message role that will trigger this function
+ * @returns Parsed ConvoMessageTrigger object, or undefined if parsing fails
+ */
+export const parseConvoMessageTrigger=(eventName:string,fnName:string,condition:string,role?:string):CodeParsingResult<ConvoTrigger>=>{
+    // todo - parse condition as conditional code
+
+    let cond:ConvoStatement[]|undefined;
+    let endIndex=0;
+    condition=condition.trim();
+    if(condition.startsWith('=')){
+        const r=parseConvoCode(`> do\n${condition.substring(1)}`);
+        if(r.error){
+            return {
+                endIndex:r.endIndex,
+                error:r.error
+            }
+        }
+        cond=r.result?.[0]?.fn?.body;
+    }
+
+
+    return {
+        endIndex,
+        result:{
+            eventName,
+            role,
+            fnName,
+            condition: cond
+        }
+    }
+
+}
+
+
+const optionsSplit=/[\*\+, \t!]+/;
 const promptStringParamsReg=/^\s*\(([^)]*)\)/s;
 const lastReg=/last\s*:\s*(\d+)/;
 const dropLastReg=/dropLast\s*:\s*(\d+)/;
-const hasMsgReg=/(^|\n)\s*>/
-const jsonReg=/json\s*:\s*(\w+)/
-export const parseConvoPromptString=(
-    content:string,
-):{prompt?:ConvoStatementPrompt,updatedContent:string,error?:string}=>{
+const hasMsgReg=/(^|\n)\s*>/;
+const jsonReg=/json\s*:\s*(\w+)/;
+const assignReg=/(\w+)\s*=/;
+const wrapTagReg=/\/(\w+)/;
+export const parseInlineConvoPrompt=(
+    content:string|ConvoStatement,
+    options?:InlineConvoParsingOptions,
+):CodeParsingResult<InlineConvoPrompt>=>{
+
+    let statement:ConvoStatement|undefined;
+    if(typeof content === 'object'){
+        statement=content;
+        const headStr=(typeof content.value ==='string')?content.value:content.params?.[1]?.value;
+        if(typeof headStr === 'string'){
+            content=headStr
+        }else{
+            content='';
+        }
+    }
+
     const paramsMatch=promptStringParamsReg.exec(content);
     const opStr=paramsMatch?.[1];
-    const options=opStr?.split(optionsSplit).map(v=>v.trim());
+    const head=opStr?.split(optionsSplit);
     if(paramsMatch){
         content=content.substring(paramsMatch[0].length+1).trim();
     }else{
         content=content.trim();
     }
-    if(!hasMsgReg.test(content)){
-        content=`> prompt\n${content}`;
+
+    let wrap=opStr?wrapTagReg.exec(opStr)?.[1]:undefined;
+    let standardPrompt:StandardConvoSystemMessage|undefined;
+    if(wrap==='m'){
+        wrap='moderator';
+        standardPrompt='moderatorTags';
+    }else if(wrap==='u'){
+        wrap='user';
+        standardPrompt='userTags';
+    }else if(wrap==='a'){
+        wrap='assistant';
+        standardPrompt='assistantTags';
     }
-    const jsonType=opStr?jsonReg.exec(opStr)?.[1]:undefined;
-    if(jsonType){
-        content=`@json ${jsonType}\n${content}`
-    }
-    const messages=parseConvoCode(content,{...options,startIndex:0});
-    if(!messages.result || messages.error){
-        return {
-            error:`Failed to parse prompt string - ${messages.error?.message}:${messages.error?.line}`,
-            updatedContent:content
+
+    const hasRole=hasMsgReg.test(content);
+
+    if(!hasRole && wrap && (options?.isStatic?!statement?.params:true)){
+        if(options?.isStatic && statement?.params){//
+            content=`<${wrap}>\n${content}`;
+            const close=`\n</${wrap}>`;
+            statement.params.push({
+                s:0,
+                e:0,
+                source:close,
+                value:close
+            });
+        }else{
+            content=`<${wrap}>\n${content}\n</${wrap}>`
         }
     }
 
-    const bool=options?.includes('boolean');
-    const boolNot=options?.includes('!boolean');
-    if(bool || boolNot){
-        const last=messages.result[messages.result.length-1];
-        if(last){
+    const extend=opStr?.includes('*');
+    const _continue=opStr?.includes('+');
+
+    let messages:ConvoMessage[];
+    let endIndex=0;
+    const jsonType=(opStr?jsonReg.exec(opStr)?.[1]:undefined)||(head?.includes('boolean')?'TrueFalse':undefined);
+
+    if(!options?.isStatic){
+        if(!hasRole && !options?.isStatic){
+            content=`> ${extend||_continue?'suffix':'user'}\n${content}`;
+        }
+        const parsed=parseConvoCode(content,options);
+        if(parsed.error){
+            return {
+                endIndex:parsed.endIndex,
+                error:parsed.error,
+            }
+        }
+        messages=parsed.result??[];
+        endIndex=parsed.endIndex;
+        const last=messages[messages.length-1];
+        if(last && jsonType){
             if(!last.tags){
                 last.tags=[];
             }
-            last.tags.push({name:'json',value:'TrueFalse'})
+            last.tags.push({name:'json',value:jsonType})
+        }
+    }else if(statement){
+        messages=[];
+        if(options.applyToStatement){
+            if(typeof statement.value==='string'){
+                statement.value=content;
+            }
+            if(statement.params){
+                const first=statement.params[0];
+                if(typeof first?.value === 'string'){
+                    if(!content){
+                        statement.params?.pop();
+                    }else{
+                        first.value=content;
+
+                    }
+                }
+            }
+        }
+    }else{
+        return {
+            error:getCodeParsingError(content,0,''),
+            endIndex:0,
         }
     }
+
     return {
-        prompt:{
-            extend:options?.includes('extend') || options?.includes('*'),
-            continue:options?.includes('continue') || options?.includes('+'),
-            system:options?.includes('system'),
-            functions:options?.includes('functions'),
+        endIndex,
+        result:{
+            extend,
+            continue:_continue,
+            system:head?.includes('system'),
+            functions:head?.includes('functions'),
+            transforms:head?.includes('transforms'),
             last:opStr?safeParseNumberOrUndefined(lastReg.exec(opStr)?.[1]):undefined,
             dropLast:opStr?safeParseNumberOrUndefined(dropLastReg.exec(opStr)?.[1]):undefined,
-            not:boolNot,
-            messages:messages.result,
+            not:opStr?.includes('!'),
+            messages,
+            hasRole,
+            action:opStr?getConvoMessageModificationAction(opStr):undefined,
+            appendOutput:head?.includes('>>'),
+            assignOutputTo:opStr?assignReg.exec(opStr)?.[1]:undefined,
+            wrapInTag:wrap,
+            systemMessages:standardPrompt?[standardPrompt]:undefined,
+            isStatic:options?.isStatic,
+            jsonType,
         },
-        updatedContent:content,
     }
+}
+
+export const doesConvoContentHaveMessage=(content:string):boolean=>{
+    return hasMsgReg.test(content);
 }

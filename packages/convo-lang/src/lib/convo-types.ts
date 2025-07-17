@@ -3,6 +3,7 @@ import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
 import type { ConvoExecutionContext } from './ConvoExecutionContext';
 import { ConvoComponentDef } from './convo-component-types';
+import type { convoSystemMessages } from './convo-system-messages';
 
 export type ConvoMessageType='text'|'function';
 
@@ -60,6 +61,8 @@ export type ConvoErrorType=(
     'missing-defaults'
 );
 
+export type StandardConvoSystemMessage=keyof typeof convoSystemMessages;
+
 export interface ConvoErrorReferences
 {
     message?:ConvoMessage;
@@ -90,7 +93,7 @@ export interface ConvoMessage
     statement?:ConvoStatement;
     fn?:ConvoFunction;
     /** Message triggers that will be evaluated when this function is defined */
-    messageTriggers?:ConvoMessageTrigger[];
+    messageTriggers?:ConvoTrigger[];
     tags?:ConvoTag[];
     markdown?:MarkdownLine[];
 
@@ -106,11 +109,6 @@ export interface ConvoMessage
      * The target render area of the message.
      */
     renderTarget?:string;
-
-    /**
-     * A variable to assign the content or jsonValue of the message to
-     */
-    assignTo?:string;
 
     /**
      * The value of the message parsed as json
@@ -314,6 +312,9 @@ export interface ConvoStatement
     prompt?:ConvoStatementPrompt;
 }
 
+/**
+ * Convo-Lang prompts that can be executed inline inside of a function
+ */
 export interface ConvoStatementPrompt
 {
     /**
@@ -324,19 +325,78 @@ export interface ConvoStatementPrompt
     extend?:boolean;
 
     /**
-     * If true the prompt will continue the last extended prompt of extend the current conversation
+     * If true the prompt will continue the inline conversation. If the prompt is static the content
+     * of the prompt will be appended to the current inline conversation.
+     * The `+` modifier is used to continue the conversation.
      */
     continue?:boolean;
 
     /**
-     * When extends is true and system is true only system messages will be extended
+     * The action the prompt should take after evaluating. The action is relative to the message
+     * that triggered the prompt
+     *
+     * @example
+     * ??? (+respond)
+     * <moderator>
+     * Tell the user they have ran out of credits and must buy more first.
+     * </moderator>
+     * ???
+     */
+    action?:ConvoMessageModificationAction;
+
+
+    /**
+     * If true the output of the prompt should be appended to the conversation. The `>>` modifier
+     * is used to enable `appendOutput`
+     *
+     * @example
+     * === (>>)
+     * > assistant
+     * Thank you. We will be in contact soon.
+     * ===
+     */
+    appendOutput?:boolean;
+
+    /**
+     * If true the prompt has at least one message defined using a role. Prompts that do not have
+     * a role will automatically be given one when a role is required.
+     */
+    hasRole?:boolean;
+
+    /**
+     * Name of a variable to assign the output of the prompt to
+     */
+    assignOutputTo?:string;
+
+    /**
+     * Name of tag to wrap the content of the prompt in. Do not use a wrapper tag if the prompt
+     * uses roles.
+     */
+    wrapInTag?:string;
+
+    /**
+     * Array of standard system messages to include. For example when using the `/m` modifier to
+     * wrap the prompt content in a moderator tag the `moderatorMessages` standard system message
+     * will be appended to the conversation
+     */
+    systemMessages?:StandardConvoSystemMessage[];
+
+    /**
+     * When extends is true and system is true system messages will be cloned from the
+     * parent conversation.
      */
     system?:boolean;
 
     /**
-     * Prevents functions from being extended in to the cloned conversation.
+     * When extends is true and functions is true functions will be cloned form the
+     * parent conversation.
      */
     functions?:boolean;
+
+    /**
+     * When extends is true and transforms is true the prompt will allow transform to be enabled.
+     */
+    transforms?:boolean;
 
     /**
      * Causes only the last N number of message to be cloned
@@ -354,10 +414,16 @@ export interface ConvoStatementPrompt
     not?:boolean;
 
     /**
-     * If undefined the prompt messages will be parsed at runtime. If a prompt string has dynamic
-     * statements it will have to be parsed at runtime.
+     * Message of the prompt to be evaluated
      */
-    messages?:ConvoMessage[];
+    messages:ConvoMessage[];
+
+    /**
+     * If true the prompt will not be evaluated and it content will be returned as string
+     */
+    isStatic?:boolean;
+
+    jsonType?:string;
 }
 
 export interface ConvoMessageAndOptStatement
@@ -730,6 +796,11 @@ export interface FlatConvoMessage
     suffix?:string;
 
     /**
+     * Content that will override the content that is sent to the LLM
+     */
+    modelContent?:string;
+
+    /**
      * A function that can be called
      */
     fn?:ConvoFunction;
@@ -1004,6 +1075,8 @@ export interface FlatConvoConversation extends FlatConvoConversationBase
 
     transformFilterMessages?:FlatConvoMessage[];
 
+    response?:ConvoCompletionMessage[];
+
 
 }
 
@@ -1068,7 +1141,7 @@ export interface FlatConvoConversationBase
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
     /** Array of message triggers that will be automatically evaluated for applicable messages */
-    messageTriggers?:ConvoMessageTrigger[];
+    messageTriggers?:ConvoTrigger[];
 
     apiKey?:string;
 
@@ -1234,7 +1307,11 @@ export interface FlattenConvoOptions
 
     initFlatMessages?:FlatConvoMessage[];
 
+    flatMessages?:FlatConvoMessage[];
+
     disableTransforms?:boolean;
+
+    messageStartIndex?:number;
 }
 
 export interface ConvoSubTask
@@ -1318,8 +1395,21 @@ export type ConvoRagCallback=(
 
 export interface AppendConvoMessageObjOptions
 {
+    /**
+     * If the the conversation will not be automatically flattened.
+     */
     disableAutoFlatten?:boolean;
+
+    /**
+     * If true the source for appending the message objects will be generated from converting the
+     * message object to text.
+     */
     appendCode?:boolean;
+
+    /**
+     * The source fo the objects to be appended. `source` will override `appendCode`
+     */
+    source?:string;
 }
 
 export interface AppendConvoOptions
@@ -1327,6 +1417,7 @@ export interface AppendConvoOptions
     mergeWithPrev?:boolean;
     throwOnError?:boolean;
     disableAutoFlatten?:boolean;
+    addTags?:ConvoTag[];
 }
 
 export interface ConvoImport
@@ -1399,6 +1490,13 @@ export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|
 export interface ConvoParsingOptions extends CodeParsingOptions
 {
     includeLineNumbers?:boolean;
+}
+
+export interface InlineConvoParsingOptions extends ConvoParsingOptions
+{
+    includeLineNumbers?:boolean;
+    isStatic?:boolean;
+    applyToStatement?:boolean;
 }
 
 export interface ParsedContentJsonOrString
@@ -1612,31 +1710,52 @@ export interface ConvoHttpToInputRequest
     inputType:string;
 }
 
+export const allConvoMessageModification=['replace','replaceForModel','append','prepend','prefix','suffix'] as const;
+
+export const allConvoMessageModificationAction=[...allConvoMessageModification,'respond'] as const;
+
 /**
- * Defines the action type for message triggers that determine how trigger function results
- * are applied to content messages.
- *
+ * Defines type type of modification that can be made to message using modification messages
  * - replace: Replaces the content of a message.
  * - replaceForModel: Replaces the content of a message but only for the LLM. User will see the original content.
  * - append: Appends text to the content of a message that is visible to the user.
  * - prepend: Prepends text to the content of a message that is visible to the user.
  * - prefix: Adds text to the prefix of a message that is not visible to the user.
  * - suffix: Adds text to the suffix of a message that is not visible to the user.
+ * - respond: Responds to the current evaluating message
  */
-export type ConvoMessageTriggerAction='replace'|'replaceForModel'|'append'|'prepend'|'prefix'|'suffix';
+export type ConvoMessageModification=typeof allConvoMessageModification[number];
+export const isConvoMessageModification=(value:any):value is ConvoMessageModification=>allConvoMessageModification.includes(value);
 
 /**
- * Configuration for message triggers that allow functions to be automatically called
- * when messages with specific roles are added to conversations.
+ * Defines how a message should be modified. Values are the same as ConvoMessageModification
+ * excluding the response value.
  */
-export interface ConvoMessageTrigger
+export type ConvoMessageModificationAction=typeof allConvoMessageModificationAction[number];
+export const isConvoMessageModificationAction=(value:any):value is ConvoMessageModificationAction=>allConvoMessageModificationAction.includes(value);
+
+/**
+ * Defines a trigger that should call a function based on eventName, condition and role
+ */
+export interface ConvoTrigger
 {
+    eventName:string;
+
     /** The message role that triggers this function call */
-    role:string;
+    role?:string;
+
     /** The name of the function to call when triggered */
     fnName:string;
-    /** How the function result should be applied to the message */
-    action:ConvoMessageTriggerAction;
+
     /** Optional condition that must be true for the trigger to fire */
-    condition?:string;
+    condition?:ConvoStatement[];
+}
+
+export interface ConvoMessageTriggerEvent
+{
+    message:FlatConvoMessage|ConvoCompletionMessage;
+    trigger:ConvoTrigger;
+    content:string;
+    isUser:boolean;
+    isAssistant:boolean;
 }

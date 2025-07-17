@@ -5,9 +5,9 @@ import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
-import { parseConvoPromptString } from './convo-parser';
-import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, convoFlowControllerKey, convoScopeFnKey } from "./convo-types";
+import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { doesConvoContentHaveMessage } from './convo-parser';
+import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -64,6 +64,8 @@ export class ConvoExecutionContext
     public maxInlinePromptDepth=10;
 
     public isReadonly=0;
+
+    public flat?:FlatConvoConversation;
 
     public constructor(convo?:Partial<ConvoGlobal>,parentConvo?:Conversation)
     {
@@ -604,8 +606,19 @@ export class ConvoExecutionContext
                     }else{
                         value=fn(scope,this);
                     }
-                    if(statement.prompt && value && (typeof value ==='string')){
-                        value=this.executePromptAsync(statement,value);
+                    if(statement.prompt){
+                        if(this.disableInlinePrompts){
+                            setConvoScopeError(scope,{
+                                message:`Inline prompts not allowed in current content. Inline prompts can not be used in content messages or top level statements`,
+                                statement,
+                            });
+                            return scope;
+                        }
+                        if(statement.prompt.isStatic){
+                            value=this.executeStaticPrompt(statement.prompt,value);
+                        }else{
+                            value=this.executePromptAsync(statement.prompt);
+                        }
                     }
                 }
             }
@@ -639,14 +652,10 @@ export class ConvoExecutionContext
                 });
                 return scope;
             }
-            if(typeof statement.value === 'string'){
-                value=this.executePromptAsync(statement);
+            if(statement.prompt.isStatic){
+                value=this.executeStaticPrompt(statement.prompt,statement.value);
             }else{
-                setConvoScopeError(scope,{
-                    message:`Prompt statement expected value to be string`,
-                    statement,
-                });
-                return scope;
+                value=this.executePromptAsync(statement.prompt);
             }
         }else{
             value=statement.value;
@@ -680,40 +689,50 @@ export class ConvoExecutionContext
 
     private lastTriggerConversation?:Conversation;
 
-    private async executePromptAsync(statement:ConvoStatement,content?:string)
+    private async executeStaticPrompt(prompt:ConvoStatementPrompt,value:any)
+    {
+        this.beforeHandlePromptResult(prompt);
+
+        const valueIsString=typeof value ==='string';
+        if((prompt.continue && prompt.isStatic) && valueIsString){
+            if(!this.lastTriggerConversation){
+                this.lastTriggerConversation=this.createTriggerConversation(prompt);
+            }
+            this.lastTriggerConversation.append((prompt.hasRole?'':'> user\n')+value,{addTags:[{name:convoTags.disableModifiers}]});
+        }
+        if(prompt.jsonType && valueIsString){
+            value=parseJson5(value);
+        }
+        return this.handlePromptResult(prompt,value);
+    }
+
+    private createTriggerConversation(prompt:ConvoStatementPrompt)
+    {
+        const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true,disableTransforms:!prompt.transforms}
+        return (this.parentConvo??new Conversation({...options,defaultVars:this.getUserSharedVars()}))?.clone({triggerPrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
+
+    }
+
+    private async executePromptAsync(prompt:ConvoStatementPrompt)
     {
         if(this.parentConvo && this.parentConvo.childDepth>this.maxInlinePromptDepth){
             throw new Error('Max inline prompt depth reached');
         }
 
-        let prompt=statement.prompt;
-        if(!prompt?.messages){
-            if(!content){
-                content=statement.value;
-            }
-            if(typeof content !== 'string'){
-                throw new Error('Unable to create runtime prompt with non string value');
-            }
-            const {error,prompt:p}=parseConvoPromptString(content);
-            if(error){
-                throw new Error(`Failed to parse runtime prompt string - ${error}`);
-            }
-            prompt=p;
-        }
-        const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true}
-        const sub=((prompt?.continue && this.lastTriggerConversation)?
-            this.lastTriggerConversation
-        :
-            (this.parentConvo?.clone({triggerPrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)??new Conversation(options))
-        )
+        const sub=(prompt.continue && this.lastTriggerConversation)?
+            this.lastTriggerConversation:this.createTriggerConversation(prompt);
 
-        if(prompt?.continue || prompt?.extend){
+        if(prompt.continue || prompt.extend){
             this.lastTriggerConversation=sub;
         }
 
-        if(prompt?.messages?.length){
+
+        if(prompt.messages?.length){
             sub.appendMessageObject(prompt.messages);
         }
+
+        this.beforeHandlePromptResult(prompt);
+
         const r=await sub.completeAsync();
         let value:any;
         if(r.message?.format==='json'){
@@ -724,9 +743,68 @@ export class ConvoExecutionContext
         }else{
             value=r.message?.content;
         }
+        return this.handlePromptResult(prompt,value);
+    }
+
+    private beforeHandlePromptResult(prompt:ConvoStatementPrompt){
+        // systemMessages
+        if(prompt.systemMessages){
+            const append=(convo:Conversation,type:StandardConvoSystemMessage)=>{
+                if(!convo.findMessage({tag:convoTags.stdSystem,tagValue:type})){
+                    convo.append(getConvoSystemMessage(type),{disableAutoFlatten:true});
+                }
+            }
+            for(const s of prompt.systemMessages){
+                if(this.parentConvo){
+                    append(this.parentConvo,s);
+                }
+                if(this.lastTriggerConversation){
+                    append(this.lastTriggerConversation,s);
+                }
+            }
+        }
+    }
+
+    private handlePromptResult(prompt:ConvoStatementPrompt,value:any){
+
         if(prompt?.not){
             value=!value;
         }
+
+        if(prompt.assignOutputTo){
+            this.setVar(undefined,value,prompt.assignOutputTo);
+        }
+
+        if(this.parentConvo){
+
+            // appendOutput
+            if(prompt.appendOutput){
+                const output=typeof value === 'string'?value:JSON.stringify(value);
+                this.parentConvo.append(
+                    (doesConvoContentHaveMessage(output)?'':'> user\n')+output,
+                    {disableAutoFlatten:true}
+                );
+            }
+            // action
+            if(prompt.action){
+                let content=value;
+                if(typeof content !== 'string'){
+                    try{
+                        content=JSON.stringify(content);
+                    }catch{
+                        content=content+'';
+                    }
+                }
+                if(isConvoMessageModification(prompt.action)){
+                    this.parentConvo.appendModification(prompt.action,content,this.flat);
+                }else if(prompt.action==='respond' && this.flat){
+                    this.parentConvo.appendResponse(prompt.hasRole?content:`> assistant\n${escapeConvo(content)}`,this.flat)
+                }
+            }
+        }
+
+
+
         return value;
     }
 
