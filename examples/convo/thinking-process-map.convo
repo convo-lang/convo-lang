@@ -1,0 +1,48 @@
+> define
+ProcessNode=struct(
+    id:number
+    type:enum("decision" "process")
+    text:string
+)
+
+ProcessEdge=struct(
+    fromId:number
+    toId:number
+)
+
+ProcessMap=struct(
+    nodes:array(ProcessNode)
+    edges:array(ProcessEdge)
+)
+
+@on user
+> local createProcessMap() -> (
+
+    // Check if user asked to create a process map. If not continue with non-thinking response
+    // !boolean instructs the LLM to respond with a boolean and inverts the returned value
+    if(??? (+!boolean /m)
+        Did the user ask to create a process map or create something that could be represented as
+        a process map?
+    ???) return()
+
+    ??? (+ highLevel=json:string[] /m)
+        Create a high level list of processes that would enable the process map
+    ???
+
+    print('highLevel' highLevel)
+
+
+    ??? (+ processMap=json:ProcessMap /m)
+        Create a process map based on the following high level list of processes. Make sure
+        to include edge nodes to define how the nodes connect.
+
+        High level processes:
+        {{highLevel}}
+    ???
+
+    return(processMap)
+
+)
+
+> user
+Create a process map for starting a farm
