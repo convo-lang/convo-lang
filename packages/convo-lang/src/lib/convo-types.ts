@@ -424,6 +424,11 @@ export interface ConvoStatementPrompt
     isStatic?:boolean;
 
     jsonType?:string;
+
+    /**
+     * A task description to display while the prompt is evaluating
+     */
+    task?:ConvoTask;
 }
 
 export interface ConvoMessageAndOptStatement
@@ -1673,6 +1678,7 @@ export interface ConvoTask
     name:string;
     progress?:Progress;
     documentUrl?:string;
+    delayMs?:number;
 }
 
 export interface ConvoInsert

@@ -60,6 +60,7 @@ export const convoScopeFunctionReadDoc=createConvoScopeFunction({usesLabels:true
             name:`Reading ${getFileName(path)}`,
             progress:runner.progress,
             documentUrl:path,
+            delayMs:750
         });
 
         try{

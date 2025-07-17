@@ -1337,6 +1337,7 @@ const hasMsgReg=/(^|\n)\s*>/;
 const jsonReg=/json\s*:\s*(\w+)/;
 const assignReg=/(\w+)\s*=/;
 const wrapTagReg=/\/(\w+)/;
+const taskReg=/(^|\s*)task\s*:\s*(.*)/;
 export const parseInlineConvoPrompt=(
     content:string|ConvoStatement,
     options?:InlineConvoParsingOptions,
@@ -1354,7 +1355,16 @@ export const parseInlineConvoPrompt=(
     }
 
     const paramsMatch=promptStringParamsReg.exec(content);
-    const opStr=paramsMatch?.[1];
+    let opStr=paramsMatch?.[1];
+
+    let task:string|undefined;
+    if(opStr){
+        const taskMatch=taskReg.exec(opStr);
+        if(taskMatch){
+            task=taskMatch[2];
+            opStr=opStr.substring(0,taskMatch.index)
+        }
+    }
     const head=opStr?.split(optionsSplit);
     if(paramsMatch){
         content=content.substring(paramsMatch[0].length+1).trim();
@@ -1464,6 +1474,7 @@ export const parseInlineConvoPrompt=(
             systemMessages:standardPrompt?[standardPrompt]:undefined,
             isStatic:options?.isStatic,
             jsonType,
+            task:task?{name:task}:undefined,
         },
     }
 }

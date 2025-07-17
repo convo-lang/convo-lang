@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -733,7 +733,13 @@ export class ConvoExecutionContext
 
         this.beforeHandlePromptResult(prompt);
 
-        const r=await sub.completeAsync();
+        const disposeTask=prompt.task?this.parentConvo?.addTask(prompt.task):undefined;
+        let r:ConvoCompletion;
+        try{
+            r=await sub.completeAsync();
+        }finally{
+            disposeTask?.();
+        }
         let value:any;
         if(r.message?.format==='json'){
             value=parseJson5(r.message.content??'');

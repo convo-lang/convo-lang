@@ -1277,6 +1277,33 @@ export const defaultConvoVars={
         enableTransform('all',ctx);
     }),
 
+    [convoFunctions.pushConvoTask]:createConvoScopeFunction((scope,ctx)=>{
+        if(!scope.paramValues){
+            return;
+        }
+        const str=scope.paramValues.map(v=>{
+            if(typeof v === 'string'){
+                return v
+            }else if(v===undefined || v===null){
+                return ''
+            }else{
+                try{
+                    return JSON.stringify(v);
+                }catch{
+                    return v+''
+                }
+            }
+        }).join(' ');
+
+        return ctx.convo.conversation?.addTask({
+            name:str
+        })
+    }),
+
+    [convoFunctions.popConvoTask]:createConvoScopeFunction((scope,ctx)=>{
+        ctx.convo.conversation?.popTask();
+    }),
+
 } as const;
 
 const enableTransform=(name:string,ctx:ConvoExecutionContext)=>{

@@ -203,6 +203,17 @@ export const convoFunctions={
      * Explicitly enables all transforms
      */
     enableAllTransforms:'enableAllTransforms',
+
+    /**
+     * Pushes a conversation task on to the task stack. The task will be display in the UI
+     * while a completion is in progress
+     */
+    pushConvoTask:'pushConvoTask',
+
+    /**
+     * Pops the last convo task off the stack
+     */
+    popConvoTask:'popConvoTask',
 } as const;
 
 /**

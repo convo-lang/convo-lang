@@ -543,6 +543,13 @@ export class Conversation
         }
     }
 
+    public popTask():void{
+        const task=this._openTasks.value[this._openTasks.value.length-1];
+        if(task){
+            removeBehaviorSubjectAryValue(this._openTasks,task);
+        }
+    }
+
     public watchComponentMessages(callback:ConvoComponentMessagesCallback):Subscription{
         return this._flat.subscribe(flat=>{
             if(!flat){
