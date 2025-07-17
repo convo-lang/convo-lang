@@ -1,5 +1,10 @@
 ## Change Log
 
+### v0.7.31
+- **Inline Prompts**: Added task display while executing inline prompts
+- **UI**: Improved task view visuals for better user experience
+- **Inline Prompts**: General improvements to inline prompting functionality
+
 ### v0.7.30
 - **Bug Fix**: Restored empty tag value back to undefined
 
