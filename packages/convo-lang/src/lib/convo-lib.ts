@@ -577,6 +577,16 @@ export const convoTags={
     task:'task',
 
     /**
+     * Can be used by functions to display a task message while the function is executing.
+     */
+    taskName:'taskName',
+
+    /**
+     * Can be used by functions to display a task message while the function is executing.
+     */
+    taskDescription:'taskDescription',
+
+    /**
      * Sets the max number of non-system messages that should be included in a task completion
      */
     maxTaskMessageCount:'maxTaskMessageCount',
@@ -895,7 +905,7 @@ export const convoTags={
 
 } as const;
 
-export const convoDynamicTags:string[]=[convoTags.condition,convoTags.disabled];
+export const convoDynamicTags:string[]=[convoTags.condition,convoTags.disabled,convoTags.taskName,convoTags.taskDescription];
 
 /**
  * JSDoc tags can be used in combination with the Convo-Lang CLI to import types, components and
@@ -1217,7 +1227,7 @@ export const convoTagsToMap=(tags:ConvoTag[],exe:ConvoExecutionContext):Record<s
         }
 
         if(t.statement){
-            const values=evalConvoTagStatement(t,exe);
+            const values=exe.getTagStatementValue(t);
             let value:any;
             if(values.length===1){
                 let value=values[0];
@@ -1239,24 +1249,6 @@ export const convoTagsToMap=(tags:ConvoTag[],exe:ConvoExecutionContext):Record<s
     return map;
 }
 
-export const evalConvoTagStatement=(tag:ConvoTag,exe:ConvoExecutionContext):any[]=>{
-    if(!tag.statement?.length){
-        return [];
-    }
-    exe.isReadonly++;
-    try{
-        const values=tag.statement.map(s=>{
-            const r=exe.executeStatement(s);
-            if(r.valuePromise){
-                throw new Error('Tag value statements are not allowed to return promises');
-            }
-            return r.value;
-        });
-        return values;
-    }finally{
-        exe.isReadonly--;
-    }
-}
 
 export const mapToConvoTags=(map:Record<string,string|undefined>):ConvoTag[]=>{
     const tags:ConvoTag[]=[];

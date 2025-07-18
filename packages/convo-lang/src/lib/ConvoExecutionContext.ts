@@ -5,9 +5,9 @@ import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, ConvoTag, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -1025,6 +1025,91 @@ export class ConvoExecutionContext
             if(this.sharedVars[e]===undefined){
                 this.sharedVars[e]=otherExec.sharedVars[e];
             }
+        }
+    }
+
+    public getTagValueByName(msg:ConvoMessage|null|undefined,tagName:string,defaultValue?:any):any{
+        const tag=getConvoTag(msg?.tags,tagName);
+        if(!tag){
+            return defaultValue;
+        }
+        return this.getTagValue(tag,defaultValue);
+    }
+
+    public getTagValue(tag:ConvoTag,defaultValue?:any):any{
+        let value:any;
+        if(tag.statement){
+            const r=this.getTagStatementValue(tag);
+            value=r.length>1?r:r[0];
+        }else{
+            value=tag.value;
+        }
+        return value===undefined?defaultValue:value;
+    }
+
+    public isTagConditionTrueByName(msg:ConvoMessage|null|undefined,tagName:string,defaultValue=false):boolean{
+        const tag=getConvoTag(msg?.tags,tagName);
+        if(!tag){
+            return false;
+        }
+        return this.isTagConditionTrue(tag,defaultValue);
+    }
+
+    public isTagConditionTrue(tag:ConvoTag,defaultValue=false):boolean{
+
+        if(tag.statement){
+            return this.getTagStatementValue(tag).every(v=>v);
+
+        }else if(tag.value!==undefined){
+            let tagValue=tag.value.trim();
+            if(!tagValue){
+                return true;
+            }
+            const not=tagValue.startsWith('!');
+            if(not){
+                tagValue=tagValue.substring(1).trim();
+            }
+            const parts=tagValue.split(/\s+/);
+            if(parts.length<1){
+                return false;
+            }
+            let value=this.getVar(parts[0]??'');
+            if(not){
+                value=!value;
+            }
+            if(parts.length===1){
+                return value?true:false;
+            }
+            let v2:any;
+            if(parts.length>2){
+                parts.shift();
+                v2=parts.join(' ');
+            }else{
+                v2=parts[1];
+            }
+            return value?.toString()===v2;
+        }else{
+            return defaultValue;
+        }
+
+    }
+
+    public getTagStatementValue(tag:ConvoTag):any[]{
+        if(!tag.statement?.length){
+            return [];
+        }
+        this.isReadonly++;
+        try{
+            const values=tag.statement.map(s=>{
+                const r=this.executeStatement(s);
+                if(r.valuePromise){
+                    throw new Error('Tag value statements are not allowed to return promises');
+                }
+                return r.value;
+            });
+            return values;
+        }finally{
+            this.isReadonly--;
         }
     }
 

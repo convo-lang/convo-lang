@@ -11,10 +11,10 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTagStatement, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, mergeConvoFlatContentMessages, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, mergeConvoFlatContentMessages, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoStatementPrompt, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoStatementPrompt, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -1964,12 +1964,26 @@ export class Conversation
                     if(!callMessage.fn?.call){
                         continue;
                     }
-                    const callResult=await exe.executeFunctionResultAsync(callMessage.fn);
-                    if(this._isDisposed){
-                        return {messages:[],status:'disposed',task}
-                    }
-                    const callResultValue=callResult.valuePromise?(await callResult.valuePromise):callResult.value;
                     const target=this._messages.find(m=>m.fn && !m.fn.call && m.fn?.name===callMessage?.fn?.name);
+                    const taskName=exe.getTagValueByName(target,convoTags.taskName);
+                    const taskDescription=exe.getTagValueByName(target,convoTags.taskDescription);
+                    const disposeTaskDisplay=((taskName || taskDescription)?
+                        this.addTask({
+                            name:(taskName && taskDescription)?`${taskName} - ${taskDescription}`:(taskName || taskDescription)
+                        })
+                    :null);
+
+                    let callResult:ConvoExecuteResult|undefined;
+                    let callResultValue:any;
+                    try{
+                        callResult=await exe.executeFunctionResultAsync(callMessage.fn);
+                        if(this._isDisposed){
+                            return {messages:[],status:'disposed',task}
+                        }
+                        callResultValue=callResult.valuePromise?(await callResult.valuePromise):callResult.value;
+                    }finally{
+                        disposeTaskDisplay?.();
+                    }
                     const disableAutoComplete=(
                         !isDefaultTask ||
                         exe.getVarEx(convoDisableAutoCompleteName,undefined,callResult.scope,false)===true ||
@@ -2955,7 +2969,7 @@ export class Conversation
                 const msg=sourceMessages[i];
 
                 if( !msg ||
-                    this.isTagConditionTrueByName(exe,msg,convoTags.disabled,true) ||
+                    exe.isTagConditionTrueByName(msg,convoTags.disabled,true) ||
                     msg.role===convoRoles.nop ||
                     msg.role===convoRoles.transformResult ||
                     msg.role===convoRoles.trigger ||
@@ -3176,7 +3190,7 @@ export class Conversation
                         flat.fn=msg.fn;
                         flat.fnParams=exe.getConvoFunctionArgsScheme(msg.fn);
                     }
-                }else if(containsConvoTag(msg.tags,convoTags.edge) && msg.statement){
+                }else if(containsConvoTag(msg.tags,convoTags.edge) && (msg.statement || getConvoTag(msg.tags,convoTags.condition))){
                     flat.edge=true;
                     edgePairs.push({flat,msg:msg,shouldParseMd,setMdVars});
 
@@ -3192,7 +3206,7 @@ export class Conversation
                         const prev=messages[messages.length-1];
                         if(prev?.content!==undefined){
                             const tag=getConvoTag(msg.tags,convoTags.condition);
-                            if(tag?.value && !this.isTagConditionTrue(exe,tag)){
+                            if(tag?.value && !exe.isTagConditionTrue(tag)){
                                 continue;
                             }
                             prev.content+='\n\n'+msg.content
@@ -3316,6 +3330,8 @@ export class Conversation
             for(const pair of edgePairs){
                 if(pair.msg.statement){
                     await flattenMsgAsync(exe,pair.msg.statement,pair.flat,pair.shouldParseMd);
+                }else{
+                    pair.flat.content=pair.msg.content;
                 }
                 this.applyTagsAndState(pair.flat,messages,explicitlyEnabledTransforms,exe,pair.setMdVars,mdVarCtx);
             }
@@ -3688,53 +3704,6 @@ export class Conversation
         }
     }
 
-    private isTagConditionTrueByName(exe:ConvoExecutionContext,msg:ConvoMessage,tagName:string,defaultValue=false):boolean{
-        const tag=getConvoTag(msg.tags,tagName);
-        if(!tag){
-            return false;
-        }
-        return this.isTagConditionTrue(exe,tag,defaultValue);
-    }
-    private isTagConditionTrue(exe:ConvoExecutionContext,tag:ConvoTag,defaultValue=false):boolean{
-
-        if(tag.statement){
-            console.log('hio 👋 👋 👋 eval tag',tag);
-            return evalConvoTagStatement(tag,exe).every(v=>v);
-
-        }else if(tag.value!==undefined){
-            let tagValue=tag.value.trim();
-            if(!tagValue){
-                return true;
-            }
-            const not=tagValue.startsWith('!');
-            if(not){
-                tagValue=tagValue.substring(1).trim();
-            }
-            const parts=tagValue.split(/\s+/);
-            if(parts.length<1){
-                return false;
-            }
-            let value=exe.getVar(parts[0]??'');
-            if(not){
-                value=!value;
-            }
-            if(parts.length===1){
-                return value?true:false;
-            }
-            let v2:any;
-            if(parts.length>2){
-                parts.shift();
-                v2=parts.join(' ');
-            }else{
-                v2=parts[1];
-            }
-            return value?.toString()===v2;
-        }else{
-            return defaultValue;
-        }
-
-    }
-
     private applyTagsAndState(
         flat:FlatConvoMessage,
         allMessages:FlatConvoMessage[],
@@ -3745,7 +3714,7 @@ export class Conversation
     ){
 
         const cond=getFlatConvoMessageCondition(flat);
-        if(cond && !this.isTagConditionTrue(exe,cond)){
+        if(cond && !exe.isTagConditionTrue(cond)){
             aryRemoveItem(allMessages,flat);
             return;
         }
@@ -3875,7 +3844,7 @@ export class Conversation
                 }
 
                 case convoTags.condition:
-                    if(!this.isTagConditionTrue(exe,{name,value:flat.tags[name]})){
+                    if(!exe.isTagConditionTrue({name,value:flat.tags[name]})){
                         aryRemoveItem(allMessages,flat);
                         return;
                     }
@@ -4465,7 +4434,7 @@ export class Conversation
     private async evalTriggersAsync(message:FlatConvoMessage|ConvoCompletionMessage,triggers:ConvoTrigger[],flat:FlatConvoConversation,isUser:boolean){
         try{
             for(const trigger of triggers){
-                if(trigger.role!==message.role || (trigger.condition && !this.isTagConditionTrue(flat.exe,{name:'condition',statement:trigger.condition}))){
+                if(trigger.role!==message.role || (trigger.condition && !flat.exe.isTagConditionTrue({name:'condition',statement:trigger.condition}))){
                     continue;
                 }
                 const fnMsg=this._messages.find(m=>m.fn?.name===trigger.fnName && !m.fn.call);
