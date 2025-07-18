@@ -2555,6 +2555,16 @@ export const setFlatConvoMessageCachedJsonValue=(msg:FlatConvoMessage|null|undef
     return value;
 }
 
+const flatConvoMsgConditionKey=Symbol('flatConvoMsgConditionKey')
+export const getFlatConvoMessageCondition=(msg:FlatConvoMessage|null|undefined):ConvoTag=>{
+    return (msg as any)?.[flatConvoMsgConditionKey];
+}
+export const setFlatConvoMessageCondition=(msg:FlatConvoMessage|null|undefined,tag:ConvoTag):void=>{
+    if(msg){
+        (msg as any)[flatConvoMsgConditionKey]=tag;
+    }
+}
+
 /**
  * Converts the messages into static convo lang with all expressions evaluated
  */
