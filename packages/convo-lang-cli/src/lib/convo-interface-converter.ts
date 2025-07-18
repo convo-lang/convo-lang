@@ -137,6 +137,8 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
     }
 }
 
+const modSortKey=(mod:Mod)=>`${mod.uri??''}::${mod.name}`;
+
 const isProjectEmpty=(project:ProjectCtx)=>{
     return (
         project.tsOut.length===0 &&
@@ -200,6 +202,7 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         });
         await Promise.all(convoFiles.map(file=>scanConvoFileAsync(file,project)));
 
+        project.mods.sort((a,b)=>modSortKey(a).localeCompare(modSortKey(b)))
         const convoHash=strHashBase64(project.mods.map(m=>m.hashSrc).join('>'));
 
 

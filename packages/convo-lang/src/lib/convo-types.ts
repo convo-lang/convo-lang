@@ -1331,6 +1331,12 @@ export interface ConvoCompletionOptions
     append?:string;
 
     /**
+     * Output from an LLM and the input given to the LLM to produce the output.
+     * The output structure should match the expected model of the conversation.
+     */
+    modelInputOutput?:ConvoModelInputOutputPair;
+
+    /**
      * If true completion should stop and return just before a function is to be called
      */
     returnOnCall?:boolean;
@@ -1764,4 +1770,10 @@ export interface ConvoMessageTriggerEvent
     content:string;
     isUser:boolean;
     isAssistant:boolean;
+}
+
+export interface ConvoModelInputOutputPair
+{
+    input:any;
+    output:any;
 }

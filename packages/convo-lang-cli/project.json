@@ -62,10 +62,22 @@
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo"
             }
         },
+        "repl": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts"
+            }
+        },
         "example-parse": {
             "executor": "nx:run-commands",
             "options": {
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo --parse --parseFormat 4"
+            }
+        },
+        "example-convert": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo --convert"
             }
         },
         "example-exec": {
@@ -74,7 +86,7 @@
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/exec.convo"
             }
         },
-        "example-convert": {
+        "example-sync": {
             "executor": "nx:run-commands",
             "options": {
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --sync-ts-config examples/sync/tsconfig.json --sync-out examples/sync/convo-generated --sync-watch"

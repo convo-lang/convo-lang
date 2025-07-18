@@ -48,7 +48,7 @@ export const convertConvoOutput=(
 }
 
 export const requireConvertConvoInput=(
-    flat:FlatConvoConversation,
+    flat:FlatConvoConversationBase,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[]
 ):any=>{
@@ -65,7 +65,7 @@ export const requireConvertConvoOutput=(
     input:any,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[],
-    flat:FlatConvoConversation
+    flat:FlatConvoConversationBase
 ):ConvoCompletionMessage[]=>{
     const r=convertConvoOutput(output,outputType,input,inputType,converters,flat);
     if(!r.success){
@@ -75,7 +75,7 @@ export const requireConvertConvoOutput=(
 }
 
 export const completeConvoUsingCompletionServiceAsync=async (
-    flat:FlatConvoConversation,
+    flat:FlatConvoConversationBase,
     service:ConvoCompletionService<any,any>|null|undefined,
     converters:ConvoConversationConverter<any,any>[]
 ):Promise<ConvoCompletionMessage[]>=>{
@@ -89,7 +89,7 @@ export const completeConvoUsingCompletionServiceAsync=async (
 }
 
 export const getConvoCompletionServiceAsync=async (
-    flat:FlatConvoConversation,
+    flat:FlatConvoConversationBase,
     services:ConvoCompletionService<any,any>[],
     updateTargetModel=false,
     cache?:Record<string,ConvoCompletionServiceAndModel[]>

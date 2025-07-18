@@ -2554,3 +2554,25 @@ export const setFlatConvoMessageCachedJsonValue=(msg:FlatConvoMessage|null|undef
     }
     return value;
 }
+
+/**
+ * Converts the messages into static convo lang with all expressions evaluated
+ */
+export const flatConvoMessagesToTextView=(messages:FlatConvoMessage[]|null|undefined):string=>{
+    if(!messages){
+        return '';
+    }
+    return messages.map(m=>{
+        if(m.content===undefined){
+            return null
+        }
+        let tagContent='';
+        if(m.tags){
+            for(const name in m.tags){
+                const v=m.tags[name];
+                tagContent+=`@${name}${v?` ${escapeConvoTagValue(v)}`:''}\n`
+            }
+        }
+        return `${tagContent}> ${m.role}\n${m.content}`;
+    }).filter(m=>m).join('\n\n')??''
+}

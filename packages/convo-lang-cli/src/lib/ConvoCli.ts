@@ -1,10 +1,11 @@
-import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
-import { EnvParams, createJsonRefReplacer, deleteUndefined, initRootScope, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { writeFile } from "fs/promises";
 import { homedir } from 'node:os';
+import { z } from 'zod';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types";
 import { createConvoExec } from './convo-exec';
 
@@ -167,6 +168,52 @@ export class ConvoCli
         });
     }
 
+    public async runReplAsync(cancel?:CancelToken)
+    {
+        if(!this.allowExec){
+            this.allowExec='ask';
+        }
+
+        this.registerExec(true);
+
+        this.convo.append(/*convo*/`
+> do
+__cwd=_getCwd()
+
+@edge
+> system
+The current working directory is: "{{__cwd}}"
+
+The current date and time is: "{{dateTime()}}"
+
+        `)
+
+        startReadingStdIn();
+
+        let len=this.convo.convo.length;
+
+        console.log("Entering Convo-Lang REPL");
+
+        while(!this._isDisposed && !cancel?.isCanceled){
+            console.log('> user');
+            const line=await readStdInLineAsync();
+            if(this._isDisposed || cancel?.isCanceled){
+                return;
+            }
+            if(!line.trim()){
+                continue;
+            }
+            await this.convo.completeAsync('> user\n'+escapeConvo(line));
+            if(this._isDisposed || cancel?.isCanceled){
+                return;
+            }
+            const c=this.convo.convo;
+            const append=c.substring(len);
+            len=c.length;
+            console.log(append);
+        }
+    }
+
     private async outAsync(...chunks:string[]){
 
         const {prefixOutput,cmdMode}=this.options;
@@ -233,7 +280,7 @@ export class ConvoCli
 
 
 
-    public async executeAsync():Promise<void>
+    public async executeAsync(cancel?:CancelToken):Promise<void>
     {
         const config=await initConvoCliAsync(this.options);
         if(!this.allowExec){
@@ -241,7 +288,9 @@ export class ConvoCli
         }
 
         if(this.options.inline){
-            if(this.options.parse){
+            if(this.options.convert){
+                this.convertCodeAsync(this.options.inline);
+            }else if(this.options.parse){
                 await this.parseCodeAsync(this.options.inline);
             }else{
                 await this.executeSourceCode(this.options.inline);
@@ -251,12 +300,19 @@ export class ConvoCli
             const source=this.options.stdin?
                 await readStdInAsStringAsync():
                 await readFileAsStringAsync(this.options.source??'');
-            if(this.options.parse){
+
+            if(this.options.convert){
+                this.convertCodeAsync(source);
+            }else if(this.options.parse){
                 await this.parseCodeAsync(source);
             }else{
                 await this.executeSourceCode(source);
             }
             this.writeOutputAsync();
+        }
+
+        if(this.options.repl){
+            await this.runReplAsync(cancel);
         }
     }
 
@@ -272,21 +328,57 @@ export class ConvoCli
         }
     }
 
-    private async executeSourceCode(code:string):Promise<void>{
-
+    private registerExec(fullEnv:boolean)
+    {
         this.convo.defineFunction({
             name:'exec',
-            registerOnly:true,
+            registerOnly:!fullEnv,
+            description:'Executes a shell command on the users computer',
+            paramsType:z.object({cmd:z.string().describe('The shell command to execute')}),
             scopeCallback:createConvoExec(typeof this.allowExec==='function'?
                 this.allowExec:this.execConfirmAsync
             )
         })
+        if(fullEnv){
+            this.convo.defineFunction({
+                name:'changeDirectory',
+                description:'Changes the current working directory',
+                paramsType:z.object({dir:z.string().describe('The directory to change to')}),
+                callback:async ({dir}:{dir:string})=>{
+                    try{
+                        globalThis.process?.chdir(dir);
+                        return `Working directory change to ${globalThis.process.cwd()}`;
+                    }catch(ex){
+                        return `Unable to move to specified directory: ${getErrorMessage(ex)}`;
+                    }
+                }
+            })
+            this.convo.defineFunction({
+                name:'_getCwd',
+                local:true,
+                callback:async (dir:string)=>{
+                    return globalThis.process.cwd();
+
+                }
+            })
+        }
+    }
+
+    private async executeSourceCode(code:string):Promise<void>{
+
+        this.registerExec(false);
         this.convo.append(code);
         const r=await this.convo.completeAsync();
         if(r.error){
             throw r.error;
         }
         await this.outAsync(this.convo.convo);
+    }
+
+    private async convertCodeAsync(code:string){
+        this.convo.append(code);
+        const r=await this.convo.toModelInputStringAsync();
+        await this.outAsync(r);
     }
 
     private async parseCodeAsync(code:string){

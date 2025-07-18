@@ -1,7 +1,7 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { convoResultErrorName, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, convoResultErrorName, flatConvoMessagesToTextView, parseConvoCode } from '@convo-lang/convo-lang';
 import { createConvoCliAsync } from '@convo-lang/convo-lang-cli';
-import { Lock } from '@iyio/common';
+import { Lock, createJsonRefReplacer } from '@iyio/common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, commands, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
@@ -121,6 +121,119 @@ const registerCommands=(context:ExtensionContext)=>{
         await window.showTextDocument(doc);
 
 
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const convo=new Conversation();
+        convo.append(src,{disableAutoFlatten:true});
+        const flat=await convo.flattenAsync();
+
+        src=flatConvoMessagesToTextView(flat.messages);
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.vars', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const convo=new Conversation();
+        convo.append(src,{disableAutoFlatten:true});
+        const flat=await convo.flattenAsync();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(flat.exe.getUserSharedVars(),createJsonRefReplacer(),4),
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cli=await createConvoCliAsync({
+            inline:src,
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+        });
+
+        try{
+
+            const convo=cli.convo;
+            convo.append(src,{disableAutoFlatten:true});
+            const flat=await convo.flattenAsync();
+            const converted=await convo.toModelInputAsync(flat);
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(converted,createJsonRefReplacer(),4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.complete', async () => {

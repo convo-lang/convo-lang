@@ -5,7 +5,7 @@ import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
-import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync } from "./convo-completion-lib";
+import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync, requireConvertConvoOutput } from "./convo-completion-lib";
 import { getConvoMessageComponent } from "./convo-component-lib";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
@@ -14,7 +14,7 @@ import { getGlobalConversationLock } from "./convo-lang-lock";
 import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTagStatement, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, mergeConvoFlatContentMessages, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoStatementPrompt, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoStatementPrompt, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -1382,10 +1382,12 @@ export class Conversation
      * @param append Optional message to append before submitting
      */
     public async completeAsync(appendOrOptions?:string|ConvoCompletionOptions):Promise<ConvoCompletion>{
+
         if(typeof appendOrOptions === 'string'){
             this.append(appendOrOptions);
             appendOrOptions=undefined;
         }
+        const modelInputOutput=appendOrOptions?.modelInputOutput;
 
         if(appendOrOptions?.append){
             this.append(appendOrOptions.append);
@@ -1399,8 +1401,13 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
-                return await this.completeWithServiceAsync(flat,await getConvoCompletionServiceAsync(
-                    flat,this.completionService?asArray(this.completionService):[],true,this.modelServiceMap))
+                const service=await getConvoCompletionServiceAsync(
+                    flat,
+                    this.completionService?asArray(this.completionService):[],
+                    true,
+                    this.modelServiceMap
+                )
+                return await this.completeWithServiceAsync(flat,service,modelInputOutput);
             },
         );
 
@@ -1416,7 +1423,8 @@ export class Conversation
 
     private async completeWithServiceAsync(
         flat:FlatConvoConversation,
-        serviceAndModel:ConvoCompletionServiceAndModel|undefined
+        serviceAndModel:ConvoCompletionServiceAndModel|undefined,
+        modelInputOutput?:ConvoModelInputOutputPair,
     ):Promise<ConvoCompletionMessage[]>{
 
         const lastMsg=flat.messages[flat.messages.length-1];
@@ -1465,7 +1473,18 @@ export class Conversation
             return []
         }
         try{
-            messages=await completeConvoUsingCompletionServiceAsync(flat,serviceAndModel.service,this.converters);
+            if(modelInputOutput!==undefined){
+                messages=requireConvertConvoOutput(
+                    modelInputOutput.output,
+                    serviceAndModel.service.outputType,
+                    modelInputOutput.input,
+                    serviceAndModel.service.inputType,
+                    this.converters,
+                    flat
+                );
+            }else{
+                messages=await completeConvoUsingCompletionServiceAsync(flat,serviceAndModel.service,this.converters);
+            }
         }finally{
             release?.();
         }
@@ -4340,8 +4359,23 @@ export class Conversation
         }]
     }
 
-    public async toModelFormatAsync(flat:FlatConvoConversation):Promise<any>
+    /**
+     * Appends output returned from an LLM
+     */
+    public async appendModelOutputAsync(modelInputOutput:ConvoModelInputOutputPair){
+        return await this.completeAsync({modelInputOutput});
+    }
+
+    /**
+     * Converts the conversation into input for its target LLM.
+     */
+    public async toModelInputAsync(flat?:FlatConvoConversation):Promise<any>
     {
+
+        if(!flat){
+            flat=await this.flattenAsync();
+        }
+
         const service=await this.getCompletionServiceAsync(flat);
         if(!service){
             return undefined;
@@ -4349,13 +4383,16 @@ export class Conversation
         if(service.service.relayConvertConvoToInputAsync){
             return await service.service.relayConvertConvoToInputAsync(flat,service.service.inputType);
         }else{
-            return convertConvoInput(flat,service.service.inputType,this.converters);
+            const conversion=convertConvoInput(flat,service.service.inputType,this.converters);
+            return conversion.result;
         }
     }
-
-    public async toModelFormatStrAsync(flat:FlatConvoConversation):Promise<string>
+    /**
+     * Converts the conversation into input for its target LLM as a string.
+     */
+    public async toModelInputStringAsync(flat?:FlatConvoConversation):Promise<string>
     {
-        const value=this.toModelFormatAsync(flat);
+        const value=await this.toModelInputAsync(flat);
         if(!value){
             return '';
         }

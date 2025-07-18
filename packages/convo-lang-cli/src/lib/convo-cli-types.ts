@@ -61,6 +61,11 @@ export interface ConvoCliOptions
     cmdMode?:boolean;
 
     /**
+     * If true the CLI should enter REPL mode where the user can chat
+     */
+    repl?:boolean;
+
+    /**
      * If true each line of output will be prefixed with characters to indicating what the output
      * is related to.
      */
@@ -91,6 +96,11 @@ export interface ConvoCliOptions
      * JSON formatting used if the parse option is true
      */
     parseFormat?:number;
+
+    /**
+     * If true the input will be converted to input format of the target LLM and written as output.
+     */
+    convert?:boolean;
 
     /**
      * Either a function that will be called with each chunk of generated code or a path to write

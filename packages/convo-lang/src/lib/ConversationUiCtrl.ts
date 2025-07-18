@@ -657,7 +657,7 @@ export class ConversationUiCtrl
                     this.showFunctions=!this.showFunctions;
                     break;
 
-                case '/model':
+                case '/convert':
                     this.showSource=this.editorMode==='model'?!this.showSource:true;
                     this.editorMode='model';
                     break;
@@ -729,7 +729,7 @@ export class ConversationUiCtrl
 /system     - Display system messages
 /function   - Display function messages
 /results    - Display function call results
-/model      - Display messages in the format of the current model
+/convert    - Display messages in the format of the current model
 /clear      - Clears all messages
 /help       - Prints this help message
         `)

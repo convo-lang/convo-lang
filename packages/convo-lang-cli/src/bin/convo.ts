@@ -1,4 +1,4 @@
-import { CancelToken, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
+import { CancelToken, getObjKeyCount, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { createConvoCliAsync } from "../lib/ConvoCli";
 import { ConvoCliOptions } from "../lib/convo-cli-types";
@@ -18,9 +18,11 @@ const args=parseCliArgsT<Args>({
         inlineConfig:args=>args[0],
         out:args=>args[0],
         parse:args=>args.length?true:false,
+        convert:args=>args.length?true:false,
         parseFormat:args=>safeParseNumberOrUndefined(args[0]),
         bufferOutput:args=>args.length?true:false,
         cmdMode:args=>args.length?true:false,
+        repl:args=>args.length?true:false,
         stdin:args=>args.length?true:false,
         allowExec:args=>args[0] as any,
         prepend:args=>args[0],
@@ -59,6 +61,10 @@ const main=async()=>{
 
     let toolPromises:Promise<any>[]=[];
 
+    if(!getObjKeyCount(args)){
+        args.repl=true;
+    }
+
     if(args.syncTsConfig?.length){
         toolPromises.push(convertConvoInterfacesAsync(args,cancel));
     }
@@ -80,7 +86,7 @@ const main=async()=>{
     if(!toolPromises.length){
         const cli=await createConvoCliAsync(args);
         try{
-            await cli.executeAsync();
+            await cli.executeAsync(cancel);
         }catch(ex){
             console.error('convo execution failed',ex);
             process.exit(1);

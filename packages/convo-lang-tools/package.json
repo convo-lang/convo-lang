@@ -89,12 +89,24 @@
         "commands": [
             {
                 "command": "convo.complete",
-                "title": "Complete Convo Conversation",
+                "title": "Complete Convo",
                 "shortTitle": "convo"
             },
             {
                 "command": "convo.parse",
-                "title": "Parse Convo Conversation"
+                "title": "Parse Convo"
+            },
+            {
+                "command": "convo.text",
+                "title": "Flatten Convo"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo Vars"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convert Convo"
             }
         ],
         "keybindings": [

@@ -1,7 +1,7 @@
 
 import { LazyCodeInput } from "@iyio/syn-taxi";
 
-import { ConversationUiCtrl, ConvoEditorMode, escapeConvoTagValue, getConvoDebugLabelComment, parseConvoCode } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoEditorMode, flatConvoMessagesToTextView, getConvoDebugLabelComment, parseConvoCode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { createJsonRefReplacer } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
@@ -74,7 +74,7 @@ export function MessagesSourceView({
         let m=true;
         (async ()=>{
             try{
-                const value=await convo.toModelFormatStrAsync(flatConvo);
+                const value=await convo.toModelInputStringAsync(flatConvo);
                 if(m){
                     setAsyncCodeValue(value);
                 }
@@ -100,19 +100,7 @@ export function MessagesSourceView({
                 :mode==='model'?
                     (flatConvo?(asyncCodeValue):'')
                 :mode==='text'?
-                    (flatConvo?.messages.map(m=>{
-                        if(m.content===undefined){
-                            return null
-                        }
-                        let tagContent='';
-                        if(m.tags){
-                            for(const name in m.tags){
-                                const v=m.tags[name];
-                                tagContent+=`@${name}${v?` ${escapeConvoTagValue(v)}`:''}\n`
-                            }
-                        }
-                        return `${tagContent}> ${m.role}\n${m.content}`;
-                    }).filter(m=>m).join('\n\n')??'')
+                    flatConvoMessagesToTextView(flatConvo?.messages)
                 :mode==='imports'?
                     `${convo?.getDebuggingImportCode()}\n\n> define\n${getConvoDebugLabelComment('source')}\n\n${code}`
                 :mode==='modules'?
