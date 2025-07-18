@@ -615,9 +615,9 @@ export class ConvoExecutionContext
                             return scope;
                         }
                         if(statement.prompt.isStatic){
-                            value=this.executeStaticPrompt(statement.prompt,value);
+                            value=this.executeStaticPrompt(statement.prompt,value,scope);
                         }else{
-                            value=this.executePromptAsync(statement.prompt);
+                            value=this.executePromptAsync(statement.prompt,scope);
                         }
                     }
                 }
@@ -653,9 +653,9 @@ export class ConvoExecutionContext
                 return scope;
             }
             if(statement.prompt.isStatic){
-                value=this.executeStaticPrompt(statement.prompt,statement.value);
+                value=this.executeStaticPrompt(statement.prompt,statement.value,scope);
             }else{
-                value=this.executePromptAsync(statement.prompt);
+                value=this.executePromptAsync(statement.prompt,scope);
             }
         }else{
             value=statement.value;
@@ -689,7 +689,7 @@ export class ConvoExecutionContext
 
     private lastTriggerConversation?:Conversation;
 
-    private async executeStaticPrompt(prompt:ConvoStatementPrompt,value:any)
+    private async executeStaticPrompt(prompt:ConvoStatementPrompt,value:any,scope:ConvoScope)
     {
         this.beforeHandlePromptResult(prompt);
 
@@ -703,7 +703,7 @@ export class ConvoExecutionContext
         if(prompt.jsonType && valueIsString){
             value=parseJson5(value);
         }
-        return this.handlePromptResult(prompt,value);
+        return this.handlePromptResult(prompt,value,scope);
     }
 
     private createTriggerConversation(prompt:ConvoStatementPrompt)
@@ -713,7 +713,7 @@ export class ConvoExecutionContext
 
     }
 
-    private async executePromptAsync(prompt:ConvoStatementPrompt)
+    private async executePromptAsync(prompt:ConvoStatementPrompt,scope:ConvoScope)
     {
         if(this.parentConvo && this.parentConvo.childDepth>this.maxInlinePromptDepth){
             throw new Error('Max inline prompt depth reached');
@@ -749,7 +749,7 @@ export class ConvoExecutionContext
         }else{
             value=r.message?.content;
         }
-        return this.handlePromptResult(prompt,value);
+        return this.handlePromptResult(prompt,value,scope);
     }
 
     private beforeHandlePromptResult(prompt:ConvoStatementPrompt){
@@ -771,14 +771,14 @@ export class ConvoExecutionContext
         }
     }
 
-    private handlePromptResult(prompt:ConvoStatementPrompt,value:any){
+    private handlePromptResult(prompt:ConvoStatementPrompt,value:any,scope:ConvoScope){
 
         if(prompt?.not){
             value=!value;
         }
 
         if(prompt.assignOutputTo){
-            this.setVar(undefined,value,prompt.assignOutputTo);
+            this.setVar(undefined,value,prompt.assignOutputTo,undefined,scope);
         }
 
         if(this.parentConvo){
