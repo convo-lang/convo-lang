@@ -17,7 +17,8 @@ export const createConvoLangApiRoutes=({
     enableCaching=false,
     cacheQueryParam=enableCaching?'cache':undefined,
     cacheDir='cache',
-    onCompletion
+    onCompletion,
+    completionCtx,
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
 
     const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
@@ -80,7 +81,8 @@ export const createConvoLangApiRoutes=({
                     const result=await completeConvoUsingCompletionServiceAsync(
                         flat,
                         service,
-                        convoConversationConverterProvider.all()
+                        convoConversationConverterProvider.all(),
+                        completionCtx
                     );
 
                     if(onCompletion){

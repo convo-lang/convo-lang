@@ -3,7 +3,7 @@ import { parseJson5 } from "@iyio/json5"
 import { Conversation } from "./Conversation"
 import { ConvoError } from "./ConvoError"
 import { appendFlatConvoMessageSuffix, convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
-import { ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
+import { ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
 import { convoTypeToJsonScheme } from "./convo-zod"
 
 export const convertConvoInput=(
@@ -77,13 +77,15 @@ export const requireConvertConvoOutput=(
 export const completeConvoUsingCompletionServiceAsync=async (
     flat:FlatConvoConversationBase,
     service:ConvoCompletionService<any,any>|null|undefined,
-    converters:ConvoConversationConverter<any,any>[]
+    converters:ConvoConversationConverter<any,any>[],
+    ctx:ConvoCompletionCtx={},
 ):Promise<ConvoCompletionMessage[]>=>{
     if(!service){
         return [];
     }
     const input=requireConvertConvoInput(flat,service.inputType,converters);
-    const r=await service.completeConvoAsync(input,flat);
+    const r=await service.completeConvoAsync(input,flat,ctx);
+    await ctx.afterComplete?.(service,r,input,flat);
     return requireConvertConvoOutput(r,service.outputType,input,service.inputType,converters,flat);
 
 }

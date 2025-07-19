@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, ConverseCommand, ConverseCommandInput, ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
-import { ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
+import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
 import { Scope } from "@iyio/common";
 import { convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib";
 import { bedrockModels } from "./bedrock-models";
@@ -55,9 +55,15 @@ export class BedrockConvoCompletionService implements ConvoCompletionService<Con
         return this.clients[key]??(this.clients[key]=new BedrockRuntimeClient({region,profile}));
     }
 
-    public async completeConvoAsync(input:ConverseCommandInput,flat:FlatConvoConversationBase):Promise<ConverseCommandOutput>
-    {
+    public async completeConvoAsync(
+        input:ConverseCommandInput,
+        flat:FlatConvoConversationBase,
+        ctx:ConvoCompletionCtx<ConverseCommandInput,ConverseCommandOutput>
+    ):Promise<ConverseCommandOutput>{
+
         const client=this.getClient();
+
+        await ctx.beforeComplete?.(this,input,flat);
 
         return await client.send(new ConverseCommand(input));
     }

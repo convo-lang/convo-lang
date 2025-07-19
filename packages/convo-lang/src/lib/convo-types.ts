@@ -975,7 +975,7 @@ export interface ConvoCompletionService<TInput,TOutput>
      */
     canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean;
 
-    completeConvoAsync(input:TInput,flat:FlatConvoConversationBase):Promise<TOutput>
+    completeConvoAsync(input:TInput,flat:FlatConvoConversationBase,ctx:ConvoCompletionCtx<TInput,TOutput>):Promise<TOutput>
 
     getModelsAsync?():Promise<ConvoModelInfo[]|undefined>;
 
@@ -989,6 +989,12 @@ export interface ConvoCompletionService<TInput,TOutput>
      * to convert message using converters server side.
      */
     relayConvertConvoToInputAsync?(flat:FlatConvoConversationBase,inputType:string):Promise<TInput>;
+}
+
+export interface ConvoCompletionCtx<TInput=any,TOutput=any>
+{
+    beforeComplete?:(service:ConvoCompletionService<TInput,TOutput>,input:TInput,flat:FlatConvoConversationBase)=>void|Promise<void>;
+    afterComplete?:(service:ConvoCompletionService<TInput,TOutput>,output:TOutput,input:TInput,flat:FlatConvoConversationBase)=>void|Promise<void>;
 }
 
 export interface ConvoCompletionServiceAndModel
@@ -1156,6 +1162,11 @@ export interface FlatConvoConversationBase
     messageTriggers?:ConvoTrigger[];
 
     apiKey?:string;
+
+    /**
+     * If true the complete service used the provided api key
+     */
+    apiKeyUsedForCompletion?:boolean;
 
     /**
      * If defined the debug function should be written to with debug info.

@@ -70,6 +70,11 @@
     },
     "dependencies": {
         "@iyio/at-dot-css": "^0.7.31",
+        "@iyio/aws-credential-providers": "^0.7.31",
+        "@iyio/aws-dynamo": "^0.7.31",
+        "@iyio/aws-lambda": "^0.7.31",
+        "@iyio/aws-secrets": "^0.7.31",
+        "@iyio/cdk-common": "^0.7.31",
         "@iyio/common": "^0.7.31",
         "@iyio/json5": "^0.7.31",
         "@iyio/media-common": "^0.7.31",

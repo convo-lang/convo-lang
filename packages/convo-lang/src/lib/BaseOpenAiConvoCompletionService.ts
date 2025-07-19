@@ -1,4 +1,4 @@
-import { ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "@convo-lang/convo-lang";
+import { ConvoCompletionCtx, ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "@convo-lang/convo-lang";
 import { NotFoundError, SecretManager, httpClient, joinPaths } from "@iyio/common";
 import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from './open-ai/resources/chat';
 
@@ -108,9 +108,15 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         })()));
     }
 
-    public async completeConvoAsync(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase):Promise<ChatCompletion>
-    {
+    public async completeConvoAsync(
+        input:ChatCompletionCreateParamsNonStreaming,
+        flat:FlatConvoConversationBase,
+        ctx:ConvoCompletionCtx<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
+    ):Promise<ChatCompletion>{
         const client=await this.getApiClientAsync(flat.apiKey??undefined,flat.responseEndpoint);
+        if(flat.apiKey && flat.apiKey===client.apiKey){
+            flat.apiKeyUsedForCompletion=true;
+        }
 
         const headers:Record<string,string|undefined>={
             [this.apiKeyHeader]:client.apiKey?((this.apiKeyHeaderValuePrefix??'')+client.apiKey):undefined,
@@ -121,6 +127,8 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
             input={...input}
             this.updateRequest(input,headers);
         }
+
+        await ctx.beforeComplete?.(this,input,flat);
 
         const r=await (
             this.completeAsync?this.completeAsync(input,flat,client.apiKey,client.url)

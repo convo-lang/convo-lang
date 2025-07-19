@@ -1716,7 +1716,7 @@ export class Conversation
                         return cps.canComplete(model,flat)
                     },
                     completeConvoAsync:async (input:any,flat:FlatConvoConversationBase)=>{
-                        const m=await cps.completeConvoAsync(input,flat);
+                        const m=await cps.completeConvoAsync(input,flat,{});
                         messages.push(...m);
                         return m;
                     },

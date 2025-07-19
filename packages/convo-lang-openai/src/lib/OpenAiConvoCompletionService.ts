@@ -1,4 +1,4 @@
-import { ConvoCompletionService, FlatConvoConversationBase, FlatConvoMessage } from "@convo-lang/convo-lang";
+import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase, FlatConvoMessage } from "@convo-lang/convo-lang";
 import { Scope, SecretManager, secretManager } from "@iyio/common";
 import OpenAIApi from 'openai';
 import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat';
@@ -110,9 +110,18 @@ export class OpenAiConvoCompletionService implements ConvoCompletionService<Chat
         })()));
     }
 
-    public async  completeConvoAsync(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase):Promise<ChatCompletion>
+    public async  completeConvoAsync(
+        input:ChatCompletionCreateParamsNonStreaming,
+        flat:FlatConvoConversationBase,
+        ctx:ConvoCompletionCtx<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
+    ):Promise<ChatCompletion>
     {
         const api=await this.getApiAsync(flat.apiKey??undefined,flat.responseEndpoint);
+        if(flat.apiKey){
+            flat.apiKeyUsedForCompletion=true;
+        }
+
+        await ctx.beforeComplete?.(this,input,flat);
 
         return await api.chat.completions.create(input);
     }
