@@ -1,9 +1,9 @@
-import { Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, httpClient, initRootScope, isHttp, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
-import { writeFile } from "fs/promises";
+import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types";
@@ -120,7 +120,30 @@ export class ConvoCli
     public constructor(options:ConvoCliOptions){
         this.allowExec=options.allowExec;
         this.options=options;
-        this.convo=createConversationFromScope(rootScope);
+        this.convo=createConversationFromScope(rootScope,{
+            importHandler:async (_import)=>{
+                const isFileHttp=isHttp(_import.name);
+                const startDir=isFileHttp?undefined:globalThis.process?.cwd();
+                try{
+                    if(_import.sourceDirectory){
+                        globalThis.process?.chdir(_import.sourceDirectory);
+                    }
+                    const [file,filePath]=await Promise.all([
+                        isFileHttp?httpClient().getStringAsync(_import.name):readFileAsStringAsync(_import.name),
+                        isFileHttp?_import.name:realpath(_import.name),
+                    ]);
+                    return {
+                        name:_import.name,
+                        convo:file,
+                        filePath
+                    }
+                }finally{
+                    if(startDir){
+                        globalThis.process.chdir(startDir);
+                    }
+                }
+            }
+        });
         if(options.cmdMode){
             this.convo.dynamicFunctionCallback=this.dynamicFunctionCallback;
             startReadingStdIn();
@@ -130,6 +153,10 @@ export class ConvoCli
         }
         if(this.options.exeCwd){
             this.convo.unregisteredVars[convoVars.__cwd]=this.options.exeCwd;
+        }
+        if(this.options.source){
+            this.convo.unregisteredVars[convoVars.__file]=this.options.source;
+
         }
     }
 
@@ -364,10 +391,18 @@ The current date and time is: "{{dateTime()}}"
         }
     }
 
+    private async appendCodeAsync(code:string,options?:AppendConvoOptions){
+        let filePath=options?.filePath??this.options.sourcePath??this.options.source;
+        if(filePath){
+            filePath=await realpath(filePath);
+        }
+        this.convo.append(code,{...options,filePath})
+
+    }
     private async executeSourceCode(code:string):Promise<void>{
 
         this.registerExec(false);
-        this.convo.append(code);
+        await this.appendCodeAsync(code);
         const r=await this.convo.completeAsync();
         if(r.error){
             throw r.error;
@@ -376,7 +411,7 @@ The current date and time is: "{{dateTime()}}"
     }
 
     private async convertCodeAsync(code:string){
-        this.convo.append(code);
+        await this.appendCodeAsync(code);
         const r=await this.convo.toModelInputStringAsync();
         await this.outAsync(r);
     }

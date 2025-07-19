@@ -170,7 +170,14 @@ export interface ConvoMessage
      * Conversation ID
      */
     cid?:string;
+
+    /**
+     * Path to file where the message was defined in
+     */
+    [convoMessageSourcePathKey]?:string;
 }
+
+export const convoMessageSourcePathKey=Symbol('convoMessageSourcePathKey');
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
 export type ConvoToolChoice=(typeof baseConvoToolChoice[number])|{name:string};
@@ -1429,9 +1436,21 @@ export interface AppendConvoOptions
     throwOnError?:boolean;
     disableAutoFlatten?:boolean;
     addTags?:ConvoTag[];
+    /**
+     * Will be assigned to all appended messages
+     */
+    filePath?:string;
 }
 
-export interface ConvoImport
+export interface ConvoImportContext
+{
+    /**
+     * The file path of the current convo file
+     */
+    sourceFilepath?:string;
+}
+
+export interface ConvoImport extends ConvoImportContext
 {
     name:string;
     /**
@@ -1450,6 +1469,11 @@ export interface ConvoImport
      * If true content messages should not be imported.
      */
     ignoreContent:boolean;
+
+    /**
+     * The directory of the current convo file
+     */
+    sourceDirectory?:string;
 }
 
 export interface ConvoModule
@@ -1492,6 +1516,11 @@ export interface ConvoModule
      * components to be added to the conversation
      */
     components?:Record<string,ConvoComponentDef>;
+
+    /**
+     * The file path of module
+     */
+    filePath?:string;
 }
 
 export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|null|undefined|Promise<ConvoModule|ConvoModule[]|null|undefined>;
@@ -1778,3 +1807,5 @@ export interface ConvoModelInputOutputPair
     input:any;
     output:any;
 }
+
+

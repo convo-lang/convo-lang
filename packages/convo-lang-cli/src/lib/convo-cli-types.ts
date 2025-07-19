@@ -55,6 +55,11 @@ export interface ConvoCliOptions
     inline?:string;
 
     /**
+     * Used to set or overwrite the source path of executed files.
+     */
+    sourcePath?:string;
+
+    /**
      * If true the CLI will operate in command mode which will allow function calling to be passed
      * though stdin and stdout
      */

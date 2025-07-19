@@ -1,0 +1,5 @@
+// run `./http-server.sh` to serve files over http
+@import http://localhost:55789/import-example-system.convo
+
+> user
+Hello

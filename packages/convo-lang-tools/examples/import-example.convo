@@ -1,0 +1,4 @@
+@import import-example-proxy.convo
+
+> user
+Hello

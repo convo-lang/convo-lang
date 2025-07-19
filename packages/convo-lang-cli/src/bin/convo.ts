@@ -16,6 +16,7 @@ const args=parseCliArgsT<Args>({
         inline:args=>args[0],
         config:args=>args[0],
         inlineConfig:args=>args[0],
+        sourcePath:args=>args[0],
         out:args=>args[0],
         parse:args=>args.length?true:false,
         convert:args=>args.length?true:false,

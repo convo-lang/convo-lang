@@ -257,6 +257,11 @@ export const convoVars={
     __cwd:'__cwd',
 
     /**
+     * Path to the current convo file
+     */
+    __file:'__file',
+
+    /**
      * When set to true debugging information will be added to conversations.
      */
     __debug:'__debug',

@@ -337,6 +337,7 @@ const registerCommands=(context:ExtensionContext)=>{
 
                 const cli=await createConvoCliAsync({
                     inline:src,
+                    sourcePath:document.uri.fsPath,
                     bufferOutput:true,
                     exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
                     allowExec:async (command)=>{
