@@ -698,7 +698,7 @@ export class ConvoExecutionContext
             if(!this.lastInlineConversation){
                 this.lastInlineConversation=this.createInlineConversation(prompt);
             }
-            this.lastInlineConversation.inlinePrompt=prompt;
+            this.applyInlinePrompt(prompt,this.lastInlineConversation,scope);
             this.lastInlineConversation.append((prompt.hasRole?'':'> user\n')+value,{addTags:[{name:convoTags.disableModifiers}]});
         }
         if(prompt.jsonType && valueIsString){
@@ -710,11 +710,26 @@ export class ConvoExecutionContext
     private createInlineConversation(prompt:InlineConvoPrompt)
     {
         const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true,disableTransforms:!prompt.transforms}
-        return (this.parentConvo??new Conversation({
-            ...options,
-            defaultVars:this.getUserSharedVars()
-        }))?.clone({inlinePrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
+        return (this.parentConvo??new Conversation(options))?.clone({inlinePrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
 
+    }
+
+    private applyInlinePrompt(prompt:InlineConvoPrompt,convo:Conversation,scope:ConvoScope){
+        convo.inlinePrompt=prompt;
+        for(const e in convo.defaultVars){
+            delete convo.defaultVars[e];
+        }
+        const vars=this.getUserSharedVars();
+
+        for(const e in vars){
+            convo.defaultVars[e]=vars[e];
+        }
+        for(const e in scope.vars){
+            if(e in defaultConvoVars){
+                continue;
+            }
+            convo.defaultVars[e]=scope.vars[e];
+        }
     }
 
     private async executePromptAsync(prompt:InlineConvoPrompt,scope:ConvoScope)
@@ -725,7 +740,7 @@ export class ConvoExecutionContext
 
         const sub=(prompt.continue && this.lastInlineConversation)?
             this.lastInlineConversation:this.createInlineConversation(prompt);
-        sub.inlinePrompt=prompt;
+        this.applyInlinePrompt(prompt,sub,scope);
 
         if(prompt.continue || prompt.extend){
             this.lastInlineConversation=sub;
