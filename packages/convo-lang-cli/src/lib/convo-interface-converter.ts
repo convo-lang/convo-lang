@@ -1,6 +1,6 @@
 import { ConvoModule, convoDescriptionToComment, convoJsDocTags, escapeConvo, escapeConvoTagValue } from "@convo-lang/convo-lang";
 import { CancelToken, getDirectoryName, getObjKeyCount, joinPaths, normalizePath, strHashBase64 } from "@iyio/common";
-import { pathExistsAsync, readDirAsync, readFileAsStringAsync, triggerNodeBreakpoint } from "@iyio/node-common";
+import { pathExistsAsync, readDirAsync, readFileAsStringAsync } from "@iyio/node-common";
 import { mkdir, realpath, watch, writeFile } from "fs/promises";
 import { relative } from "path";
 import { ExportGetableNode, JSDocTagInfo, Node, Project, SourceFile, Symbol, SyntaxKind, Type, VariableDeclaration } from "ts-morph";
@@ -549,7 +549,6 @@ const getSymbol=(type:Type|undefined|null):Symbol|undefined=>{
 }
 
 const convertFunction=(type:Type,file:SourceFile,project:ProjectCtx,tags:Record<string,string>)=>{
-    triggerNodeBreakpoint({disable:true});
     const callSig=type.getCallSignatures()?.[0];
     if(!callSig){
         return;
