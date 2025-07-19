@@ -107,6 +107,10 @@
             {
                 "command": "convo.convert",
                 "title": "Convert Convo"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convert Convo in new file"
             }
         ],
         "keybindings": [
@@ -114,6 +118,12 @@
                 "command": "convo.complete",
                 "key": "ctrl+r",
                 "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             }
         ]

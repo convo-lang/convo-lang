@@ -2,8 +2,9 @@
 import { Conversation, convoResultErrorName, flatConvoMessagesToTextView, parseConvoCode } from '@convo-lang/convo-lang';
 import { createConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { Lock, createJsonRefReplacer } from '@iyio/common';
+import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
-import { ExtensionContext, ProgressLocation, Range, commands, window, workspace } from 'vscode';
+import { ExtensionContext, ProgressLocation, Range, TextDocument, Uri, commands, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 let client:LanguageClient;
@@ -236,7 +237,7 @@ const registerCommands=(context:ExtensionContext)=>{
         }
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.complete', async () => {
+    const completeAsync=async () => {
 
         const document=window.activeTextEditor?.document;
 
@@ -381,5 +382,74 @@ const registerCommands=(context:ExtensionContext)=>{
 
         });
 
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{
+        await completeAsync();
+    }));
+    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
+
+        const document=window.activeTextEditor?.document;
+        if(document?.languageId!=='source.convo'){
+            return;
+        }
+
+        const selection=window.activeTextEditor?.selection;
+        let text:string|undefined;
+        if(selection){
+            text=document.getText(new Range(selection.start,selection.end));
+        }
+
+        if(!text){
+            text=document.getText();
+        }
+
+        let saveTo:string|undefined;
+        if(!document.isUntitled && document.uri.scheme==='file'){
+            const dir=path.dirname(document.uri.path);
+
+            let fileName=path.basename(document.uri.path);
+            let n=1;
+            const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo/i.exec(fileName);
+            if(match){
+                n=Number(match[2])+1;
+                fileName=fileName.substring(0,match.index);
+            }else if(fileName.toLowerCase().endsWith('.convo')){
+                fileName=fileName.substring(0,fileName.length-6);
+            }
+            while(true){
+                const d=new Date();
+                const name=`${
+                    fileName
+                }-${
+                    d.getFullYear()
+                }-${
+                    (d.getMonth()+1).toString().padStart(2,'0')
+                }-${
+                    d.getDate().toString().padStart(2,'0')
+                }-${
+                    n.toString().padStart(4,'0')
+                }.convo`;
+                saveTo=path.join(dir,name);
+                if(!await pathExistsAsync(saveTo)){
+                    break;
+                }
+                n++;
+            }
+
+        }
+        let doc:TextDocument;
+
+        if(saveTo){
+            const uri=Uri.file(saveTo);
+            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8'));
+            doc=await workspace.openTextDocument(uri);
+        }else{
+            doc=await workspace.openTextDocument({language:'source.convo',content:text});
+        }
+
+        await window.showTextDocument(doc);
+
+        await completeAsync();
     }));
 }
