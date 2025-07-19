@@ -12,6 +12,7 @@ const exitEarly=false;
 export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,options?:ConvoParsingOptions):ConvoGraphParsingResult=>{
 
     const result=parseConvoCode(code,{
+        logErrors:true,
         ...options,
         includeLineNumbers:true,
     });

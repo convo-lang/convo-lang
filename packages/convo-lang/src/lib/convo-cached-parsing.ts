@@ -8,7 +8,7 @@ const parsingCache:Record<string,CodeParsingResult<ConvoMessage[]>>={}
 /**
  * Parses Convo-Lang code with caching, returning both the parsing result and cache key.
  * Uses a hash-based cache to avoid re-parsing identical code strings.
- * 
+ *
  * @param code - The Convo-Lang source code to parse
  * @returns Object containing the parsing result and the cache key used
  */
@@ -18,7 +18,7 @@ export const parseConvoCachedKeyed=(code:string)=>{
     if(cached){
         return {result:cached,key};
     }
-    const r=parseConvoCode(code);
+    const r=parseConvoCode(code,{logErrors:true});
     parsingCache[key]=r;
     return {result:r,key}
 }
@@ -26,7 +26,7 @@ export const parseConvoCachedKeyed=(code:string)=>{
 /**
  * Parses Convo-Lang code with caching, returning only the parsing result.
  * This is a convenience wrapper around parseConvoCachedKeyed for when only the result is needed.
- * 
+ *
  * @param code - The Convo-Lang source code to parse
  * @returns The parsing result containing parsed ConvoMessage array or errors
  */
@@ -39,7 +39,7 @@ const typeCache:Record<string,any>={};
 /**
  * Parses and caches a specific type definition from Convo-Lang code.
  * Executes the parsed code to extract a named type definition and caches the result.
- * 
+ *
  * @param typeName - The name of the type to extract from the parsed code
  * @param convo - The Convo-Lang source code containing the type definition
  * @returns The parsed type definition, or undefined if not found

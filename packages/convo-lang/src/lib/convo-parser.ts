@@ -2,12 +2,12 @@ import { CodeParser, CodeParsingResult, getCodeParsingError, getLineNumber, pars
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, ConvoStatementPrompt as InlineConvoPrompt, StandardConvoSystemMessage, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
-const topLevelMessageReg=/(>)\s*(do|triggerResult|result|define|debug|trigger|end)/gs;
+const topLevelMessageReg=/(>)\s*(do|thinkingResult|result|define|debug|end)/gs;
 const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
@@ -853,7 +853,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 const startIndex=index;
                 fnMessageReg.lastIndex=index;
                 let match=fnMessageReg.exec(code);
-                if(match && match.index==index){
+                if(match && match.index==index && match[2]!==convoRoles.thinking){
                     msgName=match[3]??'';
                     debug?.(`NEW FUNCTION ${msgName}`,{lastComment,tags,match});
                     if(!msgName){
@@ -1231,7 +1231,17 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
     }
 
-    return {result: messages,endIndex:index,error:error?getCodeParsingError(code,index,error):undefined};
+    const parsingResult={
+        result:messages,
+        endIndex:index,
+        error:error?getCodeParsingError(code,index,error):undefined
+    };
+
+    if(parsingResult.error && options?.logErrors){
+        console.error(`Convo parsing error`,parsingResult.error);
+    }
+
+    return parsingResult;
 
 }
 
@@ -1355,24 +1365,25 @@ export const parseInlineConvoPrompt=(
     }
 
     const paramsMatch=promptStringParamsReg.exec(content);
-    let opStr=paramsMatch?.[1];
+    let header=paramsMatch?.[1];
+    const originalHeader=header;
 
     let task:string|undefined;
-    if(opStr){
-        const taskMatch=taskReg.exec(opStr);
+    if(header){
+        const taskMatch=taskReg.exec(header);
         if(taskMatch){
             task=taskMatch[2];
-            opStr=opStr.substring(0,taskMatch.index)
+            header=header.substring(0,taskMatch.index)
         }
     }
-    const head=opStr?.split(optionsSplit);
+    const headOptions=header?.split(optionsSplit);
     if(paramsMatch){
         content=content.substring(paramsMatch[0].length+1).trim();
     }else{
         content=content.trim();
     }
 
-    let wrap=opStr?wrapTagReg.exec(opStr)?.[1]:undefined;
+    let wrap=header?wrapTagReg.exec(header)?.[1]:undefined;
     let standardPrompt:StandardConvoSystemMessage|undefined;
     if(wrap==='m'){
         wrap='moderator';
@@ -1402,12 +1413,12 @@ export const parseInlineConvoPrompt=(
         }
     }
 
-    const extend=opStr?.includes('*');
-    const _continue=opStr?.includes('+');
+    const extend=header?.includes('*');
+    const _continue=header?.includes('+');
 
     let messages:ConvoMessage[];
     let endIndex=0;
-    const jsonType=(opStr?jsonReg.exec(opStr)?.[1]:undefined)||(head?.includes('boolean')?'TrueFalse':undefined);
+    const jsonType=(header?jsonReg.exec(header)?.[1]:undefined)||(headOptions?.includes('boolean')?'TrueFalse':undefined);
 
     if(!options?.isStatic){
         if(!hasRole && !options?.isStatic){
@@ -1457,19 +1468,20 @@ export const parseInlineConvoPrompt=(
     return {
         endIndex,
         result:{
+            header:originalHeader??'',
             extend,
             continue:_continue,
-            system:head?.includes('system'),
-            functions:head?.includes('functions'),
-            transforms:head?.includes('transforms'),
-            last:opStr?safeParseNumberOrUndefined(lastReg.exec(opStr)?.[1]):undefined,
-            dropLast:opStr?safeParseNumberOrUndefined(dropLastReg.exec(opStr)?.[1]):undefined,
-            not:opStr?.includes('!'),
+            system:headOptions?.includes('system'),
+            functions:headOptions?.includes('functions'),
+            transforms:headOptions?.includes('transforms'),
+            last:header?safeParseNumberOrUndefined(lastReg.exec(header)?.[1]):undefined,
+            dropLast:header?safeParseNumberOrUndefined(dropLastReg.exec(header)?.[1]):undefined,
+            not:header?.includes('!'),
             messages,
             hasRole,
-            action:opStr?getConvoMessageModificationAction(opStr):undefined,
-            appendOutput:head?.includes('>>'),
-            assignOutputTo:opStr?assignReg.exec(opStr)?.[1]:undefined,
+            action:header?getConvoMessageModificationAction(header):undefined,
+            appendOutput:headOptions?.includes('>>'),
+            assignOutputTo:header?assignReg.exec(header)?.[1]:undefined,
             wrapInTag:wrap,
             systemMessages:standardPrompt?[standardPrompt]:undefined,
             isStatic:options?.isStatic,

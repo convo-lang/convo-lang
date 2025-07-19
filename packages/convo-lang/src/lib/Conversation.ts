@@ -11,10 +11,10 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoMessageWithRole, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, mergeConvoFlatContentMessages, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoStatementPrompt, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoDocumentReference, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagCallback, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, baseConvoToolChoice, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -190,6 +190,17 @@ export interface ConversationOptions
      * Prevents transforms from being applied
      */
     disableTransforms?:boolean;
+
+    /**
+     * When the current conversation is an inline prompt inlineHost is the conversation that is
+     * hosting inline conversation
+     */
+    inlineHost?:Conversation;
+
+    /**
+     * The inline prompt the conversation the conversation represents
+     */
+    inlinePrompt?:InlineConvoPrompt;
 }
 
 export class Conversation
@@ -207,6 +218,10 @@ export class Conversation
     public readonly isAgent:boolean;
 
     public readonly childDepth:number;
+
+    public readonly inlineHost?:Conversation;
+
+    public inlinePrompt?:InlineConvoPrompt;
 
     private _messages:ConvoMessage[]=[];
     public get messages(){return this._messages}
@@ -437,6 +452,8 @@ export class Conversation
             modules,
             childDepth=0,
             disableTriggers=false,
+            inlineHost,
+            inlinePrompt,
         }=options;
         this.name=name;
         this.usage=usage;
@@ -446,6 +463,8 @@ export class Conversation
         this.disableTriggers=disableTriggers;
         this.beforeCreateExeCtx=beforeCreateExeCtx;
         this.getStartOfConversation=getStartOfConversation;
+        this.inlineHost=inlineHost;
+        this.inlinePrompt=inlinePrompt;
         this.cache=typeof cache==='boolean'?(cache?[convoCacheService()]:[]):asArray(cache);
         this.logFlat=logFlat;
         this.logFlatCached=logFlatCached;
@@ -697,7 +716,7 @@ export class Conversation
 
 
     private parseCode(code:string):ConvoParsingResult{
-        return parseConvoCode(code,{parseMarkdown:this.defaultOptions.parseMarkdown})
+        return parseConvoCode(code,{parseMarkdown:this.defaultOptions.parseMarkdown,logErrors:true})
     }
 
     private readonly enabledCapabilities:ConvoCapability[]=[];
@@ -760,20 +779,22 @@ export class Conversation
      * created conversation.
      */
     public clone({
-        triggerPrompt,
+        inlinePrompt,
         triggerName,
-        empty=(triggerPrompt && !triggerPrompt.extend && !triggerPrompt.continue),
+        empty=(inlinePrompt && !inlinePrompt.extend && !inlinePrompt.continue),
         noFunctions,
         systemOnly,
         removeAgents,
-        dropLast=triggerPrompt?.dropLast,
-        dropUntilContent=triggerPrompt?true:false,
-        last=triggerPrompt?.last,
+        dropLast=inlinePrompt?.dropLast,
+        dropUntilContent=inlinePrompt?true:false,
+        last=inlinePrompt?.last,
         cloneConvoString,
     }:CloneConversationOptions={},convoOptions?:ConversationOptions):Conversation{
         const cloneOptions=this.getCloneOptions(convoOptions);
-        if(triggerPrompt){
-            cloneOptions.debug=this.triggerToConversation;
+        if(inlinePrompt){
+            delete cloneOptions.debug;
+            cloneOptions.inlinePrompt=inlinePrompt;
+            cloneOptions.inlineHost=this;
             cloneOptions.disableTriggers=true;
             cloneOptions.disableAutoFlatten=true;
         }
@@ -782,8 +803,8 @@ export class Conversation
             conversation.setDefaultApiKey(this._defaultApiKey);
         }
         let messages=empty?[]:[...this.messages];
-        if(triggerPrompt && triggerName){
-            this.filterConvoMessagesForTrigger(triggerPrompt,triggerName,messages);
+        if(inlinePrompt && triggerName){
+            this.filterConvoMessagesForTrigger(inlinePrompt,triggerName,messages);
         }
         if(noFunctions){
             messages=messages.filter(m=>!m.fn || m.fn.topLevel);
@@ -827,7 +848,7 @@ export class Conversation
 
 
     private filterConvoMessagesForTrigger(
-        prompt:ConvoStatementPrompt,
+        prompt:InlineConvoPrompt,
         triggerName:string,
         messages:ConvoMessage[],
     ){
@@ -1259,6 +1280,32 @@ export class Conversation
         return this.messages[this.messages.length-1];
     }
 
+    public getLastUserMessage<T extends ConvoMessage|FlatConvoMessage|ConvoCompletionMessage>(messages:(T|null|undefined)[]|null|undefined):T|undefined{
+        if(!messages){
+            return undefined;
+        }
+        for(let i=messages.length-1;i>=0;i--){
+            const msg=messages[i];
+            if(msg && this.isUserMessage(msg)){
+                return msg;
+            }
+        }
+        return undefined;
+    }
+
+    public getLastUserOrThinkingMessage<T extends ConvoMessage|FlatConvoMessage|ConvoCompletionMessage>(messages:(T|null|undefined)[]|null|undefined):T|undefined{
+        if(!messages){
+            return undefined;
+        }
+        for(let i=messages.length-1;i>=0;i--){
+            const msg=messages[i];
+            if(msg && this.isUserOrThinkingMessage(msg)){
+                return msg;
+            }
+        }
+        return undefined;
+    }
+
     public appendUserMessage(message:string,options?:ConvoMessagePrefixOptions){
         this.append(formatConvoMessage('user',message,this.getPrefixTags(options)));
     }
@@ -1459,6 +1506,15 @@ export class Conversation
 
 
         this.debug?.('To be completed',flat.messages);
+        if(this.inlineHost){
+            const last=this.getLastUserOrThinkingMessage(flat.messages);
+            if(last){
+                this.inlineHost.append(`> ${convoRoles.thinking} ${last.role} (${this.inlinePrompt?.header})\n${escapeConvo(getFullFlatConvoMessageContent(last))}`,{disableAutoFlatten:true});
+            }
+            if(flat.exe.getVar(convoVars.__debugInline)){
+                this.inlineHost.appendArgsAsComment('debug thinking',flat.messages,true);
+            }
+        }
 
         let configInputResult:ModelConfigurationToInputResult|undefined;
         if(serviceAndModel.model){
@@ -1490,6 +1546,13 @@ export class Conversation
         }
 
         this.debug?.('Completion message',messages);
+        if(this.inlineHost){
+            this.inlineHost.append(messages.map(m=>`> ${convoRoles.thinking} ${m.role}\n${escapeConvo(m.content)}`),{disableAutoFlatten:true})
+            if(flat.exe.getVar(convoVars.__debugInline)){
+                this.inlineHost.appendArgsAsComment('debug thinking response',messages,true);
+            }
+        }
+
 
         if(serviceAndModel.model && configInputResult){
             applyConvoModelConfigurationToOutput(serviceAndModel.model,flat,messages,configInputResult);
@@ -2559,7 +2622,11 @@ export class Conversation
     }
 
     public isUserMessage(msg:ConvoMessage|FlatConvoMessage|ConvoCompletionMessage|null|undefined):boolean{
-        return (msg?.role && this.userRoles.includes(msg.role) && !(msg as any).fn)?true:false;
+        return (msg?.role && (this.userRoles.includes(msg.role) || !(msg.role in convoRoles))&& !(msg as any).fn)?true:false;
+    }
+
+    public isUserOrThinkingMessage(msg:ConvoMessage|FlatConvoMessage|ConvoCompletionMessage|null|undefined):boolean{
+        return ( msg?.role===convoRoles.thinking || this.isUserMessage(msg));
     }
 
     public isContentMessage(msg:ConvoMessage|FlatConvoMessage|ConvoCompletionMessage|null|undefined){
@@ -2940,7 +3007,7 @@ export class Conversation
                 if(Array.isArray(start)){
                     sourceMessages=[...start,...sourceMessages];
                 }else if(start){
-                    const r=parseConvoCode(start);
+                    const r=parseConvoCode(start,{logErrors:true});
                     if(r.error){
                         console.error('Dynamic start of conversation parsing failed'+r.error);
                     }else if(r.result){
@@ -2972,7 +3039,7 @@ export class Conversation
                     exe.isTagConditionTrueByName(msg,convoTags.disabled,true) ||
                     msg.role===convoRoles.nop ||
                     msg.role===convoRoles.transformResult ||
-                    msg.role===convoRoles.trigger ||
+                    msg.role===convoRoles.thinking ||
                     (msg.cid && msg.cid!==this.name)
                 ){
                     continue;
@@ -3477,7 +3544,7 @@ export class Conversation
             );
 
 
-            const lastUserMsg=getLastConvoMessageWithRole(messages,'user');
+            const lastUserMsg=this.getLastUserMessage(messages);
             let responseEndpoint:string|undefined=exe.getVar(convoVars.__endpoint);
             let userId:string|undefined=exe.getVar(convoVars.__userId);
 
@@ -3653,7 +3720,7 @@ export class Conversation
                 this.setFlat(flat);
             }
 
-            mergeConvoFlatContentMessages(flat.messages);
+            this.mergeConvoFlatContentMessages(flat.messages);
 
             return flat;
         }finally{
@@ -3907,14 +3974,6 @@ export class Conversation
     }
 
     /**
-     * Logs trigger execution information to the conversation as trigger role comments.
-     * Used for tracking trigger evaluation and execution.
-     */
-    public readonly triggerToConversation=(...args:any[])=>{
-        this.appendArgsAsComment('trigger',args,true);
-    }
-
-    /**
      * Appends arguments as formatted comments to the conversation with the specified role.
      * Used for debugging and logging execution information.
      *
@@ -3926,6 +3985,7 @@ export class Conversation
             return;
         }
         const out:string[]=[];
+        let last:any;
         for(const v of args){
             if(typeof v === 'string'){
                 out.push(v);
@@ -3935,13 +3995,16 @@ export class Conversation
                 }catch{
                     out.push(v?.toString()??'');
                 }
-                if(msgAry && Array.isArray(v)){
-                    const last=v[v.length-1];
-                    if(last && (typeof last.role==='string') && (typeof last.content==='string')){
-                        out.push(`> ${last.role}\n${last.content}`);
-                    }
+                if(msgAry){
+                    last=Array.isArray(v)?v[v.length-1]:undefined;
                 }
             }
+        }
+        if(msgAry && !last){
+            last=args[args.length-1];
+        }
+        if(last && (typeof last.role==='string') && (typeof last.content==='string')){
+            out.push(`> ${last.role}\n${last.content}`);
         }
         const comment=convoStringToComment(out.join('\n'));
         this.append(`> ${role}\n${comment}`);
@@ -4455,7 +4518,7 @@ export class Conversation
                 }
                 const r=await flat.exe.executeFunctionAsync(fnMsg.fn,evt);
 
-                this.appendFunctionSetters(flat.exe,true,undefined,convoRoles.triggerResult,false,true);
+                this.appendFunctionSetters(flat.exe,true,undefined,convoRoles.thinkingResult,false,true);
                 flat.exe.setVar(true,undefined,convoVars.__trigger);
 
                 if(r===false){
@@ -4477,14 +4540,14 @@ export class Conversation
         }
         if(flat){
             flat.messages.push(this.flattenMsg(msg,true,flat.exe));
-            mergeConvoFlatContentMessages(flat.messages);
+            this.mergeConvoFlatContentMessages(flat.messages);
         }
         this.appendMessageObject(msg,{disableAutoFlatten:true,appendCode:true});
     }
 
     public appendResponse(content:string,flat:FlatConvoConversation)
     {
-        const r=parseConvoCode(content,{});
+        const r=parseConvoCode(content,{logErrors:true});
         if(r.error){
             throw new Error(`Invalid response message - ${r.error.message}`);
         }
@@ -4497,11 +4560,11 @@ export class Conversation
         const flatMessages=r.result.map(m=>this.flattenMsg(m,true,flat.exe));
         flat.response=flatMessages.map(convertFlatConvoMessageToCompletionMessage);
         flat.messages.push(...flatMessages);
-        mergeConvoFlatContentMessages(flat.messages);
+        this.mergeConvoFlatContentMessages(flat.messages);
     }
 
     private appendFunctionSetters(exe:ConvoExecutionContext,isDefaultTask:boolean,lastResultValue:any,role='result',writeReturn=true,skipEmpty=false){
-        const lines:string[]=[`${this.getPrefixTags()}> ${role}`];
+        const lines:string[]=[`${role==='result'?'':'\n'}${this.getPrefixTags()}> ${role}`];
         let lastSharedVar:string|undefined;
         if(exe.sharedSetters){
             for(const s of exe.sharedSetters){
@@ -4532,6 +4595,69 @@ export class Conversation
 
     public findMessage(options:FindConvoMessageOptions):ConvoMessage|undefined{
         return findConvoMessage(this._messages,options);
+    }
+
+    /**
+     * Merges "replace", "append" and "prepend" messages with their corresponding content messages.
+     * This function processes a list of flat conversation messages and applies content modification
+     * operations (replace, append, prepend) to their target content messages.
+     *
+     * @param messages - Array of flat conversation messages to process in-place
+     */
+    private mergeConvoFlatContentMessages(messages:FlatConvoMessage[]){
+
+
+        let lastContentMessage:FlatConvoMessage|undefined;
+        let lastContentMessageI=0;
+
+        for(let i=0;i<messages.length;i++){
+            let msg=messages[i];
+            if(!msg){continue}
+
+            if(isConvoMessageModification(msg.role)){
+                if(this.isAssistantMessage(lastContentMessage)){
+                    msg.role=this.userRoles[0]??convoRoles.user;
+                    msg.content=getFullFlatConvoMessageContent(msg);
+                }else{
+                    messages.splice(i,1);
+                    i--;
+                    if(!lastContentMessage){
+                        continue;
+                    }
+                    lastContentMessage={...lastContentMessage};
+                    messages[lastContentMessageI]=lastContentMessage;
+
+                    switch(msg.role){
+                        case convoRoles.replace:
+                            lastContentMessage.content=msg.content;
+                            break;
+                        case convoRoles.replaceForModel:
+                            lastContentMessage.modelContent=msg.content;
+                            break;
+                        case convoRoles.prepend:
+                            lastContentMessage.content=`${msg.content}\n\n${lastContentMessage.content}`;
+                            break;
+                        case convoRoles.append:
+                            lastContentMessage.content=`${lastContentMessage.content}\n\n${msg.content}`;
+                            break;
+                        case convoRoles.prefix:
+                            lastContentMessage.prefix=`${lastContentMessage.prefix?`${lastContentMessage.prefix}\n\n`:''}${msg.content}`;
+                            break;
+                        case convoRoles.suffix:
+                            lastContentMessage.suffix=`${lastContentMessage.suffix?`${lastContentMessage.suffix}\n\n`:''}${msg.content}`;
+                            break;
+                    }
+                    continue;
+                }
+
+            }
+
+            if(msg.content!==undefined && !(msg.tags && (convoTags.disableModifiers in msg.tags))){
+                lastContentMessage=msg;
+                lastContentMessageI=i;
+            }
+
+        }
     }
 }
 

@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoStatementPrompt, ConvoTag, FlatConvoConversation, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -687,18 +687,19 @@ export class ConvoExecutionContext
         return scope;
     }
 
-    private lastTriggerConversation?:Conversation;
+    private lastInlineConversation?:Conversation;
 
-    private async executeStaticPrompt(prompt:ConvoStatementPrompt,value:any,scope:ConvoScope)
+    private async executeStaticPrompt(prompt:InlineConvoPrompt,value:any,scope:ConvoScope)
     {
         this.beforeHandlePromptResult(prompt);
 
         const valueIsString=typeof value ==='string';
         if((prompt.continue && prompt.isStatic) && valueIsString){
-            if(!this.lastTriggerConversation){
-                this.lastTriggerConversation=this.createTriggerConversation(prompt);
+            if(!this.lastInlineConversation){
+                this.lastInlineConversation=this.createInlineConversation(prompt);
             }
-            this.lastTriggerConversation.append((prompt.hasRole?'':'> user\n')+value,{addTags:[{name:convoTags.disableModifiers}]});
+            this.lastInlineConversation.inlinePrompt=prompt;
+            this.lastInlineConversation.append((prompt.hasRole?'':'> user\n')+value,{addTags:[{name:convoTags.disableModifiers}]});
         }
         if(prompt.jsonType && valueIsString){
             value=parseJson5(value);
@@ -706,24 +707,28 @@ export class ConvoExecutionContext
         return this.handlePromptResult(prompt,value,scope);
     }
 
-    private createTriggerConversation(prompt:ConvoStatementPrompt)
+    private createInlineConversation(prompt:InlineConvoPrompt)
     {
         const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true,disableTransforms:!prompt.transforms}
-        return (this.parentConvo??new Conversation({...options,defaultVars:this.getUserSharedVars()}))?.clone({triggerPrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
+        return (this.parentConvo??new Conversation({
+            ...options,
+            defaultVars:this.getUserSharedVars()
+        }))?.clone({inlinePrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
 
     }
 
-    private async executePromptAsync(prompt:ConvoStatementPrompt,scope:ConvoScope)
+    private async executePromptAsync(prompt:InlineConvoPrompt,scope:ConvoScope)
     {
         if(this.parentConvo && this.parentConvo.childDepth>this.maxInlinePromptDepth){
             throw new Error('Max inline prompt depth reached');
         }
 
-        const sub=(prompt.continue && this.lastTriggerConversation)?
-            this.lastTriggerConversation:this.createTriggerConversation(prompt);
+        const sub=(prompt.continue && this.lastInlineConversation)?
+            this.lastInlineConversation:this.createInlineConversation(prompt);
+        sub.inlinePrompt=prompt;
 
         if(prompt.continue || prompt.extend){
-            this.lastTriggerConversation=sub;
+            this.lastInlineConversation=sub;
         }
 
 
@@ -752,7 +757,7 @@ export class ConvoExecutionContext
         return this.handlePromptResult(prompt,value,scope);
     }
 
-    private beforeHandlePromptResult(prompt:ConvoStatementPrompt){
+    private beforeHandlePromptResult(prompt:InlineConvoPrompt){
         // systemMessages
         if(prompt.systemMessages){
             const append=(convo:Conversation,type:StandardConvoSystemMessage)=>{
@@ -764,14 +769,14 @@ export class ConvoExecutionContext
                 if(this.parentConvo){
                     append(this.parentConvo,s);
                 }
-                if(this.lastTriggerConversation){
-                    append(this.lastTriggerConversation,s);
+                if(this.lastInlineConversation){
+                    append(this.lastInlineConversation,s);
                 }
             }
         }
     }
 
-    private handlePromptResult(prompt:ConvoStatementPrompt,value:any,scope:ConvoScope){
+    private handlePromptResult(prompt:InlineConvoPrompt,value:any,scope:ConvoScope){
 
         if(prompt?.not){
             value=!value;

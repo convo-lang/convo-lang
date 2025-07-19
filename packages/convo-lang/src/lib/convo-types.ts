@@ -3,6 +3,7 @@ import type { ZodObject, ZodType } from 'zod';
 import type { Conversation } from "./Conversation";
 import type { ConvoExecutionContext } from './ConvoExecutionContext';
 import { ConvoComponentDef } from './convo-component-types';
+import type { convoReservedRoles } from './convo-lib';
 import type { convoSystemMessages } from './convo-system-messages';
 
 export type ConvoMessageType='text'|'function';
@@ -12,12 +13,6 @@ export type ConvoValueConstant=(typeof convoValueConstants)[number];
 
 export const convoNonFuncKeywords=['in'] as const;
 export type ConvoNonFuncKeyword=(typeof convoNonFuncKeywords)[number];
-
-/**
- * Reserved role names in Convo-Lang that have special meaning and cannot be used as custom roles.
- * These roles are used for system functionality like function calls, execution blocks, and debugging.
- */
-export const convoReservedRoles=['call','do','result','define','debug','end','trigger'] as const;
 
 /** Union type of all reserved role names */
 export type ConvoReservedRole=(typeof convoReservedRoles)[number];
@@ -309,14 +304,19 @@ export interface ConvoStatement
     /**
      * Used with prompt strings and indicates the string is a prompt to be completed
      */
-    prompt?:ConvoStatementPrompt;
+    prompt?:InlineConvoPrompt;
 }
 
 /**
  * Convo-Lang prompts that can be executed inline inside of a function
  */
-export interface ConvoStatementPrompt
+export interface InlineConvoPrompt
 {
+    /**
+     * The header portion of the source the prompt was parsed from
+     */
+    header:string;
+
     /**
      * If true the prompt should extend the current conversation. Only content based and top level
      * messages are included. Use the `system` and `functions` properties to include functions and
@@ -1379,7 +1379,7 @@ export interface CloneConversationOptions
     dropUntilContent?:boolean;
     empty?:boolean;
     triggerName?:string;
-    triggerPrompt?:ConvoStatementPrompt;
+    inlinePrompt?:InlineConvoPrompt;
 }
 
 export interface ConvoDocumentReference
@@ -1501,6 +1501,7 @@ export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|
 export interface ConvoParsingOptions extends CodeParsingOptions
 {
     includeLineNumbers?:boolean;
+    logErrors?:boolean;
 }
 
 export interface InlineConvoParsingOptions extends ConvoParsingOptions
