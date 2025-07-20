@@ -1,13 +1,17 @@
-import { unknownConvoTokenPrice } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, convoRoles, convoTags, unknownConvoTokenPrice } from "@convo-lang/convo-lang";
 import { createConvoLangApiRoutes } from "@convo-lang/convo-lang-api-routes";
-import { BadRequestError, FnEvent, NotFoundError, asArrayItem, createFnHandler, queryParamsToObject } from '@iyio/common';
+import { FnEvent, NotFoundError, asArrayItem, createFnHandler, queryParamsToObject } from '@iyio/common';
 import { HttpRoute, getHttpRoute } from '@iyio/node-common';
 import { initBackend } from "../convo-lang-aws-cdk-lib";
-import { checkTokenQuotaAsync, storeTokenUsageAsync } from '../price-capping';
+import { checkTokenQuotaAsync, getTokenQuotaAsync, storeTokenUsageAsync } from '../price-capping';
 
 
 initBackend();
 
+class TokenLimitError extends Error
+{
+
+}
 
 let currentRemoteAddress='0.0.0.0';
 let routes:HttpRoute[]|null=null;
@@ -38,9 +42,12 @@ const getRoutes=()=>{
                 }
                 const quota=await checkTokenQuotaAsync({remoteAddress:currentRemoteAddress});
                 if(!quota.allow){
-                    throw new BadRequestError('Token limit reached');
+                    throw new TokenLimitError('Token limit reached');
                 }
             },
+        },
+        getUsage:async ()=>{
+            return await getTokenQuotaAsync({remoteAddress:currentRemoteAddress})
         }
     }));
 }
@@ -94,6 +101,19 @@ const ConvoLangAPi=async (
             method,
             query
         });
+    }catch(ex){
+        if(ex instanceof TokenLimitError){
+            const msg:ConvoCompletionMessage={
+                tags:{
+                    [convoTags.tokenLimit]:''
+                },
+                role:convoRoles.assistant,
+                content:ex.message
+            }
+            return [msg];
+        }else{
+            throw ex;
+        }
     }finally{
         currentRemoteAddress='0.0.0.0';
     }

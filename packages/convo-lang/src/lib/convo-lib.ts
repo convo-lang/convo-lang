@@ -945,6 +945,11 @@ export const convoTags={
      */
     disableModifiers:'disableModifiers',
 
+    /**
+     * Attached to a message to indicate the user has reached their limit of tokens
+     */
+    tokenLimit:'tokenLimit',
+
 } as const;
 
 export const convoDynamicTags:string[]=[convoTags.condition,convoTags.disabled,convoTags.taskName,convoTags.taskDescription];

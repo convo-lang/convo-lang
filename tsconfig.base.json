@@ -46,14 +46,8 @@
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
             ],
-            "@convo-lang/convo-lang-aws": [
-                "packages/convo-lang-aws/src/index.ts"
-            ],
             "@convo-lang/convo-lang-aws-cdk": [
                 "packages/convo-lang-aws-cdk/src/index.ts"
-            ],
-            "@convo-lang/convo-lang-aws-lambda": [
-                "packages/convo-lang-aws-lambda/src/index.ts"
             ]
         }
     },

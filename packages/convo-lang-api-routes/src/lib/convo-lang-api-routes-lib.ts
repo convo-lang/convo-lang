@@ -1,5 +1,6 @@
 import { ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoImageGenerator, FlatConvoConversation } from "@convo-lang/convo-lang";
 import { HttpRequestContext } from "@iyio/node-common";
+import { z } from "zod";
 
 export const defaultConvoLangFsRoot='./convo-lang'
 
@@ -73,6 +74,8 @@ export interface ConvoLangRouteOptions extends ConvoLangRouteOptionsBase
     onCompletion?:(requestCtx:ConvoCompletionRequestCtx)=>void;
 
     completionCtx?:ConvoCompletionCtx;
+
+    getUsage?:(ctx:HttpRequestContext)=>ConvoTokenQuota|undefined|Promise<ConvoTokenQuota|undefined>;
 }
 
 
@@ -111,3 +114,12 @@ export interface ImageGenRouteOptions extends ConvoLangRouteOptionsBase
      */
     imageCacheSubDir?:string;
 }
+
+
+export const ConvoTokenQuotaScheme=z.object({
+    id:z.string(),
+    usage:z.number(),
+    cap:z.number().optional(),
+})
+export type ConvoTokenQuota=z.infer<typeof ConvoTokenQuotaScheme>;
+

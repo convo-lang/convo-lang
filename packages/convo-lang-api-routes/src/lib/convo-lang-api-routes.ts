@@ -1,7 +1,7 @@
 import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
 import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
-import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
+import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
 import { createImageGenRoute } from './createImageGenRoute';
 
 const modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={}
@@ -19,6 +19,7 @@ export const createConvoLangApiRoutes=({
     cacheDir='cache',
     onCompletion,
     completionCtx,
+    getUsage,
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
 
     const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
@@ -150,6 +151,27 @@ export const createConvoLangApiRoutes=({
                 const request:ConvoHttpToInputRequest=body;
 
                 return convertConvoInput(request.flat,request.inputType,convoConversationConverterProvider.all());
+            }
+        },
+
+        {
+            method:'GET',
+            match:new RegExp(`${regPrefix}/usage$`),
+            handler:async (ctx)=>{
+
+                let usage:ConvoTokenQuota|undefined;
+                if(getUsage){
+                    usage=await getUsage(ctx);
+                }
+
+                if(!usage){
+                    usage={
+                        id:'_',
+                        usage:-1,
+                    }
+                }
+
+                return usage;
             }
         },
     ];
