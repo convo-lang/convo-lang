@@ -1,0 +1,8 @@
+> define
+__convoEndpoint="https://c7r4jxkllcupiuqzxiayxn4oai0ritqf.lambda-url.us-east-1.on.aws/api"
+__trackModel=true
+__trackTokenUsage=true
+__model="us.meta.llama3-1-70b-instruct-v1:0"
+
+> user
+hi

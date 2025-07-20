@@ -5,6 +5,7 @@ import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
+import { HttpConvoCompletionService } from "./HttpConvoCompletionService";
 import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync, requireConvertConvoOutput } from "./convo-completion-lib";
 import { getConvoMessageComponent } from "./convo-component-lib";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
@@ -1364,6 +1365,7 @@ export class Conversation
     }
 
     private readonly modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
+    private readonly endpointModelServiceMap:Record<string,Record<string,ConvoCompletionServiceAndModel[]>>={};
 
 
     public async getCompletionServiceAsync(flat:FlatConvoConversation):Promise<ConvoCompletionServiceAndModel|undefined>{
@@ -1454,11 +1456,21 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
+                const convoEndpoint=flat.exe.getVar(convoVars.__convoEndpoint);
+
                 const service=await getConvoCompletionServiceAsync(
                     flat,
-                    this.completionService?asArray(this.completionService):[],
+                    (convoEndpoint?
+                        [this.getHttpService(convoEndpoint)]
+                    :this.completionService?
+                        asArray(this.completionService)
+                    :
+                        []
+                    ),
                     true,
-                    this.modelServiceMap
+                    convoEndpoint?
+                        (this.endpointModelServiceMap[convoEndpoint]??(this.endpointModelServiceMap[convoEndpoint]={})):
+                        this.modelServiceMap
                 )
                 return await this.completeWithServiceAsync(flat,service,modelInputOutput);
             },
@@ -1474,11 +1486,20 @@ export class Conversation
         return result;
     }
 
+    private readonly httpEndpointServices:Record<string,ConvoCompletionService<any,any>>={};
+    private getHttpService(endpoint:string):ConvoCompletionService<any,any>{
+        return this.httpEndpointServices[endpoint]??(this.httpEndpointServices[endpoint]=
+            new HttpConvoCompletionService({endpoint})
+        )
+    }
+
     private async completeWithServiceAsync(
         flat:FlatConvoConversation,
         serviceAndModel:ConvoCompletionServiceAndModel|undefined,
         modelInputOutput?:ConvoModelInputOutputPair,
     ):Promise<ConvoCompletionMessage[]>{
+
+        //@@with-service
 
         const lastMsg=flat.messages[flat.messages.length-1];
         let cacheType=(
@@ -1512,10 +1533,11 @@ export class Conversation
 
 
         this.debug?.('To be completed',flat.messages);
+        const triggerName=flat.exe.getVar(convoVars.__trigger);
         if(this.inlineHost){
             const last=this.getLastUserOrThinkingMessage(flat.messages);
             if(last){
-                this.inlineHost.append(`> ${convoRoles.thinking} ${last.role} (${this.inlinePrompt?.header})\n${escapeConvo(getFullFlatConvoMessageContent(last))}`,{disableAutoFlatten:true});
+                this.inlineHost.append(`> ${convoRoles.thinking}${triggerName?' '+triggerName:''} ${last.role} (${this.inlinePrompt?.header})\n${escapeConvo(getFullFlatConvoMessageContent(last))}`,{disableAutoFlatten:true});
             }
             if(flat.exe.getVar(convoVars.__debugInline)){
                 this.inlineHost.appendArgsAsComment('debug thinking',flat.messages,true);
@@ -1553,7 +1575,7 @@ export class Conversation
 
         this.debug?.('Completion message',messages);
         if(this.inlineHost){
-            this.inlineHost.append(messages.map(m=>`> ${convoRoles.thinking} ${m.role}\n${escapeConvo(m.content)}`),{disableAutoFlatten:true})
+            this.inlineHost.append(messages.map(m=>`> ${convoRoles.thinking}${triggerName?' '+triggerName:''} ${m.role}\n${escapeConvo(m.content)}`),{disableAutoFlatten:true})
             if(flat.exe.getVar(convoVars.__debugInline)){
                 this.inlineHost.appendArgsAsComment('debug thinking response',messages,true);
             }
@@ -1689,6 +1711,19 @@ export class Conversation
         return await getConvoCompletionServiceModelsAsync(service);
     }
 
+    public async getAllModelsAsync():Promise<ConvoModelInfo[]>{
+        if(!this.completionService){
+            return [];
+        }
+        const models:ConvoModelInfo[]=[];
+        const ary=asArray(this.completionService);
+        for(const s of ary){
+            const m=await getConvoCompletionServiceModelsAsync(s);
+            models.push(...m);
+        }
+        return models;
+    }
+
     private async completeParallelMessagesAsync(
         messages:ConvoMessage[],
         labels:(string|undefined)[],
@@ -1715,8 +1750,8 @@ export class Conversation
                     canComplete:(model:string|undefined,flat:FlatConvoConversationBase)=>{
                         return cps.canComplete(model,flat)
                     },
-                    completeConvoAsync:async (input:any,flat:FlatConvoConversationBase)=>{
-                        const m=await cps.completeConvoAsync(input,flat,{});
+                    completeConvoAsync:async (input:any,flat:FlatConvoConversationBase,ctx)=>{
+                        const m=await cps.completeConvoAsync(input,flat,ctx);
                         messages.push(...m);
                         return m;
                     },
@@ -3616,6 +3651,10 @@ export class Conversation
                 messageTriggers
             });
             exe.flat=flat;
+            const apiKey=exe.getVar(convoVars.__apiKey);
+            if(apiKey){
+                flat.apiKey=apiKey;
+            }
 
             let includeInTransforms:FlatConvoMessage[]|undefined;
             for(let i=0;i<messages.length;i++){

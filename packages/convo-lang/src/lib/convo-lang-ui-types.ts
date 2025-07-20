@@ -12,8 +12,9 @@ export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
  * text - Show as code with all text content evaluated
  * tree - Show syntax tree
  * model - Show JSON model that will be sent to LLM
+ * models - List all known LLM models
  */
-export type ConvoEditorMode='code'|'imports'|'modules'|'vars'|'flat'|'text'|'tree'|'model';
+export type ConvoEditorMode='code'|'imports'|'modules'|'vars'|'flat'|'text'|'tree'|'model'|'models';
 
 export type ConvoPromptMediaPurpose='preview'|'prompt';
 

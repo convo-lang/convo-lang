@@ -111,6 +111,10 @@
             {
                 "command": "convo.split-complete",
                 "title": "Convert Convo in new file"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "List Convo Models"
             }
         ],
         "keybindings": [

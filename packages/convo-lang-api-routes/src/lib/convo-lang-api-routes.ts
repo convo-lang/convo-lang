@@ -39,7 +39,7 @@ export const createConvoLangApiRoutes=({
         prefix=prefix.substring(0,prefix.length-1);
     }
 
-    const regPrefix='^'+escapeRegex(prefix);
+    const regPrefix='^'+(prefix?escapeRegex(prefix):'')
 
     const routes:HttpRoute[]=[
         {

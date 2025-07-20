@@ -67,19 +67,29 @@ export function MessagesSourceView({
 
     const [asyncCodeValue,setAsyncCodeValue]=useState('');
     useEffect(()=>{
-        if(mode!=='model' || !flatConvo || !convo){
+        let m=true;
+        if(mode==='model' && flatConvo && convo){
+            (async ()=>{
+                try{
+                    const value=await convo.toModelInputStringAsync(flatConvo);
+                    if(m){
+                        setAsyncCodeValue(value);
+                    }
+                }catch{}
+            })();
+        }else if(mode==='models' && convo){
+            (async ()=>{
+                try{
+                    const value=JSON.stringify(await convo.getAllModelsAsync(),null,4);
+                    if(m){
+                        setAsyncCodeValue(value);
+                    }
+                }catch{}
+            })();
+        }else{
             setAsyncCodeValue('');
             return;
         }
-        let m=true;
-        (async ()=>{
-            try{
-                const value=await convo.toModelInputStringAsync(flatConvo);
-                if(m){
-                    setAsyncCodeValue(value);
-                }
-            }catch{}
-        })();
         return ()=>{
             m=false;
         }
@@ -99,6 +109,8 @@ export function MessagesSourceView({
                     JSON.stringify(convo?.messages??[],null,4)
                 :mode==='model'?
                     (flatConvo?(asyncCodeValue):'')
+                :mode==='models'?
+                    asyncCodeValue
                 :mode==='text'?
                     flatConvoMessagesToTextView(flatConvo?.messages)
                 :mode==='imports'?

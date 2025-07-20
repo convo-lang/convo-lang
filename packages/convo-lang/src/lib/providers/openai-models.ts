@@ -80,8 +80,21 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
         outputAudioTokenPriceUsd:m(200),
     },
 
-    // gpt-4o
+    // gpt-4.1
     _chat=_vision={
+        name:'gpt-4.1',
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(2),
+        outputTokenPriceUsd:m(8),
+        isServiceDefault:true,
+    },
+
+    // gpt-4o
+    {
         name:'gpt-4o',
         supportsFunctionCalling:true,
         supportsChat:true,
@@ -90,7 +103,6 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(2.5),
         outputTokenPriceUsd:m(10),
-        isServiceDefault:true,
     },
     {
         name:'gpt-4o-2024-08-06',

@@ -277,6 +277,17 @@ export const convoVars={
     __endpoint:'__endpoint',
 
     /**
+     * Endpoint to a convo compatible endpoint
+     */
+    __convoEndpoint:'__convoEndpoint',
+
+    /**
+     * API key to send to completions endpoint. The `apiKey` of the `FlatConvoConversationBase` will
+     * be populated by this variable if defined.
+     */
+    __apiKey:'__apiKey',
+
+    /**
      * Sets the default user id of the conversation
      */
     __userId:'__userId',
@@ -1661,7 +1672,11 @@ export const isConvoTokenUsageEmpty=(usage:ConvoTokenUsage):boolean=>{
     );
 }
 
-export const unknownConvoTokenPrice=1000/1000000;
+/**
+ * The token price used when the input or output token price of a model is unknown. This value is
+ * set high to $150 per 1M tokens to avoid losing money.
+ */
+export const unknownConvoTokenPrice=150/1000000;
 export const calculateConvoTokenUsage=(
     model:string,
     models:ConvoModelInfo[],
@@ -1683,8 +1698,8 @@ export const calculateConvoTokenUsage=(
             inputTokens,
             outputTokens,
             tokenPrice:(
-                inputTokens*(info.inputTokenPriceUsd??0)+
-                outputTokens*(info.inputTokenPriceUsd??0)
+                inputTokens*(info.inputTokenPriceUsd??unknownConvoTokenPrice)+
+                outputTokens*(info.inputTokenPriceUsd??unknownConvoTokenPrice)
             )
         }
     }

@@ -453,4 +453,21 @@ const registerCommands=(context:ExtensionContext)=>{
 
         await completeAsync();
     }));
+
+    context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
+
+        const cli=await createConvoCliAsync({});
+        try{
+            const models=await cli.convo.getAllModelsAsync();
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(models,null,4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
 }

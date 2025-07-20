@@ -174,6 +174,11 @@ export interface ConvoCliOptions
      * The directory where the create app command will be ran
      */
     createAppWorkingDir?:string;
+
+    /**
+     * If true all known models will be listed as JSON
+     */
+    listModels?:boolean;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

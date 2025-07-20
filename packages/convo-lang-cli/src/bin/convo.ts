@@ -40,6 +40,7 @@ const args=parseCliArgsT<Args>({
         createAppDir:args=>args[0],
         createNextApp:args=>args.length?true:false,
         createAppWorkingDir:args=>args[0],
+        listModels:args=>args.length?true:false,
     }
 }).parsed as Args;
 
@@ -87,7 +88,12 @@ const main=async()=>{
     if(!toolPromises.length){
         const cli=await createConvoCliAsync(args);
         try{
-            await cli.executeAsync(cancel);
+            if(args.listModels){
+                const models=await cli.convo.getAllModelsAsync();
+                console.log(JSON.stringify(models,null,4));
+            }else{
+                await cli.executeAsync(cancel);
+            }
         }catch(ex){
             console.error('convo execution failed',ex);
             process.exit(1);

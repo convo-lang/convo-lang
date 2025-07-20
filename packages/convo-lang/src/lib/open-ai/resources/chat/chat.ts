@@ -8,6 +8,7 @@ export type ChatModel =
   | 'o1-preview-2024-09-12'
   | 'o1-mini'
   | 'o1-mini-2024-09-12'
+  | 'gpt-4.1'
   | 'gpt-4o'
   | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'

@@ -40,9 +40,11 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
 
     public readonly serviceId='http';
 
-    public static fromScope(scope:Scope){
-        const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
-        const endpoint=ep.length===1?ep[0]:ep;
+    public static fromScope(scope:Scope,endpoint?:string|string[]){
+        if(!endpoint){
+            const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
+            endpoint=ep.length===1?ep[0]:ep;
+        }
         if(!endpoint){
             throw new Error('Empty HttpConvoCompletionService provided');
         }
@@ -98,7 +100,11 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         if(!r){
             throw new Error('convo-lang ai endpoint returned empty response');
         }
-        return r;
+        if(!Array.isArray(r) && (r as any).messages){
+            return (r as any).messages;
+        }else{
+            return r;
+        }
     }
 
     public getModelsAsync():Promise<ConvoModelInfo[]|undefined>

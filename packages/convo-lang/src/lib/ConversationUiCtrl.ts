@@ -640,6 +640,11 @@ export class ConversationUiCtrl
                     this.editorMode='text';
                     break;
 
+                case '/models':
+                    this.showSource=this.editorMode==='models'?!this.showSource:true;
+                    this.editorMode='models';
+                    break;
+
                 case '/tree':
                     this.showSource=this.editorMode==='tree'?!this.showSource:true;
                     this.editorMode='tree';
@@ -721,6 +726,7 @@ export class ConversationUiCtrl
 /source     - Display convo script source
 /imports    - Display convo script source and imported modules
 /modules    - Display convo script source and registered modules
+/models     - Display all registered LLM models
 /ui         - Display convo chat conversation ui
 /flat       - Display the convo as flat messages
 /text       - Display as convo script with all text content evaluated

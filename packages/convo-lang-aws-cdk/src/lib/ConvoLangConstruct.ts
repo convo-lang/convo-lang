@@ -1,8 +1,9 @@
 import { openAiSecretsParam } from '@convo-lang/convo-lang';
-import { convoLangCompletionFnArnParam, convoLangGetTokenQuotaFnArnParam } from '@convo-lang/convo-lang-aws';
+import { convoLangApiFnArnParam, convoLangGetTokenQuotaFnArnParam } from '@convo-lang/convo-lang-aws';
 import { FnInfo, FnsBuilder, ManagedProps, NodeFn, NodeFnProps, getDefaultManagedProps, grantTableQueryPerms } from '@iyio/cdk-common';
 import * as cdk from 'aws-cdk-lib';
 import * as db from "aws-cdk-lib/aws-dynamodb";
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { convoLangAnonUsdCapParam, convoLangAnonUsdCapTotalParam, convoLangCapsTableParam } from "./convo-lang-aws-cdk.deps";
@@ -38,7 +39,7 @@ export class ConvoLangConstruct extends Construct
     public constructor(scope:Construct,id:string,{
         managed=getDefaultManagedProps(),
         defaultFnProps,
-        fnName="OpenAiCompletionFn",
+        fnName="ConvoLangApiFn",
         anonUsdCap,
         anonUsdCapTotal,
         grantAccess,
@@ -57,12 +58,13 @@ export class ConvoLangConstruct extends Construct
 
         const fnsInfo:FnInfo[]=[{
             name:fnName,
-            arnParam:convoLangCompletionFnArnParam,
+            arnParam:convoLangApiFnArnParam,
             grantAccess,
             createProps:{
+                createPublicUrl:true,
                 bundledHandlerFileNames:[
-                    '../../dist/packages/convo-lang-aws-cdk/handlers/CompleteConvoLangPrompt',
-                    '../../node_modules/@convo-lang/convo-lang-aws-cdk/handlers/CompleteConvoLangPrompt',
+                    '../../dist/packages/convo-lang-aws-cdk/handlers/ConvoLangApi',
+                    '../../node_modules/@convo-lang/convo-lang-aws-cdk/handlers/ConvoLangApi',
                 ],
                 timeoutMs:1000*60*5,
                 ...defaultFnProps,
@@ -76,6 +78,7 @@ export class ConvoLangConstruct extends Construct
                 arnParam:convoLangGetTokenQuotaFnArnParam,
                 grantAccess,
                 createProps:{
+                    createPublicUrl:true,
                     bundledHandlerFileNames:[
                         '../../dist/packages/convo-lang-aws-cdk/handlers/GetConvoLangTokenQuota',
                         '../../node_modules/@convo-lang/convo-lang-aws-cdk/handlers/GetConvoLangTokenQuota',
@@ -105,6 +108,14 @@ export class ConvoLangConstruct extends Construct
 
         this.handlerFn=handlerFn;
         this.getQuotaFn=quotaFn;
+
+        handlerFn.func.addToRolePolicy(new iam.PolicyStatement({
+            effect:iam.Effect.ALLOW,
+            actions:[
+                "bedrock:InvokeModel"
+            ],
+            resources:["*"],
+        }))
 
         if(anonUsdCap!==undefined){
             handlerFn.func.addEnvironment(convoLangAnonUsdCapParam.typeName,anonUsdCap.toString());

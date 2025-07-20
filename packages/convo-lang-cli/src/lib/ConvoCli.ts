@@ -72,7 +72,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
             [openAiVisionModelParam.typeName]:config.visionModel,
             [openAiSecretsParam.typeName]:config.secrets,
             [convoCapabilitiesParams.typeName]:config.capabilities,
-            [convoDefaultModelParam.typeName]:'gpt-4o',
+            [convoDefaultModelParam.typeName]:'gpt-4.1',
         }) as Record<string,string>);
 
         reg.use(nodeCommonModule);
