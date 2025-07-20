@@ -1,8 +1,15 @@
 > define
-__convoEndpoint="https://c7r4jxkllcupiuqzxiayxn4oai0ritqf.lambda-url.us-east-1.on.aws/api"
+__convoEndpoint="https://api.convo-lang.ai"
 __trackModel=true
 __trackTokenUsage=true
 __model="us.meta.llama3-1-70b-instruct-v1:0"
 
 > user
 hi
+
+@tokenUsage 15 / 22 / $0.000026640000000000002
+@model us.meta.llama3-1-70b-instruct-v1:0
+> assistant
+How's it going? Is there something I can help you with or would you like to chat?
+
+> user
