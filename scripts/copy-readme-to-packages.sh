@@ -4,6 +4,7 @@ cd "$(dirname "$0")/.."
 
 cp -v README.md packages/convo-lang/README.md
 cp -v README.md packages/convo-lang-api-routes/README.md
+cp -v README.md packages/convo-lang-aws-cdk/README.md
 cp -v README.md packages/convo-lang-bedrock/README.md
 cp -v README.md packages/convo-lang-cli/README.md
 cp -v README.md packages/convo-lang-model-testing/README.md

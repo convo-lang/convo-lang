@@ -91,11 +91,7 @@ npm run dev
 ## Model Provider Support
 
 - OpenAI - https://platform.openai.com/docs/models
-  - chatgpt-4o-latest
-  - gpt-3.5-turbo
-  - gpt-3.5-turbo-0125
-  - gpt-3.5-turbo-1106
-  - gpt-3.5-turbo-16k
+  - gpt-4.1
   - gpt-4
   - gpt-4-0125-preview
   - gpt-4-0613
@@ -108,10 +104,15 @@ npm run dev
   - gpt-4o-2024-08-06
   - gpt-4o-mini
   - gpt-4o-mini-2024-07-18
+  - chatgpt-4o-latest
   - o1-mini
   - o1-mini-2024-09-12
   - o1-preview
   - o1-preview-2024-09-12
+  - gpt-3.5-turbo
+  - gpt-3.5-turbo-0125
+  - gpt-3.5-turbo-1106
+  - gpt-3.5-turbo-16k
 
 - OpenAI Chat Completions Compatible APIs
   - LM Studio - https://lmstudio.ai/docs/app/api/endpoints/openai
@@ -431,6 +432,24 @@ X - https://x.com/ConvoLang
 Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
+
+### v0.7.32
+- **Model Listing**: Added support for listing all registered models
+  - CLI: use the `--list-models` argument
+  - Extension: Run the `List Convo Models` command
+  - Conversation UI - enter the `/models` command 
+- **Prompt Conversion**: Added support for converting convo into target LLM format
+  - CLI: use the `--convert` argument
+  - Extension: Run the `Convert Convo` command
+  - Conversation UI - enter the `/convert` command
+- **AWS CDK**: Added the `@convo-lang/convo-lang-aws-cdk` package for deploying Convo-Lang compatible APIs using AWS CDK
+- **API**: Added the /usage endpoint to the standard convo-lang API routes
+- **Models**: Added gpt-4.1 to OpenAI model list and set as default
+- **System Variables**: Added the __convoEndpoint system variable for defining endpoints to convo lang compatible endpoints using the http relay service
+- **Imports**: Added support for imports in CLI and VS Code extension (filesystem and HTTP imports)
+- **Extensions**: Added the "complete in new file" command to the VS Code extension
+- **Convo Functions**: Added aryContact, aryDistinct and aryJoin convo functions for array operations
+- **Error Handling**: The Conversation class now logs all parsing errors
 
 ### v0.7.31
 - **Inline Prompts**: Added task display while executing inline prompts
