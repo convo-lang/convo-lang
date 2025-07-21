@@ -430,12 +430,25 @@ export interface InlineConvoPrompt
      */
     isStatic?:boolean;
 
+    /**
+     * The json schema the prompt should return
+     */
     jsonType?:string;
+
+    /**
+     * If true the prompt should return an array.
+     */
+    jsonAry?:boolean;
 
     /**
      * A task description to display while the prompt is evaluating
      */
     task?:ConvoTask;
+
+    /**
+     * If true the white space of the response of the prompt will be preserved.
+     */
+    preSpace?:boolean;
 }
 
 export interface ConvoMessageAndOptStatement

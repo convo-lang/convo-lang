@@ -1,7 +1,27 @@
 # Convo-Lang.
+
+**An AI native programming language**
+
 Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
 developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
+
+*@@static*
+``` convo
+@import @/learn-convo-lang.md
+
+@on user
+> onAskAboutConvoLang() -> (
+    if(??? (+ boolean /m)
+        Did the user ask about Convo-Lang
+    ???) then (??? (+ respond /m)
+        Tell them it will change the way the build AI application
+    ???)
+)
+
+> user
+How can convo-lang help me?
+```
 
 Convo-Lang can be used in Javascript, Python, from the command line or directly in VSCode via the
 Convo-Lang extension. The core of Convo-Lang consists of 2 parts, the Convo-Lang language and the
@@ -19,6 +39,7 @@ level details of working with an LLM such as implementing the usages of tools.
 > system
 You are a prompt engineer learning Convo-Lang. Prompting will never be the same 🥹
 ```
+
 
 ## Why Convo-Lang
 Q. Why do we need another programming language when LLMs understand English?
@@ -51,12 +72,69 @@ Welcome to Convo-Lang 🥳
 This is amazing 🤩
 ```
 
+## Key Features
+
+- Unified Multi-LLM Support - Convo-Lang provides a consistent syntax that works across different LLM providers (OpenAI, Claude, etc.) without vendor lock-in. Switch between models or even use multiple models within the same prompt. capabilities of less powerful LLMs so that you can use advanced features 
+
+- Clean and Easy to Read Syntax - Convo-Lang makes reading and writing long multi-role prompts easy and intuitive. Prompts are structure as simple conversations separated by speaker roles, no long hard to read JSON objects and special escape characters for newline and quotes.
+
+- Built-in Tool Use / Function Calling - Define functions that LLMs can call with simple, clean syntax. No complex JSON schemas or verbose parameter definitions. External functions in JavaScript/Python integrate seamlessly with just an `extern` declaration.
+
+- Advanced Conversation Management
+  - Conditional Messages: Dynamic conversations based on current context  
+  - Edge Messages: System messages that always reflect the latest state
+  - Message Transformers: Convert LLM responses into structured data
+  - RAG Integration: Built-in retrieval augmented generation support
+
+- Built-in Typing System - Define custom data structures, enums, and typed function parameters. The LLM automatically respects these constraints, ensuring reliable, type-safe interactions.
+
+- Production-Ready Features  
+  - Caching: Built-in prompt caching for performance
+  - Statistics Tracking: Monitor token usage, response times, and model performance
+  - Parallel Execution: Run multiple AI tasks simultaneously  
+  - Vision Support: Markdown-style image integration
+  - JSON Mode: Structured responses with schema validation
+
+- Developer Experience  
+  - VSCode Extension: Syntax highlighting and in-editor script execution
+  - Interactive Documentation: All examples are runnable and modifiable
+  - TypeScript/JavaScript Integration: First-class support with React components
+
+- Flexible Deployment - Run in the browser, Node.js, Python, CLI, or directly in VSCode. Deploy to AWS with CDK integration. Use standalone or embed in existing applications.
+
 ## A Quick Comparison
 To demonstrate some of the advantages of Convo-Lang we will take a look at the same prompt in
 both the OpenAI standard and in Convo-Lang. The prompt instructs an agent to act as a funny dude
 and to always respond to the user with a joke and if the user likes a joke to call the likeJoke function.
 
-OpenAI Standard:
+### Convo-Lang version
+Here is the Convo-Lang version, clean and easy to read:
+*@@static*
+``` convo
+# Call when the user likes a joke
+> likeJoke(
+    # The joke the user liked
+    joke:string
+    # The reason they liked the joke
+    reason?:string
+) -> (
+    httpPost("https://funny-jokes.com/api/like" __args)
+)
+
+> system
+You are a funny dude. respond to all messages with a joke regardless of the situation.
+
+If a user says that they like one of your jokes call the like Joke function
+
+> assistant
+How can I make you laugh today 🤓
+```
+
+
+### OpenAI version
+And here is the same prompt using the OpenAI Standard, you can still read it but it's not pretty to look at.
+
+On top of it being longer and harder to read it doesn't even include the actual API call to the jokes API, that would have to be done in Javascript or Python and require even more code for handling the tool call.
 ``` json
 {
     "model": "gpt-4o",
@@ -98,27 +176,7 @@ OpenAI Standard:
 }
 ```
 
-Convo-Lang:
-*@@static*
-``` convo
-# Call when the user likes a joke
-> likeJoke(
-    # The joke the user liked
-    joke:string
-    # The reason they liked the joke
-    reason?:string
-) -> (
-    httpPost("https://funny-jokes.com/api/like" __args)
-)
 
-> system
-You are a funny dude. respond to all messages with a joke regardless of the situation.
-
-If a user says that they like one of your jokes call the like Joke function
-
-> assistant
-How can I make you laugh today 🤓
-```
 
 You can decide which version you prefer, but it's pretty obvious which one is easier to read. And
 as an added bonus the Convo-Lang version even handles making the HTTP request to submit the liked
@@ -152,6 +210,106 @@ Convo-Lang execution flow:
 15. The LLM returns a response message based on the return value message
 16. Return to step 3](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-execution-flow.png?raw=true)
 
+
+## Multi Models Support
+
+Convo-Lang provides true multi-LLM support, allowing you to use different models from various providers seamlessly within the same application or even within a single conversation.
+Prompts are not just simply converted from one format to anther, Convo-Lang levels the playing field for all supported LLMs by implementing common features such as tool usage and structured output for less capable models via prompt injection. This allows you to truly "write once, run anywhere" with your prompts.
+
+### Supported Providers
+
+**OpenAI Models**
+- GPT-4.1 series
+- GPT-4 series
+- GPT-3.5 series
+- O1 reasoning models
+
+**Amazon Bedrock Models**
+- Claude models
+- Llama models
+- Nova models
+- Mistral models
+- DeepSeek models
+
+**Local Models**
+- LM Studio integration
+- Ollama support
+- Any OpenAI-compatible endpoint
+
+**More Models and Providers coming soon**
+
+
+### Setting Default Models
+
+Use the `__model` system variable to set the default model for a conversation:
+
+*@@static*
+``` convo
+> define
+__model="gpt-4o"
+// Setting __trackModel to true causes responses from the LLM to be tagged with the 
+// model used to complete the response
+__trackModel=true
+
+> user
+What's the weather like today?
+
+@model gpt-4o
+> assistant
+I'd be happy to help with weather information, but I don't have access to real-time weather data.
+```
+
+### Mid-Conversation Model Switching
+
+Switch models for specific messages using the `@responseModel` tag:
+
+*@@static*
+``` convo
+> define
+__model="gpt-4o"
+
+> user
+Analyze this complex data set
+
+> assistant
+[Response from GPT-4o with detailed analysis]
+
+@responseModel claude-3-5-sonnet
+> user
+Now explain it in simple terms for a child
+
+@model us.anthropic.claude-3-5-sonnet-20241022-v2:0
+> assistant
+[Response from Claude with child-friendly explanation]
+```
+
+### Cost Tracking Across Models
+
+Monitor usage and costs across different providers:
+
+*@@static*
+``` convo
+> define
+__trackTokenUsage=true
+__trackModel=true
+
+> user
+Compare the performance of different models
+
+@tokenUsage 24 / 188 / $0.00294
+@model gpt-4o
+> assistant
+[Response with automatic cost and model tracking]
+```
+
+### Benefits of Multi-Model Support
+
+- **Vendor Independence:** Avoid lock-in to any single provider
+- **Cost Optimization:** Use cheaper models for simple tasks, premium models for complex ones
+- **Capability Matching:** Choose models based on specific strengths (vision, reasoning, coding, etc.)
+- **Fallback Options:** Automatically switch if a provider is unavailable
+- **A/B Testing:** Compare responses from different models easily
+- **Privacy Control:** Use local models for sensitive data, cloud models for general tasks
 
 
 # Learning Time.
@@ -946,8 +1104,265 @@ The color of the triangle has been set to orange
 ```
 
 ## Inline Prompts
-Inline prompts allow to execute convo-lang prompts directly in a function. The prompt can also
-optionally extend the current conversation that called the function.
+Inline prompts are used to evaluate prompts inside of functions. Inline prompts start and end with
+triple questions marks `???` and can optionally include a header that define modifiers that control
+the behaviour of the inline prompt. Headers are defined directly after the opening `???` and are
+enclosed in a set of parentheses.
+
+
+
+
+### Inline Prompt Modifiers
+All examples define an inline prompt in the example function then show the evaluated prompt after it is expanded
+
+
+#### Extend
+`*` - Extends a conversation by including all user and assistant messages of the current conversation. After the prompt is executed it is added the the message stack of the current scope.
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+> example() -> (
+    ??? (+)
+    <moderator>
+    Did the user ask to open a page?
+    </moderator>
+    ???
+)
+```
+Expanded prompt:
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+<moderator>
+Did the user ask to open a page?
+</moderator>
+```
+
+
+
+#### Continue
+`+` -  Similar to extending a conversation but also includes any other extended or continued prompts in the current function that have been executed.
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+> example() -> (
+    ??? (+)
+    <moderator>
+    Did the user ask to open a page?
+    </moderator>
+    ???
+
+    ??? (+)
+    <moderator>
+    Open the page and give the user a suggestion for what to do on the page
+    </moderator>
+    ???
+)
+
+```
+Expanded prompt - 
+Only showing the last inline prompt and includes the response from the first inline prompt
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+<moderator>
+Did the user ask to open a page?
+</moderator>
+
+> assistant
+Yes, the user asked to open the account settings page
+
+> user
+<moderator>
+Open the page and give the user a suggestion for what to do on the page
+</moderator>
+```
+
+
+
+#### Tag
+`/{tag}` - Wraps the content of the prompt in an XML tag. The value after the slash is used as the name of the tag. In most cases tags are used in combination with the `*` or `+` modifiers.
+
+*@@static*
+``` convo
+> example() -> (
+    ??? (/teacher)
+    Please open your book to page 10
+    ???
+)
+```
+Expanded prompt:
+*@@static*
+``` convo
+> prompt
+<teacher>
+Please open your book to page 10
+</teacher>
+```
+
+
+
+#### Moderator Tag
+`/m` - Wraps the content of the prompt in the moderator XML tag adds the `moderatorTags` system message. Moderator tags are used to denote text as coming from a moderator in contrast to coming from the user.
+
+*@@static*
+``` convo
+> user
+When does my flight leave
+
+> example() -> (
+    ??? (+ /m)
+    Does the user have a question?
+    ???
+)
+
+```
+Expanded prompt:
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+When does my flight leave
+
+<moderator>
+Does the user have a question?
+</moderator>
+```
+
+
+
+#### Replace
+`replace` - Causes the response of the prompt to replace the last message of the current conversation
+
+*@@static*
+``` convo
+> user
+I like the snow
+
+@on user
+> example() -> (
+    ??? (+ replace /m)
+    Replace the user's message with the opposite of what they are saying
+    ???
+)
+
+```
+Expanded prompt:
+*@@static*
+``` convo
+> user
+I like the snow
+
+<moderator>
+Replace the user's message with the opposite of what they are saying
+</moderator>
+
+```
+Conversation after calling example function:
+*@@static*
+``` convo
+> user
+I dislike the snow
+```
+
+- `replaceForModel` - **Replace for Model** - Causes the response of the prompt to replace the last message of the current conversation that the LLM sees but the user still sees the original message.
+- `append` - **Append** - Appends the response of the prompt to the last message in the current conversation.
+- `prepend` - **Prepend** - Prepends the response of the prompt to the last message in the current conversation.
+- `suffix` - **Suffix** - Appends the response of the prompt to the last message in the current conversation but hides the appended content from the user.
+- `prefix` - **Prefix** - Prepends the response of the prompt to the last message in the current conversation but hides the appended content from the user.
+- `respond` - **Respond** - Sets the response of the current conversation to the response of the prompt.
+- `>>` - **Write Output** - Causes the response of the prompt to be written to the current conversation as a new message
+- `{varName}=` - **Assign** - Assigns the response of the prompt to a variable
+- `system` - **System Messages** - When used with `*` or `+` modifiers system messages are also included in the prompt
+- `functions` - **Function Messages** - When used with `*` or `+` modifiers function messages are also included in the prompt
+- `transforms` - **Enable Transforms** - Allows transforms to be evaluated. By define transforms are disabled in inline prompts
+- `last:{number}` - **Last** - Causes the last N number of user and assistant messages of the current conversation to be included in the prompt
+- `drop:{number}` - **Drop** - Causes the last N number of user and assistant messages to not be included form the current conversation
+- `pre` - **Preserve Whitespace** - Preserves the whitespace of the response of the prompt. 
+- `boolean` - **Boolean** - Causes the prompt to respond with a true or false value.
+- `!` - **Invert** - Causes the value of the repose of the prompt to be inverted. This modifier is commonly used with the boolean modifier
+- `json:{type}` - **JSON** - Defines a JSON schema the prompt response should conform to
+- `task:{description}` - **Task** - Provides a description of what the inline prompt is doing and display the description in the UI. The task modifier must be defined as the last modifier in the header. All content in the header after the task modifier is included in the description of the task modifier.
+
+
+### Inline Prompt Interactive Example
+This example define a function adds menu items to an order and check if 
+``` convo
+> define
+MenuItem=enum("burger" "tacos" "steak" "salmon")
+Side=enum("fries" "salad" "chips" "beans")
+orderMenuItems = []
+orderSides = []
+
+> system
+You are taking a user's order at a drive through.
+
+Main Menu:
+- burger
+- tacos
+- steak
+- salmon
+
+Sides:
+- fries
+- salad
+- chips
+- beans
+
+# Adds a menu item to the user's order
+> addMenuItem(
+    # The menu item the user ordered
+    menuItem:MenuItem
+) -> (
+
+    orderMenuItems = aryAdd(orderMenuItems menuItem)
+
+    if(??? (+ boolean /m)
+        Did the user ask for any sides?
+    ???) then (
+
+        ??? (+ sides=json:Side[] /m task:Adding sides)
+            List any sides the user asked for
+        ???
+
+        orderSides = aryConcat(orderSides sides)
+
+        return(===
+            {{menuItem}} and {{aryJoin(sides)}} have been added to your order.
+        ===)
+
+    )else(
+
+        return(===
+            {{menuItem}} as been added to your order.
+        ===)
+        
+    )
+
+)
+```
+
+
+
+
 
 **More documentation coming soon**
 
@@ -964,20 +1379,35 @@ LLM and even mix models using more specialized LLMs for specific tasks.
 This example interviews the user based on a list of topics and dive into each topic
 ``` convo
 
-
 > define
 Answer=struct(
-    topic:string
+    topic:enum('location' 'hobby' 'personality')
     question:string
+    # The user answer from perspective of the moderator
     answer:string
 )
 
 answers=[]
+interviewDone=false
+interviewSummary=null
+
+
+
+@condition = not(interviewDone)
+@edge
+> system
+You are interviewing a user on several topics. Only ask the user one question at a time
+
+@condition = interviewDone
+@edge
+> system
+You are having an open friendly conversation with the user.
+Tell the user about what you think of their answers. Try not to asking too many questions, you
+are now giving your option.
+
 
 @edge
 > system
-You are interviewing a user on several topics.
-
 Interview Topics:
 - Location
 - Hobbies
@@ -989,41 +1419,77 @@ Current Answers:
 </answers>
 
 
-@on user suffix
-> local onAnswer(content:string) -> (
 
-    if( ??? (+!boolean /m)
-        Did the user answer a question?
-    ??? ) return(false)
-
-    ??? (+ answer=json:Answer /m task:Saving answer)
-        Convert the user's answer to an Answer object
-    ???
-
-    answers = aryAdd(answers answer)
-
-    switch(
-        ??? (+ boolean /m task:Reviewing)
-        Has the user given enough detail about the topic of {{answer.topic}} for you to have a
-        full understanding of their relation with the topic? The user should have answered at least
-        3 questions about the topic.
-        ???
-
-        === (suffix /m)
-        Move on to the next topic
-        ===
-
-        === (suffix /m)
-        Dive deeper into the users last answer by asking them a related question
-        ===
-    )
+@taskName Summarizing interview
+# Call when all interview topics have been covered
+> finishInterview(
+    # The summary of the interview in markdown format. Start the summary with an h1 header. The
+    # summary should be in the form of a paragraph and include a key insight
+    summary:string
+) -> (
+    interviewSummary=summary
+    interviewDone=true
+    ===
+        The interview is complete. Tell the user thank you for their time then complement them on
+        one of the topics and ask a question about one of their answers to start a side bar conversation.
+        Act very interested in the user.
+    ===
 )
 
-@disableTriggers
-@init
-@hidden
-> user
-Ask the first question
+
+@on user = not(interviewDone)
+> local onAnswer(content:string) -> (
+
+    if( ??? (+boolean /m)
+        Did the user answer a question?
+    ??? ) then(
+        ??? (+ answer=json:Answer /m task:Saving answer)
+            Convert the user's answer to an Answer object
+        ???
+
+        answers = aryAdd(answers answer)
+
+        switch(
+            ??? (+ boolean /m task:Reviewing)
+                Has the user given enough detail about the topic of {{answer.topic}} for you to have a
+                full understanding of their relation with the topic? The user should have answered at least
+                3 questions about the topic.
+            ???
+
+            === (suffix /m)
+                Move on to the next topic
+            ===
+
+            === (suffix /m)
+                Dive deeper into the users last answer by asking them a related question
+            ===
+        )
+    ) else (
+
+        switch(
+
+            ??? (+ boolean /m task:Reviewing)
+                Have all topics been completed?
+            ???
+
+            === (suffix /m)
+                The interview is finished
+            ===
+
+            === (suffix /m)
+                Continue the interview
+            ===
+
+        )
+
+    )
+
+
+)
+
+
+> assistant
+Let's begin! First, can you tell me where you're currently located?
 
 ```
 

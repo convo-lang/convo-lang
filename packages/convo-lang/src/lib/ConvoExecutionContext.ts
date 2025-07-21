@@ -482,7 +482,7 @@ export class ConvoExecutionContext
         }
     }
 
-    private executeScope(scope:ConvoScope,parent:ConvoScope|undefined,defaultScope:ConvoScope,resumeParamScope?:ConvoScope):ConvoScope{
+    private executeScope(scope:ConvoScope,parent:ConvoScope|undefined,defaultScope:ConvoScope,resumeParamScope?:ConvoScope,prevPi?:string):ConvoScope{
 
         const statement=scope.s;
 
@@ -551,6 +551,9 @@ export class ConvoExecutionContext
                             if(paramScope.si){
                                 this.suspendScope(scope,paramScope);
                                 paramScope.pi=scope.si;
+                                if(prevPi){
+                                    scope.pi=prevPi;
+                                }
                                 return scope;
                             }
 
@@ -689,7 +692,7 @@ export class ConvoExecutionContext
 
     private lastInlineConversation?:Conversation;
 
-    private async executeStaticPrompt(prompt:InlineConvoPrompt,value:any,scope:ConvoScope)
+    private executeStaticPrompt(prompt:InlineConvoPrompt,value:any,scope:ConvoScope)
     {
         this.beforeHandlePromptResult(prompt);
 
@@ -831,7 +834,7 @@ export class ConvoExecutionContext
 
 
 
-        return value;
+        return (!prompt.preSpace && (typeof value === 'string'))?value.trim():value;
     }
 
 
@@ -893,8 +896,9 @@ export class ConvoExecutionContext
                 if(r.pi && !parent){
                     throw new ConvoError('suspension-parent-not-found',{statement:scope.s});
                 }
+                const prevPi=r.pi;
                 delete r.pi;
-                this.executeScope(r,parent,defaultScope,scope);
+                this.executeScope(r,parent,defaultScope,scope,prevPi);
             }
         }
     }

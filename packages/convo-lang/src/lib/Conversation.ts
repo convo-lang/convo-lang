@@ -1574,16 +1574,17 @@ export class Conversation
         }
 
         this.debug?.('Completion message',messages);
+
+
+        if(serviceAndModel.model && configInputResult){
+            applyConvoModelConfigurationToOutput(serviceAndModel.model,flat,messages,configInputResult);
+        }
+
         if(this.inlineHost){
             this.inlineHost.append(messages.map(m=>`> ${convoRoles.thinking}${triggerName?' '+triggerName:''} ${m.role}\n${escapeConvo(m.content)}`),{disableAutoFlatten:true})
             if(flat.exe.getVar(convoVars.__debugInline)){
                 this.inlineHost.appendArgsAsComment('debug thinking response',messages,true);
             }
-        }
-
-
-        if(serviceAndModel.model && configInputResult){
-            applyConvoModelConfigurationToOutput(serviceAndModel.model,flat,messages,configInputResult);
         }
 
         if(cache?.cachedResponse){

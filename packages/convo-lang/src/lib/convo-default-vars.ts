@@ -518,6 +518,60 @@ export const defaultConvoVars={
         return ary;
     }),
 
+    aryConcat:createConvoScopeFunction(scope=>{
+        const ary:any[]=[];
+        if(!scope.paramValues?.length){
+            return ary;
+        }
+        for(const v of scope.paramValues){
+            if(Array.isArray(v)){
+                ary.push(...v)
+            }else if(v!==undefined){
+                ary.push(v);
+            }
+        }
+        return ary;
+    }),
+
+    aryDistinct:createConvoScopeFunction(scope=>{
+        const ary:any[]=[];
+        if(!scope.paramValues?.length){
+            return ary;
+        }
+        for(const v of scope.paramValues){
+            if(Array.isArray(v)){
+                for(const a of v){
+                    if(!ary.includes(a)){
+                        ary.push(a);
+                    }
+                }
+            }else if(v!==undefined && !ary.includes(v)){
+                ary.push(v);
+            }
+        }
+        return ary;
+    }),
+
+    aryJoin:createConvoScopeFunction(scope=>{
+        let ary=scope.paramValues?.[0];
+        if(!scope.paramValues || !Array.isArray(ary)){
+            return [];
+        }
+        if(scope.paramValues.length>2){
+            const out:any[]=[];
+            for(let i=0;i<ary.length-1;i++){
+                out.push(ary[i]);
+                out.push(scope.paramValues[1+(i%(scope.paramValues.length-1))])
+            }
+            if(ary.length){
+                out.push(ary[ary.length-1]);
+            }
+            return out.join('');
+        }else{
+            return ary.join(scope.paramValues[1]??', ')
+        }
+    }),
+
 
 
     add:createConvoScopeFunction(scope=>{

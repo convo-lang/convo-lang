@@ -496,8 +496,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                             break parsingLoop;
                         }
                         strStatement.prompt=prompt.result;
-                        delete strStatement.fn;
-                        delete strStatement.params;
+                        console.log('hio 👋 👋 👋 parsed str',strStatement);
                     }
                 }
                 index=nextIndex;
@@ -1342,9 +1341,9 @@ export const parseConvoMessageTrigger=(eventName:string,fnName:string,condition:
 const optionsSplit=/[\*\+, \t!]+/;
 const promptStringParamsReg=/^\s*\(([^)]*)\)/s;
 const lastReg=/last\s*:\s*(\d+)/;
-const dropLastReg=/dropLast\s*:\s*(\d+)/;
+const dropLastReg=/drop\s*:\s*(\d+)/;
 const hasMsgReg=/(^|\n)\s*>/;
-const jsonReg=/json\s*:\s*(\w+)/;
+const jsonReg=/json\s*:\s*(\w+)(\[\s*\])?/;
 const assignReg=/(\w+)\s*=/;
 const wrapTagReg=/\/(\w+)/;
 const taskReg=/(^|\s*)task\s*:\s*(.*)/;
@@ -1356,7 +1355,7 @@ export const parseInlineConvoPrompt=(
     let statement:ConvoStatement|undefined;
     if(typeof content === 'object'){
         statement=content;
-        const headStr=(typeof content.value ==='string')?content.value:content.params?.[1]?.value;
+        const headStr=(typeof content.value ==='string')?content.value:content.params?.[0]?.value;
         if(typeof headStr === 'string'){
             content=headStr
         }else{
@@ -1418,7 +1417,9 @@ export const parseInlineConvoPrompt=(
 
     let messages:ConvoMessage[];
     let endIndex=0;
-    const jsonType=(header?jsonReg.exec(header)?.[1]:undefined)||(headOptions?.includes('boolean')?'TrueFalse':undefined);
+    const jsonMatch=header?jsonReg.exec(header):undefined
+    const jsonType=jsonMatch?.[1]||(headOptions?.includes('boolean')?'TrueFalse':undefined);
+    const jsonAry=jsonMatch?.[2]?true:undefined;
 
     if(!options?.isStatic){
         if(!hasRole && !options?.isStatic){
@@ -1438,7 +1439,7 @@ export const parseInlineConvoPrompt=(
             if(!last.tags){
                 last.tags=[];
             }
-            last.tags.push({name:'json',value:jsonType})
+            last.tags.push({name:'json',value:jsonType+(jsonAry?'[]':'')})
         }
     }else if(statement){
         messages=[];
@@ -1450,7 +1451,7 @@ export const parseInlineConvoPrompt=(
                 const first=statement.params[0];
                 if(typeof first?.value === 'string'){
                     if(!content){
-                        statement.params?.pop();
+                        statement.params?.shift();
                     }else{
                         first.value=content;
 
@@ -1486,6 +1487,7 @@ export const parseInlineConvoPrompt=(
             systemMessages:standardPrompt?[standardPrompt]:undefined,
             isStatic:options?.isStatic,
             jsonType,
+            jsonAry,
             task:task?{name:task}:undefined,
         },
     }
