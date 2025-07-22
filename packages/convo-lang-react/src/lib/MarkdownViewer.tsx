@@ -135,6 +135,9 @@ export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
         border-radius:4px;
         display:block;
     }
+    @.root table{
+        width:100%;
+    }
 `});
 
 const mdBlock=/[\s\n\r]*```\s*(md|markdown).*/
