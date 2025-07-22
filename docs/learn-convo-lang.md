@@ -2,6 +2,10 @@
 
 **An AI native programming language**
 
+## Summary
+
+## Opening
+
 Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
 developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
 provided a uniform syntax for working with all LLMs.
@@ -391,8 +395,6 @@ What do you use variables
 Doc is purely written in Convo-Lang and uses the document you are reading right now as his knowledge
 base in combination with a few functions in integrate into the Convo-Lang website. Doc is a great
 example of what can be done with Convo-Lang.
-
-## Summary
 
 ## Conversations
 At the heart of Convo-Lang are Conversations. A Conversation is a collection
@@ -1103,395 +1105,6 @@ The color of the triangle has been set to orange
 
 ```
 
-## Inline Prompts
-Inline prompts are used to evaluate prompts inside of functions. Inline prompts start and end with
-triple questions marks `???` and can optionally include a header that define modifiers that control
-the behaviour of the inline prompt. Headers are defined directly after the opening `???` and are
-enclosed in a set of parentheses.
-
-
-
-
-### Inline Prompt Modifiers
-All examples define an inline prompt in the example function then show the evaluated prompt after it is expanded
-
-
-#### Extend
-`*` - Extends a conversation by including all user and assistant messages of the current conversation. After the prompt is executed it is added the the message stack of the current scope.
-
-*@@static*
-``` convo
-> user
-Can you open the account settings?
-
-> example() -> (
-    ??? (+)
-    <moderator>
-    Did the user ask to open a page?
-    </moderator>
-    ???
-)
-```
-Expanded prompt:
-*@@static*
-``` convo
-> user
-Can you open the account settings?
-
-<moderator>
-Did the user ask to open a page?
-</moderator>
-```
-
-
-
-#### Continue
-`+` -  Similar to extending a conversation but also includes any other extended or continued prompts in the current function that have been executed.
-
-*@@static*
-``` convo
-> user
-Can you open the account settings?
-
-> example() -> (
-    ??? (+)
-    <moderator>
-    Did the user ask to open a page?
-    </moderator>
-    ???
-
-    ??? (+)
-    <moderator>
-    Open the page and give the user a suggestion for what to do on the page
-    </moderator>
-    ???
-)
-
-```
-Expanded prompt - 
-Only showing the last inline prompt and includes the response from the first inline prompt
-*@@static*
-``` convo
-> user
-Can you open the account settings?
-
-<moderator>
-Did the user ask to open a page?
-</moderator>
-
-> assistant
-Yes, the user asked to open the account settings page
-
-> user
-<moderator>
-Open the page and give the user a suggestion for what to do on the page
-</moderator>
-```
-
-
-
-#### Tag
-`/{tag}` - Wraps the content of the prompt in an XML tag. The value after the slash is used as the name of the tag. In most cases tags are used in combination with the `*` or `+` modifiers.
-
-*@@static*
-``` convo
-> example() -> (
-    ??? (/teacher)
-    Please open your book to page 10
-    ???
-)
-```
-Expanded prompt:
-*@@static*
-``` convo
-> prompt
-<teacher>
-Please open your book to page 10
-</teacher>
-```
-
-
-
-#### Moderator Tag
-`/m` - Wraps the content of the prompt in the moderator XML tag adds the `moderatorTags` system message. Moderator tags are used to denote text as coming from a moderator in contrast to coming from the user.
-
-*@@static*
-``` convo
-> user
-When does my flight leave
-
-> example() -> (
-    ??? (+ /m)
-    Does the user have a question?
-    ???
-)
-
-```
-Expanded prompt:
-*@@static*
-``` convo
-@stdSystem
-@includeInTriggers
-@disableModifiers
-> system
-## Moderator messages
-Some messages will also include a moderator message wrapped in an XML tag with the a tag name
-of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
-visible to the user.
-
-> user
-When does my flight leave
-
-<moderator>
-Does the user have a question?
-</moderator>
-```
-
-
-
-#### Replace
-`replace` - Causes the response of the prompt to replace the last message of the current conversation
-
-*@@static*
-``` convo
-> user
-I like the snow
-
-@on user
-> example() -> (
-    ??? (+ replace /m)
-    Replace the user's message with the opposite of what they are saying
-    ???
-)
-
-```
-Expanded prompt:
-*@@static*
-``` convo
-> user
-I like the snow
-
-<moderator>
-Replace the user's message with the opposite of what they are saying
-</moderator>
-
-```
-Conversation after calling example function:
-*@@static*
-``` convo
-> user
-I dislike the snow
-```
-
-- `replaceForModel` - **Replace for Model** - Causes the response of the prompt to replace the last message of the current conversation that the LLM sees but the user still sees the original message.
-- `append` - **Append** - Appends the response of the prompt to the last message in the current conversation.
-- `prepend` - **Prepend** - Prepends the response of the prompt to the last message in the current conversation.
-- `suffix` - **Suffix** - Appends the response of the prompt to the last message in the current conversation but hides the appended content from the user.
-- `prefix` - **Prefix** - Prepends the response of the prompt to the last message in the current conversation but hides the appended content from the user.
-- `respond` - **Respond** - Sets the response of the current conversation to the response of the prompt.
-- `>>` - **Write Output** - Causes the response of the prompt to be written to the current conversation as a new message
-- `{varName}=` - **Assign** - Assigns the response of the prompt to a variable
-- `system` - **System Messages** - When used with `*` or `+` modifiers system messages are also included in the prompt
-- `functions` - **Function Messages** - When used with `*` or `+` modifiers function messages are also included in the prompt
-- `transforms` - **Enable Transforms** - Allows transforms to be evaluated. By define transforms are disabled in inline prompts
-- `last:{number}` - **Last** - Causes the last N number of user and assistant messages of the current conversation to be included in the prompt
-- `drop:{number}` - **Drop** - Causes the last N number of user and assistant messages to not be included form the current conversation
-- `pre` - **Preserve Whitespace** - Preserves the whitespace of the response of the prompt. 
-- `boolean` - **Boolean** - Causes the prompt to respond with a true or false value.
-- `!` - **Invert** - Causes the value of the repose of the prompt to be inverted. This modifier is commonly used with the boolean modifier
-- `json:{type}` - **JSON** - Defines a JSON schema the prompt response should conform to
-- `task:{description}` - **Task** - Provides a description of what the inline prompt is doing and display the description in the UI. The task modifier must be defined as the last modifier in the header. All content in the header after the task modifier is included in the description of the task modifier.
-
-
-### Inline Prompt Interactive Example
-This example define a function adds menu items to an order and check if 
-``` convo
-> define
-MenuItem=enum("burger" "tacos" "steak" "salmon")
-Side=enum("fries" "salad" "chips" "beans")
-orderMenuItems = []
-orderSides = []
-
-> system
-You are taking a user's order at a drive through.
-
-Main Menu:
-- burger
-- tacos
-- steak
-- salmon
-
-Sides:
-- fries
-- salad
-- chips
-- beans
-
-# Adds a menu item to the user's order
-> addMenuItem(
-    # The menu item the user ordered
-    menuItem:MenuItem
-) -> (
-
-    orderMenuItems = aryAdd(orderMenuItems menuItem)
-
-    if(??? (+ boolean /m)
-        Did the user ask for any sides?
-    ???) then (
-
-        ??? (+ sides=json:Side[] /m task:Adding sides)
-            List any sides the user asked for
-        ???
-
-        orderSides = aryConcat(orderSides sides)
-
-        return(===
-            {{menuItem}} and {{aryJoin(sides)}} have been added to your order.
-        ===)
-
-    )else(
-
-        return(===
-            {{menuItem}} as been added to your order.
-        ===)
-        
-    )
-
-)
-```
-
-
-
-
-
-**More documentation coming soon**
-
-## Message Triggers
-Message triggers allow you to execution function when messages are appended to a conversation and
-can optionally replace or added to message content.
-
-**More documentation coming soon**
-
-## Custom Thinking models
-Using Inline Prompts and Message Triggers you can implement custom thinking algorithms using any
-LLM and even mix models using more specialized LLMs for specific tasks.
-
-This example interviews the user based on a list of topics and dive into each topic
-``` convo
-
-> define
-Answer=struct(
-    topic:enum('location' 'hobby' 'personality')
-    question:string
-    # The user answer from perspective of the moderator
-    answer:string
-)
-
-answers=[]
-interviewDone=false
-interviewSummary=null
-
-
-
-@condition = not(interviewDone)
-@edge
-> system
-You are interviewing a user on several topics. Only ask the user one question at a time
-
-@condition = interviewDone
-@edge
-> system
-You are having an open friendly conversation with the user.
-Tell the user about what you think of their answers. Try not to asking too many questions, you
-are now giving your option.
-
-
-@edge
-> system
-Interview Topics:
-- Location
-- Hobbies
-- Personality
-
-Current Answers:
-<answers>
-{{answers}}
-</answers>
-
-
-
-@taskName Summarizing interview
-# Call when all interview topics have been covered
-> finishInterview(
-    # The summary of the interview in markdown format. Start the summary with an h1 header. The
-    # summary should be in the form of a paragraph and include a key insight
-    summary:string
-) -> (
-    interviewSummary=summary
-    interviewDone=true
-    ===
-        The interview is complete. Tell the user thank you for their time then complement them on
-        one of the topics and ask a question about one of their answers to start a side bar conversation.
-        Act very interested in the user.
-    ===
-)
-
-
-@on user = not(interviewDone)
-> local onAnswer(content:string) -> (
-
-    if( ??? (+boolean /m)
-        Did the user answer a question?
-    ??? ) then(
-        ??? (+ answer=json:Answer /m task:Saving answer)
-            Convert the user's answer to an Answer object
-        ???
-
-        answers = aryAdd(answers answer)
-
-        switch(
-            ??? (+ boolean /m task:Reviewing)
-                Has the user given enough detail about the topic of {{answer.topic}} for you to have a
-                full understanding of their relation with the topic? The user should have answered at least
-                3 questions about the topic.
-            ???
-
-            === (suffix /m)
-                Move on to the next topic
-            ===
-
-            === (suffix /m)
-                Dive deeper into the users last answer by asking them a related question
-            ===
-        )
-    ) else (
-
-        switch(
-
-            ??? (+ boolean /m task:Reviewing)
-                Have all topics been completed?
-            ???
-
-            === (suffix /m)
-                The interview is finished
-            ===
-
-            === (suffix /m)
-                Continue the interview
-            ===
-
-        )
-
-    )
-
-
-)
-
-
-> assistant
-Let's begin! First, can you tell me where you're currently located?
-
-```
 
 ## Tags
 Tags are used in many ways in Convo-Lang and serve as a way to add metadata to messages and 
@@ -2051,21 +1664,23 @@ You can use the following advanced messaging techniques to create highly dynamic
 allow a conversation to be transformed based on the state of the conversation.
 
 ### Conditional Messages
-Conditional messages use the `@condition` tag to conditionally remove them from a conversation based on the value of a variable. Conditional messages allow you to alter a conversation based on the current state of the conversation.
+The `@condition` tag is used to conditionally include messages in a conversation based on the value the condition expression. 
+In most cases you will want to pair the `@condition` tag with the `@edge` tag so that the expression value is based on the
+latest state of the conversation.
 
 ``` convo
 > define
 characterType='goodGuy'
 
 @edge
-@condition characterType goodGuy
+@condition = eq(characterType "goodGuy")
 > system
 You are the hero in a super hero movie. Always be
 positive and try to help the user.
 Response with a single sentence
 
 @edge
-@condition characterType badGuy
+@condition = eq(characterType "badGuy")
 > system
 You are the villain in a super hero movie.
 Alway be negative and bully the user.
@@ -2173,18 +1788,1284 @@ name="Bob"
 Hi, how are you today?
 
 @concat
-@condition name Matt
+@condition = eq(name "Matt")
 > assistant
 My name is Matt and I like watching paint dry 😐
 
 @concat
-@condition name Bob
+@condition = eq(name "Bob")
 > assistant
 My name is Bob and I like long walks do the isles
 of my local Home Depot 👷🏼‍♂️
 
 ```
 
+## Message Triggers
+Message triggers allow the execution of functions when after appending new messages to a conversation.
+The `@on` tag is used to mark a function as a message trigger. Message triggers can be combined with
+inline prompting to create custom thinking models.
+
+
+
+## Inline Prompts
+Inline prompts are used to evaluate prompts inside of functions. Inline prompts start and end with
+triple questions marks `???` and can optionally include a header that define modifiers that control
+the behaviour of the inline prompt. Headers are defined directly after the opening `???` and are
+enclosed in a set of parentheses.
+
+
+*@@static*
+``` convo
+@on user
+> inlineExample() -> (
+
+    // Any todo items the user mentioned will be assigned to the todoItems variable
+    ??? (+ todoItems=json:Todo[] /m)
+        Extract any todo items the user mentioned
+    ???
+)
+
+> user
+I need to learn Convo-Lang
+
+> thinkingResult
+todoItems=[{
+    name:"Learn Convo-Lang",
+    status:"in-progress"
+}]
+
+```
+
+| Modifier Name                                                        | Syntax                | Category          |
+|----------------------------------------------------------------------|-----------------------|-------------------|
+| [Extend](#extend-modifier)                                           | `*`                   | Context           |
+| [Continue](#continue-modifier)                                       | `+`                   | Context           |
+| [Include System](#include-system-modifier)                           | `system`              | Context           |
+| [Include Functions](#include-functions-modifier)                     | `functions`           | Context           |
+| [Enable Transforms](#enable-transforms-modifier)                     | `transforms`          | Context           |
+| [Last](#last-modifier)                                               | `last:{number}`       | Context           |
+| [Drop](#drop-modifier)                                               | `drop:{number}`       | Context           |
+| [Tag](#tag-modifier)                                                 | `/{tag}`              | Tagging           |
+| [Moderator Tag](#moderator-tag-modifier)                             | `/m`                  | Tagging           |
+| [User Tag](#user-tag-modifier)                                       | `/u`                  | Tagging           |
+| [Assistant Tag](#assistant-tag-modifier)                             | `/a`                  | Tagging           |
+| [Replace](#replace-modifier)                                         | `replace`             | Content Placement |
+| [Replace for Model](#replace-for-model-modifier)                     | `replaceForModel`     | Content Placement |
+| [Append](#append-modifier)                                           | `append`              | Content Placement |
+| [Prepend](#prepend-modifier)                                         | `prepend`             | Content Placement |
+| [Suffix](#suffix-modifier)                                           | `suffix`              | Content Placement |
+| [Prefix](#prefix-modifier)                                           | `prefix`              | Content Placement |
+| [Respond](#respond-modifier)                                         | `respond`             | Content Placement |
+| [Write Output](#write-output-modifier)                               | `>>`                  | Output            |
+| [Assign](#assign-modifier)                                           | `{varName}=`          | Assignment        |
+| [Boolean](#boolean-modifier)                                         | `boolean`             | Typing            |
+| [Invert](#invert-modifier)                                           | `!`                   | Typing            |
+| [JSON](#json-modifier)                                               | `json:{type}`         | Typing            |
+| [Preserve Whitespace](#preserve-whitespace-modifier)                 | `pre`                 | Formatting        |
+| [Task](#task-modifier)                                               | `task:{description}`  | UI                |
+
+(note - The `task:{description}` modifier must be the last modifier in an inline prompt header if used)
+
+
+
+### Extend Modifier
+`*` - Extends a conversation by including all user and assistant messages of the current conversation. After the prompt is executed it is added the the message stack of the current scope.
+
+*@@tabs*
+
+#### Source
+
+Source before calling the checkForOpenRequest function
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+@on user
+> checkForOpenRequest() -> (
+    ??? (*)
+    <moderator>
+    Did the user ask to open a page?
+    </moderator>
+    ???
+)
+```
+
+------
+
+#### Inline Expanded
+
+The full inline prompt after applying all modifiers. The content includes the user message from the
+parent conversation of the inline prompt.
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+> suffix
+<moderator>
+Did the user ask to open a page?
+</moderator>
+```
+
+------
+
+#### Inline LLM View
+
+Content of the inline prompt as it seen by the LLM.
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+<moderator>
+Did the user ask to open a page?
+</moderator>
+```
+
+------
+
+
+*@@endTabs*
+
+
+### Continue Modifier
+`+` -  Similar to extending a conversation but also includes any other extended or continued prompts in the current function that have been executed.
+
+*@@tabs*
+
+#### Source
+
+Source before calling the checkForOpenRequest function
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+> checkForOpenRequest() -> (
+    ??? (+)
+    <moderator>
+    Did the user ask to open a page?
+    </moderator>
+    ???
+
+    ??? (+)
+    <moderator>
+    Open the page and give the user a suggestion for what to do on the page
+    </moderator>
+    ???
+)
+
+
+```
+------
+
+
+#### Inline Expanded
+
+The full content of the last inline prompt after applying all modifiers. The content includes the
+user message from the parent conversation and the content of the previous inline prompt.
+
+(note - Messages with the `suffix` role only merge with user messages. If an assistant message
+precedes a suffix message the suffix message will be converted to a user message when flattened)
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+> suffix
+<moderator>
+Did the user ask to open a page?
+</moderator>
+
+
+> assistant
+Yes the user ask to open the account settings page
+
+> suffix
+<moderator>
+Open the page and give the user a suggestion for what to do on the page
+</moderator>
+```
+
+------
+
+#### Inline LLM View
+
+Content of the inline prompt as it seen by the LLM.
+
+*@@static*
+``` convo
+> user
+Can you open the account settings?
+
+<moderator>
+Did the user ask to open a page?
+</moderator>
+
+> assistant
+Yes the user ask to open the account settings page
+
+> user
+<moderator>
+Open the page and give the user a suggestion for what to do on the page
+</moderator>
+```
+
+------
+
+*@@endTabs*
+
+
+
+### Tag Modifier
+`/{tag}` - Wraps the content of the prompt in an XML tag. The value after the slash is used as the name of the tag. In most cases tags are used in combination with the `*` or `+` modifiers.
+
+*@@tabs*
+
+#### Source
+Source before calling startClass
+*@@static*
+``` convo
+> user
+Hello class
+> startClass() -> (
+    ??? (/teacher)
+    Please open your book to page 10
+    ???
+)
+```
+
+------
+
+#### Inline Expanded
+
+*@@static*
+``` convo
+> prompt
+<teacher>
+Please open your book to page 10
+</teacher>
+```
+
+------
+
+*@@endTabs*
+
+
+
+
+### Moderator Tag Modifier
+`/m` - Wraps the content of the prompt in the moderator XML tag adds the `moderatorTags` system message. Moderator tags are used to denote text as coming from a moderator in contrast to coming from the user.
+
+*@@tabs*
+
+#### Source
+
+*@@static*
+``` convo
+> user
+I'm running late. When does my flight leave
+
+> updateFlight() -> (
+    ??? (+ /m)
+    Does the user need to modify their flight?
+    ???
+)
+
+```
+------
+
+#### Inline Expanded
+
+The full content of the inline prompt after applying all modifiers. The content of the prompt
+has been wrapped in the `<modifier>` tag and a system message has been added explaining how
+the LLM should interpret `<modifier>` tags.
+
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm running late. When does my flight leave
+
+> suffix
+<moderator>
+Does the user need to modify their flight?
+</moderator>
+```
+------
+
+#### Inline LLM View
+
+Content of the inline prompt as it seen by the LLM.
+
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm running late. When does my flight leave
+
+<moderator>
+Does the user need to modify their flight?
+</moderator>
+```
+------
+
+*@@endTabs*
+
+
+
+
+### User Tag Modifier
+`/u` - Wraps the content of the prompt in the `<user>` tag adds the `userTags` system message.
+The user tag modifier functions similar to the moderator modifier tag but indicates messages are 
+coming from the user. In most cases the user modifier tag is not needed
+
+
+
+
+### Assistant Tag Modifier
+`/a` - Wraps the content of the prompt in the `<assistant>` tag adds the `assistantTags` system message.
+The assistant tag modifier functions similar to the moderator modifier tag but indicates messages are 
+coming from the assistant. In most cases the assistant modifier tag is not needed
+
+
+
+### Replace Modifier
+`replace` - Replaces the content of the last user message with the response of the inline prompt. The
+replace modifier is commonly used with message triggers and uses the replace message role to modifier
+user messages.
+
+*@@tabs*
+
+#### Source
+Source conversation before calling onUserMessage
+*@@static*
+``` convo
+> user
+I like the snow
+
+@on user
+> onUserMessage() -> (
+    ??? (+ replace /m)
+    Replace the user's message with the opposite of what they are saying
+    ???
+)
+
+```
+------
+
+
+#### Inline Expanded
+Content of the inline prompt after all modifiers have been applied
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+> suffix
+<moderator>
+Replace the user's message with the opposite of what they are saying
+</moderator>
+
+```
+------
+
+#### Inline LLM View
+Content of the inline prompt as seen by the LLM.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+<moderator>
+Replace the user's message with the opposite of what they are saying
+</moderator>
+```
+------
+
+#### Trigger Result
+The result of the inline prompt after calling the onUserMessage function and the response from the LLM
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+> replace
+I dislike the snow
+
+> assistant
+I'm sorry to hear that. Do you not like the cold?
+```
+------
+
+#### Result LLM View
+The conversation as seen by the LLM. The replace role message content has replaced
+the content of the original user message.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I dislike the snow
+
+> assistant
+I'm sorry to hear that. Do you not like the cold?
+```
+------
+
+*@@endTabs*
+
+### Replace for Model Modifier
+`replaceForModel` - The same as the `replace` modifier with the exception that the user will not
+see the replaced message value.
+
+Take notice that the content of the user message is different for the User view and the LLM view.
+
+*@@tabs*
+
+#### Source
+Source conversation before calling onUserMessage
+*@@static*
+``` convo
+> user
+I like the snow
+
+@on user
+> onUserMessage() -> (
+    ??? (+ replaceForModel /m)
+    Replace the user's message with the opposite of what they are saying
+    ???
+)
+
+```
+------
+
+#### Inline Expanded
+Content of the inline prompt after all modifiers have been applied
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+> suffix
+<moderator>
+Replace the user's message with the opposite of what they are saying
+</moderator>
+
+```
+------
+
+#### Inline LLM View
+Content of the inline prompt as seen by the LLM.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+<moderator>
+Replace the user's message with the opposite of what they are saying
+</moderator>
+```
+------
+
+#### Trigger Result
+The result of the inline prompt after calling the onUserMessage function and the response from the LLM
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+> replaceForModel
+I dislike the snow
+
+> assistant
+I'm sorry to hear that. Do you not like the cold?
+```
+------
+
+#### Result User View
+The conversation as seen by the LLM. The replace role message content has replaced
+the content of the original user message.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I like the snow
+
+> assistant
+I'm sorry to hear that. Do you not like the cold?
+```
+------
+
+#### Result LLM View
+The conversation as seen by the LLM. The replace role message content has replaced
+the content of the original user message.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I dislike the snow
+
+> assistant
+I'm sorry to hear that. Do you not like the cold?
+```
+------
+
+*@@endTabs*
+
+### Append Modifier
+`append` - Appends the response of the inline prompt to the last message in the current conversation.
+
+*@@tabs*
+
+#### Source
+Source conversation before calling onUserMessage
+
+*@@static*
+``` convo
+> user
+I'm going to the store to pick up some fresh tomatoes and bananas
+
+@on user
+> onUserMessage() -> (
+    ??? (+ append /m)
+    Generate a checklist of items
+    ???
+)
+```
+------
+
+#### Inline Expanded
+Content of the inline prompt after all modifiers have been applied and the response of the LLM
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm going to the store to pick up some fresh tomatoes and bananas
+
+> suffix
+<moderator>
+Generate a checklist of items
+</moderator>
+
+> assistant
+Item Checklist:
+- [ ] Tomatoes
+- [ ] Bananas
+```
+------
+
+#### Inline LLM View
+Content of the inline prompt as seen by the LLM.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm going to the store to pick up some fresh tomatoes and bananas
+
+<moderator>
+Generate a checklist of items
+</moderator>
+
+> assistant
+Item Checklist:
+- [ ] Tomatoes
+- [ ] Bananas
+```
+------
+
+#### Trigger Result
+The result of the inline prompt after calling the onUserMessage function.
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm going to the store to pick up some fresh tomatoes and bananas
+
+> append
+Item Checklist:
+- [ ] Tomatoes
+- [ ] Bananas
+```
+------
+
+#### Flattened Result
+The result conversation after apply the result of the trigger and applying all modification messages
+
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I'm going to the store to pick up some fresh tomatoes and bananas
+
+Item Checklist:
+- [ ] Tomatoes
+- [ ] Bananas
+```
+------
+*@@endTabs*
+
+
+### Prepend Modifier
+`prepend` - Similar to the `append` modifier but prepends content to the user message.
+
+### Suffix Modifier
+`suffix` - Similar to the `append` modifier but the user can not see the appended content. The suffix
+modifier can be useful for injecting information related to the user message but you don't want
+the user to see the contents.
+
+### Prefix Modifier
+`prefix` - Similar to the `prepend` modifier but the user can not see the appended content.
+
+
+### Respond Modifier
+`respond` - Sets the response of a user message
+
+*@@tabs*
+
+#### Source
+Source conversation before calling onUserMessage
+
+*@@static*
+``` convo
+> user
+What's 2 + 2?
+
+@on user
+> onUserMessage() -> (
+    ??? (+ respond /m)
+    Answer the users question and include a funny joke related to their message.
+    ???
+)
+```
+------
+
+#### Inline Expanded
+
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+What's 2 + 2?
+
+> suffix
+<moderator>
+Answer the users question and include a funny joke related to their message.
+</moderator>
+
+> assistant
+2 + 2 equals 4!
+
+And here’s a joke for you: Why was 6 afraid of 7? Because 7 8 (ate) 9! But don’t worry, 2 and 2 always stick together—they’re adding up just fine.
+```
+------
+
+#### Trigger Result
+The resulting conversation after running the trigger. The response to the user is taken directly from
+the response of the inline prompt
+
+@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+What's 2 + 2?
+
+> assistant
+2 + 2 equals 4!
+
+And here’s a joke for you: Why was 6 afraid of 7? Because 7 8 (ate) 9! But don’t worry, 2 and 2 always stick together—they’re adding up just fine.
+```
+----
+
+*@@endTabs*
+
+
+### Write Output Modifier
+`>>` - Causes the response of the prompt to be written to the current conversation as a append message.
+
+*@@tabs*
+
+#### Source
+Source conversation before calling the facts function
+*@@static*
+``` convo
+> user
+Here are some interesting facts.
+
+> facts() -> (
+    
+    ??? (>>)
+    What is the tallest building in the world?
+    ???
+    
+    ??? (>>)
+    What is the deepest swimming pool in the world?
+    ???
+)
+```
+------
+
+#### Result
+The resulting conversation after calling the facts function
+
+*@@static*
+``` convo
+> user
+Here are some interesting facts.
+
+> append
+As of 2024, the **tallest building in the world** is the **Burj Khalifa** in Dubai, United Arab Emirates. It stands at **828 meters (2,717 feet)** tall and was completed in 2010.
+
+> append
+As of June 2024, the **deepest swimming pool in the world** is **Deep Dive Dubai**, located in Dubai, United Arab Emirates. It reaches a depth of **60.02 meters (196 feet 10 inches)** and holds almost 14 million liters of fresh water. Deep Dive Dubai opened in July 2021, surpassing previous record-holders such as Deepspot in Poland.
+```
+------
+
+#### Result Flattened
+The resulting conversation with all modification messages applied
+
+*@@static*
+``` convo
+> user
+Here are some interesting facts.
+
+As of 2024, the **tallest building in the world** is the **Burj Khalifa** in Dubai, United Arab Emirates. It stands at **828 meters (2,717 feet)** tall and was completed in 2010.
+
+As of June 2024, the **deepest swimming pool in the world** is **Deep Dive Dubai**, located in Dubai, United Arab Emirates. It reaches a depth of **60.02 meters (196 feet 10 inches)** and holds almost 14 million liters of fresh water. Deep Dive Dubai opened in July 2021, surpassing previous record-holders such as Deepspot in Poland.
+```
+------
+*@@endTabs*
+
+
+### Assign Modifier
+`{varName}=` - Assigns the response of the prompt to a variable.
+
+*@@tabs*
+
+#### Source
+The source conversation before running the onUserMessage trigger
+
+*@@static*
+``` convo
+> define
+UserProps=struct(
+    name?:string
+    age?:number
+    favoriteColor?:string
+    vehicleType?:string
+)
+> user
+My favorite color is green and I drive a truck
+
+@on user
+> onUserMessage() -> (
+    ??? (+ userInfo=json:UserProps /m)
+    Extract user information from the user's message
+    ???
+)
+```
+------
+
+#### Inline Expanded
+Content of the inline prompt after all modifiers have been applied and the response of the LLM
+
+*@@static*
+``` convo
+> user
+My favorite color is green and I drive a truck
+
+@json UserProps
+> suffix
+<moderator>
+Extract user information from the user's message
+</moderator>
+
+
+> assistant
+{
+  "favoriteColor": "green",
+  "vehicleType": "truck"
+}
+```
+------
+
+#### Trigger Result
+The result of the inline prompt after calling the onUserMessage function. The thinkingResult message
+stores the extracted value in the state of the conversation.
+
+*@@static*
+``` convo
+> user
+My favorite color is green and I drive a truck
+
+> thinkingResult
+userInfo={
+    "favoriteColor": "green",
+    "vehicleType": "truck"
+}
+
+> assistant
+That’s awesome! Green is such a fresh, vibrant color, and trucks are great for both work and adventure. What kind of truck do you drive? And is there a particular shade of green that’s your favorite?
+```
+------
+
+
+*@@endTabs*
+
+### Include System Modifier
+`system` - When used with `*` or `+` modifiers system messages are also included in the prompt. By default
+system messages of continued or extended conversations are not included.
+
+
+### Include Functions Modifier
+`functions` - When used with `*` or `+` modifiers function messages are also included in the prompt.
+By default functions of continued or extended conversations are not included.
+
+### Enable Transforms Modifier
+`transforms` - Allows transforms to be evaluated. By default transforms are disabled in inline prompts.
+
+### Last Modifier
+`last:{number}` - Causes the last N number of user and assistant messages of the current conversation to be included in the prompt.
+
+### Drop Modifier
+`drop:{number}` - Causes the last N number of user and assistant messages to not be included from the current conversation.
+
+### Preserve Whitespace Modifier
+`pre` - Preserves the whitespace of the response of the prompt.
+
+### Boolean Modifier
+`boolean` - Causes the prompt to respond with a true or false value.
+
+*@@tabs*
+
+#### Source
+Source conversation before running the onUserMessage trigger
+
+*@@static*
+``` convo
+> define
+positiveSentiment=0
+
+> user
+I love pizza
+
+@on user
+> onUserMessage() -> (
+    if(??? (+ boolean /m)
+        Does the user express a positive sentiment about food?
+    ???) then(
+        positiveSentiment = inc(positiveSentiment)
+    )
+)
+```
+------
+
+#### Inline Expended
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I love pizza
+
+@json TrueFalse
+> suffix
+<moderator>
+Does the user express a positive sentiment about food?
+</moderator>
+
+> assistant
+{
+    "isTrue":true
+}
+```
+------
+
+#### Trigger Result
+*@@static*
+``` convo
+@stdSystem
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> user
+I love pizza
+
+> thinkingResult
+positiveSentiment=1
+
+> assistant
+Who doesn’t? 🍕 Pizza is a classic favorite—crisp crust, gooey cheese, and endless topping possibilities. Do you have a favorite kind of pizza or a go-to place you love?
+```
+------
+*@@endTabs*
+
+
+### Invert Modifier
+`!` - Causes the value of the response of the prompt to be inverted. This modifier is commonly used with the boolean modifier.
+
+
+### JSON Modifier
+`json:{type}` - Defines a JSON schema the prompt response should conform to.
+
+
+*@@tabs*
+
+#### Source
+The source conversation before running the onUserMessage trigger
+
+*@@static*
+``` convo
+> define
+UserProps=struct(
+    name?:string
+    age?:number
+    favoriteColor?:string
+    vehicleType?:string
+)
+> user
+My favorite color is green and I drive a truck
+
+@on user
+> onUserMessage() -> (
+    ??? (+ userInfo=json:UserProps /m)
+    Extract user information from the user's message
+    ???
+)
+```
+------
+
+#### Inline Expanded
+Content of the inline prompt after all modifiers have been applied and the response of the LLM
+
+*@@static*
+``` convo
+> user
+My favorite color is green and I drive a truck
+
+@json UserProps
+> suffix
+<moderator>
+Extract user information from the user's message
+</moderator>
+
+
+> assistant
+{
+  "favoriteColor": "green",
+  "vehicleType": "truck"
+}
+```
+------
+
+#### Trigger Result
+The result of the inline prompt after calling the onUserMessage function. The thinkingResult message
+stores the extracted value in the state of the conversation.
+
+*@@static*
+``` convo
+> user
+My favorite color is green and I drive a truck
+
+> thinkingResult
+userInfo={
+    "favoriteColor": "green",
+    "vehicleType": "truck"
+}
+
+> assistant
+That’s awesome! Green is such a fresh, vibrant color, and trucks are great for both work and adventure. What kind of truck do you drive? And is there a particular shade of green that’s your favorite?
+
+```
+------
+
+*@@endTabs*
+
+
+
+### Task Modifier
+`task:{description}` - Provides a description of what the inline prompt is doing and displays the description in the UI. The task modifier must be defined as the last modifier in the header. All content in the header after the task modifier is included in the description of the task modifier.
+
+
+## Specialized Thinking Model Example
+Using Inline Prompts and Message Triggers you can implement specialized thinking algorithms using any
+LLM and even mix models using more specialized LLMs for specific tasks.
+
+This example interviews the user based on a list of topics and dive into each topic
+``` convo
+
+> define
+Answer=struct(
+    topic:enum('location' 'hobby' 'personality')
+    question:string
+    # The user answer from perspective of the moderator
+    answer:string
+)
+
+answers=[]
+interviewDone=false
+interviewSummary=null
+
+
+
+@condition = not(interviewDone)
+@edge
+> system
+You are interviewing a user on several topics. Only ask the user one question at a time
+
+@condition = interviewDone
+@edge
+> system
+You are having an open friendly conversation with the user.
+Tell the user about what you think of their answers. Try not to asking too many questions, you
+are now giving your option.
+
+
+@edge
+> system
+Interview Topics:
+- Location
+- Hobbies
+- Personality
+
+Current Answers:
+<answers>
+{{answers}}
+</answers>
+
+
+
+@taskName Summarizing interview
+# Call when all interview topics have been covered
+> finishInterview(
+    # The summary of the interview in markdown format. Start the summary with an h1 header. The
+    # summary should be in the form of a paragraph and include a key insight
+    summary:string
+) -> (
+    interviewSummary=summary
+    interviewDone=true
+    ===
+        The interview is complete. Tell the user thank you for their time then complement them on
+        one of the topics and ask a question about one of their answers to start a side bar conversation.
+        Act very interested in the user.
+    ===
+)
+
+
+@on user = not(interviewDone)
+> local onAnswer(content:string) -> (
+
+    if( ??? (+boolean /m)
+        Did the user answer a question?
+    ??? ) then(
+        ??? (+ answer=json:Answer /m task:Saving answer)
+            Convert the user's answer to an Answer object
+        ???
+
+        answers = aryAdd(answers answer)
+
+        switch(
+            ??? (+ boolean /m task:Reviewing)
+                Has the user given enough detail about the topic of {{answer.topic}} for you to have a
+                full understanding of their relation with the topic? The user should have answered at least
+                3 questions about the topic.
+            ???
+
+            === (suffix /m)
+                Move on to the next topic
+            ===
+
+            === (suffix /m)
+                Dive deeper into the users last answer by asking them a related question
+            ===
+        )
+    ) else (
+
+        switch(
+
+            ??? (+ boolean /m task:Reviewing)
+                Have all topics been completed?
+            ???
+
+            === (suffix /m)
+                The interview is finished
+            ===
+
+            === (suffix /m)
+                Continue the interview
+            ===
+
+        )
+
+    )
+
+
+)
+
+
+> assistant
+Let's begin! First, can you tell me where you're currently located?
+
+```
 
 
 ## Executable Statements
@@ -3222,6 +4103,7 @@ a free pizza
         Submit a support ticket based on the following:
         
         {{workflow.message}}
+
 ```
 
 ## Example Agents
