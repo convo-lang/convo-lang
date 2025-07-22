@@ -333,11 +333,9 @@ const registerCommands=(context:ExtensionContext)=>{
                 let msg=`\n\n// completing...`;
                 await setCodeAsync(msg,false,true);
 
-
-
                 const cli=await createConvoCliAsync({
                     inline:src,
-                    sourcePath:document.uri.fsPath,
+                    sourcePath:document.isUntitled?undefined:document.uri.fsPath,
                     bufferOutput:true,
                     exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
                     allowExec:async (command)=>{
