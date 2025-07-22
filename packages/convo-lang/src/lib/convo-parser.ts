@@ -496,7 +496,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                             break parsingLoop;
                         }
                         strStatement.prompt=prompt.result;
-                        console.log('hio 👋 👋 👋 parsed str',strStatement);
                     }
                 }
                 index=nextIndex;
