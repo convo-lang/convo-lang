@@ -810,7 +810,7 @@ export class ConvoExecutionContext
             if(prompt.appendOutput){
                 const output=typeof value === 'string'?value:JSON.stringify(value);
                 this.parentConvo.append(
-                    (doesConvoContentHaveMessage(output)?'':'> user\n')+output,
+                    (doesConvoContentHaveMessage(output)?'':'> append\n')+output,
                     {disableAutoFlatten:true}
                 );
             }
