@@ -37,6 +37,7 @@
                 "extensions": [
                     ".convo"
                 ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
                 "configuration": "./convo-language-configuration.json",
                 "icon": {
                     "light": "assets/convo-icon.png",
