@@ -1178,24 +1178,7 @@ export const defaultConvoVars={
     }),
 
     [convoFunctions.enableRag]:createConvoScopeFunction((scope,ctx)=>{
-        ctx.setVar(true,true,convoVars.__rag);
-        let ragParams=ctx.getVar(convoVars.__ragParams);
-        if(!ragParams || (typeof ragParams!=='object')){
-            ragParams={};
-            ctx.setVar(true,ragParams,convoVars.__ragParams);
-        }
-        if(!ragParams.values){
-            ragParams.values=[];
-        }
-        const ary=ragParams.values as any[];
-        if(scope.paramValues){
-            for(const v of scope.paramValues){
-                if(!ary.includes(v)){
-                    ary.push(v);
-                }
-            }
-        }
-        return ary;
+        ctx.enableRag(Array.isArray(scope.paramValues)?scope.paramValues:undefined);
     }),
 
     [convoFunctions.shortUuid]:createConvoScopeFunction(()=>{

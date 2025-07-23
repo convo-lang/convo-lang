@@ -36,8 +36,6 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 - @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
 - @convo-lang/convo-lang-openai - Conversation adapter for OpenAI.
 - @convo-lang/convo-lang-bedrock - Conversation adapter for AWS Bedrock.
-- @convo-lang/convo-lang-pinecone - Rag service provider using Pinecone
-- @convo-lang/convo-lang-aws-cdk - AWS CDK construct for deploying convo-lang compatible api endpoints
 - @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
 - @convo-lang/convo-vfs - Used to integrate Convo-Lang into virtual file systems.
 - @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.

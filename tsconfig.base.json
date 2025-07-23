@@ -46,6 +46,9 @@
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
             ],
+            "@convo-lang/convo-lang-pinecone": [
+                "packages/convo-lang-pinecone/src/index.ts"
+            ],
             "@convo-lang/convo-lang-aws-cdk": [
                 "packages/convo-lang-aws-cdk/src/index.ts"
             ]

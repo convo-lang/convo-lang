@@ -1,5 +1,5 @@
-import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, defaultConvoHttpEndpointPrefix, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
-import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage } from "@iyio/common";
+import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
+import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage, safeParseNumber } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
 import { createImageGenRoute } from './createImageGenRoute';
@@ -172,6 +172,51 @@ export const createConvoLangApiRoutes=({
                 }
 
                 return usage;
+            }
+        },
+
+        {
+            method:'POST',
+            match:new RegExp(`${regPrefix}/rag/search$`),
+            handler:async ({
+                body
+            })=>{
+
+                const search:ConvoRagSearch=body;
+                if(!search){
+                    throw new BadRequestError();
+                }
+
+                if(search.limit===undefined){
+                    search.limit=defaultConvoRagSearchLimit;
+                }
+
+                if(search.limit>defaultMaxConvoRagSearchLimit){
+                    search.limit=defaultMaxConvoRagSearchLimit;
+                }
+
+                return await convoRagService().searchAsync(search);
+            }
+        },
+
+        {
+            method:'GET',
+            match:new RegExp(`${regPrefix}/rag/search/(.*)`),
+            handler:async ({
+                query
+            })=>{
+
+                const content=query['1'];
+                if(!content){
+                    throw new BadRequestError();
+                }
+
+                return await convoRagService().searchAsync({
+                    content,
+                    tolerance:safeParseNumber(query['tol'],defaultConvoRagTol),
+                    paths:query['paths']?.split(',').map(p=>p.trim()).filter(p=>p),
+                    limit:Math.min(safeParseNumber(query['limit'],defaultConvoRagSearchLimit),defaultMaxConvoRagSearchLimit),
+                });
             }
         },
     ];

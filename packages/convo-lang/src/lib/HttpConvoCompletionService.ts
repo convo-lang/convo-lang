@@ -1,5 +1,7 @@
 import { NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
+import { convoRagService } from "./convo-rag-lib";
+import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types";
 import { ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types";
 import { convoCompletionService } from "./convo.deps";
 
@@ -10,6 +12,7 @@ export const httpConvoCompletionEndpointParam=defineStringParam('httpConvoComple
 
 export const convoHttpRelayModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,scope=>HttpConvoCompletionService.fromScope(scope));
+    scope.implementService(convoRagService,scope=>HttpConvoCompletionService.fromScope(scope));
 }
 
 export interface HttpConvoCompletionServiceOptions
@@ -35,7 +38,7 @@ export interface HttpConvoCompletionServiceOptions
  * ### GET /models ()=>ConvoModelInfo[]
  * Returns all models known to the server
  */
-export class HttpConvoCompletionService implements ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>
+export class HttpConvoCompletionService implements ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>, ConvoRagService
 {
 
     public readonly serviceId='http';
@@ -120,6 +123,18 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         const r=await httpClient().postAsync<FlatConvoConversationBase>(joinPaths(this.getEndpoint(),'/convert'),request);
         if(!r){
             throw new NotFoundError();
+        }
+        return r;
+    }
+
+    public async searchAsync(search:ConvoRagSearch):Promise<ConvoRagSearchResult>
+    {
+        const r=await httpClient().postAsync<ConvoRagSearchResult>(
+            joinPaths(this.getEndpoint(),'/rag/search'),
+            search
+        );
+        if(!r){
+            throw new Error('convo-lang ai endpoint returned empty response');
         }
         return r;
     }

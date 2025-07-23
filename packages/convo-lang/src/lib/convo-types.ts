@@ -449,6 +449,8 @@ export interface InlineConvoPrompt
      * If true the white space of the response of the prompt will be preserved.
      */
     preSpace?:boolean;
+
+    tags?:ConvoTag[];
 }
 
 export interface ConvoMessageAndOptStatement
@@ -1413,28 +1415,6 @@ export interface CloneConversationOptions
     inlinePrompt?:InlineConvoPrompt;
 }
 
-export interface ConvoDocumentReference
-{
-    content:string;
-
-    sourceId?:string;
-    sourceName?:string;
-    sourceUrl?:string;
-}
-
-export interface ConvoRagContext
-{
-    params:Record<string,any>;
-    tolerance:number;
-    lastMessage:FlatConvoMessage;
-    flat:FlatConvoConversation;
-    conversation:Conversation;
-}
-
-export type ConvoRagCallback=(
-    ragContext:ConvoRagContext
-)=>ConvoDocumentReference|null|(ConvoDocumentReference|null)[]|Promise<ConvoDocumentReference|null|(ConvoDocumentReference|null)[]>;
-
 export interface AppendConvoMessageObjOptions
 {
     /**
@@ -1592,6 +1572,13 @@ export interface ConvoModelInfo
      * to define shorter alias names or matching patters
      */
     name:string;
+
+    /**
+     * If true the models name will match more specific model names if the more specific model name
+     * starts with the value of the name property.
+     */
+    matchNameStart?:boolean;
+
     /**
      * Used when picking between multiple models with matching names or aliases
      */

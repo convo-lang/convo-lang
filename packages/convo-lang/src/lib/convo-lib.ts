@@ -5,8 +5,9 @@ import { ZodObject } from "zod";
 import type { ConversationOptions } from "./Conversation";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
+import { ConvoDocumentReference } from "./convo-rag-types";
 import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoDocumentReference, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker, isConvoMessageModificationAction } from "./convo-types";
+import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker, isConvoMessageModificationAction } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -455,6 +456,11 @@ export const convoTags={
      * Defines an event listener for a message
      */
     on:'on',
+
+    /**
+     * Enable rag for a message. The value of the tag will be added as a rag path
+     */
+    rag:'rag',
 
     /**
      * Manually labels a message
@@ -1688,7 +1694,7 @@ export const calculateConvoTokenUsage=(
     inputTokens=0,
     outputTokens=0,
 ):ConvoTokenUsage=>{
-    const info=models.find(m=>m.name===model);
+    const info=models.find(m=>m.name===model)??models.find(m=>m.matchNameStart && model.startsWith(m.name));
     if(!info){
         return {
             inputTokens,
@@ -1961,7 +1967,7 @@ export const convoMessageToString=(msg:ConvoMessage):string=>{
 export const getLastCompletionMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
     for(let i=messages.length-1;i>=0;i--){
         const msg=messages[i];
-        if(!msg || msg.role==='function'){
+        if(!msg || msg.role==='function' || msg.role===convoRoles.system){
             continue;
         }
         return msg;
@@ -2264,9 +2270,11 @@ export const getNormalizedFlatMessageList=(
             msg.content=getFullFlatConvoMessageContent(msg);
         }
 
-        if(msg.role===convoRoles.rag && !disableRag){
+        if(msg.role===convoRoles.rag){
+            messages.splice(i,1);
+            i--;
 
-            if(!lastContentMessage?.content){
+            if(!lastContentMessage?.content || disableRag){
                 continue;
             }
 

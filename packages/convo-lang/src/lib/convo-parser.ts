@@ -1,4 +1,4 @@
-import { CodeParser, CodeParsingResult, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
+import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
@@ -1465,6 +1465,15 @@ export const parseInlineConvoPrompt=(
         }
     }
 
+    if(statement?.tags){
+        for(const msg of messages){
+            if(!msg.tags){
+                msg.tags=[];
+            }
+            msg.tags.push(...statement.tags.map(t=>deepClone(t)))
+        }
+    }
+
     return {
         endIndex,
         result:{
@@ -1488,6 +1497,7 @@ export const parseInlineConvoPrompt=(
             jsonType,
             jsonAry,
             task:task?{name:task}:undefined,
+            tags:statement?.tags?deepClone(statement.tags):undefined,
         },
     }
 }

@@ -1137,6 +1137,28 @@ export class ConvoExecutionContext
         }
     }
 
+    public enableRag(paramValues?:any[])
+    {
+        this.setVar(true,true,convoVars.__rag);
+        let ragParams=this.getVar(convoVars.__ragParams);
+        if(!ragParams || (typeof ragParams!=='object')){
+            ragParams={};
+            this.setVar(true,ragParams,convoVars.__ragParams);
+        }
+        if(!Array.isArray(ragParams.values)){
+            ragParams.values=[];
+        }
+        const ary=ragParams.values as any[];
+        if(paramValues){
+            for(const v of paramValues){
+                if(!ary.includes(v)){
+                    ary.push(v);
+                }
+            }
+        }
+        return ary;
+    }
+
     /**
      * Gets built-in type aliases by name. Used to provide predefined types
      * that are commonly used in Convo-Lang but not explicitly defined in user code.
