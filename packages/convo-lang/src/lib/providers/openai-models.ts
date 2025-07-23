@@ -83,6 +83,7 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
     // gpt-4.1
     _chat=_vision={
         name:'gpt-4.1',
+        matchNameStart:true,
         supportsFunctionCalling:true,
         supportsChat:true,
         contextWindowSize:1047576,
