@@ -435,6 +435,18 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
 
+### v0.7.33
+- **Child Conversations**: Child conversations now pass tasks up to their parents for better task coordination
+- **Message Conversion**: Fixed convert message relaying functionality
+- **RAG Integration**: RAG now adds tasks to the UI for better user visibility
+- **API Routes**: Added mock API route for convo demos
+- **Bedrock Models**: Added user-friendly aliases to bedrock models
+- **UI Enhancements**: Added more styling options for suggestions and markdown viewer improvements
+- **RAG Service**: Added convoRagService scope service to standardize RAG implementations
+- **Pinecone Integration**: Added @convo-lang/convo-lang-pinecone package for using Pinecone as a RAG service
+- **Extension**: Added convo-lang new file detection to the VS Code extension
+- **Bug Fix**: Fixed bug in extension that caused new unsaved files to not be able to be completed
+
 ### v0.7.32
 - **Model Listing**: Added support for listing all registered models
   - CLI: use the `--list-models` argument
