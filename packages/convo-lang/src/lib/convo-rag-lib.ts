@@ -21,9 +21,14 @@ export const defaultConvoRagServiceCallback=async (
         tolerance:ragContext.tolerance,
         limit:safeParseNumber(ragContext.params?.['limit'],defaultConvoRagSearchLimit),
     }
-    const r=await Promise.all(services.map(s=>s.searchAsync(search)))
+    const removeTask=ragContext.conversation.addTask({name:'Retrieving related information'});
+    try{
+        const r=await Promise.all(services.map(s=>s.searchAsync(search)))
 
-    return mergeConvoRagResults(r).items.map(i=>i.document);
+        return mergeConvoRagResults(r).items.map(i=>i.document);
+    }finally{
+        removeTask();
+    }
 }
 
 

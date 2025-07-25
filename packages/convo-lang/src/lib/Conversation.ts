@@ -554,6 +554,7 @@ export class Conversation
 
         this._activeTaskCount.next(this._activeTaskCount.value+1);
         pushBehaviorSubjectAry(this._openTasks,task);
+        const removeFromHost=this.inlineHost?.addTask(task);
         let removed=false;
         return ()=>{
             if(removed){
@@ -562,6 +563,7 @@ export class Conversation
             removed=true;
             this._activeTaskCount.next(this._activeTaskCount.value-1);
             removeBehaviorSubjectAryValue(this._openTasks,task);
+            removeFromHost?.();
         }
     }
 
@@ -569,6 +571,11 @@ export class Conversation
         const task=this._openTasks.value[this._openTasks.value.length-1];
         if(task){
             removeBehaviorSubjectAryValue(this._openTasks,task);
+            this._activeTaskCount.next(this._activeTaskCount.value-1);
+            if(this.inlineHost?._openTasks.value.includes(task)){
+                removeBehaviorSubjectAryValue(this.inlineHost._openTasks,task);
+                this.inlineHost._activeTaskCount.next(this.inlineHost._activeTaskCount.value-1);
+            }
         }
     }
 
@@ -1458,23 +1465,9 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
-                const convoEndpoint=flat.exe.getVar(convoVars.__convoEndpoint);
 
-                const service=await getConvoCompletionServiceAsync(
-                    flat,
-                    (convoEndpoint?
-                        [this.getHttpService(convoEndpoint)]
-                    :this.completionService?
-                        asArray(this.completionService)
-                    :
-                        []
-                    ),
-                    true,
-                    convoEndpoint?
-                        (this.endpointModelServiceMap[convoEndpoint]??(this.endpointModelServiceMap[convoEndpoint]={})):
-                        this.modelServiceMap
-                )
-                return await this.completeWithServiceAsync(flat,service,modelInputOutput);
+
+                return await this.completeWithServiceAsync(flat,modelInputOutput);
             },
         );
 
@@ -1497,11 +1490,27 @@ export class Conversation
 
     private async completeWithServiceAsync(
         flat:FlatConvoConversation,
-        serviceAndModel:ConvoCompletionServiceAndModel|undefined,
         modelInputOutput?:ConvoModelInputOutputPair,
     ):Promise<ConvoCompletionMessage[]>{
 
         //@@with-service
+
+        const convoEndpoint=flat.exe.getVar(convoVars.__convoEndpoint);
+
+        const serviceAndModel=await getConvoCompletionServiceAsync(
+            flat,
+            (convoEndpoint?
+                [this.getHttpService(convoEndpoint)]
+            :this.completionService?
+                asArray(this.completionService)
+            :
+                []
+            ),
+            true,
+            convoEndpoint?
+                (this.endpointModelServiceMap[convoEndpoint]??(this.endpointModelServiceMap[convoEndpoint]={})):
+                this.modelServiceMap
+        )
 
         const lastMsg=flat.messages[flat.messages.length-1];
         let cacheType=(
@@ -4493,7 +4502,7 @@ export class Conversation
             return undefined;
         }
         if(service.service.relayConvertConvoToInputAsync){
-            return await service.service.relayConvertConvoToInputAsync(flat,service.service.inputType);
+            return await service.service.relayConvertConvoToInputAsync(flat);
         }else{
             const conversion=convertConvoInput(flat,service.service.inputType,this.converters);
             return conversion.result;

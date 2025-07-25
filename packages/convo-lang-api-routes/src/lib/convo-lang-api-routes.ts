@@ -1,8 +1,9 @@
-import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
-import { BadRequestError, InternalOptions, dupDeleteUndefined, escapeRegex, getErrorMessage, safeParseNumber } from "@iyio/common";
+import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
+import { BadRequestError, InternalOptions, NotFoundError, dupDeleteUndefined, escapeRegex, getErrorMessage, safeParseNumber } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
 import { createImageGenRoute } from './createImageGenRoute';
+import { getMockConvoRoutes } from './mock-routes';
 
 const modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={}
 
@@ -20,6 +21,7 @@ export const createConvoLangApiRoutes=({
     onCompletion,
     completionCtx,
     getUsage,
+    enableMockRoute
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
 
     const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
@@ -144,13 +146,26 @@ export const createConvoLangApiRoutes=({
         {
             method:'POST',
             match:new RegExp(`${regPrefix}/convert$`),
-            handler:({
+            handler:async ({
                 body,
             })=>{
 
                 const request:ConvoHttpToInputRequest=body;
+                let inputType=request.inputType;
 
-                return convertConvoInput(request.flat,request.inputType,convoConversationConverterProvider.all());
+                if(!inputType){
+                    const modelService=await getConvoCompletionServiceAsync(request.flat,convoCompletionService.all());
+                    if(!modelService?.service){
+                        throw new NotFoundError('Unable to find service for model');
+                    }
+                    inputType=modelService.service.inputType;
+                }
+
+                const result=convertConvoInput(request.flat,inputType,convoConversationConverterProvider.all()).result
+                if(!result){
+                    throw new NotFoundError('No conversion found');
+                }
+                return result;
             }
         },
 
@@ -220,6 +235,10 @@ export const createConvoLangApiRoutes=({
             }
         },
     ];
+
+    if(enableMockRoute){
+        routes.push(...getMockConvoRoutes(regPrefix))
+    }
 
     if(imageGenOptions || imageGenCallback){
         const imageGenerator=imageGenCallback??imageGenOptions?.imageGenerator;

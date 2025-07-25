@@ -76,6 +76,11 @@ export interface ConvoLangRouteOptions extends ConvoLangRouteOptionsBase
     completionCtx?:ConvoCompletionCtx;
 
     getUsage?:(ctx:HttpRequestContext)=>ConvoTokenQuota|undefined|Promise<ConvoTokenQuota|undefined>;
+
+    /**
+     * If true a mock route will be added for demoing purposes
+     */
+    enableMockRoute?:boolean;
 }
 
 

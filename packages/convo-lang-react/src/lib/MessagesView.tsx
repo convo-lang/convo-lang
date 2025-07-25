@@ -534,12 +534,13 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         background-color:#3B3B3D99 !important;
     }
     @.msg.suggestion{
-        background-color:#000000;
-        border:1px solid color-mix( in srgb, @@borderColor , transparent 50% );
+        background-color:@@suggestionBackgroundColor;
+        border:@@suggestionBorder;
         padding:0;
         display:flex;
         flex-direction:column;
-        border-radius:calc( @@messageBorderRadius / 2 );
+        color:@@suggestionColor;
+        font-weight:@@suggestionWeight;
     }
     @.msg.agent.suggestion{
     }
@@ -549,7 +550,7 @@ const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css
         fill:@@agentColor;
     }
     @.suggestBtn{
-        border-top:1px solid color-mix( in srgb, @@borderColor , transparent 50% );
+        border-top:@@suggestionDivider;
         padding:@@messagePadding;
         transition:background-color 0.2s ease-in-out;
         text-align:center;

@@ -1003,7 +1003,7 @@ export interface ConvoCompletionService<TInput,TOutput>
      * Used to relay message formatting. This is primarily used by the HttpConvoCompletionService
      * to convert message using converters server side.
      */
-    relayConvertConvoToInputAsync?(flat:FlatConvoConversationBase,inputType:string):Promise<TInput>;
+    relayConvertConvoToInputAsync?(flat:FlatConvoConversationBase,inputType?:string):Promise<TInput>;
 }
 
 export interface ConvoCompletionCtx<TInput=any,TOutput=any>
@@ -1760,7 +1760,7 @@ export interface SimulatedConvoFunctionCall
 export interface ConvoHttpToInputRequest
 {
     flat:FlatConvoConversationBase;
-    inputType:string;
+    inputType?:string;
 }
 
 export const allConvoMessageModification=['replace','replaceForModel','append','prepend','prefix','suffix'] as const;

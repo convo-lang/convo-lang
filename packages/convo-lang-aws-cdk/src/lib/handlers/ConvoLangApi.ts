@@ -17,6 +17,7 @@ let currentRemoteAddress='0.0.0.0';
 let routes:HttpRoute[]|null=null;
 const getRoutes=()=>{
     return routes??(routes=createConvoLangApiRoutes({
+        enableMockRoute:true,
         prefix:'',
         onCompletion:async ({result,flat})=>{
             if(flat.apiKeyUsedForCompletion){

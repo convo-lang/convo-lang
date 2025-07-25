@@ -34,6 +34,12 @@ export interface ConvoLangTheme
     messageRowUnstyled?:boolean;
     rowWidth?:string;
 
+    suggestionBackgroundColor:string;
+    suggestionColor:string;
+    suggestionWeight:string;
+    suggestionBorder:string;
+    suggestionDivider:string;
+
 }
 
 export const defaultLightConvoLangTheme:ConvoLangTheme={
@@ -61,6 +67,11 @@ export const defaultLightConvoLangTheme:ConvoLangTheme={
     maxMessageWidth:'700px',
     messageBorderRadius:'1.2rem',
     messagePadding:'10px 14px',
+    suggestionBackgroundColor:'#ffffff',
+    suggestionColor:'#111111',
+    suggestionWeight:'500',
+    suggestionBorder:'none',
+    suggestionDivider:'#00000055'
 } as const
 
 export const defaultDarkConvoLangTheme:ConvoLangTheme={
@@ -73,4 +84,8 @@ export const defaultDarkConvoLangTheme:ConvoLangTheme={
     buttonColor:'#333333',
     buttonForeground:'#ffffff',
     agentBorder:'1px solid rgba(255, 255, 255, 0.11)',
+    suggestionBorder:'1px solid rgba(255, 255, 255, 0.11)',
+    suggestionBackgroundColor:'#000000',
+    suggestionColor:'#ffffff',
+    suggestionDivider:'1px solid #ffffff55'
 } as const

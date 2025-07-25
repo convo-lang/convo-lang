@@ -102,14 +102,39 @@ const style=atDotCss({name:'MarkdownViewer',css:`
 `});
 
 export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
+    @.root > *:first-child{
+        margin-top:0;
+    }
+
+    @.root h1,@.root h2,@.root h3,@.root h4,@.root h5,@.root h6{
+        margin-top:2rem;
+        font-weight:500 !important;
+        letter-spacing:0.02em;
+    }
+
     @.root h1{
-        margin:0 0 1rem 0;
+        font-size:2rem;
     }
     @.root h2{
-        margin:0 0 0.7rem 0;
+        font-size:1.7rem;
     }
-    @.root h3,@.root h4,@.root h5,@.root h6{
-        margin:0 0 0.5rem 0;
+    @.root h3{
+        font-size:1.5rem;
+    }
+    @.root h3{
+        font-size:1.2rem;
+    }
+    @.root h4{
+        font-size:1.1rem;
+    }
+    @.root h5{
+        font-size:1rem;
+    }
+    @.root h6{
+        font-size:0.9rem;
+    }
+    @.root strong{
+        font-weight:600;
     }
     @.root p{
         margin:0 0 0.5rem 0;

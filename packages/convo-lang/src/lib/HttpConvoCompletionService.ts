@@ -115,7 +115,7 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         return httpClient().getAsync<ConvoModelInfo[]>(joinPaths(this.getEndpoint(),'/models'));
     }
 
-    public async relayConvertConvoToInputAsync(flat:FlatConvoConversationBase,inputType:string):Promise<FlatConvoConversationBase>{
+    public async relayConvertConvoToInputAsync(flat:FlatConvoConversationBase,inputType?:string):Promise<FlatConvoConversationBase>{
         const request:ConvoHttpToInputRequest={
             flat:getSerializableFlatConvoConversation(flat),
             inputType

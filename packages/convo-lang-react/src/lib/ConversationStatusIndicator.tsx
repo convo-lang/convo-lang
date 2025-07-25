@@ -28,7 +28,7 @@ export function ConversationStatusIndicator({
 
     return (<>{
         convoTasks?.length?
-            convoTasks.map((t,i)=><ConvoTaskView className={convoTaskViewClassName} key={i} task={t} />)
+            convoTasks.map((t,i)=><ConvoTaskView mt05={i!==0} className={convoTaskViewClassName} key={i} task={t} />)
         :(currentTask || busy)?
             (loadingIndicator??<LoadingDots/>)
         :
