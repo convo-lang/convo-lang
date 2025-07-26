@@ -283,7 +283,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
             let e=index-1;
             const hasNewline=end.includes('\n');
-            let first=true;
             while(true){
                 let s=code.lastIndexOf('\n',e);
                 if(s<startIndex){
@@ -1012,9 +1011,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         }
     }
 
-    if(!messages.length && tags.length){
+    if(tags.length || lastComment){
         messages.push({
-            tags,
+            tags:tags.length?tags:undefined,
+            description:lastComment||undefined,
             role:'define',
             fn:{
                 body:[],
