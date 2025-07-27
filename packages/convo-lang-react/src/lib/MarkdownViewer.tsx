@@ -151,14 +151,20 @@ export const markdownStyle=atDotCss({name:'MarkdownStyle',css:`
         padding:revert;
         white-space:normal;
     }
+    @.root code{
+        background:#ffffff22;
+        padding:0 0.1rem;
+        border-radius:4px;
+    }
     @.root pre{
         white-space:pre-wrap;
     }
-    @.root code{
+    @.root pre code{
         border:1px solid #ffffff44;
         padding:1rem;
         border-radius:4px;
         display:block;
+        background:transparent;
     }
     @.root table{
         width:100%;
