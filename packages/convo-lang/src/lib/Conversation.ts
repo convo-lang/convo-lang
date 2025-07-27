@@ -1,4 +1,4 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, isClassInstanceObject, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, getValueByPath, isClassInstanceObject, log, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
@@ -4643,15 +4643,30 @@ export class Conversation
     private appendFunctionSetters(exe:ConvoExecutionContext,isDefaultTask:boolean,lastResultValue:any,role='result',writeReturn=true,skipEmpty=false){
         const lines:string[]=[`${role==='result'?'':'\n'}${this.getPrefixTags()}> ${role}`];
         let lastSharedVar:string|undefined;
-        if(exe.sharedSetters){
-            for(const s of exe.sharedSetters){
+        if(exe.sharedSetters.length){
+            setter:for(let i=0;i<exe.sharedSetters.length;i++){
+                const s=exe.sharedSetters[i];
+                if(!s){
+                    continue;
+                }
+                const sTerm=s+'.';
+                for(let ci=0;ci<exe.sharedSetters.length;ci++){
+                    if(ci===i){
+                        continue;
+                    }
+                    const c=exe.sharedSetters[ci];
+                    if(c===s || sTerm.startsWith(c as string)){
+                        continue setter;
+                    }
+                }
                 lastSharedVar=s;
-                lines.push(`${s}=${JSON.stringify(exe.sharedVars[s],null,4)}`)
+                lines.push(`${s}=${JSON.stringify(getValueByPath(exe.sharedVars,s),null,4)}`)
             }
         }
 
         if(writeReturn){
-            if(lastSharedVar && exe.sharedVars[lastSharedVar] && lastResultValue===exe.sharedVars[lastSharedVar]){
+            const lastValue=lastSharedVar?getValueByPath(exe.sharedVars,lastSharedVar):undefined;
+            if(lastSharedVar && lastValue && lastResultValue===lastValue){
                 lines.push(`${convoResultReturnName}=${lastSharedVar}`)
             }else if( (typeof lastResultValue === 'string') &&
                 lastResultValue.length>50 &&

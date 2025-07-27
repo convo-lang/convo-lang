@@ -994,8 +994,13 @@ export class ConvoExecutionContext
             (scope && scope.vars[name]===undefined && this.sharedVars[name]!==undefined)
         )?this.sharedVars:scope.vars;
 
-        if(shared!==false && vars===this.sharedVars && (typeof value !== 'function') && !this.sharedSetters.includes(name)){
-            this.sharedSetters.push(name);
+        if(shared!==false && vars===this.sharedVars && (typeof value !== 'function')){
+            const setterName=path?name+'.'+path.join('.'):name;
+            const i=this.sharedSetters.indexOf(setterName)
+            if(i!==-1){
+                this.sharedSetters.splice(i,1);
+            }
+            this.sharedSetters.push(setterName);
         }
 
         if(path){

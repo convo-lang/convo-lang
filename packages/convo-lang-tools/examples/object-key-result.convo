@@ -1,0 +1,42 @@
+> define
+projects={
+    nxb4:{
+        id:'mxb4',
+        name:'Trucks',
+        status:'waiting',
+    },
+    nt76:{
+        id:'nt76',
+        name:'Cars',
+        status:'ready',
+    }
+}
+> callMe()->(
+    projects.nxb4.status="active"
+    projects.nxb4={new:true}
+    projects.nxb4.status="not-ready"
+)
+
+> assistant
+Projects: {{projects}}
+
+@call
+> user
+Call fn
+
+
+@toolId call_ab52j4UGdIcWiYSJda75baFd
+> call callMe()
+> result
+projects.nxb4={
+    "new": true,
+    "status": "not-ready"
+}
+__return="not-ready"
+
+
+> assistant
+The function you requested (fn) is not ready at the moment. If you have any other tasks or need further assistance, please let me know!
+
+
+> user
