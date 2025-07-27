@@ -1681,7 +1681,7 @@ export class Conversation
         }else{
             this._isCompleting.next(true);
             try{
-                return await this._completeAsync(true,additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
+                return await this._completeAsync(undefined,true,additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
             }finally{
                 this._isCompleting.next(false);
             }
@@ -1815,6 +1815,7 @@ export class Conversation
     public get isCompleting(){return this._isCompleting.value}
 
     private async _completeAsync(
+        callerExcludeMessages:ConvoMessage[]|undefined,
         isSourceMessage:boolean,
         usage:ConvoTokenUsage|undefined,
         task:string|undefined,
@@ -1851,7 +1852,10 @@ export class Conversation
                 discardTemplates:!isDefaultTask || templates!==undefined,
                 threadFilter:additionalOptions?.threadFilter,
                 toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
+                excludeMessageSetters:callerExcludeMessages
             });
+
+            let nextCallerExcludeMessages:ConvoMessage[]|undefined;
 
             if(flat.parallelMessages?.length){
                 const parallelResult=await this.completeParallelAsync(flat,additionalOptions);
@@ -1867,6 +1871,7 @@ export class Conversation
                     }
                     if(flat.queueRef){
                         return await this._completeAsync(
+                            undefined,
                             true,
                             usage,
                             task,
@@ -2121,7 +2126,10 @@ export class Conversation
                     lastResultValue=(typeof callResultValue === 'function')?undefined:callResultValue;
                     hasReturnValue=true;
 
-                    this.appendFunctionSetters(exe,isDefaultTask,lastResultValue);
+                    if(!nextCallerExcludeMessages){
+                        nextCallerExcludeMessages=[];
+                    }
+                    nextCallerExcludeMessages.push(...this.appendFunctionSetters(exe,isDefaultTask,lastResultValue));
 
                     if(this.appendAfterCall.length){
                         const appendAfter=this.appendAfterCall.join('\n\n');
@@ -2174,6 +2182,7 @@ export class Conversation
                 }
             }else if(hasReturnValue && autoCompleteDepth<this.maxAutoCompleteDepth && !(additionalOptions?.returnOnCalled || directInvoke)){
                 return await this._completeAsync(
+                    nextCallerExcludeMessages,
                     false,
                     undefined,
                     task,
@@ -2239,6 +2248,7 @@ export class Conversation
                 }
                 this.append(parts,{disableAutoFlatten:true,throwOnError:true});
                 this._completeAsync(
+                    undefined,
                     false,
                     undefined,
                     task,
@@ -2257,6 +2267,7 @@ export class Conversation
 
             if(flat.queueRef){
                 return await this._completeAsync(
+                    undefined,
                     true,
                     usage,
                     task,
@@ -2594,7 +2605,7 @@ export class Conversation
         const remove:ConvoSubTask[]=[];
 
         const subs=tasks.map<ConvoSubTask>(task=>{
-            const promise=this._completeAsync(false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth);
+            const promise=this._completeAsync(undefined,false,undefined,task,additionalOptions,getCompletion,autoCompleteDepth);
             const sub:ConvoSubTask={
                 name:task,
                 promise
@@ -3044,6 +3055,8 @@ export class Conversation
             initFlatMessages,
             messageStartIndex=0,
             flatMessages,
+            excludeMessages,
+            excludeMessageSetters,
         }:FlattenConvoOptions={}
     ):Promise<FlatConvoConversation>{
 
@@ -3107,7 +3120,8 @@ export class Conversation
                     msg.role===convoRoles.nop ||
                     msg.role===convoRoles.transformResult ||
                     msg.role===convoRoles.thinking ||
-                    (msg.cid && msg.cid!==this.name)
+                    (msg.cid && msg.cid!==this.name) ||
+                    excludeMessages?.includes(msg)
                 ){
                     continue;
                 }
@@ -3288,11 +3302,17 @@ export class Conversation
                     if(msg.fn.local || msg.fn.call){
                         continue;
                     }else if(msg.fn.topLevel){
+                        const prevVarPrefix=exe.varPrefix;
+                        const prefix=excludeMessageSetters?.includes(msg)?'__excluded_setter__':'';
+                        if(prefix){
+                            exe.varPrefix=prefix;
+                        }
                         exe.clearSharedSetters();
                         const r=exe.executeFunction(msg.fn);
                         if(r.valuePromise){
                             await r.valuePromise;
                         }
+                        exe.varPrefix=prevVarPrefix;
                         if(exe.sharedSetters.length){
                             const varSetter:FlatConvoMessage={
                                 role:msg.role??'define',
@@ -3307,7 +3327,7 @@ export class Conversation
                         if(prev?.fn){
                             flat.role='function';
                             flat.called=prev.fn;
-                            flat.calledReturn=exe.getVarEx(convoResultReturnName,undefined,undefined,false);
+                            flat.calledReturn=exe.getVarEx(prevVarPrefix+convoResultReturnName,undefined,undefined,false);
                             flat.calledParams=exe.getConvoFunctionArgsValue(prev.fn);
                             // if(prev.component){
                             //     flat.component=prev.component;
@@ -4640,7 +4660,7 @@ export class Conversation
         this.mergeConvoFlatContentMessages(flat.messages);
     }
 
-    private appendFunctionSetters(exe:ConvoExecutionContext,isDefaultTask:boolean,lastResultValue:any,role='result',writeReturn=true,skipEmpty=false){
+    private appendFunctionSetters(exe:ConvoExecutionContext,isDefaultTask:boolean,lastResultValue:any,role='result',writeReturn=true,skipEmpty=false):ConvoMessage[]{
         const lines:string[]=[`${role==='result'?'':'\n'}${this.getPrefixTags()}> ${role}`];
         let lastSharedVar:string|undefined;
         if(exe.sharedSetters.length){
@@ -4681,7 +4701,9 @@ export class Conversation
 
         if(isDefaultTask && (lines.length>1 || !skipEmpty)){
             lines.push('');
-            this.append(lines.join('\n'),true);
+            return this.append(lines.join('\n'),true)?.result??[];
+        }else{
+            return [];
         }
     }
 

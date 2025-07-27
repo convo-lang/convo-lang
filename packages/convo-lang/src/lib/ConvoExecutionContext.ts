@@ -67,6 +67,8 @@ export class ConvoExecutionContext
 
     public flat?:FlatConvoConversation;
 
+    public varPrefix?:string;
+
     public constructor(convo?:Partial<ConvoGlobal>,parentConvo?:Conversation)
     {
         this.convo={
@@ -986,6 +988,10 @@ export class ConvoExecutionContext
             }else{
                 throw new Error(msg);
             }
+        }
+
+        if(this.varPrefix){
+            name=this.varPrefix+name;
         }
 
         const vars=(

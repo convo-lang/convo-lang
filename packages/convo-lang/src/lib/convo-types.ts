@@ -1351,6 +1351,16 @@ export interface FlattenConvoOptions
 
     flatMessages?:FlatConvoMessage[];
 
+    excludeMessages?:ConvoMessage[];
+    excludeMessageSetters?:ConvoMessage[];
+
+    /**
+     * A message index in the messages array of the Conversation object at where edge messages with
+     * be force to be flattened instead of waiting till all other messages have been processed.
+     * This is used by function call responses to not see edge state early.
+     */
+    edgeStopIndex?:number;
+
     disableTransforms?:boolean;
 
     messageStartIndex?:number;

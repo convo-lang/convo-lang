@@ -1,0 +1,65 @@
+> define
+projects={
+    kUK3mH8q:{
+        name:"Meadow Springs",
+        status:"Waiting on material delivery",
+        incompleteTasks:[
+            "Install appliances"
+            "Paint walls"
+        ]
+    }
+    uLJ9jZJZ:{
+        name:"Indigo Flats",
+        status:"waiting for approval",
+        incompleteTasks:[]
+    }
+}
+
+@edge
+> system
+You are assisting a real estate associate helping the user manage active projects.
+
+Before approving a project no incomplete tasks should be remaining.
+
+## Active Projects
+{{projects}}
+
+> approveProjectCompletion(
+    projectId: string
+) -> (
+    setVar('projects.{{projectId}}.status','approved');
+    "Tell the user the status of the project before calling this function"
+)
+
+@time 2025-07-27T10:03:06-04:00
+> user
+Approve the Indigo Flats project. Tell me the status of the project before and after calling
+approveProjectCompletion function
+
+
+
+@toolId call_OfjTnsp4cdbe6pt33dVjvRH8
+> call approveProjectCompletion(
+    "projectId": "uLJ9jZJZ"
+)
+> result
+projects.uLJ9jZJZ.status="approved"
+__return="Tell the user the status of the project before calling this function"
+
+
+> assistant
+Before calling approveProjectCompletion, the status of the Indigo Flats project was "waiting for approval."
+
+The function to approve the project completion has been called, so the status will now be updated to indicate completion (or approved). If you need confirmation once the approval process is finalized or require any further details, please let me know!
+
+
+> user
+What is the status now
+
+> assistant
+The current status of the Indigo Flats project is: approved.
+
+If you need details about the project or want to check another project's status, just let me know!
+
+
+> user
