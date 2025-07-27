@@ -1200,17 +1200,24 @@ export const defaultConvoVars={
     }),
 
     [convoFunctions.setVar]:createConvoScopeFunction((scope,ctx)=>{
-        const name=scope.paramValues?.[0];
-        if(typeof name !=='string'){
-            return undefined
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return undefined;
         }
-        const v=scope.paramValues?.[1];
+        let name='';
+        for(let i=0;i<scope.paramValues.length-1;i++){
+            const n=scope.paramValues[i];
+            if(n){
+                name+=(name?'.':'')+n;
+            }
+        }
+        const v=scope.paramValues[scope.paramValues.length-1];
         if(name.includes('.')){
             const parts=name.split('.');
             ctx.setVar(true,v,parts.shift() as string,parts);
         }else{
             ctx.setVar(true,v,name);
         }
+        return v;
     }),
 
     [convoFunctions.describeScene]:createConvoScopeFunction((scope,ctx)=>{
