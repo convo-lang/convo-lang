@@ -1526,80 +1526,62 @@ Retrieval augmented generation or RAG is a key part of any serious AI applicatio
 
 **How does RAG work in Convo-Lang**
 1. A user sends a message
-2. A registered RAG callback function is called and is passed the message the user is sending
-3. The RAG callback then preforms the task of retrieving information related to the user's message
+2. Registered RAG providers are forwarded the user's message
+3. The RAG providers preforms the task of retrieving information related to the user's message. In the case of this website Pinecone is used.
 4. The RAG callback returns the related information
 5. Convo-Lang then appends the related information to the user's message and optionally encloses the information in a prefix and suffix
 
-The following RAG example uses a very simple keyword matching algorithm. If the user's message
-contains all of the keywords of one of the JSON items below that item will be used as RAG source.
-*@@rag-source*
-``` json
-[
-    {
-        "keywords":["fast","car"],
-        "id":1,
-        "name":"Faster than lighting",
-        "text":"The Tesla Model S Plaid is one of the fastest production vehicles ever made"
-    },
-    {
-        "keywords":["truck","reliable"],
-        "id":2,
-        "name":"Just won't die",
-        "text":"Toyota Tundras are known to last up to 1,000,000 miles"
-    }
-]
-```
-
+**The following example enables RAG using a vector store containing movie quotes.**
 
 [:rag.convo:]
 ``` convo
-> define
-__rag=true
+// The @rag tag enables RAG search on the public movies index
+@rag public/movies
 
-// This message will be used as a prefix for
-// any injected RAG information
-> ragPrefix
-Use the following related information as context
-for your response
-<related-information>
+> system
+You are a movie enthusiast resiting quotes from movies the user is talking about.
+Respond with a funny replay based on the content in the RAG xml tags. The tags can not be
+seen by the user.
 
-// This message will be used as a suffixed for
-// any injected RAG information
-> ragSuffix
-</related-information>
+// This message will be used as a template to insert rag content into the user message.
+// $$RAG$$ will be replaced with the actual retrieved content.
+> ragTemplate
+<RAG>
+Movie Quotes:
+
+$$RAG$$
+</RAG>
 
 > user
-I'm looking for a fast car
+Forrest Gump is one of my favorite movies
 
-
-@sourceId 1
-@sourceName Faster than lighting
+@sourceId gump_23
+@sourceId gump_31
+@sourceId gump_32
+@sourceId dirt_16
+@sourceId gump_9
+@ragContentRage 20 205
 > rag
-The Tesla Model S Plaid is one of the fastest
-production vehicles ever made
+<RAG>
+Movie Quotes:
+
+My name’s Forrest, Forrest Gump.
+
+Forrest, you’re no different than anybody else is.
+
+You do your very best, Forrest.
+
+Don’t try to church it up, son. Don’t you mean ‘Joe Dirt’?
+
+Lieutenant Dan, ice cream!
+</RAG>
 
 > assistant
-If you're looking for a fast car, the Tesla Model S
-Plaid is definitely worth considering. It's one of
-the fastest production vehicles ever made,
-delivering exceptional speed and performance.
-```
+Life is like a box of chocolates—you never know what quote you’re gonna get! But if you see Lieutenant Dan, tell him I’ve got his ice cream!
 
-After the rag message and rag prefix and suffix are applied the user message it will look like the
-following to the LLMs.
-
-
-[:rag-expanded.convo:]
-``` convo
 > user
-I'm looking for a fast car
-
-Use the following related information as context for your response
-<related-information>
-The Tesla Model S Plaid is one of the fastest
-production vehicles ever made
-</related-information>
+I wanna go fast
+<__send/>
 ```
 
 ## Vision
@@ -4306,7 +4288,7 @@ Chain of though callback used to answer questions about Convo-Lang
         Did the user ask about Convo-Lang in their last message
     ???) then (
 
-        @rag public/learn-convo
+        @ragForMsg public/learn-convo
         ??? (+ respond /m task:Generating response about Convo-Lang)
             Answer the users question using the following information about Convo-Lang
         ???
