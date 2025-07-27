@@ -53,7 +53,7 @@ const msgShouldBe=(convo:ConvoParsingResult,index:number,value:string|any[])=>{
     }
 }
 
-const defaultPrompt=/*convo*/`
+const defaultPrompt=`
 
 > define
 Category = enum('fun' 'boring')
@@ -166,8 +166,6 @@ My name is {{name}}
     job:map( name: 'salad fingers' )
 )
 
-
-# end
 `;
 
 
