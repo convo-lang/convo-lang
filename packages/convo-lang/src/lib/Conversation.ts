@@ -2797,7 +2797,7 @@ export class Conversation
     /**
      * Called when an import message is found
      */
-    private async loadImportsAsync(msg:ConvoMessage):Promise<void>
+    private async loadImportsAsync(msg:ConvoMessage,exe?:ConvoExecutionContext):Promise<void>
     {
         if(this.importMessages.includes(msg) || !msg.tags){
             return;
@@ -2809,7 +2809,8 @@ export class Conversation
             if(t.name!==convoTags.import || !t.value){
                 continue;
             }
-            await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index);
+            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index);
+            exe?.loadFunctions(imported,this.externFunctions);
         }
     }
 
@@ -3146,7 +3147,7 @@ export class Conversation
                 }
 
                 if(containsConvoTag(msg.tags,convoTags.import) && !this.importMessages.includes(msg)){
-                    await this.loadImportsAsync(msg);
+                    await this.loadImportsAsync(msg,exe);
                     i--;
                     continue;
                 }
