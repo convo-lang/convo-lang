@@ -6,6 +6,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
 import { HttpConvoCompletionService } from "./HttpConvoCompletionService";
+import { requireParseConvoCached } from "./convo-cached-parsing";
 import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync, requireConvertConvoOutput } from "./convo-completion-lib";
 import { getConvoMessageComponent } from "./convo-component-lib";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
@@ -141,6 +142,8 @@ export interface ConversationOptions
     ragPrefix?:string;
 
     ragSuffix?:string;
+
+    ragTemplate?:string;
 
     formatWhitespace?:boolean;
 
@@ -851,7 +854,12 @@ export class Conversation
             messages.splice(0,messages.length-last);
         }
 
+        if(triggerName){
+            messages.push(...requireParseConvoCached(`> define\n${convoFunctions.clearRag}()`));
+        }
+
         conversation.appendMessageObject(messages,{disableAutoFlatten:true,appendCode:cloneConvoString});
+
 
         return conversation;
     }
@@ -1927,7 +1935,7 @@ export class Conversation
             }
 
             if(ragDoc){
-                ragMsg=convoRagDocRefToMessage(ragDoc,convoRoles.rag);
+                ragMsg=convoRagDocRefToMessage(flat,ragDoc,convoRoles.rag);
                 if(ragMsg){
                     flat.messages.push(this.flattenMsg(ragMsg,true,flat.exe));
                     this.applyRagMode(flat.messages,flat.ragMode);
@@ -3491,8 +3499,8 @@ export class Conversation
             }
 
             const ragMsg=getLastCompletionMessage(messages);
-            if(ragMsg?.tags && (convoTags.rag in ragMsg.tags) && (this.isUserMessage(ragMsg) || this.isModificationMessage(ragMsg))){
-                const paths=getFlatConvoTagValues(convoTags.rag,ragMsg.tags);
+            if(ragMsg?.tags && (convoTags.ragForMsg in ragMsg.tags) && (this.isUserMessage(ragMsg) || this.isModificationMessage(ragMsg))){
+                const paths=getFlatConvoTagValues(convoTags.ragForMsg,ragMsg.tags);
                 exe.enableRag(paths.length?paths:undefined);
             }
 
@@ -3683,6 +3691,7 @@ export class Conversation
                 toolChoice:toolTag?baseConvoToolChoice.includes(toolTag as any)?toolTag as any:{name:toolTag}:toolChoice,
                 ragPrefix:this.defaultOptions.ragPrefix,
                 ragSuffix:this.defaultOptions.ragSuffix,
+                ragTemplate:this.defaultOptions.ragTemplate,
                 responseModel,
                 responseEndpoint,
                 userId,
@@ -3716,6 +3725,13 @@ export class Conversation
 
                     case convoRoles.ragSuffix:
                         flat.ragSuffix=msg.content;
+                        messages.splice(i,1);
+                        removed=true;
+                        i--;
+                        break;
+
+                    case convoRoles.ragTemplate:
+                        flat.ragTemplate=msg.content;
                         messages.splice(i,1);
                         removed=true;
                         i--;
@@ -3967,6 +3983,7 @@ export class Conversation
         if(!flat.tags){
             return;
         }
+
         let responseFormat:string|undefined;
         let enabledTransforms:string[]|undefined;
         for(const name in flat.tags){
@@ -4007,12 +4024,11 @@ export class Conversation
                     break;
                 }
 
-                case convoTags.condition:
-                    if(!exe.isTagConditionTrue({name,value:flat.tags[name]})){
-                        aryRemoveItem(allMessages,flat);
-                        return;
-                    }
+                case convoTags.rag:{
+                    const ragSources=getFlatConvoTagValues(convoTags.rag,flat.tags);
+                    exe.enableRag(ragSources.length?ragSources:undefined)
                     break;
+                }
 
             }
         }

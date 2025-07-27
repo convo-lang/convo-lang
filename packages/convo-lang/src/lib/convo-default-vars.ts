@@ -1182,6 +1182,10 @@ export const defaultConvoVars={
         ctx.enableRag(Array.isArray(scope.paramValues)?scope.paramValues:undefined);
     }),
 
+    [convoFunctions.clearRag]:createConvoScopeFunction((scope,ctx)=>{
+        ctx.clearRag();
+    }),
+
     [convoFunctions.shortUuid]:createConvoScopeFunction(()=>{
         return shortUuid();
     }),

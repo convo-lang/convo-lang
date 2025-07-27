@@ -1170,6 +1170,12 @@ export class ConvoExecutionContext
         return ary;
     }
 
+    public clearRag()
+    {
+        this.setVar(true,false,convoVars.__rag);
+        this.setVar(true,undefined,convoVars.__ragParams);
+    }
+
     /**
      * Gets built-in type aliases by name. Used to provide predefined types
      * that are commonly used in Convo-Lang but not explicitly defined in user code.

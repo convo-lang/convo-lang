@@ -34,6 +34,18 @@ export const parseConvoCached=(code:string)=>{
     return parseConvoCachedKeyed(code).result;
 }
 
+/**
+ * Parses Convo-Lang code with caching and throws an error if the code fails to parse
+ */
+export const requireParseConvoCached=(code:string):ConvoMessage[]=>{
+    const r=parseConvoCachedKeyed(code).result;
+    if(!r?.result){
+        console.error('Failed to parse required cached convo code code:',code);
+        throw new Error()
+    }
+    return r.result;
+}
+
 const typeCache:Record<string,any>={};
 
 /**

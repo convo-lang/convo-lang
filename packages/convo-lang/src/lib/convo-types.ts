@@ -1128,6 +1128,7 @@ export interface FlatConvoConversationBase
     ragMode?:ConvoRagMode;
     ragPrefix?:string;
     ragSuffix?:string;
+    ragTemplate?:string;
 
     toolChoice?:ConvoToolChoice;
 

@@ -49,6 +49,8 @@ export const defaultConvoTask='default';
 
 export const convoAnyModelName='__any__';
 
+export const convoRagTemplatePlaceholder='$$RAG$$';
+
 export const convoRoles={
     user:'user',
     assistant:'assistant',
@@ -95,7 +97,11 @@ export const convoRoles={
      */
     thinkingResult:'thinkingResult',
 
+    /**
+     * Contains RAG content
+     */
     rag:'rag',
+
     /**
      * Used to define a prefix to add to rag messages
      */
@@ -105,6 +111,11 @@ export const convoRoles={
      * Used to define a suffix to add to rag messages
      */
     ragSuffix:'ragSuffix',
+
+    /**
+     * A message used as a template to insert RAG content into. The value __RAG__ will be used replaced with the actual rag content
+     */
+    ragTemplate:'ragTemplate',
 
     /**
      * When encountered a conversation will executed the preceding message before continuing unless
@@ -185,6 +196,11 @@ export const convoFunctions={
      * will not be added to __ragParams.
      */
     enableRag:'enableRag',
+
+    /**
+     * Disables and clears all rag params
+     */
+    clearRag:'clearRag',
 
     /**
      * Defines a form that a user can be guided through
@@ -515,7 +531,17 @@ export const convoTags={
     /**
      * Enable rag for a message. The value of the tag will be added as a rag path
      */
+    ragForMsg:'ragForMsg',
+
+    /**
+     * Enables rag for the current conversation
+     */
     rag:'rag',
+
+    /**
+     * Defines the start index and length of the actual rag content without prefix and suffix
+     */
+    ragContentRage:'ragContentRage',
 
     /**
      * Manually labels a message
@@ -1124,6 +1150,7 @@ export const allowedConvoDefinitionFunctions=[
     convoJsonArrayFnName,
     convoFunctions.getState,
     convoFunctions.enableRag,
+    convoFunctions.clearRag,
     convoFunctions.defineForm,
     convoFunctions.uuid,
     convoFunctions.shortUuid,
@@ -1971,14 +1998,18 @@ export const shouldDisableConvoAutoScroll=(messages:FlatConvoMessage[]):boolean=
     return false;
 }
 
-export const convoRagDocRefToMessage=(docs:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[],role:string):ConvoMessage|undefined=>{
+export const convoRagDocRefToMessage=(
+    flat:FlatConvoConversation,
+    docs:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[],
+    role:string
+):ConvoMessage|undefined=>{
     const ary=asArray(docs);
     if(!ary){
         return undefined;
     }
     const msg:ConvoMessage={
         role,
-        content:ary.map(d=>d?.content??'').join('\n'),
+        content:ary.map(d=>d?.content??'').join('\n\n'),
         tags:[]
     }
 
@@ -2009,6 +2040,23 @@ export const convoRagDocRefToMessage=(docs:ConvoDocumentReference|null|undefined
                 msg.sourceUrl=doc.sourceUrl;
             }
             msg.tags?.push({name:convoTags.sourceUrl,value:doc.sourceUrl})
+        }
+    }
+
+    let template=flat.ragTemplate;
+    if(!template && (flat.ragPrefix || flat.ragSuffix)){
+        template=(
+            (flat.ragPrefix?flat.ragPrefix+'\n\n':'')+
+            convoRagTemplatePlaceholder+
+            (flat.ragSuffix?'\n\n'+flat.ragSuffix:'')
+        )
+    }
+
+    if(template){
+        let i=template.indexOf(convoRagTemplatePlaceholder);
+        if(i!==-1){
+            msg.tags?.push({name:convoTags.ragContentRage,value:`${i} ${msg.content.length}`})
+            msg.content=template.replace(convoRagTemplatePlaceholder,msg.content);
         }
     }
 
@@ -2278,6 +2326,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         ragMode:flat.ragMode,
         ragPrefix:flat.ragPrefix,
         ragSuffix:flat.ragSuffix,
+        ragTemplate:flat.ragTemplate,
         toolChoice:flat.toolChoice,
         responseModel:flat.responseModel,
         responseEndpoint:flat.responseEndpoint,
@@ -2360,16 +2409,9 @@ export const getNormalizedFlatMessageList=(
                 continue;
             }
 
-            let content=msg.content??'';
-            if(flat.ragPrefix){
-                content=flat.ragPrefix+'\n\n'+content;
-            }
-            if(flat.ragSuffix){
-                content+='\n\n'+flat.ragSuffix;
-            }
             lastContentMessage={...lastContentMessage};
             messages[lastContentMessageI]=lastContentMessage;
-            lastContentMessage.content+='\n\n'+content;
+            lastContentMessage.content+='\n\n'+(msg.content??'');
             continue;
         }
 
