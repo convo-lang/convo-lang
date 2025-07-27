@@ -1,7 +1,7 @@
-import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined } from '@iyio/common';
+import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
 import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
@@ -18,6 +18,8 @@ const optIndex=6;
 const setIndex=8;
 const valueIndex=9;
 const fnOpenIndex=10;
+
+const jsonAryReg=/\s*array\((\w+)\)/
 
 const returnTypeReg=/\s*(\w+)?\s*->\s*(\w+)?\s*(\(?)/gs;
 
@@ -37,6 +39,9 @@ const tagReg=/(\w+)\s*(=)?(.*)/
 
 const space=/\s/;
 const allSpace=/^\s$/;
+
+const anonEscapeReg=/[_-]/g;
+const anonTypeOptReg=/^\s*(array\(\s*(?<aryType>\w*)\s*\)|(?<type>\w+))\s*(?<ary>\[\s*\])?\s*$/;
 
 const tagOrCommentReg=/(\n|\r|^)[ \t]*(#|@|\/\/)/;
 
@@ -106,6 +111,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
     let currentMessage:ConvoMessage|null=null;
     let currentFn:ConvoFunction|null=null;
     let error:string|undefined=undefined;
+    const anonTypes:Record<string,string>={};
     const stack:ConvoStatement[]=[];
     const len=code.length;
 
@@ -228,17 +234,51 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
             debug?.('TAG',tag);
             let v=tag[3]?.trim()||undefined;
             const tagObj:ConvoTag={name:tag[1]??''};
-            if(tag[2] && convoDynamicTags.includes(tagObj.name)){
+            if(tag[2]){
                 if(!convoDynamicTags.includes(tagObj.name)){
                     error=`Only ${convoDynamicTags.join(', ')} are allowed to have dynamic expressions`
                     return false;
                 }
-                const r=parseConvoCode(`> do\n${v}`);
-                if(r.error){
-                    error=r.error.message;
-                    return false;
+                const optAnon=anonTypeOptReg.exec(v??'');
+                if(optAnon?.groups){
+                    const {aryType,type,ary}=optAnon.groups;
+                    if(aryType){
+                        tagObj.value=aryType+'[]';
+                    }else if(type){
+                        tagObj.value=type+(ary?'[]':'');
+                    }
+                    if(tagObj.value!==v){
+                        tagObj.srcValue=v;
+                    }
+                }else if(convoAnonTypeTags.includes(tagObj.name)){
+                    const anonType=convoAnonTypePrefix+(
+                        strHashBase64Fs(v??'')
+                        .replace(anonEscapeReg,(value)=>'_'+(value==='_'?'0':'1'))
+                    );
+                    if(!anonTypes[anonType]){
+                        const r=parseConvoCode(`> define\n${anonType}=${v}`);
+                        if(r.error){
+                            error=r.error.message;
+                            return false;
+                        }
+                        if(!r.result){
+                            error='Define statement expected from dynamic anon tag value parsing';
+                            return false;
+                        }
+                        messages.push(...r.result);
+                        anonTypes[anonType]=v??'';
+                    }
+                    tagObj.value=anonType;
+                    tagObj.srcValue=v;
+                }else{
+                    const r=parseConvoCode(`> do\n${v}`);
+                    if(r.error){
+                        error=r.error.message;
+                        return false;
+                    }
+                    tagObj.srcValue=v;
+                    tagObj.statement=r.result?.[0]?.fn?.body;
                 }
-                tagObj.statement=r.result?.[0]?.fn?.body;
             }else{
                 tagObj.value=v;
             }
@@ -1145,6 +1185,18 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
                     case convoTags.hidden:
                         msg.renderTarget='hidden';
+                        break;
+
+                    case convoTags.json:
+                        if(tag.statement){
+
+                        }else if(tag.value){
+                            const jsonAryMatch=jsonAryReg.exec(tag.value);
+                            if(jsonAryMatch){
+                                tag.srcValue=tag.value;
+                                tag.value=jsonAryMatch[1]+'[]';
+                            }
+                        }
                         break;
 
                     case convoTags.on:

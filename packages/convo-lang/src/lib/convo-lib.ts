@@ -236,6 +236,61 @@ export const convoFunctions={
      * Pops the last convo task off the stack
      */
     popConvoTask:'popConvoTask',
+
+    /**
+     * Reads a JSON value from the virtual file system
+     */
+    fsRead:'fsRead',
+
+    /**
+     * Writes a JSON value to the virtual file system and returns the written value.
+     */
+    fsWrite:'fsWrite',
+
+    /**
+     * Delete a file or directory from the virtual file system
+     */
+    fsRemove:'fsRemove',
+
+    /**
+     * Creates a directory in the virtual file system
+     */
+    fsMkDir:'fsMkDir',
+
+    /**
+     * Checks if a path exists in the virtual file system
+     */
+    fsExists:'fsExists',
+
+    /**
+     * Joins file paths
+     */
+    joinPaths:'joinPaths',
+
+    /**
+     * Returns true if all values passed to the function are undefined
+     */
+    isUndefined:'isUndefined',
+
+    /**
+     * Returns the passed in value as milliseconds
+     */
+    secondMs:'secondMs',
+
+    /**
+     * Returns the passed in value as milliseconds
+     */
+    minuteMs:'minuteMs',
+
+    /**
+     * Returns the passed in value as milliseconds
+     */
+    hourMs:'hourMs',
+
+    /**
+     * Returns the passed in value as milliseconds
+     */
+    dayMs:'dayMs',
 } as const;
 
 /**
@@ -958,7 +1013,29 @@ export const convoTags={
 
 } as const;
 
-export const convoDynamicTags:string[]=[convoTags.condition,convoTags.disabled,convoTags.taskName,convoTags.taskDescription];
+/**
+ * Tags that are allowed to have dynamic expressions as the value when using the equals operator.
+ * @example (@)condition = eq(name "Bob")
+ */
+export const convoDynamicTags:string[]=[
+    convoTags.condition,
+    convoTags.disabled,
+    convoTags.taskName,
+    convoTags.taskDescription,
+    convoTags.json,
+];
+
+/**
+ * Tags whom have a dynamic expression will be evaluated as an anonymous type
+ */
+export const convoAnonTypeTags:string[]=[
+    convoTags.json,
+]
+
+/**
+ * Prefix used to define anonymous types
+ */
+export const convoAnonTypePrefix='AnonType_';
 
 /**
  * JSDoc tags can be used in combination with the Convo-Lang CLI to import types, components and
@@ -1056,6 +1133,11 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.setDefault,
     convoFunctions.enableTransform,
     convoFunctions.enableAllTransforms,
+    convoFunctions.isUndefined,
+    convoFunctions.secondMs,
+    convoFunctions.minuteMs,
+    convoFunctions.hourMs,
+    convoFunctions.dayMs,
     'setObjDefaults',
     'is',
     'and',

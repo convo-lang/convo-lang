@@ -25,6 +25,10 @@ export interface ConvoTag
     name:string;
     value?:string;
     statement?:ConvoStatement[];
+    /**
+     * Stores the original string source of the tag when the tag uses statements
+     */
+    srcValue?:string;
 }
 
 export type ConvoErrorType=(
