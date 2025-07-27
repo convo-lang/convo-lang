@@ -16,6 +16,7 @@ export interface ConvoLangTheme
     borderColor:string;
 
     userBackground:string;
+    submitButtonColor?:string;
     userColor:string;
     userBorder:string;
     userWeight:string;

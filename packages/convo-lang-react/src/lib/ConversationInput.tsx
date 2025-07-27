@@ -27,6 +27,7 @@ export interface ConversationInputProps
     imageAr?:string|number;
     autoFocus?:boolean|number;
     autoFocusDelayMs?:number;
+    submitButtonClassName?:string;
 }
 
 export function ConversationInput({
@@ -49,7 +50,8 @@ export function ConversationInput({
     imageSize='3rem',
     imageAr='1',
     autoFocus,
-    autoFocusDelayMs=30
+    autoFocusDelayMs=30,
+    submitButtonClassName
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -89,8 +91,8 @@ export function ConversationInput({
 
     if(children===undefined && !noSubmitButton){
         children=(
-            <SlimButton className={style.submitBtn({show:!!value})} type="submit">
-                <Icon icon="circle-up" size={20} color={theme.userBackground} />
+            <SlimButton className={style.submitBtn({show:!!value},submitButtonClassName)} type="submit">
+                <Icon icon="circle-up" size={20} color={theme.submitButtonColor??theme.userBackground} />
             </SlimButton>
         )
     }
