@@ -435,6 +435,15 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
 
+### v0.7.34
+- **JSON Tags**: The `@json` tag now supports inline anonymous types
+- **RAG Behavior**: Updated the behavior of RAG messages to be more transparent
+- **Edge Messages**: Function result responses do not effect with edge messages until the function call is complete
+- **Function Results**: Function result setters now include the path of updated object values instead of reassigning the entire object
+- **VFS Functions**: Added functions for interacting with the virtual file system
+- **Time Conversion**: Added functions for converting values to milliseconds
+- **Function Registration**: Newly imported functions are now properly registered with the current execution context. This mainly effects imports
+
 ### v0.7.33
 - **Child Conversations**: Child conversations now pass tasks up to their parents for better task coordination
 - **Message Conversion**: Fixed convert message relaying functionality
