@@ -1440,6 +1440,43 @@ export const defaultConvoVars={
         return (scope.paramValues?.[0]??0)*86400000;
     }),
 
+    [convoFunctions.aryFindMatch]:createConvoScopeFunction(async (scope)=>{
+        const ary=scope.paramValues?.[0];
+        const match=scope.paramValues?.[1];
+
+        if(!Array.isArray(ary)){
+            return undefined;
+        }
+
+        for(let i=0;i<ary.length;i++){
+            const item=ary[i];
+            if(isShallowEqualTo(match,item)){
+                return item;
+            }
+        }
+
+        return undefined;
+    }),
+
+    [convoFunctions.aryRemoveMatch]:createConvoScopeFunction(async (scope)=>{
+        const ary=scope.paramValues?.[0];
+        const match=scope.paramValues?.[1];
+
+        if(!Array.isArray(ary)){
+            return false;
+        }
+
+        for(let i=0;i<ary.length;i++){
+            const item=ary[i];
+            if(isShallowEqualTo(match,item)){
+                ary.splice(i,1);
+                return true;
+            }
+        }
+
+        return false;
+    }),
+
 } as const;
 
 const enableTransform=(name:string,ctx:ConvoExecutionContext)=>{
@@ -1469,4 +1506,28 @@ export const getConvoMarkdownVar=(name:string,format:string,ctx:ConvoExecutionCo
     }else{
         return v?.toString?.()??'';
     }
+}
+
+
+const isShallowEqualTo=<T=any>(a:T, b:T, shouldTestKey?:(key:keyof T)=>boolean):boolean=>
+{
+    if(!a && !b)
+        return true;
+
+    if(!a || !b)
+        return false;
+
+    if(!(b && (typeof b === 'object')) || !(a && (typeof a === 'object'))){
+        return a===b;
+    }
+
+    for(const key in a) {
+        if(shouldTestKey && !shouldTestKey(key as any)){
+            continue;
+        }
+        if(!(key in (b as any)) || a[key] !== b[key]) {
+            return false;
+        }
+    }
+    return true;
 }

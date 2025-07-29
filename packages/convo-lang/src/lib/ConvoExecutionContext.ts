@@ -5,7 +5,7 @@ import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
 import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
@@ -113,7 +113,7 @@ export class ConvoExecutionContext
                     sourceFn:msg.fn
                 },(scope,ctx)=>{
                     if(msg.fn?.body){
-                        const r=this.executeFunction(msg.fn,convoLabeledScopeParamsToObj(scope));
+                        const r=this.executeFunction(msg.fn,convoLabeledScopeFnParamsToObj(scope,msg.fn.params));
                         return r.valuePromise??r.value;
                     }else{
                         const externFn=externFunctions?.[msg.fn?.name??''];

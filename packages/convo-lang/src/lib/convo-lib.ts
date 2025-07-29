@@ -307,6 +307,16 @@ export const convoFunctions={
      * Returns the passed in value as milliseconds
      */
     dayMs:'dayMs',
+
+    /**
+     * Finds an item in an array using shallow comparison.
+     */
+    aryFindMatch:'aryFindMatch',
+
+    /**
+     * Removes the first matching item in an array using shallow comparison.
+     */
+    aryRemoveMatch:'aryRemoveMatch'
 } as const;
 
 /**
@@ -1165,6 +1175,8 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.minuteMs,
     convoFunctions.hourMs,
     convoFunctions.dayMs,
+    convoFunctions.aryFindMatch,
+    convoFunctions.aryRemoveMatch,
     'setObjDefaults',
     'is',
     'and',
@@ -1474,8 +1486,15 @@ export const getConvoStructPropertyCount=(value:any):number=>{
     return metadata?.properties?getObjKeyCount(metadata.properties):0;
 }
 
+export const convoLabeledScopeFnParamsToObj=(
+    scope:ConvoScope,
+    fnParams:ConvoStatement[],
+):Record<string,any>=>{
+    return convoParamsToObj(scope,undefined,false,fnParams);
+}
+
 export const convoLabeledScopeParamsToObj=(
-    scope:ConvoScope
+    scope:ConvoScope,
 ):Record<string,any>=>{
     return convoParamsToObj(scope,undefined,false);
 }
@@ -1484,6 +1503,7 @@ export const convoParamsToObj=(
     scope:ConvoScope,
     unlabeledMap?:string[],
     unlabeledKey:string|boolean=true,
+    fallbackFnParams?:ConvoStatement[]
 ):Record<string,any>=>{
     const obj:Record<string,any>={};
     const labels=scope.labels;
@@ -1494,8 +1514,10 @@ export const convoParamsToObj=(
         (obj as any)[convoMetadataKey]=metadata;
     }
     const labeled:number[]=[];
+    let hasLabels=false;
     if(labels){
         for(const e in labels){
+            hasLabels=true;
             const label=labels[e];
             if(label===undefined){
                 continue;
@@ -1539,6 +1561,15 @@ export const convoParamsToObj=(
                 }
 
             }
+        }
+    }else if(!hasLabels && fallbackFnParams && scope.paramValues){
+        for(let i=0;i<fallbackFnParams.length;i++){
+            const p=fallbackFnParams[i];
+            const v=scope.paramValues[i];
+            if(!p?.label || v===undefined){
+                continue;
+            }
+            obj[p.label]=v;
         }
     }
     return obj;
