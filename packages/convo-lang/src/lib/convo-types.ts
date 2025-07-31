@@ -1835,3 +1835,10 @@ export interface ConvoModelInputOutputPair
 }
 
 
+export interface ConvoCompletionStartEvt
+{
+    convo:Conversation;
+    completionPromise:Promise<ConvoCompletion>;
+    options?:ConvoCompletionOptions;
+    task?:string,
+}

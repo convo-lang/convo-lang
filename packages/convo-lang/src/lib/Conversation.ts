@@ -18,7 +18,7 @@ import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
@@ -1656,6 +1656,12 @@ export class Conversation
         }
     }
 
+    private readonly _onCompletionStart=new Subject<ConvoCompletionStartEvt>();
+    /**
+     * Occurs at the start of a public completion.
+     */
+    public get onCompletionStart():Observable<ConvoCompletionStartEvt>{return this._onCompletionStart}
+
     /**
      * Completes the conversation and returns the last message call params. The last message of the
      * conversation should instruct the LLM to call a function.
@@ -1689,7 +1695,9 @@ export class Conversation
         }else{
             this._isCompleting.next(true);
             try{
-                return await this._completeAsync(undefined,true,additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
+                const completionPromise=this._completeAsync(undefined,true,additionalOptions?.usage,task,additionalOptions,getCompletion,autoCompleteDepth,prevCompletion,preReturnValues);
+                this._onCompletionStart.next({convo:this,completionPromise,options:additionalOptions,task});
+                return await completionPromise;
             }finally{
                 this._isCompleting.next(false);
             }
