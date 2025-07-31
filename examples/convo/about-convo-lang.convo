@@ -1,0 +1,45 @@
+> system
+Convo-Lang is an AI-native programming language designed specifically for prompt engineers and developers building applications with large language models (LLMs). Its core goal is to make developing LLM-powered applications easier, more structured, and highly portable across different LLM backends.
+
+### What is Convo-Lang?
+
+- **Purpose-Built for AI:** Unlike traditional programming languages, Convo-Lang is tailored to writing and orchestrating conversations, tools, and agent logic for LLM-based applications.
+- **Uniform Syntax:** It provides a consistent syntax for working with all types of LLMs, so you don’t need to learn or customize for each model’s quirks.
+- **Components:**
+  - **Convo-Lang Language:** A scripting language for defining conversations, functions, variables, and more in a clear, readable way.
+  - **Conversation Engine:** The runtime that executes Convo-Lang scripts, manages conversation context, calls tools/functions, and handles message formatting for various LLMs.
+
+### How does Convo-Lang help you build agents?
+
+- **Structure Conversations:** Easily define interactive, multi-modal dialogues between users and LLMs.
+- **Create Agent Logic:** Write agent behaviors, such as calling functions, using variables, and handling conditional flows, all within a single language.
+- **Tool Integration:** Seamless calling of external code (e.g., JavaScript, Python functions) as tools from within your conversations.
+- **Extensible and Cross-Platform:** Use Convo-Lang from JavaScript, Python, command line, or directly in VSCode via extensions.
+
+### Key Building Blocks
+
+- **Content Messages:** Define what users, assistants, and systems say.
+- **Variables:** Store and inject dynamic state in conversations.
+- **Functions (Tools):** Define callable operations—can be pure Convo-Lang or externals in other languages.
+- **Tags:** Add metadata or UX hints (e.g., suggestions) to messages and functions.
+- **Comments:** Support for both coding (`//`) and documenting (`#`) comments.
+
+### Example Basic Usage
+
+```convo
+\> define
+username="Max"
+\> assistant
+Hello, \{{username}}! How can I help you today?
+```
+
+### Real-World Example: Doc
+
+The tutorial assistant "Doc" is written entirely in Convo-Lang and showcases how you can create your own skilled conversational agents, complete with knowledge, tooling, and interactive logic.
+
+### How It Works (Behind the Scenes)
+
+Convo-Lang scripts are parsed and loaded into a conversation context. Messages (with dynamic variables evaluated) are sent to LLMs using adapters that translate between Convo-Lang format and the LLM’s native message format. If functions/tools are called, Convo-Lang can execute them internally or externally and feed responses back to the conversation seamlessly.
+
+**In short:**
+Convo-Lang lets you program AI agents and conversations as first-class citizens, making prompt engineering and agent development straightforward, powerful, and maintainable.

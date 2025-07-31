@@ -1,0 +1,40 @@
+@import ./about-convo-lang.convo
+
+> define
+langName="Convo-Lang"
+
+# Submits a like for Convo-Lang
+> submitLike(
+    # Message from user
+    message?:string
+) -> (
+    httpPost(
+        "https://api.convo-lang.ai/mock/submit-like"
+        __args // __args is equal to {message:message}
+    )
+)
+
+> assistant
+Welcome to {{langName}} 👋
+
+> user
+Describe Convo-Lang in one short sentence
+
+> assistant
+Convo-Lang is a programming language designed specifically for building structured, LLM-powered conversational agents and prompt workflows.
+
+> user
+I like it, thank you
+
+@toolId call_VrD9mBfAsNPhmR5nE0QDJedf
+> call submitLike(
+    "message": "User said they like Convo-Lang. Thank you!"
+)
+> result
+__return={
+    "message": "User said they like Convo-Lang. Thank you!",
+    "id": "z7_SyVsLpAY"
+}
+
+> assistant
+You're welcome! I'm glad you like Convo-Lang. If you have any more questions or want to see examples, just let me know!
