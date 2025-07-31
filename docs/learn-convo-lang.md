@@ -474,14 +474,16 @@ information about integration.
 ### TypeScript/Javascript Integration
 The follow NPM packages are available for TypeScript/JavaScript integration
 
-- @convo-lang/convo-lang - Contains the Convo-Lang Conversation Engine, and a Typescript/Javascript library to use Convo-Lang in your application.
-- @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
-- @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
-- @convo-lang/convo-vfs - Used to integrate Convo-Lang into virtual file systems.
-- @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
-- @convo-lang/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
-  in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
-  In most cases, you will not install this package but instead install the vscode convo-lang extension.
+- Core - [@convo-lang/convo-lang](https://www.npmjs.com/package/@convo-lang/convo-lang)
+- API Routes for standard Convo-Lang backend - [@convo-lang/convo-lang-api-routes](https://www.npmjs.com/package/@convo-lang/convo-lang-api-routes)
+- AWS CDK construct for deploying Convo-Lang backend using AWS Lambda - [@convo-lang/convo-lang-aws-cdk](https://www.npmjs.com/package/@convo-lang/convo-lang-aws-cdk)
+- AWS Bedrock LLMs - [@convo-lang/convo-lang-bedrock](https://www.npmjs.com/package/@convo-lang/convo-lang-bedrock)
+- CLI - [@convo-lang/convo-lang-cli](https://www.npmjs.com/package/@convo-lang/convo-lang-cli)
+- Pinecone RAG Provider - [@convo-lang/convo-lang-pinecone](https://www.npmjs.com/package/@convo-lang/convo-lang-pinecone)
+- React UI Components - [@convo-lang/convo-lang-react](https://www.npmjs.com/package/@convo-lang/convo-lang-react)
+- Virtual File System access for agents - [@convo-lang/convo-vfs](https://www.npmjs.com/package/@convo-lang/convo-vfs)
+
+The core `@convo-lang/convo-lang` package can use any LLM that uses OpenAI api standard, including local models.
 
 ### Create NextJS App
 You can use the `npx @convo-lang/convo-lang-cli --create-next-app` command to quickly get started building AI Agents powered
@@ -492,7 +494,7 @@ by Convo-Lang in a NextJS project
 npx @convo-lang/convo-lang-cli --create-next-app
 ```
 
-**Step 1:** Open newly created project in VSCode or your favorite editor
+**Step 2:** Open newly created project in VSCode or your favorite editor
 ``` sh
 # Open project directory
 cd {NEWLY_CREATED_PROJECT_NAME}
@@ -3851,14 +3853,18 @@ the statement directly after if is skipped
 ``` convo
 > do
 age = 36
+message=''
 
 if( gte( age 21 ) ) then (
-    print( "You can buy beer in the US" )
+    message = "You can buy beer in the US"
 ) elif (lt( age 16 )) then(
-    print( "You're not even close" )
+    message = "You're not even close"
 ) else (
-    print( '{{sub(21 age)}} years until you can buy beer in the US' )
+    message = '{{sub(21 age)}} years until you can buy beer in the US'
 )
+
+> assistant
+{{message}}
 
 ```
 
@@ -3873,14 +3879,16 @@ otherwise the statement directly after if is skipped and the while loop will exi
 > do
 lap = 0
 
-while( lt( lap 500 ) ) do (
+while( lt( lap 30 ) ) do (
     print("go fast")
     print("turn left")
 
     // increment by 1
-    inc(lap)
+    lap = inc(lap)
 )
 
+> assistant
+lap = {{lap}}
 ```
 
 #### foreach( iterator:any )
@@ -3894,8 +3902,8 @@ foreach( num=in(array(1 2 3 4 )) ) do (
     total = add( num total )
 )
 
-// 10
-print(total)
+> assistant
+total = {{total}}
 ```
 
 #### in( value: array(any) )
@@ -3915,12 +3923,15 @@ while( true ) do (
     print("turn left")
 
     // increment by 1
-    inc(lap)
+    lap = inc(lap)
 
-    if( eq( lap 500 ) ) then (
+    if( eq( lap 30 ) ) then (
         break()
     )
 )
+
+> assistant
+lap = {{lap}}
 ```
 
 #### do( ...statements: any)
@@ -3935,14 +3946,18 @@ calculations.
 n = 0
 while( lt( n 10 ) ) do (
     // increment by 1
-    inc(lap)
+    n = inc(n)
 )
 
 // 22
-print( add( 5 do(
+sumWithDo=add( 5 do(
     sum = mul(n 2)
     sum = sub( sum 3 )
-)) )
+))
+
+> assistant
+n = {{n}}
+sumWithDo = {{sumWithDo}}
 
 ```
 
@@ -3960,6 +3975,8 @@ value = rand(9)
 // can be 20 to 29
 value2 = add(20 rand(9))
 
+message=''
+
 
 switch(
 
@@ -3967,36 +3984,43 @@ switch(
     // changed further down the switch
     value
 
-    case(0) print("Lowest")
+    case(0) message = "Lowest"
 
     case(1) do(
-        print("Value is 1")
+        message = "Value is 1"
     )
 
     case(2) do(
-        print("Number two")
+        message = "Number two"
     )
 
     case(3) do(
-        print("Tree or three")
+        message = "Tree or three"
     )
 
     // change the value to a value in ary
     value2
 
     case(20) do(
-        print("2 zero")
+        message = "2 zero"
     )
 
     test(lt(value2 28)) do(
-        print("less than 28")
+        message = "less than 28"
     )
 
-    default() print("Fall back to default")
+    default() message = "Fall back to default"
 
 )
 
+print(message)
 
+> assistant
+value = {{value}}
+value2 = {{value2}}
+message = {{message}}
+
+> do
 // values matched by switches are returned and the value can be assigned to a variable
 str = "two"
 value = switch(
@@ -4010,14 +4034,15 @@ value = switch(
 // 2
 print(value)
 
+> assistant
+value from switch = {{value}}
+
 
 // switches can also be used as a ternary
+> assistant
+switch(true "yes" "no") = {{switch(true "yes" "no")}}
 
-// yes
-print( switch(true "yes" "no") )
-
-// no
-print( switch(false "yes" "no") )
+switch(false "yes" "no") = {{switch(false "yes" "no")}}
 ```
 
 #### return( value:any )
@@ -4039,6 +4064,9 @@ value = customMath(a:4 b:3)
 
 // 21
 print(value)
+
+> assistant
+Return value = {{value}}
 
 ```
 
@@ -4150,6 +4178,74 @@ Named arguments:
 
 ## Example Agents
 
+### Floor for Less
+
+[:floors-for-less.convo:]
+``` convo
+@import ./customer-support-add-ons.convo
+
+> system
+You are “Flo,” the friendly, knowledgeable customer support agent for **floors-for-less.com**,
+a website dedicated to affordable flooring solutions.
+
+## Your role
+- Guide users as they navigate floors-for-less.com.
+- Answer questions about:
+  - Flooring products and materials.
+  - Pricing and promotions.
+  - Shipping, delivery, and returns.
+  - DIY installation advice and product compatibility.
+  - Store policies and warranties.
+- Help users:
+  - Find specific products or categories.
+  - Use the website's features (search, filter, compare, order).
+  - Complete their order or checkout.
+  - Resolve account or order issues.
+
+## How to interact
+- Use clear, concise, and step-by-step instructions.
+- Ask clarifying questions if the user's request is unclear.
+- Be patient, empathetic, and professional in all interactions.
+- Refrain from guessing; if unsure:
+  - Offer to connect the user to a supervisor or specialist.
+  - Provide a link to relevant help articles or FAQs.
+- For inquiries involving sensitive information:
+  - Gently direct the user to a secure communication channel (e.g., account portal, phone).
+
+## Tone and best practices
+- Always make the user feel supported and welcome.
+- Use positive, helpful language.
+- Personalize responses when possible (e.g., use the customer's name if known).
+- Confirm resolution or satisfaction before ending the conversation.
+
+## Restrictions
+- Never request or handle sensitive payment or personal data directly through chat.
+- Never give legal or financial advice.
+- Don't make promises you cannot keep.
+
+## Product List
+- Oak Hardwood Plank: $3.99/sqft, online-only
+- Rustic Gray Laminate: $1.99/sqft, free-shipping
+- Classic Bamboo Flooring: $2.49/sqft, in-store-only
+- Waterproof Vinyl Tile: $2.79/sqft, online-only, free-shipping
+- Eco Cork Floor: $3.25/sqft, free-shipping
+- Honey Maple Engineered Wood: $4.49/sqft, online-only
+- Natural Hickory Laminate: $2.15/sqft, in-store-only
+- Whitewash Pine Vinyl Plank: $2.59/sqft, free-shipping
+- Reclaimed Barnwood Look Laminate: $2.39/sqft, online-only
+- Espresso Oak Engineered Wood: $4.85/sqft, online-only, free-shipping
+- Ultra-Durable Garage Floor Tile: $3.59/sqft, in-store-only
+- Luxury Marble-Look Vinyl: $3.20/sqft, free-shipping
+- Deep Walnut Hardwood: $5.29/sqft, online-only
+- Classic Slate Porcelain Tile: $2.99/sqft, free-shipping
+- Modern Ash Laminate: $2.69/sqft, in-store-only
+- Beach House Bamboo: $2.79/sqft, online-only, free-shipping
+
+> assistant
+Hi 👋, I'm Flo. Welcome to Floors-for-Less!
+I'm here to help you find the perfect flooring at the best price.
+```
+
 ### Pizza Agent
 
 Below is an example of creating an agent named Willy that will help a user order a pizza.
@@ -4221,6 +4317,7 @@ large pizza with chicken and bacon
 > user
 I want a pizza with bacon, onions and sausage
 
+<__send/>
 ```
 
 ### Sandwich Assistant
@@ -4269,8 +4366,7 @@ Turkey Sandwich
 > user
 I'll take a Ham Sandwich please
 
-
-
+<__send/>
 ```
 
 ## _Util
@@ -4343,4 +4439,65 @@ Utility functions for managing user state
 > do
 isNewVisitor=checkIfNewVisitor()
 
+```
+
+[:customer-support-add-ons.convo:]
+``` convo
+> define
+
+SupportTicket=struct(
+    type: enum("checkout" "product-return" "shipping" "other")
+    message: string
+    productName?: string
+)
+
+Product=struct(
+    name:string
+    pricePerSqf:number
+    totalSqf:number
+    inStoreOnly?:boolean
+    onlineOnly?:boolean
+    freeShipping?:boolean
+)
+
+cart=[]
+
+@edge
+> system
+<cart>
+{{toJson(cart)}}
+</cart>
+
+# Adds a product to the user's cart. If a product with matching name is already in the users cart
+# it is replaced with the new product.
+> addToCart(product:Product) -> (
+
+    removeFromCart(product.name)
+
+    cart=aryAdd(cart product)
+    return("Product added to cart")
+)
+
+# Removes a product from the user's cart
+> removeFromCart(productName:string) -> (
+    match={name:productName}
+    if(aryFindMatch(ary match)) then(
+        cart=aryRemoveMatch(ary match)
+        return("Product remove from cart")
+    ) else (
+        return("No product in cart with matching name")
+    )
+)
+
+# Submits a support ticket if you can not resolve the user's issue
+> submitSupportRequest(ticket:SupportTicket) -> (
+
+    submission=httpPost("https://api.convo-lang.ai/mock/support-request" ticket)
+
+    return(===
+        Tell the user a new support ticket has been submitted and they can
+        reference using id {{submission.id}}. Display the id in a fenced code block
+        at the end of your response with the contents of "Support Ticket ID: {ID_HERE}".
+    ===)
+)
 ```
