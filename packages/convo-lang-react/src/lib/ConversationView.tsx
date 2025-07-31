@@ -8,7 +8,7 @@ import { ConversationInput, ConversationInputProps } from "./ConversationInput";
 import { MessagesSourceView } from "./MessagesSourceView";
 import { MessagesView, MessagesViewProps } from "./MessagesView";
 import { SuggestionsView, SuggestionsViewProps } from './SuggestionsView';
-import { ConversationUiContext } from "./convo-lang-react";
+import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react";
 import { ConvoLangTheme, defaultDarkConvoLangTheme, defaultLightConvoLangTheme } from "./convo-lang-theme";
 
 export interface ConversationViewProps
@@ -57,6 +57,8 @@ export interface ConversationViewProps
     modulesRefreshKey?:string|number;
 
     imports?:string|string[];
+
+    onInputChange?:(change:ConversationInputChange)=>void;
 }
 
 export function ConversationView({
@@ -98,6 +100,7 @@ export function ConversationView({
     modules,
     modulesRefreshKey,
     imports,
+    onInputChange,
 }:ConversationViewProps){
 
     const refs=useRef({modules});
@@ -288,6 +291,7 @@ export function ConversationView({
             autoScrollBehavior={codeInputAutoScrollBehavior}
             mode={sourceMode}
             autoHeight={autoHeight}
+            onInputChange={onInputChange}
         />
     :
         <MessagesView
@@ -324,7 +328,7 @@ export function ConversationView({
                     !noInput &&
                     <>
                         {suggestionsLocation==='before-input' && suggestions}
-                        {renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} {...inputProps} />}
+                        {renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} onInputChange={onInputChange} {...inputProps} />}
                         {suggestionsLocation==='after-input' && suggestions}
                     </>
                 }

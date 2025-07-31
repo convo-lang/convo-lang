@@ -3,6 +3,13 @@ import { useSubject } from '@iyio/react-common';
 import { createContext, useContext } from "react";
 import { ConvoLangTheme } from "./convo-lang-theme";
 
+export type ConversationInputChangeType='chat'|'source'
+export interface ConversationInputChange
+{
+    type:ConversationInputChangeType;
+    value:string;
+}
+
 export const ConversationUiContext=createContext<ConversationUiCtrl|null>(null);
 
 export const useConversationUiCtrl=(ctrlOverride?:ConversationUiCtrl):ConversationUiCtrl=>{

@@ -5,8 +5,8 @@ import { ConversationUiCtrl, ConvoEditorMode, flatConvoMessagesToTextView, getCo
 import { atDotCss } from "@iyio/at-dot-css";
 import { createJsonRefReplacer } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
-import { useCallback, useEffect, useState } from "react";
-import { useConversation, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ConversationInputChange, useConversation, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 
 export interface MessagesSourceViewProps
 {
@@ -14,7 +14,7 @@ export interface MessagesSourceViewProps
     mode?:ConvoEditorMode;
     autoScrollBehavior?:ScrollBehavior;
     autoHeight?:boolean;
-
+    onInputChange?:(change:ConversationInputChange)=>void;
 }
 
 /**
@@ -24,8 +24,12 @@ export function MessagesSourceView({
     ctrl:_ctrl,
     mode='code',
     autoScrollBehavior,
-    autoHeight
+    autoHeight,
+    onInputChange
 }:MessagesSourceViewProps){
+
+    const refs=useRef({onInputChange});
+    refs.current.onInputChange=onInputChange;
 
     const ctrl=useConversationUiCtrl(_ctrl);
 
@@ -94,6 +98,13 @@ export function MessagesSourceView({
             m=false;
         }
     },[mode,flatConvo,convo]);
+
+    const changeCode=onInputChange?code:undefined;
+    useEffect(()=>{
+        if(changeCode!==undefined && refs.current.onInputChange){
+            refs.current.onInputChange({type:'source',value:changeCode});
+        }
+    },[changeCode]);
 
     const codeInput=(
         <LazyCodeInput

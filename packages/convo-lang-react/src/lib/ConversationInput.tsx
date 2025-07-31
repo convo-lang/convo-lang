@@ -2,7 +2,7 @@ import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Form, Image, SlimButton } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
-import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
+import { ConversationInputChange, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
 import { Icon } from "./icon/Icon";
 
 export interface ConversationInputProps
@@ -28,6 +28,7 @@ export interface ConversationInputProps
     autoFocus?:boolean|number;
     autoFocusDelayMs?:number;
     submitButtonClassName?:string;
+    onInputChange?:(change:ConversationInputChange)=>void;
 }
 
 export function ConversationInput({
@@ -51,7 +52,8 @@ export function ConversationInput({
     imageAr='1',
     autoFocus,
     autoFocusDelayMs=30,
-    submitButtonClassName
+    submitButtonClassName,
+    onInputChange,
 }:ConversationInputProps){
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -117,7 +119,12 @@ export function ConversationInput({
                 name={inputName}
                 type={inputType}
                 value={value}
-                onChange={e=>setValue(e.target.value)}
+                onChange={e=>{
+                    setValue(e.target.value);
+                    if(onInputChange){
+                        onInputChange({type:'chat',value:e.target.value});
+                    }
+                }}
             />
 
             {afterInput}
