@@ -220,10 +220,14 @@ export const convo=<T>(
             return _self;
         },
         convertAsync:()=>{
-            return getConversation().toModelInputAsync();
+            const c=getConversation().clone();
+            c.append(getInput());
+            return c.toModelInputAsync();
         },
         flattenAsync:()=>{
-            return getConversation().flattenAsync();
+            const c=getConversation().clone();
+            c.append(getInput());
+            return c.flattenAsync();
         },
         then:(callback)=>{
             getValueAsync().then(callback);
