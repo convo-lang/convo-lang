@@ -92,6 +92,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
     code=code+'\n';
 
+    if(!hasMsgReg.test(code)){
+        code='> user\n'+code;
+    }
+
     const messages:ConvoMessage[]=[];
     const parseMd=options?.parseMarkdown??false;
 
