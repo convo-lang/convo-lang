@@ -1860,7 +1860,9 @@ export interface AwaitableConversation<T>
     getInput():string;
     dependencies:any[];
     zodType?:ZodType;
-    debug():AwaitableConversation<T>;
+    debug(verbose?:boolean):AwaitableConversation<T>;
+    convertAsync():Promise<any>;
+    flattenAsync():Promise<FlatConvoConversation>;
     isFinalized():boolean;
     getOutputOptions():AwaitableConversationOutputOptions;
     getConversation():Conversation;

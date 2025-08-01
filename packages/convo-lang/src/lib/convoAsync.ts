@@ -206,18 +206,24 @@ export const convo=<T>(
         setVars,
         setExternFunctions,
         getOutputOptions,
-        debug:()=>{
+        debug:(verbose?:boolean)=>{
             console.log('AwaitableConversation',{
                 input:getInput(),
-                conversation:getConversation(),
                 vars:defaultVars,
                 isFinalized:isFinalized(),
                 dependencies,
                 options,
                 externFunctions,
-                externScopeFunctions
+                externScopeFunctions,
+                conversation:verbose?getConversation():undefined,
             });
             return _self;
+        },
+        convertAsync:()=>{
+            return getConversation().toModelInputAsync();
+        },
+        flattenAsync:()=>{
+            return getConversation().flattenAsync();
         },
         then:(callback)=>{
             getValueAsync().then(callback);
