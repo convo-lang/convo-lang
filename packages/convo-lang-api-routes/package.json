@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-api-routes",
-    "version": "0.7.38",
+    "version": "0.7.39",
     "type": "commonjs",
     "sideEffects": false,
     "repository": {

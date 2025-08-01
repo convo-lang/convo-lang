@@ -1,5 +1,9 @@
 ## Change Log
 
+### v0.7.39
+- **Bug Fix**: Replaced all uses of instanceof operator on Zod objects to fix issues with using different versions of Zod in the same project
+- **Async Functions**: Added convertAsync and flattenAsync functions to convo text template
+
 ### v0.7.38
 - **Bug fix**: Fixed a bug in convo text template function that caused extern function to not be registered
 - **OpenAI**: Moved the initOpenAiBackend function into the main convo-lang package
