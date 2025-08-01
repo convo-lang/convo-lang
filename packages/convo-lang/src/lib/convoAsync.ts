@@ -27,7 +27,8 @@ export const convo=<T>(
     const zodName=getZodTypeName(valueOrZodType as any);
     const dependencies:any[]=[
         ...strings,
-        ...values
+        valueOrZodType,
+        ...values,
     ];
 
     const isFinalized=()=>(conversation || _input!==undefined)?true:false;
@@ -106,14 +107,10 @@ export const convo=<T>(
             return conversation;
         }
 
-        if(defaultVars || externFunctions || externScopeFunctions){
-            options={
-                ...options,
-                ...getOutputOptions(),
-            }
-        }
-
-        conversation=new Conversation(options);
+        conversation=new Conversation({
+            ...options,
+            ...getOutputOptions(),
+        });
         return conversation;
     }
 
