@@ -4598,6 +4598,9 @@ export class Conversation
         if(!service){
             return undefined;
         }
+        if(service.model){
+            await applyConvoModelConfigurationToInputAsync(service.model,flat,this);
+        }
         if(service.service.relayConvertConvoToInputAsync){
             return await service.service.relayConvertConvoToInputAsync(flat);
         }else{
