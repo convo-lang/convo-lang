@@ -57,6 +57,7 @@ export * from './lib/providers/anthropic-lib';
 export * from './lib/providers/anthropic-models';
 export * from './lib/providers/anthropic-params';
 export * from './lib/providers/anthropic-service';
+export * from './lib/providers/initOpenAiBackend';
 export * from './lib/providers/openai-lib';
 export * from './lib/providers/openai-models';
 export * from './lib/providers/openai-params';
