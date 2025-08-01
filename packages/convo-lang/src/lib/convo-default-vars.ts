@@ -1,7 +1,6 @@
-import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid } from "@iyio/common";
+import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
-import { ZodObject } from "zod";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoForm } from "./convo-forms-types";
@@ -56,7 +55,7 @@ const or=createConvoScopeFunction({
 
 const describeStruct=createConvoScopeFunction(scope=>{
     const type=convoValueToZodType(scope.paramValues?.[0]);
-    if(!(type instanceof ZodObject)){
+    if(!valueIsZodObject(type)){
         throw new ConvoError('invalid-args',{statement:scope.s},'The first arg of new should be a type variable')
     }
     return describeConvoScheme(type,scope.paramValues?.[1]);
@@ -1095,7 +1094,7 @@ export const defaultConvoVars={
 
     ['new']:createConvoScopeFunction(scope=>{
         const type=convoValueToZodType(scope.paramValues?.[0]);
-        if(!(type instanceof ZodObject)){
+        if(!valueIsZodObject(type)){
             throw new ConvoError('invalid-args',{statement:scope.s},'The first arg of new should be a type variable')
         }
         const r=type.safeParse(scope.paramValues?.[1]??{});

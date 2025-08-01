@@ -1,4 +1,4 @@
-import { JsonScheme, wordToSingular, zodTypeToJsonScheme } from "@iyio/common";
+import { JsonScheme, valueIsZodType, wordToSingular, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { ConvoError } from "./ConvoError";
 import { convoDescriptionToCommentOut, convoMetadataKey } from "./convo-lib";
@@ -138,7 +138,7 @@ export const convoBaseTypeToZodType=(type:ConvoBaseType):ZodType<any>=>{
 }
 
 export const schemeToConvoTypeString=(scheme:ZodTypeAny|JsonScheme,nameOverride?:string):string=>{
-    if(scheme instanceof ZodType){
+    if(valueIsZodType(scheme)){
         const json=zodTypeToJsonScheme(scheme);
         if(!json){
             throw new ConvoError('invalid-scheme-type');
@@ -242,7 +242,7 @@ const _jsonSchemeToConvoTypeString=(
 
 
 export const describeConvoScheme=(scheme:JsonScheme|ZodTypeAny,value:any,nameOverride?:string):string=>{
-    if(scheme instanceof ZodType){
+    if(valueIsZodType(scheme)){
         const json=zodTypeToJsonScheme(scheme);
         if(!json){
             throw new ConvoError('invalid-scheme-type');

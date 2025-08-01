@@ -1,4 +1,4 @@
-import { asType } from '@iyio/common';
+import { asType, valueIsZodObject } from '@iyio/common';
 import { ZodEnum, ZodObject, z } from 'zod';
 import { CallbackConvoCompletionService } from './CallbackConvoCompletionService';
 import { Conversation } from "./Conversation";
@@ -388,7 +388,7 @@ describe('conversation',()=>{
         zod=c.exe?.getVarAsType('Grade');
         expect(zod).toBeInstanceOf(ZodObject);
         expect(zod?.description).toBe(`description ${m++}`);
-        if(zod instanceof ZodObject){
+        if(valueIsZodObject(zod)){
             expect(zod.shape['score']?.description).toBe(`description ${m++}`);
             expect(zod.shape['suggestions']?.description).toBe(`description ${m++}`);
             expect(zod.shape['category']?.description).toBe(`description ${m++}`);

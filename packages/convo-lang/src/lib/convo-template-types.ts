@@ -1,5 +1,4 @@
-import { createJsonRefReplacer, getErrorMessage } from "@iyio/common";
-import { ZodType } from "zod";
+import { createJsonRefReplacer, getErrorMessage, valueIsZodType } from "@iyio/common";
 import { escapeConvoMessageContent } from "./convo-lib";
 import { zodSchemeToConvoTypeString } from "./convo-zod";
 
@@ -24,7 +23,7 @@ export const getRawConvoValueAsString=(value:any,escape=false):string=>{
             }
             if(isRawConvoValue(value)){
                 return value.rawConvoValue;
-            }else if(value instanceof ZodType){
+            }else if(valueIsZodType(value)){
                 return zodSchemeToConvoTypeString(value);
             }else{
                 try{

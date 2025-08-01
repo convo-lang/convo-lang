@@ -1,4 +1,4 @@
-import { getErrorMessage, getValueByAryPath, isPromise, zodCoerceObject } from '@iyio/common';
+import { getErrorMessage, getValueByAryPath, isPromise, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation';
@@ -325,7 +325,7 @@ export class ConvoExecutionContext
             if(!type){
                 throw new ConvoError('function-args-type-not-defined',{fn});
             }
-            if(!(type instanceof ZodObject)){
+            if(!valueIsZodObject(type)){
                 throw new ConvoError('function-args-type-not-an-object',{fn})
             }
             scheme=type;
@@ -422,7 +422,7 @@ export class ConvoExecutionContext
 
         const zType=convoValueToZodType(scope.v);
 
-        if(!(zType instanceof ZodObject)){
+        if(!valueIsZodObject(zType)){
             throw new ConvoError(
                 'zod-object-expected',
                 {statements:params},
