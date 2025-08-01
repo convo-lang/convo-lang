@@ -435,6 +435,10 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
 
+### v0.7.38
+- **Bug fix**: Fixed a bug in convo text template function that caused extern function to not be registered
+- **OpenAI**: Moved the initOpenAiBackend function into the main convo-lang package
+
 ### v0.7.37
 - **Template Function Registration**: String template functions now register passed functions as extern functions, enabling JavaScript/TypeScript function calls within templates
 
