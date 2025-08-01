@@ -640,6 +640,7 @@ export interface ConvoFlowController
 export type ConvoScopeFunction=(scope:ConvoScope,ctx:ConvoExecutionContext)=>any;
 
 export const convoScopeFnKey=Symbol('convoScopeFnKey');
+export const convoScopeFnDefKey=Symbol('convoScopeFnDefKey');
 export const convoScopeParentKey=Symbol('convoScopeParentKey');
 
 export interface ConvoScope
@@ -698,6 +699,11 @@ export interface ConvoScope
     fi?:boolean;
 
     [convoScopeFnKey]?:ConvoScopeFunction;
+
+    /**
+     * The root Convo function being called
+     */
+    [convoScopeFnDefKey]?:ConvoFunction;
 
     /**
      * Param values used with function statements
@@ -1843,6 +1849,7 @@ export interface ConvoCompletionStartEvt
     task?:string,
 }
 
+export type AwaitableConversationOutputOptions=Partial<Pick<ConversationOptions,'externFunctions'|'externScopeFunctions'|'defaultVars'>>;
 export interface AwaitableConversationCompletion<T>
 {
     value:T;
@@ -1853,11 +1860,14 @@ export interface AwaitableConversation<T>
     getInput():string;
     dependencies:any[];
     zodType?:ZodType;
+    debug():AwaitableConversation<T>;
     isFinalized():boolean;
+    getOutputOptions():AwaitableConversationOutputOptions;
     getConversation():Conversation;
     setConversation(conversation:Conversation):AwaitableConversation<T>;
     setVars(vars:Record<string,any>):AwaitableConversation<T>;
     setOptions(options:ConversationOptions):AwaitableConversation<T>;
+    setExternFunctions(functions:Record<string,AnyFunction>):AwaitableConversation<T>;
     getValueAsync():Promise<T>;
     getCompletionAsync():Promise<AwaitableConversationCompletion<T>>;
     then(callback?:((value:T)=>void)|null|undefined):AwaitableConversation<T>;

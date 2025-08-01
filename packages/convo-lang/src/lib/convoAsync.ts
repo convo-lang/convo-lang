@@ -1,11 +1,13 @@
-import { getZodTypeName } from "@iyio/common";
+import { AnyFunction, getZodTypeName } from "@iyio/common";
 import { ZodType, z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
-import { parseConvoJsonMessage } from "./convo-lib";
+import { getAssumedConvoCompletionValue } from "./convo-lib";
 import { convoScript } from "./convo-template";
-import { AwaitableConversation, AwaitableConversationCompletion } from "./convo-types";
+import { AwaitableConversation, AwaitableConversationCompletion, AwaitableConversationOutputOptions, ConvoScopeFunction, convoScopeFnDefKey } from "./convo-types";
 
 const jsonEndReg=/@json[ \t]*$/;
+
+let fnIndex=0;
 
 /**
  * Converts a template literal string into an AwaitableConversation. The completion of the conversation
@@ -28,10 +30,10 @@ export const convo=<T>(
         ...values
     ];
 
-    const isFinalized=()=>conversation?true:false;
+    const isFinalized=()=>(conversation || _input!==undefined)?true:false;
 
     let _input:string|undefined;
-    const getInput=()=>{
+    const getInput=():string=>{
         if(_input!==undefined){
             return _input;
         }
@@ -42,21 +44,73 @@ export const convo=<T>(
             values.splice(0,0,' InlineJsonType')
         }else{
             values.splice(0,0,valueOrZodType);
+        }
 
+        for(let i=0;i<values.length;i++){
+            const fn=values[i];
+            if(typeof fn !== 'function'){
+                continue;
+            }
+
+            const index=fnIndex++;
+            const name=`_inline_extern_function_${index}_`;
+            const next=strings[i+1];
+            if(next?.startsWith('_')){// call function
+                values[i]=name.substring(0,name.length-1);
+                if(!externFunctions){
+                    externFunctions={}
+                }
+                externFunctions[name]=fn;
+            }else{// define as function body
+                values[i]=`(${name}(__args))`
+                if(!externScopeFunctions){
+                    externScopeFunctions={}
+                }
+                const externFn=fn;
+                externScopeFunctions[name]=(scope)=>{
+                    const argsObj=scope.paramValues?.[0];
+                    if(!argsObj || !(typeof argsObj === 'object')){
+                        throw new Error(`__args object should be passed to ${name}`);
+                    }
+                    const scopeFn=scope[convoScopeFnDefKey];
+                    if(!scopeFn){
+                        throw new Error(`convoScopeFnDefKey not defined in scope when calling ${name}`);
+                    }
+                    const args:any[]=[];
+                    for(const p of scopeFn.params){
+                        if(p.label){
+                            args.push(argsObj[p.label]);
+                        }
+                    }
+                    return externFn(...args);
+                };
+            }
         }
 
         _input=prefix+convoScript(strings,...values);
         return _input;
     }
 
+    const getOutputOptions=():AwaitableConversationOutputOptions=>{
+        // must call get input since it can register extern functions
+        getInput();
+        return {
+            defaultVars:(options?.defaultVars || defaultVars)?{...options?.defaultVars,...defaultVars}:undefined,
+            externFunctions:(options?.externFunctions || externFunctions)?{...options?.externFunctions,...externFunctions}:undefined,
+            externScopeFunctions:(options?.externScopeFunctions || externScopeFunctions)?{...options?.externScopeFunctions,...externScopeFunctions}:undefined,
+        }
+    }
 
     const getConversation=():Conversation=>{
         if(conversation){
             return conversation;
         }
 
-        if(defaultVars){
-            options={...options,defaultVars:{...options?.defaultVars,...defaultVars}}
+        if(defaultVars || externFunctions || externScopeFunctions){
+            options={
+                ...options,
+                ...getOutputOptions(),
+            }
         }
 
         conversation=new Conversation(options);
@@ -96,23 +150,15 @@ export const convo=<T>(
         const cv=getConversation();
         cv.append(getInput());
         const completion=await cv.completeAsync({returnOnCalled:true});
-        let value:any;
-        if(completion.returnValues){
-            value=completion.returnValues[completion.returnValues.length-1];
-        }else if(completion.message?.format==='json'){
-            value=parseConvoJsonMessage(completion.message.content??'',completion.message.formatIsArray);
-        }else{
-            value=completion.message?.content;
-        }
         return {
-            value,
+            value:getAssumedConvoCompletionValue(completion),
             completion
         }
 
     }
 
     let defaultVars:Record<string,any>|undefined;
-    const vars=(vars:Record<string,any>)=>{
+    const setVars=(vars:Record<string,any>)=>{
         if(isFinalized()){
             throw new Error('Unable set vars of a finalized convo');
         }
@@ -129,6 +175,25 @@ export const convo=<T>(
         return _self;
     }
 
+    let externScopeFunctions:Record<string,ConvoScopeFunction>|undefined;
+    let externFunctions:Record<string,AnyFunction>|undefined;
+    const setExternFunctions=(functions:Record<string,AnyFunction>)=>{
+        if(isFinalized()){
+            throw new Error('Unable set extern functions of a finalized convo');
+        }
+        if(!externFunctions){
+            externFunctions={}
+        }
+        for(const e in functions){
+            const fn=functions[e];
+            dependencies.push(e,fn);
+            if(fn){
+                externFunctions[e]=fn;
+            }
+        }
+        return _self;
+    }
+
 
 
     const _self:AwaitableConversation<any>={
@@ -141,7 +206,22 @@ export const convo=<T>(
         getValueAsync,
         getCompletionAsync,
         setOptions,
-        setVars: vars,
+        setVars,
+        setExternFunctions,
+        getOutputOptions,
+        debug:()=>{
+            console.log('AwaitableConversation',{
+                input:getInput(),
+                conversation:getConversation(),
+                vars:defaultVars,
+                isFinalized:isFinalized(),
+                dependencies,
+                options,
+                externFunctions,
+                externScopeFunctions
+            });
+            return _self;
+        },
         then:(callback)=>{
             getValueAsync().then(callback);
             return _self;

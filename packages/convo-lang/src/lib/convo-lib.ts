@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoDocumentReference } from "./convo-rag-types";
 import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker, isConvoMessageModificationAction } from "./convo-types";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker, isConvoMessageModificationAction } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -479,7 +479,7 @@ export const convoVars={
     /**
      * If true inline prompt messages should be written to debug output
      */
-    __debugInline:'__debugInline'
+    __debugInline:'__debugInline',
 
 } as const;
 
@@ -2738,4 +2738,14 @@ export const flatConvoMessagesToTextView=(messages:FlatConvoMessage[]|null|undef
         }
         return `${tagContent}> ${m.role}\n${m.content}`;
     }).filter(m=>m).join('\n\n')??''
+}
+
+export const getAssumedConvoCompletionValue=(completion:ConvoCompletion):any=>{
+    if(completion.returnValues){
+        return completion.returnValues[completion.returnValues.length-1];
+    }else if(completion.message?.format==='json'){
+        return parseConvoJsonMessage(completion.message.content??'',completion.message.formatIsArray);
+    }else{
+        return completion.message?.content;
+    }
 }

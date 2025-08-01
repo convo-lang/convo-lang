@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnDefKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -183,7 +183,7 @@ export class ConvoExecutionContext
         args=parsed.data;
 
         const vars:Record<string,any>={
-            [convoArgsName]:args
+            [convoArgsName]:args,
         }
 
         let scope:ConvoScope;
@@ -191,6 +191,7 @@ export class ConvoExecutionContext
             scope={
                 i:0,
                 vars,
+                [convoScopeFnDefKey]:fn,
                 s:{
                     fn:convoBodyFnName,
                     params:fn.body,
@@ -278,6 +279,7 @@ export class ConvoExecutionContext
                     paramValues,
                     labels,
                     [convoScopeFnKey]:v,
+                    [convoScopeFnDefKey]:fn,
                 }
                 const r=v(scope,this);
                 const isP=isPromise(r);
@@ -492,6 +494,9 @@ export class ConvoExecutionContext
 
         if(statement.fn){
             scope=copyDefaultScope(scope);
+            if(parent){
+                scope[convoScopeFnDefKey]=parent[convoScopeFnDefKey];
+            }
             const fn=scope[convoScopeFnKey]??(scope[convoScopeFnKey]=statement.fnPath?
                 getValueByAryPath(this.sharedVars,statement.fnPath)?.[statement.fn]:
                 this.sharedVars[statement.fn]
