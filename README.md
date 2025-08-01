@@ -1,5 +1,5 @@
 # Convo-Lang
-A Conversational Language
+The language of AI
 
 ![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/learn-convo-demo.webp)
 
@@ -434,6 +434,9 @@ X - https://x.com/ConvoLang
 Join our Discord Server - https://discord.gg/GyXp8Dsa
 
 ## Change Log
+
+### v0.7.37
+- **Template Function Registration**: String template functions now register passed functions as extern functions, enabling JavaScript/TypeScript function calls within templates
 
 ### v0.7.36
 - **Template Literals**: Added convo, useConvo, useConvoValue functions for using Convo-Lang as awaitable string template literals

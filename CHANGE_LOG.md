@@ -1,5 +1,8 @@
 ## Change Log
 
+### v0.7.37
+- **Template Function Registration**: String template functions now register passed functions as extern functions, enabling JavaScript/TypeScript function calls within templates
+
 ### v0.7.36
 - **Template Literals**: Added convo, useConvo, useConvoValue functions for using Convo-Lang as awaitable string template literals
 - **Parser Enhancement**: Code passed to convo parser without defined roles now automatically uses the user role
