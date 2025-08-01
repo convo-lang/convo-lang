@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-openai",
-    "version": "0.7.34",
+    "version": "0.7.36",
     "type": "commonjs",
     "sideEffects": false,
     "repository": {

@@ -1,5 +1,11 @@
 ## Change Log
 
+### v0.7.36
+- **Template Literals**: Added convo, useConvo, useConvoValue functions for using Convo-Lang as awaitable string template literals
+- **Parser Enhancement**: Code passed to convo parser without defined roles now automatically uses the user role
+- **UI Events**: Added onInput prop to ConversationInput for hooking into user typing
+- **Completion Events**: Added onCompletionStart event with completion promise reference
+
 ### v0.7.34
 - **JSON Tags**: The `@json` tag now supports inline anonymous types
 - **RAG Behavior**: Updated the behavior of RAG messages to be more transparent
