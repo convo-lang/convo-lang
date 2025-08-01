@@ -31,7 +31,7 @@
             ]
         },
         {
-            "begin": "(convo\\w*)\\s*(/\\*.*\\*/\\s*)?(`)",
+            "begin": "([cC]onvo\\w*)\\s*(/\\*.*\\*/\\s*)?(`)",
             "beginCaptures": {
                 "1":{
                     "name": "support.type"
