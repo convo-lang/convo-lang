@@ -1,8 +1,8 @@
-import { AnyFunction, CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress } from '@iyio/common';
+import type { AnyFunction, CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress } from '@iyio/common';
 import type { ZodObject, ZodType } from 'zod';
-import type { Conversation } from "./Conversation";
+import type { Conversation, ConversationOptions } from "./Conversation";
 import type { ConvoExecutionContext } from './ConvoExecutionContext';
-import { ConvoComponentDef } from './convo-component-types';
+import type { ConvoComponentDef } from './convo-component-types';
 import type { convoReservedRoles } from './convo-lib';
 import type { convoSystemMessages } from './convo-system-messages';
 
@@ -1841,4 +1841,26 @@ export interface ConvoCompletionStartEvt
     completionPromise:Promise<ConvoCompletion>;
     options?:ConvoCompletionOptions;
     task?:string,
+}
+
+export interface AwaitableConversationCompletion<T>
+{
+    value:T;
+    completion:ConvoCompletion;
+}
+export interface AwaitableConversation<T>
+{
+    getInput():string;
+    dependencies:any[];
+    zodType?:ZodType;
+    isFinalized():boolean;
+    getConversation():Conversation;
+    setConversation(conversation:Conversation):AwaitableConversation<T>;
+    setVars(vars:Record<string,any>):AwaitableConversation<T>;
+    setOptions(options:ConversationOptions):AwaitableConversation<T>;
+    getValueAsync():Promise<T>;
+    getCompletionAsync():Promise<AwaitableConversationCompletion<T>>;
+    then(callback?:((value:T)=>void)|null|undefined):AwaitableConversation<T>;
+    catch(callback?:((error:any)=>void)|null|undefined):AwaitableConversation<T>;
+    finally(callback?:(()=>void)|null|undefined):AwaitableConversation<T>;
 }

@@ -24,6 +24,7 @@ import { convoCacheService, convoCompletionService, convoConversationConverterPr
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
 
+let nextInstanceId=1;
 
 export interface ConversationOptions
 {
@@ -216,6 +217,8 @@ export class Conversation
     public getConvoStrings(){
         return [...this._convo];
     }
+
+    public readonly instanceId:number;
 
     public readonly name:string;
 
@@ -461,6 +464,7 @@ export class Conversation
             inlineHost,
             inlinePrompt,
         }=options;
+        this.instanceId=nextInstanceId++;
         this.name=name;
         this.usage=usage;
         this.isAgent=isAgent;

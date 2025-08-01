@@ -52,6 +52,7 @@ export * from './lib/convo-types';
 export * from './lib/convo-value-conditions';
 export * from './lib/convo-zod';
 export * from './lib/convo.deps';
+export * from './lib/convoAsync';
 export * from './lib/providers/anthropic-lib';
 export * from './lib/providers/anthropic-models';
 export * from './lib/providers/anthropic-params';
