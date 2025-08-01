@@ -1,9 +1,9 @@
 {
   "comments": {
-    "lineComment": "//",
+    "lineComment": "//"
   },
   "brackets": [
-    ["(", ")"],
+    ["(", ")"]
   ],
   "autoClosingPairs": [
     ["(", ")"],
@@ -12,7 +12,7 @@
     ["{{", "}}"],
     ["???","???"],
     ["===","==="],
-    { "open": "<", "close": ">" },
+    { "open": "<", "close": ">" }
   ],
   "autoCloseBefore": "/> \n\t" ,
   "surroundingPairs": [
