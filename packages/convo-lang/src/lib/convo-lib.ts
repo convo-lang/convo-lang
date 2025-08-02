@@ -1047,6 +1047,12 @@ export const convoTags={
      */
     tokenLimit:'tokenLimit',
 
+    router:'router',
+
+    routeTo:'routeTo',
+
+    routeFrom:'routeFrom'
+
 } as const;
 
 /**
@@ -1059,6 +1065,8 @@ export const convoDynamicTags:string[]=[
     convoTags.taskName,
     convoTags.taskDescription,
     convoTags.json,
+    convoTags.routeTo,
+    convoTags.routeFrom,
 ];
 
 /**
