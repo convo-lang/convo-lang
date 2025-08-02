@@ -3,7 +3,7 @@ import { ZodType, z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { getAssumedConvoCompletionValue } from "./convo-lib";
 import { convoScript } from "./convo-template";
-import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, convoScopeFnDefKey } from "./convo-types";
+import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, LockedConvoObject, convoScopeFnDefKey } from "./convo-types";
 
 const jsonEndReg=/@json[ \t]*$/;
 
@@ -21,6 +21,11 @@ export const convo=<T>(
     valueOrZodType?:T,
     ...values:any[]
 ):ConvoObject<T extends ZodType?z.infer<T>:any>=>{
+
+    const isLocked=valueOrZodType===lockFlag;
+    if(isLocked){
+        valueOrZodType=values.shift();
+    }
 
     const cloneSrc={
         valueOrZodType,
@@ -119,19 +124,23 @@ export const convo=<T>(
         return conversation;
     }
 
-    const setConversation=(_conversation:Conversation)=>{
+    const assertUpdate=()=>{
         if(isFinalized()){
-            throw new Error('Unable set the conversation of a finalized convo');
+            throw new Error('Unable modify finalized convo object');
         }
+        if(isLocked){
+            throw new Error('Unable locked finalized convo object');
+        }
+    }
+
+    const setConversation=(_conversation:Conversation)=>{
         dependencies.push(`instId:${_conversation.instanceId}`);
         conversation=_conversation;
         return _self;
     }
 
     const setOptions=(_options:ConversationOptions)=>{
-        if(isFinalized()){
-            throw new Error('Unable set the options of a finalized convo');
-        }
+        assertUpdate();
         for(const e in _options){
             const v=(_options as any)[e];
             dependencies.push(e,v);
@@ -160,10 +169,8 @@ export const convo=<T>(
     }
 
     let defaultVars:Record<string,any>|undefined;
-    const setVars=(vars:Record<string,any>)=>{
-        if(isFinalized()){
-            throw new Error('Unable set vars of a finalized convo');
-        }
+    const addVars=(vars:Record<string,any>)=>{
+        assertUpdate();
 
         if(!defaultVars){
             defaultVars={}
@@ -181,9 +188,7 @@ export const convo=<T>(
     let externFunctions:Record<string,AnyFunction>|undefined;
     let internalExternFunctions:Record<string,AnyFunction>|undefined;
     const setExternFunctions=(functions:Record<string,AnyFunction>)=>{
-        if(isFinalized()){
-            throw new Error('Unable set extern functions of a finalized convo');
-        }
+        assertUpdate()
         if(!externFunctions){
             externFunctions={}
         }
@@ -197,6 +202,22 @@ export const convo=<T>(
         return _self;
     }
 
+    const clone=(lock:boolean)=>{
+        const clone=(lock?
+            convo(strings,lockFlag,cloneSrc.valueOrZodType,...cloneSrc.values):
+            convo(strings,cloneSrc.valueOrZodType,...cloneSrc.values)
+        );
+        if(defaultVars){
+            clone.addVars(defaultVars);
+        }
+        if(externFunctions){
+            clone.setExternFunctions(externFunctions);
+        }
+        if(options){
+            clone.setOptions(options);
+        }
+        return clone;
+    }
 
 
     const _self:ConvoObject<any>={
@@ -209,7 +230,7 @@ export const convo=<T>(
         getValueAsync,
         getCompletionAsync,
         setOptions,
-        addVars: setVars,
+        addVars,
         setExternFunctions,
         getOutputOptions,
         debug:(verbose?:boolean)=>{
@@ -238,17 +259,7 @@ export const convo=<T>(
             return c.flattenAsync();
         },
         clone:()=>{
-            const clone=convo(strings,cloneSrc.valueOrZodType,...cloneSrc.values);
-            if(defaultVars){
-                clone.addVars(defaultVars);
-            }
-            if(externFunctions){
-                clone.setExternFunctions(externFunctions);
-            }
-            if(options){
-                clone.setOptions(options);
-            }
-            return clone;
+            return clone(false);
         },
         then:(callback)=>{
             getValueAsync().then(callback);
@@ -263,9 +274,7 @@ export const convo=<T>(
             return _self;
         },
         proxyFunctions:(proxy:(index:number,sourceFn:AnyFunction)=>AnyFunction|null|undefined)=>{
-            if(isFinalized()){
-                throw new Error('Unable set function proxies of a finalized convo');
-            }
+            assertUpdate();
             if(typeof valueOrZodType === 'function'){
                 const proxied=proxy(0,valueOrZodType as any);
                 if(proxied){
@@ -284,26 +293,34 @@ export const convo=<T>(
                     dependencies[i+1]=proxied;
                 }
             }
+        },
+        lock:()=>{
+            const c=clone(true);
+            return {
+                dependencies:c.dependencies,
+                zodType:c.zodType,
+                clone:c.clone,
+                debug:c.debug,
+                isFinalized:c.isFinalized,
+                getOutputOptions:c.getOutputOptions,
+            }
         }
     };
 
-    (_self as any)[ConvoObjectIdentifier]=true;
+    (_self as any)[isLocked?lockedConvoObjectIdentifier:convoObjectIdentifier]=true;
 
     return _self as any;
 }
 
 export const isConvoObject=(value:any):value is ConvoObject<any>=>{
-    return value?.[ConvoObjectIdentifier]===true;
+    return value?.[convoObjectIdentifier]===true;
+}
+export const isLockedConvoObject=(value:any):value is LockedConvoObject<any>=>{
+    return value?.[lockedConvoObjectIdentifier]===true;
 }
 
-const ConvoObjectIdentifier=Symbol('ConvoObject');
-
-const x=async ()=>{
-    const r=await convo`
-        @json ${z.object({name:z.string()})}
-        > user
-        Scott
-    `
-}
+const convoObjectIdentifier=Symbol('ConvoObject');
+const lockedConvoObjectIdentifier=Symbol('LockedConvoObject');
 
 
+const lockFlag=Symbol();

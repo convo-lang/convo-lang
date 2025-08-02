@@ -1956,7 +1956,17 @@ export interface ConvoObject<T>
      */
     getCompletionAsync():Promise<ConvoObjectCompletion<T>>;
 
+    /**
+     * Returns a locked copy of the convo object.
+     */
+    lock():LockedConvoObject<T>;
+
     then(callback?:((value:T)=>void)|null|undefined):ConvoObject<T>;
     catch(callback?:((error:any)=>void)|null|undefined):ConvoObject<T>;
     finally(callback?:(()=>void)|null|undefined):ConvoObject<T>;
 }
+
+/**
+ * A locked convo object that can more safely be passed around without the concern of it being awaited.
+ */
+export type LockedConvoObject<T>=Pick<ConvoObject<T>,'dependencies'|'zodType'|'clone'|'debug'|'isFinalized'|'getOutputOptions'>
