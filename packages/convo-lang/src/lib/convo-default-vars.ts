@@ -985,7 +985,23 @@ export const defaultConvoVars={
         const out:string[]=[];
         for(let i=0;i<scope.paramValues.length;i++){
             const value=scope.paramValues[i];
-            objectToMarkdownBuffer(value,out,'',5);
+            if(value===undefined){
+                out.push('undefined');
+            }else if(value===null){
+                out.push('null');
+            }else if((typeof value === 'object') && !isPrimitiveArray(value) && !(value instanceof Date)){
+                try{
+                    out.push(JSON.stringify(value,null,4));
+                }catch{
+                    try{
+                        out.push(JSON.stringify(value,createJsonRefReplacer(),4));
+                    }catch{
+                        out.push('[[object with excessive recursive references]]')
+                    }
+                }
+            }else{
+                objectToMarkdownBuffer(value,out,'',5);
+            }
         }
         return out.join('');
     }),
@@ -1525,6 +1541,19 @@ const isShallowEqualTo=<T=any>(a:T, b:T, shouldTestKey?:(key:keyof T)=>boolean):
             continue;
         }
         if(!(key in (b as any)) || a[key] !== b[key]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+const isPrimitiveArray=(value:any)=>{
+    if(!Array.isArray(value)){
+        return false;
+    }
+    for(let i=0;i<value.length;i++){
+        const v=value[i];
+        if(v && (typeof v === 'object') && !(v instanceof Date)){
             return false;
         }
     }
