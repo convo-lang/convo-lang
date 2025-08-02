@@ -3370,7 +3370,7 @@ export class Conversation
                     if(msg.fn.local || msg.fn.call){
                         continue;
                     }else if(msg.fn.topLevel){
-                        const prevVarPrefix=exe.varPrefix;
+                        const prevVarPrefix=exe.varPrefix??'';
                         const prefix=excludeMessageSetters?.includes(msg)?'__excluded_setter__':'';
                         if(prefix){
                             exe.varPrefix=prefix;
