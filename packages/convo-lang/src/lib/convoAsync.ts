@@ -11,10 +11,10 @@ let fnIndex=0;
 
 /**
  * Converts a template literal string into an AwaitableConversation. The completion of the conversation
- * is start started until then, catch, finally, getValue or getCompletionAsync is called. After one
- * of the previously statemented functions are called the AwaitableConversation is considered
- * finalized and non of the setter function will be allowed to be called, if they are called
- * an error will be thrown.
+ * is not started until then, catch, finally, getValue or getCompletionAsync is called. After one
+ * of the previously stated functions or getInput, getValueAsync or getCompletionAsync are called
+ * the AwaitableConversation is considered finalized and non of the setter function will be allowed
+ * to be called, if they are called an error will be thrown.
  */
 export const convo=<T>(
     strings:TemplateStringsArray,
@@ -22,13 +22,18 @@ export const convo=<T>(
     ...values:any[]
 ):AwaitableConversation<T extends ZodType?z.infer<T>:any>=>{
 
+    const cloneSrc={
+        valueOrZodType,
+        values:[...values]
+    }
+
     let options:ConversationOptions|undefined;
     let conversation:Conversation|undefined;
     const zodName=getZodTypeName(valueOrZodType as any);
     const dependencies:any[]=[
-        ...strings,
         valueOrZodType,
         ...values,
+        ...strings,
     ];
 
     const isFinalized=()=>(conversation || _input!==undefined)?true:false;
@@ -58,10 +63,10 @@ export const convo=<T>(
             const next=strings[i+1];
             if(next?.startsWith('_')){// call function
                 values[i]=name.substring(0,name.length-1);
-                if(!externFunctions){
-                    externFunctions={}
+                if(!internalExternFunctions){
+                    internalExternFunctions={}
                 }
-                externFunctions[name]=fn;
+                internalExternFunctions[name]=fn;
             }else{// define as function body
                 values[i]=`(${name}(__args))`
                 if(!externScopeFunctions){
@@ -97,7 +102,7 @@ export const convo=<T>(
         getInput();
         return {
             defaultVars:(options?.defaultVars || defaultVars)?{...options?.defaultVars,...defaultVars}:undefined,
-            externFunctions:(options?.externFunctions || externFunctions)?{...options?.externFunctions,...externFunctions}:undefined,
+            externFunctions:(options?.externFunctions || externFunctions || internalExternFunctions)?{...options?.externFunctions,...internalExternFunctions,...externFunctions}:undefined,
             externScopeFunctions:(options?.externScopeFunctions || externScopeFunctions)?{...options?.externScopeFunctions,...externScopeFunctions}:undefined,
         }
     }
@@ -174,6 +179,7 @@ export const convo=<T>(
 
     let externScopeFunctions:Record<string,ConvoScopeFunction>|undefined;
     let externFunctions:Record<string,AnyFunction>|undefined;
+    let internalExternFunctions:Record<string,AnyFunction>|undefined;
     const setExternFunctions=(functions:Record<string,AnyFunction>)=>{
         if(isFinalized()){
             throw new Error('Unable set extern functions of a finalized convo');
@@ -203,18 +209,20 @@ export const convo=<T>(
         getValueAsync,
         getCompletionAsync,
         setOptions,
-        setVars,
+        addVars: setVars,
         setExternFunctions,
         getOutputOptions,
         debug:(verbose?:boolean)=>{
+            const f=isFinalized();
             console.log('AwaitableConversation',{
-                input:getInput(),
+                isFinalized:f,
+                input:f?getInput():null,
                 vars:defaultVars,
-                isFinalized:isFinalized(),
                 dependencies,
                 options,
                 externFunctions,
                 externScopeFunctions,
+                internalExternFunctions,
                 conversation:verbose?getConversation():undefined,
             });
             return _self;
@@ -229,6 +237,19 @@ export const convo=<T>(
             c.append(getInput());
             return c.flattenAsync();
         },
+        clone:()=>{
+            const clone=convo(strings,cloneSrc.valueOrZodType,...cloneSrc.values);
+            if(defaultVars){
+                clone.addVars(defaultVars);
+            }
+            if(externFunctions){
+                clone.setExternFunctions(externFunctions);
+            }
+            if(options){
+                clone.setOptions(options);
+            }
+            return clone;
+        },
         then:(callback)=>{
             getValueAsync().then(callback);
             return _self;
@@ -241,6 +262,29 @@ export const convo=<T>(
             getValueAsync().finally(callback);
             return _self;
         },
+        proxyFunctions:(proxy:(index:number,sourceFn:AnyFunction)=>AnyFunction|null|undefined)=>{
+            if(isFinalized()){
+                throw new Error('Unable set function proxies of a finalized convo');
+            }
+            if(typeof valueOrZodType === 'function'){
+                const proxied=proxy(0,valueOrZodType as any);
+                if(proxied){
+                    valueOrZodType=proxied as any;
+                    dependencies[0]=proxied;
+                }
+            }
+            for(let i=0;i<values.length;i++){
+                const fn=values[i];
+                if(typeof fn !== 'function'){
+                    continue;
+                }
+                const proxied=proxy(i+1,fn);
+                if(proxied){
+                    values[i]=proxied;
+                    dependencies[i+1]=proxied;
+                }
+            }
+        }
     };
 
     (_self as any)[awaitableConversationIdentifier]=true;

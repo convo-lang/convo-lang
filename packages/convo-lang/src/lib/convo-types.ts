@@ -1855,23 +1855,107 @@ export interface AwaitableConversationCompletion<T>
     value:T;
     completion:ConvoCompletion;
 }
+
+/**
+ * A conversation object that can be awaited. AwaitableConversation objects are constructed by the
+ * `convo` tagged template literal function. The prompt created by the object is not sent to the
+ * LLM until it is awaited by calling the then, catch, finally, flattenAsync, getValueAsync or getCompletionsAsync
+ * function. Once a convo object is finalized it can not be modified. Calling any of the previously
+ * stated functions or calling getInput, getConversation or setConversation will finalize the.
+ * conversation.
+ */
 export interface AwaitableConversation<T>
 {
+    /**
+     * Returns the convo source that will be completed. Calling getInput will finalize the convo object.
+     */
     getInput():string;
+
+    /**
+     * Dependencies that can effect the result of the convo object
+     */
     dependencies:any[];
+
+    /**
+     * The detected zod type passed to the template string that created the convo object
+     */
     zodType?:ZodType;
+
+    /**
+     * Returns a clone of the convo object
+     */
+    clone():AwaitableConversation<T>;
+
+    /**
+     * Prints debug information about the convo object
+     */
     debug(verbose?:boolean):AwaitableConversation<T>;
+
+    /**
+     * Replaces functions passed to the string literal with the returned proxy functions and updates
+     * the dependencies of the convo object.
+     */
+    proxyFunctions(proxy:(index:number,sourceFn:AnyFunction)=>AnyFunction|null|undefined):void;
+
+    /**
+     * Converts the source convo input to the format of the target LLM
+     */
     convertAsync():Promise<any>;
+
+    /**
+     * Returns a FlattedConversation object that contains the messages of the conversation as objects.
+     */
     flattenAsync():Promise<FlatConvoConversation>;
+
+    /**
+     * If true the convo object is finalized and can no longer be modified
+     */
     isFinalized():boolean;
+
+    /**
+     * Returns Conversation options that can be used to create a clone conversation
+     */
     getOutputOptions():AwaitableConversationOutputOptions;
+
+    /**
+     * Returns the Conversation that will be used to complete the convo. Calling getConversation
+     * will finalize the convo object.
+     */
     getConversation():Conversation;
+
+    /**
+     * Sets the Conversation that will be used to complete the convo. Calling setConversation will
+     * finalize the convo object.
+     */
     setConversation(conversation:Conversation):AwaitableConversation<T>;
-    setVars(vars:Record<string,any>):AwaitableConversation<T>;
+
+    /**
+     * Adds variables that will be passed to the Conversation for completing
+     */
+    addVars(vars:Record<string,any>):AwaitableConversation<T>;
+
+    /**
+     * Sets Conversation options that will be passed to the created Conversation used to complete
+     * the convo. If the Conversation is set using the setConversation function the options are ignored.
+     */
     setOptions(options:ConversationOptions):AwaitableConversation<T>;
+
+    /**
+     * Sets extern functions that can be called from the Conversation.
+     */
     setExternFunctions(functions:Record<string,AnyFunction>):AwaitableConversation<T>;
+
+    /**
+     * Returns the completion value of the convo. Calling getValueAsync will finalize the convo object.
+     */
     getValueAsync():Promise<T>;
+
+    /**
+     * Returns a completion object that contains the complete value and additional metadata. Calling
+     * getCompletionAsync will finalize the convo object.
+     */
     getCompletionAsync():Promise<AwaitableConversationCompletion<T>>;
+
     then(callback?:((value:T)=>void)|null|undefined):AwaitableConversation<T>;
     catch(callback?:((error:any)=>void)|null|undefined):AwaitableConversation<T>;
     finally(callback?:(()=>void)|null|undefined):AwaitableConversation<T>;

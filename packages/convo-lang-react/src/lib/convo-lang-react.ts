@@ -1,8 +1,7 @@
 import { AwaitableConversation, AwaitableConversationCompletion, Conversation, ConversationOptions, ConversationUiCtrl, ConvoTask, FlatConvoMessage } from "@convo-lang/convo-lang";
-import { delayAsync, getErrorMessage, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, zodTypeToJsonScheme } from "@iyio/common";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ZodType, z } from "zod";
 import { ConvoLangTheme } from "./convo-lang-theme";
 
 export type ConversationInputChangeType='chat'|'source'
@@ -54,6 +53,8 @@ export interface UseConvoOptions
     conversationOptions?:ConversationOptions;
     vars?:Record<string,any>;
     conversation?:Conversation;
+    disable?:boolean;
+    updateTrigger?:number;
 }
 
 export interface UseConvoValue<T>
@@ -71,15 +72,12 @@ export interface UseConvoValue<T>
 /**
  * Uses the value of a convo scripts. Use the convo function to create the value to pass to the hook.
  *
- * @note !!!! - `(@)json` should be `@json` but due to JSDoc tag escaping in examples `@json` can not be used.
- *
  * @example
  * const llmValue=useConvoValue(convo`
- *     (@)json ${z.object({name:z.string,favoriteFood:z.string()})}
  *     > user
- *     My name is Bob and my favorite food is cheese
+ *     What is the color of the sky
  * `))
- * // llmValue === {busy:true,complete:false} | {busy:false,complete:true,value:{name:"Bob",favoriteFood:"cheese"}}
+ * // llmValue === {busy:true,complete:false} | {busy:false,complete:true,value:"The color of the sky is blue"}}
  *
  */
 export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<ReturnType<C['getValueAsync']>>>(
@@ -87,35 +85,96 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
     options?:UseConvoOptions,
 ):UseConvoValue<R>=>{
 
-    if(convo && options){
-        if(options.conversation){
-            convo.setConversation(options.conversation);
-        }
-        if(options.conversationOptions){
-            convo.setOptions(options.conversationOptions);
-        }
-        if(options.vars){
-            convo.setVars(options.vars);
-        }
+    if(convo?.isFinalized()){
+        console.error(
+            'A finalized convo object has been passed to useConvo. '+
+            'The convo will be cloned before being used, which impacts performance and may prompts '+
+            'to be ran multiple times. Do not await or call functions on the '+
+            'convo object that will finalize it.\n\nThe source of the convo is as follows:\n'+
+            convo.getInput()
+        )
+        convo=convo.clone() as C;
     }
 
-    const [value,setValue]=useState<UseConvoValue<T extends ZodType?z.infer<T>:any>>({complete:false,input:convo as any,busy:false,tasks:[]});
-
-    let deps=convo?.dependencies??[];
-    const zodType=convo?.zodType;
-    const zodString=useMemo(()=>zodType?JSON.stringify(zodTypeToJsonScheme(zodType)):undefined,[zodType]);
-    if(zodString){
-        deps=[...deps,zodString];
-    }
-
-    const refs=useRef({first:true,initDelayMs:options?.initDelayMs??16,updateDelayMs:options?.updateDelayMs??1000});
+    const refs=useRef({
+        first:true,
+        initDelayMs:options?.initDelayMs??16,
+        updateDelayMs:options?.updateDelayMs??1000,
+        options,
+        depIndex:0,
+        targetFns:[] as AnyFunction[],
+        proxyFns:[] as AnyFunction[],
+    });
+    refs.current.options=options;
     refs.current.initDelayMs=options?.initDelayMs??16;
     refs.current.updateDelayMs=options?.updateDelayMs??1000;
+
+    convo?.proxyFunctions((index,src)=>{
+        refs.current.targetFns[index]=src;
+        return refs.current.proxyFns[index]??(refs.current.proxyFns[index]=(...args:any[])=>{
+            return refs.current.targetFns[index]?.(...args);
+        })
+    })
+
+    const deps=convo?.dependencies?[...convo.dependencies]:[];
+    const depsRef=useRef(deps);
+
+    const [value,setValue]=useState<UseConvoValue<R>>({complete:false,input:convo as any,busy:false,tasks:[]});
+
+    const zodType=valueIsZodType(deps[0])?deps[0]:undefined;
+    const zodString=useMemo(()=>zodType?JSON.stringify(zodTypeToJsonScheme(zodType)):undefined,[zodType]);
+    if(zodString){
+        deps[0]=zodString;
+    }
+
+    if(options){
+        deps.push(depsDep);
+        if(options.conversation){
+            deps.push(options.conversation);
+        }
+        if(options.conversationOptions){
+            const keys=Object.keys(options.conversationOptions);
+            keys.sort();
+            for(const e of keys){
+                const v=(options.conversationOptions as any)[e];
+                if(v!==undefined){
+                    deps.push(e,v);
+                }
+            }
+        }
+        if(options.vars){
+            const keys=Object.keys(options.vars);
+            keys.sort();
+            for(const e of keys){
+                const v=options.vars[e];
+                if(v!==undefined){
+                    deps.push(e,options.vars[e]);
+                }
+            }
+        }
+    }
+
+
+    const prevDeps=depsRef.current;
+    if(prevDeps.length!==deps.length){
+        refs.current.depIndex++;
+    }else{
+        for(let i=0;i<deps.length;i++){
+            if(deps[i]!==prevDeps[i]){
+                refs.current.depIndex++;
+                break;
+            }
+        }
+    }
+    depsRef.current=deps;
+    const disable=options?.disable??false;
+
     useEffect(()=>{
 
-        if(!convo){
+        if(!convo || disable){
+            refs.current.first=true;
             setValue({
-                input:convo,
+                input:convo as AwaitableConversation<any>|null|undefined,
                 complete:false,
                 busy:false,
                 tasks:[],
@@ -128,6 +187,18 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
         (async ()=>{
 
             try{
+                const options=refs.current.options;
+                if(options){
+                    if(options.conversation){
+                        convo.setConversation(options.conversation);
+                    }
+                    if(options.conversationOptions){
+                        convo.setOptions(options.conversationOptions);
+                    }
+                    if(options.vars){
+                        convo.addVars(options.vars);
+                    }
+                }
                 const delay=refs.current.first?refs.current.initDelayMs:refs.current.updateDelayMs;
                 refs.current.first=false;
                 await delayAsync(delay??16);
@@ -186,10 +257,13 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
             m=false;
         }
 
-    },deps);
+    },[refs.current.depIndex,disable,options?.updateTrigger]);
 
     return value;
 }
+
+
+const depsDep=Symbol();
 
 
 /**
