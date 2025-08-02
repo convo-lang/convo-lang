@@ -18,10 +18,10 @@ import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, AwaitableConversation, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
-import { isAwaitableConversation } from "./convoAsync";
+import { isConvoObject } from "./convoAsync";
 import { createConvoVisionFunction } from "./createConvoVisionFunction";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript";
 
@@ -1170,10 +1170,10 @@ export class Conversation
         return this.appendDefineVars({[name]:value});
     }
 
-    public append(convo:AwaitableConversation<any>,options?:AppendConvoOptions):ConvoParsingResult;
+    public append(convo:ConvoObject<any>,options?:AppendConvoOptions):ConvoParsingResult;
     public append(messages:string|(ConvoMessagePart|string)[],mergeWithPrev?:boolean,throwOnError?:boolean):ConvoParsingResult;
     public append(messages:string|(ConvoMessagePart|string)[],options?:AppendConvoOptions):ConvoParsingResult;
-    public append(messages:AwaitableConversation<any>|string|(ConvoMessagePart|string)[],mergeWithPrevOrOptions:boolean|AppendConvoOptions=false,_throwOnError=true):ConvoParsingResult{
+    public append(messages:ConvoObject<any>|string|(ConvoMessagePart|string)[],mergeWithPrevOrOptions:boolean|AppendConvoOptions=false,_throwOnError=true):ConvoParsingResult{
         const options=(typeof mergeWithPrevOrOptions === 'object')?mergeWithPrevOrOptions:{mergeWithPrev:mergeWithPrevOrOptions};
 
         const {
@@ -1183,7 +1183,7 @@ export class Conversation
             addTags,
         }=options;
 
-        if(isAwaitableConversation(messages)){
+        if(isConvoObject(messages)){
             const outputOptions=messages.getOutputOptions();
             for(const e in outputOptions.defaultVars){
                 const v=outputOptions.defaultVars[e];
@@ -1489,7 +1489,7 @@ export class Conversation
      * instead of awaiting the convo has a key difference in the fact that function responses
      * are waited for by default when calling completeConvoAsync.
      */
-    public async completeAsync<T>(convo:AwaitableConversation<T>,options?:ConvoCompletionOptions):Promise<T>;
+    public async completeAsync<T>(convo:ConvoObject<T>,options?:ConvoCompletionOptions):Promise<T>;
 
     /**
      * Submits the current conversation and optionally appends messages to the conversation before
@@ -1499,9 +1499,9 @@ export class Conversation
     public async completeAsync(appendOrOptions?:string|ConvoCompletionOptions):Promise<ConvoCompletion>;
 
 
-    async completeAsync(appendOrOptions?:string|ConvoCompletionOptions|AwaitableConversation<any>,optionsForAwaitable?:ConvoCompletionOptions):Promise<any>{
+    async completeAsync(appendOrOptions?:string|ConvoCompletionOptions|ConvoObject<any>,optionsForAwaitable?:ConvoCompletionOptions):Promise<any>{
 
-        if(isAwaitableConversation(appendOrOptions)){
+        if(isConvoObject(appendOrOptions)){
             this.append(appendOrOptions);
             const completion=await this.completeAsync(optionsForAwaitable);
             return getAssumedConvoCompletionValue(completion);

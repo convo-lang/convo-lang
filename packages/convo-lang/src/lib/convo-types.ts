@@ -1849,22 +1849,22 @@ export interface ConvoCompletionStartEvt
     task?:string,
 }
 
-export type AwaitableConversationOutputOptions=Partial<Pick<ConversationOptions,'externFunctions'|'externScopeFunctions'|'defaultVars'>>;
-export interface AwaitableConversationCompletion<T>
+export type ConvoObjectOutputOptions=Partial<Pick<ConversationOptions,'externFunctions'|'externScopeFunctions'|'defaultVars'>>;
+export interface ConvoObjectCompletion<T>
 {
     value:T;
     completion:ConvoCompletion;
 }
 
 /**
- * A conversation object that can be awaited. AwaitableConversation objects are constructed by the
+ * A conversation object that can be awaited. ConvoObjects are constructed by the
  * `convo` tagged template literal function. The prompt created by the object is not sent to the
  * LLM until it is awaited by calling the then, catch, finally, flattenAsync, getValueAsync or getCompletionsAsync
  * function. Once a convo object is finalized it can not be modified. Calling any of the previously
  * stated functions or calling getInput, getConversation or setConversation will finalize the.
  * conversation.
  */
-export interface AwaitableConversation<T>
+export interface ConvoObject<T>
 {
     /**
      * Returns the convo source that will be completed. Calling getInput will finalize the convo object.
@@ -1884,12 +1884,12 @@ export interface AwaitableConversation<T>
     /**
      * Returns a clone of the convo object
      */
-    clone():AwaitableConversation<T>;
+    clone():ConvoObject<T>;
 
     /**
      * Prints debug information about the convo object
      */
-    debug(verbose?:boolean):AwaitableConversation<T>;
+    debug(verbose?:boolean):ConvoObject<T>;
 
     /**
      * Replaces functions passed to the string literal with the returned proxy functions and updates
@@ -1915,7 +1915,7 @@ export interface AwaitableConversation<T>
     /**
      * Returns Conversation options that can be used to create a clone conversation
      */
-    getOutputOptions():AwaitableConversationOutputOptions;
+    getOutputOptions():ConvoObjectOutputOptions;
 
     /**
      * Returns the Conversation that will be used to complete the convo. Calling getConversation
@@ -1927,23 +1927,23 @@ export interface AwaitableConversation<T>
      * Sets the Conversation that will be used to complete the convo. Calling setConversation will
      * finalize the convo object.
      */
-    setConversation(conversation:Conversation):AwaitableConversation<T>;
+    setConversation(conversation:Conversation):ConvoObject<T>;
 
     /**
      * Adds variables that will be passed to the Conversation for completing
      */
-    addVars(vars:Record<string,any>):AwaitableConversation<T>;
+    addVars(vars:Record<string,any>):ConvoObject<T>;
 
     /**
      * Sets Conversation options that will be passed to the created Conversation used to complete
      * the convo. If the Conversation is set using the setConversation function the options are ignored.
      */
-    setOptions(options:ConversationOptions):AwaitableConversation<T>;
+    setOptions(options:ConversationOptions):ConvoObject<T>;
 
     /**
      * Sets extern functions that can be called from the Conversation.
      */
-    setExternFunctions(functions:Record<string,AnyFunction>):AwaitableConversation<T>;
+    setExternFunctions(functions:Record<string,AnyFunction>):ConvoObject<T>;
 
     /**
      * Returns the completion value of the convo. Calling getValueAsync will finalize the convo object.
@@ -1954,9 +1954,9 @@ export interface AwaitableConversation<T>
      * Returns a completion object that contains the complete value and additional metadata. Calling
      * getCompletionAsync will finalize the convo object.
      */
-    getCompletionAsync():Promise<AwaitableConversationCompletion<T>>;
+    getCompletionAsync():Promise<ConvoObjectCompletion<T>>;
 
-    then(callback?:((value:T)=>void)|null|undefined):AwaitableConversation<T>;
-    catch(callback?:((error:any)=>void)|null|undefined):AwaitableConversation<T>;
-    finally(callback?:(()=>void)|null|undefined):AwaitableConversation<T>;
+    then(callback?:((value:T)=>void)|null|undefined):ConvoObject<T>;
+    catch(callback?:((error:any)=>void)|null|undefined):ConvoObject<T>;
+    finally(callback?:(()=>void)|null|undefined):ConvoObject<T>;
 }

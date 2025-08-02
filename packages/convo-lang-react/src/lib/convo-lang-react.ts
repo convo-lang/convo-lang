@@ -1,4 +1,4 @@
-import { AwaitableConversation, AwaitableConversationCompletion, Conversation, ConversationOptions, ConversationUiCtrl, ConvoTask, FlatConvoMessage } from "@convo-lang/convo-lang";
+import { Conversation, ConversationOptions, ConversationUiCtrl, ConvoObject, ConvoObjectCompletion, ConvoTask, FlatConvoMessage } from "@convo-lang/convo-lang";
 import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, zodTypeToJsonScheme } from "@iyio/common";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -60,11 +60,11 @@ export interface UseConvoOptions
 export interface UseConvoValue<T>
 {
     value?:T;
-    completion?:AwaitableConversationCompletion<T>;
+    completion?:ConvoObjectCompletion<T>;
     error?:any;
     errorMessage?:string;
     complete:boolean;
-    input:AwaitableConversation<T>|null|undefined;
+    input:ConvoObject<T>|null|undefined;
     busy:boolean;
     tasks:ConvoTask[];
 }
@@ -80,7 +80,7 @@ export interface UseConvoValue<T>
  * // llmValue === {busy:true,complete:false} | {busy:false,complete:true,value:"The color of the sky is blue"}}
  *
  */
-export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<ReturnType<C['getValueAsync']>>>(
+export const useConvo=<T,C extends ConvoObject<T>,R extends Awaited<ReturnType<C['getValueAsync']>>>(
     convo:C|null|undefined,
     options?:UseConvoOptions,
 ):UseConvoValue<R>=>{
@@ -174,7 +174,7 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
         if(!convo || disable){
             refs.current.first=true;
             setValue({
-                input:convo as AwaitableConversation<any>|null|undefined,
+                input:convo as ConvoObject<any>|null|undefined,
                 complete:false,
                 busy:false,
                 tasks:[],
@@ -205,7 +205,7 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
                 if(!m){return}
 
                 let tasks:ConvoTask[]=[];
-                const update=(completion?:AwaitableConversationCompletion<any>)=>{
+                const update=(completion?:ConvoObjectCompletion<any>)=>{
                     if(m){
                         setValue({
                             complete:completion?true:false,
@@ -229,7 +229,7 @@ export const useConvo=<T,C extends AwaitableConversation<T>,R extends Awaited<Re
                 try{
                     ready=true;
                     update();
-                    const completion:AwaitableConversationCompletion<any>=await convo.getCompletionAsync();
+                    const completion:ConvoObjectCompletion<any>=await convo.getCompletionAsync();
                     if(!m){return;}
                     update(completion);
                     m=false;
@@ -280,7 +280,7 @@ const depsDep=Symbol();
  * // llmValue === {name:"Bob",favoriteFood:"cheese"} | undefined
  *
  */
-export const useConvoValue=<T,C extends AwaitableConversation<T>,R extends Awaited<ReturnType<C['getValueAsync']>>>(
+export const useConvoValue=<T,C extends ConvoObject<T>,R extends Awaited<ReturnType<C['getValueAsync']>>>(
     convo:C|null|undefined,
     options?:UseConvoOptions,
 ):R|undefined=>{

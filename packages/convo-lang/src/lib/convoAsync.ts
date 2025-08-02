@@ -3,24 +3,24 @@ import { ZodType, z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation";
 import { getAssumedConvoCompletionValue } from "./convo-lib";
 import { convoScript } from "./convo-template";
-import { AwaitableConversation, AwaitableConversationCompletion, AwaitableConversationOutputOptions, ConvoScopeFunction, convoScopeFnDefKey } from "./convo-types";
+import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, convoScopeFnDefKey } from "./convo-types";
 
 const jsonEndReg=/@json[ \t]*$/;
 
 let fnIndex=0;
 
 /**
- * Converts a template literal string into an AwaitableConversation. The completion of the conversation
+ * Converts a template literal string into a ConvoObject. The completion of the conversation
  * is not started until then, catch, finally, getValue or getCompletionAsync is called. After one
  * of the previously stated functions or getInput, getValueAsync or getCompletionAsync are called
- * the AwaitableConversation is considered finalized and non of the setter function will be allowed
+ * the ConvoObject is considered finalized and non of the setter function will be allowed
  * to be called, if they are called an error will be thrown.
  */
 export const convo=<T>(
     strings:TemplateStringsArray,
     valueOrZodType?:T,
     ...values:any[]
-):AwaitableConversation<T extends ZodType?z.infer<T>:any>=>{
+):ConvoObject<T extends ZodType?z.infer<T>:any>=>{
 
     const cloneSrc={
         valueOrZodType,
@@ -97,7 +97,7 @@ export const convo=<T>(
         return _input;
     }
 
-    const getOutputOptions=():AwaitableConversationOutputOptions=>{
+    const getOutputOptions=():ConvoObjectOutputOptions=>{
         // must call get input since it can register extern functions
         getInput();
         return {
@@ -144,11 +144,11 @@ export const convo=<T>(
         return (await getCompletionAsync()).value;
     }
 
-    let valuePromise:Promise<AwaitableConversationCompletion<any>>|undefined;
-    const getCompletionAsync=():Promise<AwaitableConversationCompletion<any>>=>{
+    let valuePromise:Promise<ConvoObjectCompletion<any>>|undefined;
+    const getCompletionAsync=():Promise<ConvoObjectCompletion<any>>=>{
         return valuePromise??(valuePromise=_getCompletionAsync())
     }
-    const _getCompletionAsync=async ():Promise<AwaitableConversationCompletion<any>>=>{
+    const _getCompletionAsync=async ():Promise<ConvoObjectCompletion<any>>=>{
         const cv=getConversation();
         cv.append(getInput());
         const completion=await cv.completeAsync({returnOnCalled:true});
@@ -199,7 +199,7 @@ export const convo=<T>(
 
 
 
-    const _self:AwaitableConversation<any>={
+    const _self:ConvoObject<any>={
         getInput,
         dependencies,
         zodType:zodName?(valueOrZodType as any):undefined,
@@ -214,7 +214,7 @@ export const convo=<T>(
         getOutputOptions,
         debug:(verbose?:boolean)=>{
             const f=isFinalized();
-            console.log('AwaitableConversation',{
+            console.log('ConvoObject',{
                 isFinalized:f,
                 input:f?getInput():null,
                 vars:defaultVars,
@@ -287,16 +287,16 @@ export const convo=<T>(
         }
     };
 
-    (_self as any)[awaitableConversationIdentifier]=true;
+    (_self as any)[ConvoObjectIdentifier]=true;
 
     return _self as any;
 }
 
-export const isAwaitableConversation=(value:any):value is AwaitableConversation<any>=>{
-    return value?.[awaitableConversationIdentifier]===true;
+export const isConvoObject=(value:any):value is ConvoObject<any>=>{
+    return value?.[ConvoObjectIdentifier]===true;
 }
 
-const awaitableConversationIdentifier=Symbol('AwaitableConversation');
+const ConvoObjectIdentifier=Symbol('ConvoObject');
 
 const x=async ()=>{
     const r=await convo`
