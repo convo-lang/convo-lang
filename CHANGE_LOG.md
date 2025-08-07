@@ -1,5 +1,14 @@
 ## Change Log
 
+### v0.7.43
+- **OpenAI Models**: Added OpenAI model definitions for gpt-5 and gpt-oss
+- **Package Deprecation**: Marked all exports from @convo-lang/convo-lang-openai as deprecated - all OpenAI support has been moved into core package
+- **Markdown & JSON Imports**: Markdown and JSON files can now be directly imported and use import templates
+- **Virtual File System**: Added ConvoVfsImportService to handle imports using the virtual file system
+- **HTTP Imports**: Added ConvoHttpImportService to handle imports over http
+- **CLI Improvements**: Replaced the custom ConvoCli import handler with the ConvoHttpImportService and ConvoVfsImportService services
+- **VSCode Extension**: Fixed issues with converting and flattening relative imports
+
 ### v0.7.39
 - **Bug Fix**: Replaced all uses of instanceof operator on Zod objects to fix issues with using different versions of Zod in the same project
 - **Async Functions**: Added convertAsync and flattenAsync functions to convo text template
