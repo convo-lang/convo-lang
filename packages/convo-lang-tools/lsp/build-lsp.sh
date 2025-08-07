@@ -22,6 +22,8 @@ npx esbuild \
     --external:'path' \
     --external:'vscode-languageserver-textdocument' \
     --external:'vscode-languageserver' \
+    --external:'vscode-languageserver' \
+    --external:'fsevents' \
     --outfile=server/out/server.js
 
 npx esbuild \
@@ -34,5 +36,6 @@ npx esbuild \
     --external:'path' \
     --external:'vscode-languageserver-textdocument' \
     --external:'vscode-languageserver' \
+    --external:'fsevents' \
     --outfile=client/out/extension.js
     #--packages=external \

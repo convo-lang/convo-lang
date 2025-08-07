@@ -2801,3 +2801,5 @@ const hasRoleReg=/(^|\n)\s*>/;
 export const contentHasConvoRole=(content:string):boolean=>{
     return hasRoleReg.test(content);
 }
+
+export const defaultConvoImportServicePriority=0;

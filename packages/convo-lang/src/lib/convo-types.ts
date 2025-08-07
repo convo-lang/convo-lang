@@ -1534,6 +1534,8 @@ export interface ConvoImport extends ConvoImportContext
      */
     sourceDirectory?:string;
 
+    targetPath?:string;
+
     /**
      * Name of a importTemplate message to use with the imported content of the import
      */
@@ -1605,6 +1607,12 @@ export interface ConvoModule
 
 export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|null|undefined|Promise<ConvoModule|ConvoModule[]|null|undefined>;
 
+export interface ConvoImportService
+{
+    handleImport:ConvoImportHandler;
+    priority?:number;
+    canImport(path:string):boolean;
+}
 
 
 export interface ConvoParsingOptions extends CodeParsingOptions

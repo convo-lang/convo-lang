@@ -1,0 +1,12 @@
+@import ./docs/**.md
+
+@importMatch ! \.(md|mdx)$
+> importTemplate
+History Lesson:
+
+<history-lesson>
+$$CONTENT$$
+</history-lesson>
+
+> user
+What topics are covered by the history lesson

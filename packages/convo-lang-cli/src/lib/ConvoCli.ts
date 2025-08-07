@@ -1,8 +1,10 @@
-import { AppendConvoOptions, Conversation, ConvoScope, convoCapabilitiesParams, convoDefaultModelParam, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, httpClient, initRootScope, isHttp, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
+import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
+import { VfsDiskMntCtrl } from "@iyio/vfs-node";
 import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import { z } from 'zod';
@@ -78,6 +80,24 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
         reg.use(nodeCommonModule);
         reg.use(convoOpenAiModule);
         reg.use(convoBedrockModule);
+
+        reg.implementService(convoImportService,()=>new ConvoVfsImportService());
+        reg.implementService(convoImportService,()=>new ConvoHttpImportService());
+
+        reg.implementService(vfs,()=>new VfsCtrl({
+            config:{
+                mountPoints:[
+                    {
+                        type:vfsMntTypes.file,
+                        mountPath:'/',
+                        sourceUrl:'/',
+                    }
+                ],
+            },
+            mntProviderConfig:{
+                ctrls:[new VfsDiskMntCtrl()]
+            },
+        }));
     })
     await rootScope.getInitPromise();
     return config;
@@ -120,32 +140,7 @@ export class ConvoCli
     public constructor(options:ConvoCliOptions){
         this.allowExec=options.allowExec;
         this.options=options;
-        this.convo=createConversationFromScope(rootScope,{
-            importHandler:async (_import)=>{
-                const isFileHttp=isHttp(_import.name);
-                const isConvo=_import.name?.toLowerCase().endsWith('.convo')
-                const startDir=isFileHttp?undefined:globalThis.process?.cwd();
-                try{
-                    if(_import.sourceDirectory){
-                        globalThis.process?.chdir(_import.sourceDirectory);
-                    }
-                    const [file,filePath]=await Promise.all([
-                        isFileHttp?httpClient().getStringAsync(_import.name):readFileAsStringAsync(_import.name),
-                        isFileHttp?_import.name:realpath(_import.name),
-                    ]);
-                    return {
-                        name:_import.name,
-                        convo:isConvo?file:undefined,
-                        content:isConvo?undefined:file,
-                        filePath
-                    }
-                }finally{
-                    if(startDir){
-                        globalThis.process.chdir(startDir);
-                    }
-                }
-            }
-        });
+        this.convo=createConversationFromScope(rootScope);
         if(options.cmdMode){
             this.convo.dynamicFunctionCallback=this.dynamicFunctionCallback;
             startReadingStdIn();

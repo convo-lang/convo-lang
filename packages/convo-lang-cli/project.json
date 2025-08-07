@@ -22,7 +22,8 @@
                             "target":"node18",
                             "minify":false,
                             "banner": {"js":"#!/usr/bin/env node"},
-                            "sourcemap":"external"
+                            "sourcemap":"external",
+                            "external":["fsevents"]
                         }
                     }
                 ]

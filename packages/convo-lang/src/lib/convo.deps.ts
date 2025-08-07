@@ -3,7 +3,7 @@ import { ConvoLocalStorageCache } from "./ConvoLocalStorageCache";
 import { ConvoVfsCache } from "./ConvoVfsCache";
 import { PassthroughConvoConversationConverter } from "./PassthroughConvoConversationConverter";
 import { ConvoGraphStore } from "./convo-graph-types";
-import { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter } from "./convo-types";
+import { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoImportService } from "./convo-types";
 
 export const convoCompletionService=defineService<ConvoCompletionService<any,any>>('ConvoCompletionService');
 
@@ -16,3 +16,5 @@ export const convoDefaultModelParam=defineStringParam('convoDefaultModel');
 export const convoGraphStore=defineService<ConvoGraphStore>('ConvoGraphStore');
 
 export const convoCacheService=defineService<ConvoConversationCache>('convoCacheService',()=>globalThis.window?new ConvoLocalStorageCache():new ConvoVfsCache());
+
+export const convoImportService=defineService<ConvoImportService>('convoImportService');
