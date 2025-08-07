@@ -145,8 +145,14 @@ const registerCommands=(context:ExtensionContext)=>{
             return;
         }
 
-        const convo=new Conversation();
-        convo.append(src,{disableAutoFlatten:true});
+        const cli=await createConvoCliAsync({
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+        });
+
+        const convo=cli.convo;
+        convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
         const flat=await convo.flattenAsync();
 
         src=flatConvoMessagesToTextView(flat.messages);
@@ -214,15 +220,15 @@ const registerCommands=(context:ExtensionContext)=>{
         }
 
         const cli=await createConvoCliAsync({
-            inline:src,
             bufferOutput:true,
             exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
         });
 
         try{
 
             const convo=cli.convo;
-            convo.append(src,{disableAutoFlatten:true});
+            convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
             const flat=await convo.flattenAsync();
             const converted=await convo.toModelInputAsync(flat);
 
