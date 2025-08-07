@@ -176,10 +176,39 @@ export interface ConvoMessage
     cid?:string;
 
     /**
+     * Name given to the message using the (@)name tag
+     */
+    name?:string;
+
+    /**
+     * Used by import templates to match imports
+     */
+    importMatch?:ConvoImportMatch;
+
+    /**
      * Path to file where the message was defined in
      */
     [convoMessageSourcePathKey]?:string;
 }
+
+export interface ConvoImportMatch{
+    /**
+     * A regular expression pattern to match imports by.
+     */
+    pattern?:string;
+
+    /**
+     * A path to match imports by.
+     */
+    path?:string;
+
+    /**
+     * Parsed version of pattern
+     */
+    [convoImportMatchRegKey]?:RegExp;
+}
+
+export const convoImportMatchRegKey=Symbol('convoImportMatchRegKey');
 
 export const convoMessageSourcePathKey=Symbol('convoMessageSourcePathKey');
 
@@ -815,6 +844,11 @@ export interface FlatConvoMessage
     isSystem?:boolean;
 
     content?:string;
+
+    /**
+     * Name given to the message using the (@)name tag
+     */
+    name?:string;
 
     /**
      * Used to mark the message for insertion and control flow. Some message types like queue
@@ -1499,6 +1533,22 @@ export interface ConvoImport extends ConvoImportContext
      * The directory of the current convo file
      */
     sourceDirectory?:string;
+
+    /**
+     * Name of a importTemplate message to use with the imported content of the import
+     */
+    templateName?:string;
+
+    /**
+     * The role given to content imports.
+     * @default "system"
+     */
+    role?:string;
+
+    /**
+     * A variable to assign the content of the import to
+     */
+    assign?:string;
 }
 
 export interface ConvoModule
@@ -1514,6 +1564,11 @@ export interface ConvoModule
      * Convo to be inserted before the import
      */
     convo?:string;
+
+    /**
+     * Text content to be inserted as context
+     */
+    content?:string;
 
     /**
      * A type or set of types that will be converted to a convo type and imported

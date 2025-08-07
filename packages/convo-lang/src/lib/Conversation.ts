@@ -13,12 +13,12 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam } from "./convo.deps";
 import { isConvoObject } from "./convoAsync";
@@ -209,6 +209,11 @@ export interface ConversationOptions
      * The inline prompt the conversation the conversation represents
      */
     inlinePrompt?:InlineConvoPrompt;
+
+    /**
+     * A template used to wrap imported content such as markdown files.
+     */
+    defaultImportTemplate?:string;
 }
 
 export class Conversation
@@ -2813,6 +2818,9 @@ export class Conversation
             flat.content=msg.content;
         }
 
+        if(msg.name!==undefined){
+            flat.name=msg.name;
+        }
         if(msg.component!==undefined){
             flat.component=msg.component;
         }
@@ -2898,11 +2906,22 @@ export class Conversation
         const handler=this.defaultOptions.importHandler;
 
         const modifiers=name.split(' ');
+
+        let templateName:string|undefined;
+        let role:string|undefined;
+        let assign:string|undefined;
         name=''
         for(let i=0;i<modifiers.length;i++){
-            const m=modifiers[i];
+            let m=modifiers[i];
             if(m?.startsWith('!')){
                 modifiers[i]=m.substring(1);
+                if(m.startsWith('!template:')){
+                    templateName=m.substring(10);
+                }else if(m.startsWith('!role:')){
+                    role=m.substring(6);
+                }else if(m.startsWith('!assign:')){
+                    assign=m.substring(8);
+                }
             }else{
                 name=m??'';
                 modifiers.splice(i,1);
@@ -2935,7 +2954,10 @@ export class Conversation
                 modifiers,
                 system,
                 ignoreContent,
-                sourceDirectory:context?.sourceFilepath?getDirectoryName(context.sourceFilepath):undefined
+                sourceDirectory:context?.sourceFilepath?getDirectoryName(context.sourceFilepath):undefined,
+                templateName,
+                role,
+                assign
             });
             if(result){
                 if(Array.isArray(result)){
@@ -2953,7 +2975,7 @@ export class Conversation
         const messages:ConvoMessage[]=[];
         for(const i of imports){
             if(!this.importedModules[i.name]){
-                messages.push(...this.registerModule(i,{name:i.name,modifiers,system,ignoreContent,},index));
+                messages.push(...this.registerModule(i,{name:i.name,modifiers,system,ignoreContent,templateName,role,assign},index));
             }
         }
         return messages;
@@ -3004,7 +3026,39 @@ export class Conversation
             }
         }
 
+        let content=module.content??'';
+        const templateMessage=content?this.getImportTemplateMessage(importStatement):null;
+        let templateUsed=false;
+        if(templateMessage?.content){
+            templateUsed=true
+            content=insertConvoContentIntoSlot(content,templateMessage.content);
+        }
+
+        if(content){
+            if(importStatement.assign){
+                const assignMessage=`> define\n${importStatement.assign} = ${
+                    importStatement.name.toLowerCase().endsWith('.json')?content:JSON.stringify(content)
+                }`;
+                if(templateUsed){
+                    if(!contentHasConvoRole(content)){
+                        content=`> ${importStatement.role??convoRoles.system}\n${content}`;
+                    }
+                    content+='\n\n'+assignMessage;
+                }else{
+                    content=assignMessage;
+                }
+
+            }else if(!contentHasConvoRole(content)){
+                content=`> ${importStatement.role??convoRoles.system}\n${content}`;
+            }
+        }
+
+
         let convo=module.convo??'';
+
+        if(content){
+            convo+=(convo?'\n\n':'')+content;
+        }
 
         if(module.type){
             convo=(
@@ -3055,6 +3109,25 @@ export class Conversation
         }
 
         return r.result??[];
+    }
+
+    private getImportTemplateMessage(importStatement:ConvoImport):ConvoMessage|undefined{
+
+        for(const msg of this.messages){
+            if(msg.role!==convoRoles.importTemplate){
+                continue;
+            }
+            if( (importStatement.templateName && importStatement.templateName==msg.name) ||
+                (msg.importMatch && (
+                    msg.importMatch.path===importStatement.name ||
+                    msg.importMatch[convoImportMatchRegKey]?.test(importStatement.name)
+                ))
+            ){
+                return msg;
+            }
+        }
+
+        return undefined;
     }
 
     public async flattenSourceAsync({
@@ -3183,11 +3256,18 @@ export class Conversation
             messagesLoop: for(let i=messageStartIndex;i<sourceMessages.length;i++){
                 const msg=sourceMessages[i];
 
+                if(msg && containsConvoTag(msg.tags,convoTags.import) && !this.importMessages.includes(msg)){
+                    await this.loadImportsAsync(msg,exe);
+                    i--;
+                    continue;
+                }
+
                 if( !msg ||
                     exe.isTagConditionTrueByName(msg,convoTags.disabled,true) ||
                     msg.role===convoRoles.nop ||
                     msg.role===convoRoles.transformResult ||
                     msg.role===convoRoles.thinking ||
+                    msg.role===convoRoles.importTemplate ||
                     (msg.cid && msg.cid!==this.name) ||
                     excludeMessages?.includes(msg)
                 ){
@@ -3226,12 +3306,6 @@ export class Conversation
 
                 if(secondPassRoles.includes(msg.role)){
                     secondPass=true;
-                }
-
-                if(containsConvoTag(msg.tags,convoTags.import) && !this.importMessages.includes(msg)){
-                    await this.loadImportsAsync(msg,exe);
-                    i--;
-                    continue;
                 }
 
                 if(msg.role==='user' && !msg.content && !msg.statement){

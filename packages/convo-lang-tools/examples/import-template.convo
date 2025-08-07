@@ -1,0 +1,13 @@
+@import ./bio-stamp.md !assign:meVar
+
+@importMatch ! \.(md|mdx)$
+> importTemplate
+Company Info:
+
+<company-info>
+$$CONTENT$$
+</company-info>
+
+> user
+Tell me about the company
+

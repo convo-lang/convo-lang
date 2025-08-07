@@ -123,6 +123,7 @@ export class ConvoCli
         this.convo=createConversationFromScope(rootScope,{
             importHandler:async (_import)=>{
                 const isFileHttp=isHttp(_import.name);
+                const isConvo=_import.name?.toLowerCase().endsWith('.convo')
                 const startDir=isFileHttp?undefined:globalThis.process?.cwd();
                 try{
                     if(_import.sourceDirectory){
@@ -134,7 +135,8 @@ export class ConvoCli
                     ]);
                     return {
                         name:_import.name,
-                        convo:file,
+                        convo:isConvo?file:undefined,
+                        content:isConvo?undefined:file,
                         filePath
                     }
                 }finally{

@@ -1,8 +1,8 @@
-import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, strHashBase64Fs } from '@iyio/common';
+import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getErrorMessage, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, starStringToRegex, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
@@ -1187,6 +1187,23 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
+                    case convoTags.name:
+                        if(tag.value){
+                            msg.name=tag.value;
+                        }
+                        break;
+
+                    case convoTags.importMatch:
+                        if(tag.value){
+                            const r=parseConvoImportMatch(tag.value);
+                            if(r.error){
+                                error=`Invalid importMatch tag value(${tag.value}): ${r.error.message}`;
+                                break finalPass;
+                            }
+                            msg.importMatch=r.result;
+                        }
+                        break;
+
                     case convoTags.hidden:
                         msg.renderTarget='hidden';
                         break;
@@ -1560,4 +1577,59 @@ export const parseInlineConvoPrompt=(
 
 export const doesConvoContentHaveMessage=(content:string):boolean=>{
     return hasMsgReg.test(content);
+}
+
+/**
+ * Parses a ConvoImportMatchThe match value can use wild cards are be a regular expression.
+ * Regular expressions start with a (!) followed by a space then the regular expression pattern.
+ *
+ *  * @example // By path
+ * ./company-policies.md
+ *
+ * @example // wildcard
+ * *policies.md
+ *
+ * @example // regular expression
+ * ! policies\.(md|mdx)$
+ */
+export const parseConvoImportMatch=(value:string):CodeParsingResult<ConvoImportMatch>=>{
+    if(value.startsWith('!')){
+        try{
+            const pattern=value.substring(1).trim();
+            return {
+                endIndex:value.length,
+                result:{
+                    pattern,
+                    [convoImportMatchRegKey]:new RegExp(pattern)
+                }
+            }
+        }catch(ex){
+            return {
+                endIndex:0,
+                error:getCodeParsingError(value,0,`Invalid regex pattern: ${getErrorMessage(ex)}`),
+            }
+        }
+    }else if(value.includes('*')){
+        try{
+            return {
+                endIndex:value.length,
+                result:{
+                    path:value,
+                    [convoImportMatchRegKey]:starStringToRegex(value)
+                }
+            }
+        }catch(ex){
+            return {
+                endIndex:0,
+                error:getCodeParsingError(value,0,`Invalid wildcard pattern: ${getErrorMessage(ex)}`),
+            }
+        }
+    }else{
+        return {
+            endIndex:value.length,
+            result:{
+                path:value,
+            }
+        }
+    }
 }

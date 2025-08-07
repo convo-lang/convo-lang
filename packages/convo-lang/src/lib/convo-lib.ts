@@ -118,6 +118,11 @@ export const convoRoles={
     ragTemplate:'ragTemplate',
 
     /**
+     * importTemplate messages are used to format imported content such as markdown.
+     */
+    importTemplate:'importTemplate',
+
+    /**
      * When encountered a conversation will executed the preceding message before continuing unless
      * preceded by a flushed message.
      */
@@ -534,6 +539,11 @@ export const convoTags={
     init:'init',
 
     /**
+     * Used to set the name of the message
+     */
+    name:'name',
+
+    /**
      * Defines an event listener for a message
      */
     on:'on',
@@ -865,6 +875,23 @@ export const convoTags={
      * Used to import external convo script code
      */
     import:'import',
+
+    /**
+     * Matches an import by path. The match value can use wild cards are be a regular expression.
+     * Regular expressions start with a (!) followed by a space then the regular expression pattern
+     *
+     * @example // By path
+     * (@)importMatch ./company-policies.md
+     *
+     * @example // wildcard
+     * (@)importMatch *policies.md
+     *
+     * @example // regular expression
+     * (@)importMatch ! policies\.(md|mdx)$
+     */
+    importMatch:'importMatch',
+
+    importRole:'importRole',
 
     /**
      * Causes a message to be concatenated with the previous message. Both the message the tag
@@ -2756,4 +2783,21 @@ export const getAssumedConvoCompletionValue=(completion:ConvoCompletion):any=>{
     }else{
         return completion.message?.content;
     }
+}
+
+const slotReg=/\$\$(RAG|CHILD|CHILDREN|CONTENT|SLOT_(\w+))\$\$/g;
+export const insertConvoContentIntoSlot=(content:string,template:string,slotName?:string):string=>{
+    slotReg.lastIndex=0;
+    return template.replace(slotReg,(_,_type:string,slot?:string)=>{
+        if(slotName){
+            return slot===slotName?escapeConvo(content):_;
+        }else{
+            return escapeConvo(content);
+        }
+    })
+}
+
+const hasRoleReg=/(^|\n)\s*>/;
+export const contentHasConvoRole=(content:string):boolean=>{
+    return hasRoleReg.test(content);
 }
