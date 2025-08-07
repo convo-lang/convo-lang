@@ -1,4 +1,4 @@
-import { ConvoModelInfo, ConvoModelTestManager, convoAnthropicModule, convoOpenAiModule, knownConvoAnthropicModels, knownConvoOpenAiModels } from "@convo-lang/convo-lang";
+import { ConvoModelInfo, ConvoModelTestManager, convoAnthropicModule, convoOpenAiModule, knownConvoAnthropicModels, openAiModels } from "@convo-lang/convo-lang";
 import { bedrockModels, convoBedrockModule } from '@convo-lang/convo-lang-bedrock';
 import { EnvParams, initRootScope, parseCliArgsT, rootScope } from "@iyio/common";
 import { nodeCommonModule, pathExistsAsync, readFileAsStringAsync } from "@iyio/node-common";
@@ -35,7 +35,7 @@ const args=parseCliArgsT<Args>({
 }).parsed as Args;
 
 const allModels=[
-    ...knownConvoOpenAiModels,
+    ...openAiModels,
     ...knownConvoAnthropicModels,
     ...bedrockModels,
 ]
@@ -106,7 +106,7 @@ const main=async ({
         }
 
         if(openai){
-            testModels.push(...knownConvoOpenAiModels);
+            testModels.push(...openAiModels);
         }
 
         if(anthropic){

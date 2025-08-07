@@ -1,0 +1,14 @@
+> define
+__model="gpt-5"
+__trackModel=true
+
+> user
+Hi
+
+
+@model gpt-5-2025-08-07
+> assistant
+Hi! How can I help today?
+
+
+> user

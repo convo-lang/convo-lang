@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 export interface OpenAiModels
 {
     chatModel?:string;
@@ -5,7 +8,9 @@ export interface OpenAiModels
     imageModel?:string;
     visionModel?:string;
 }
-
+/**
+ * @deprecated
+ */
 export interface OpenAiSecrets
 {
     apiKey:string;

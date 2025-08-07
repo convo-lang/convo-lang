@@ -2,6 +2,9 @@ import { Scope } from "@iyio/common";
 import { openAiAudioModelParam, openAiChatModelParam, openAiImageModelParam, openAiVisionModelParam } from "./convo-lang-openai-params";
 import { OpenAiModels } from "./openai-types";
 
+/**
+ * @deprecated
+ */
 export const getOpenAiModelsFromScope=(scope:Scope):OpenAiModels=>{
     return {
         chatModel:scope.to(openAiChatModelParam).get(),

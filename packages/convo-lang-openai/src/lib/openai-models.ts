@@ -9,12 +9,76 @@ let _embedding:ConvoModelInfo;
 
 const m=(num:number)=>num/1000000;
 
+/**
+ * Use `openAiModels` exported from the core `@convo-lang/convo-lang` package instead.
+ * @deprecated
+ */
 export const openAiModels:ConvoModelInfo[]=[
+
+
+
+    // gpt-5
+    _chat=_vision={
+        name:'gpt-5',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+        isServiceDefault:true,
+    },
+    {
+        name:'gpt-5-mini',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.25),
+        outputTokenPriceUsd:m(2),
+    },
+    {
+        name:'gpt-5-nano',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.05),
+        outputTokenPriceUsd:m(0.4),
+    },
+
+
+    // gpt-oss
+    {
+        name:'gpt-oss-120b',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:131072,
+        inputCapabilities:['text'],
+        outputCapabilities:['text'],
+    },
+    {
+        name:'gpt-oss-20b',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:131072,
+        inputCapabilities:['text'],
+        outputCapabilities:['text'],
+    },
 
     // o1
     {
         name:'o1-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -24,6 +88,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'o1-preview-2024-09-12',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -35,6 +100,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'o1-mini',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -44,6 +110,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'o1-mini-2024-09-12',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -55,6 +122,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-realtime-preview-2024-10-01',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','audio'],
         outputCapabilities:['text','audio'],
@@ -66,6 +134,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-realtime-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','audio'],
         outputCapabilities:['text','audio'],
@@ -75,20 +144,56 @@ export const openAiModels:ConvoModelInfo[]=[
         outputAudioTokenPriceUsd:m(200),
     },
 
+    // gpt-4.1
+    {
+        name:'gpt-4.1',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(2),
+        outputTokenPriceUsd:m(8),
+    },
+    {
+        name:'gpt-4.1-mini',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.4),
+        outputTokenPriceUsd:m(1.6),
+    },
+    {
+        name:'gpt-4.1-nano',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.1),
+        outputTokenPriceUsd:m(0.4),
+    },
+
     // gpt-4o
-    _chat=_vision={
+    {
         name:'gpt-4o',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(2.5),
         outputTokenPriceUsd:m(10),
-        isServiceDefault:true,
     },
     {
         name:'gpt-4o-2024-08-06',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -98,6 +203,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-2024-05-13',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -107,6 +213,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-audio-preview-2024-10-01',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -118,6 +225,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-audio-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -129,6 +237,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'chatgpt-4o-latest',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -140,6 +249,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-mini',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -149,6 +259,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4o-mini-2024-07-18',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text','image'],
         outputCapabilities:['text'],
@@ -160,6 +271,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-turbo',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -169,6 +281,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-turbo-2024-04-09',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -178,6 +291,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-turbo-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -189,6 +303,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-1106-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -198,6 +313,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-0125-preview',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:128000,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -207,6 +323,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:8192,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -216,6 +333,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-4-0613',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:8192,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -227,6 +345,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo-instruct',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:4096,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -236,6 +355,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo-instruct-0914',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:4096,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -245,6 +365,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo-16k',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -254,6 +375,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo-1106',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -263,6 +385,7 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo-0125',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
@@ -272,26 +395,11 @@ export const openAiModels:ConvoModelInfo[]=[
     {
         name:'gpt-3.5-turbo',
         supportsFunctionCalling:true,
+        supportsChat:true,
         contextWindowSize:16385,
         inputCapabilities:['text'],
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(1.5),
-        outputTokenPriceUsd:m(2),
-    },
-
-    // legacy
-    {
-        name:'babbage-002',
-        inputCapabilities:['text'],
-        outputCapabilities:['text'],
-        inputTokenPriceUsd:m(0.4),
-        outputTokenPriceUsd:m(0.4),
-    },
-    {
-        name:'davinci-002',
-        inputCapabilities:['text'],
-        outputCapabilities:['text'],
-        inputTokenPriceUsd:m(2),
         outputTokenPriceUsd:m(2),
     },
 
@@ -329,22 +437,15 @@ export const openAiModels:ConvoModelInfo[]=[
         inputTokenPriceUsd:15,
     },
 
-    // Image
-    {
-        name:'gpt-image-1',
+    // dall-e
+    _image={
+        name:'dall-e-3',
         inputCapabilities:['text'],
         outputCapabilities:['image'],
         imagePriceUsd:0.04,
         imageLgPriceUsd:0.08,
         imageHdPriceUsd:0.08,
         imageLgHdPriceUsd:0.12,
-    },
-    _image={
-        name:'dall-e-3',
-        inputCapabilities:['text'],
-        outputCapabilities:['image'],
-        inputTokenPriceUsd:5,
-        outputTokenPriceUsd:40,
     },
     {
         name:'dall-e-2',
@@ -383,9 +484,27 @@ for(const m of openAiModels){
     Object.freeze(m);
 }
 
+/**
+ * @deprecated
+ */
 export const defaultOpenAiChantModel=_chat;
+/**
+ * @deprecated
+ */
 export const defaultOpenAiVisionModel=_vision;
+/**
+ * @deprecated
+ */
 export const defaultOpenAiImageModel=_image;
+/**
+ * @deprecated
+ */
 export const defaultOpenAiTextToSpeechModel=_textToSpeech;
+/**
+ * @deprecated
+ */
 export const defaultOpenAiSpeechToTextModel=_speechToText;
+/**
+ * @deprecated
+ */
 export const defaultOpenAiEmbeddingModel=_embedding;

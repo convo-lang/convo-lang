@@ -7,8 +7,15 @@ import { getOpenAiModelsFromScope } from "./openai-model-helper";
 import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models";
 import { OpenAiModels } from "./openai-types";
 
+/**
+ * @deprecated
+ */
 export type OpenAiConvoConverterOptions=OpenAiModels;
 
+/**
+ * Use `createOpenAiConvoConverterFromScope` exported from the core `@convo-lang/convo-lang` package instead.
+ * @deprecated
+ */
 export class OpenAiConvoConverter implements ConvoConversationConverter<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
 {
 

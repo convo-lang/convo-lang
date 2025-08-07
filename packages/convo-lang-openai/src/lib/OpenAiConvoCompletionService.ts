@@ -1,4 +1,4 @@
-import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase, FlatConvoMessage } from "@convo-lang/convo-lang";
+import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
 import { Scope, SecretManager, secretManager } from "@iyio/common";
 import OpenAIApi from 'openai';
 import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat';
@@ -8,20 +8,10 @@ import { getOpenAiModelsFromScope } from "./openai-model-helper";
 import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models";
 import { OpenAiModels, OpenAiSecrets } from "./openai-types";
 
-const getLastNonCallAiCompleteMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
-    for(let i=messages.length-1;i>=0;i--){
-        const msg=messages[i];
-        if(msg && !msg.called){
-            return msg;
-        }
-    }
-    return undefined;
-}
 
-const dalle3Model='dall-e-3';
-const defaultVisionModel='gpt-4o';
-const visionModels=['gpt-4o','gpt-4-vision'];
-
+/**
+ * @deprecated
+ */
 export interface OpenAiConvoCompletionServiceOptions extends OpenAiModels
 {
     apiKey?:string;
@@ -30,6 +20,10 @@ export interface OpenAiConvoCompletionServiceOptions extends OpenAiModels
     secretsName?:string;
 }
 
+/**
+ * Use `createOpenAiConvoServiceFromScope` exported from the core `@convo-lang/convo-lang` package instead.
+ * @deprecated
+ */
 export class OpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
 {
     public readonly serviceId='open-ai';

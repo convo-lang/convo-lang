@@ -3,7 +3,7 @@ import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionSe
 import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter";
 import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps";
 import { convoOpenAiInputType, convoOpenAiOutputType } from "./openai-lib";
-import { defaultOpenAiChatModel, knownConvoOpenAiModels } from "./openai-models";
+import { defaultOpenAiChatModel, openAiModels } from "./openai-models";
 import { openAiApiKeyParam, openAiBaseUrlParam, openAiChatModelParam, openAiSecretsParam, openAiVisionModelParam } from "./openai-params";
 
 export const convoOpenAiModule=(scope:ScopeRegistration)=>{
@@ -20,7 +20,7 @@ export const createOpenAiConvoServiceFromScope=(scope:Scope):BaseOpenAiConvoComp
         secretsName:scope.to(openAiSecretsParam).get(),
         inputType:convoOpenAiInputType,
         outputType:convoOpenAiOutputType,
-        models:knownConvoOpenAiModels,
+        models:openAiModels,
         isFallback:true,
     });
 }
@@ -30,7 +30,7 @@ export const createOpenAiConvoConverterFromScope=(scope:Scope):BaseOpenAiConvoCo
         visionModel:scope.to(openAiVisionModelParam).get(),
         supportedInputTypes:[convoOpenAiInputType],
         supportedOutputTypes:[convoOpenAiOutputType],
-        models:knownConvoOpenAiModels,
+        models:openAiModels,
         hasVision:model=>model.startsWith('gtp-4o')
     });
 }

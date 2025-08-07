@@ -9,7 +9,67 @@ let _embedding:ConvoModelInfo;
 
 const m=(num:number)=>num/1000000;
 
-export const knownConvoOpenAiModels:ConvoModelInfo[]=[
+export const openAiModels:ConvoModelInfo[]=[
+
+
+
+    // gpt-5
+    _chat=_vision={
+        name:'gpt-5',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+        isServiceDefault:true,
+    },
+    {
+        name:'gpt-5-mini',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.25),
+        outputTokenPriceUsd:m(2),
+    },
+    {
+        name:'gpt-5-nano',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.05),
+        outputTokenPriceUsd:m(0.4),
+    },
+
+
+    // gpt-oss
+    {
+        name:'gpt-oss-120b',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:131072,
+        inputCapabilities:['text'],
+        outputCapabilities:['text'],
+    },
+    {
+        name:'gpt-oss-20b',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:131072,
+        inputCapabilities:['text'],
+        outputCapabilities:['text'],
+    },
+
     // o1
     {
         name:'o1-preview',
@@ -81,7 +141,7 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
     },
 
     // gpt-4.1
-    _chat=_vision={
+    {
         name:'gpt-4.1',
         matchNameStart:true,
         supportsFunctionCalling:true,
@@ -91,7 +151,28 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(2),
         outputTokenPriceUsd:m(8),
-        isServiceDefault:true,
+    },
+    {
+        name:'gpt-4.1-mini',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.4),
+        outputTokenPriceUsd:m(1.6),
+    },
+    {
+        name:'gpt-4.1-nano',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1047576,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(0.1),
+        outputTokenPriceUsd:m(0.4),
     },
 
     // gpt-4o
@@ -318,22 +399,6 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
         outputTokenPriceUsd:m(2),
     },
 
-    // legacy
-    {
-        name:'babbage-002',
-        inputCapabilities:['text'],
-        outputCapabilities:['text'],
-        inputTokenPriceUsd:m(0.4),
-        outputTokenPriceUsd:m(0.4),
-    },
-    {
-        name:'davinci-002',
-        inputCapabilities:['text'],
-        outputCapabilities:['text'],
-        inputTokenPriceUsd:m(2),
-        outputTokenPriceUsd:m(2),
-    },
-
     // whisper
     _speechToText={
         name:'whisper-1',
@@ -370,6 +435,15 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
 
     // dall-e
     _image={
+        name:'gpt-image-1',
+        inputCapabilities:['text','image'],
+        outputCapabilities:['image'],
+        imagePriceUsd:0.063,
+        imageLgPriceUsd:0.063,
+        imageHdPriceUsd:0.25,
+        imageLgHdPriceUsd:0.25,
+    },
+    {
         name:'dall-e-3',
         inputCapabilities:['text'],
         outputCapabilities:['image'],
@@ -408,8 +482,9 @@ export const knownConvoOpenAiModels:ConvoModelInfo[]=[
         inputTokenPriceUsd:m(0.1),
         outputDimension:1536,
     },
-]
-Object.freeze(knownConvoOpenAiModels);
+];
+
+Object.freeze(openAiModels);
 export const defaultOpenAiChatModel=_chat;
 export const defaultOpenAiVisionModel=_vision;
 export const defaultOpenAiImageModel=_image;
@@ -417,6 +492,6 @@ export const defaultOpenAiTextToSpeechModel=_textToSpeech;
 export const defaultOpenAiSpeechToTextModel=_speechToText;
 export const defaultOpenAiEmbeddingModel=_embedding;
 
-for(const m of knownConvoOpenAiModels){
+for(const m of openAiModels){
     Object.freeze(m);
 }

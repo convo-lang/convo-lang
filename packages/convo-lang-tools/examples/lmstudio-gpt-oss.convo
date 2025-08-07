@@ -1,0 +1,7 @@
+> define
+__endpoint="http://localhost:1234/v1/chat/completions"
+__model="gpt-oss-20b"
+__trackModel=true
+
+> user
+Hi

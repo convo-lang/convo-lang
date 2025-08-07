@@ -1,6 +1,6 @@
-import { ConvoImageGenerator, ConvoImageResponse } from "@convo-lang/convo-lang";
+import { ConvoImageGenerator, ConvoImageResponse, defaultOpenAiImageModel } from "@convo-lang/convo-lang";
 import { httpClient, joinPaths } from "@iyio/common";
-import { openAiApiKeyParam, openAiBaseUrlParam, openAiImageModelParam } from "./convo-lang-openai-params";
+import { openAiApiKeyParam, openAiBaseUrlParam, openAiImageModelParam } from "./openai-params";
 
 interface ImagesResponse
 {
@@ -8,9 +8,6 @@ interface ImagesResponse
     data:{url:string;revised_prompt?:string}[]
 }
 
-/**
- * @deprecated
- */
 export interface OpenAiConvoImageGeneratorOptions
 {
     apiBaseUrl?:string;
@@ -19,15 +16,11 @@ export interface OpenAiConvoImageGeneratorOptions
     defaultSize?:string
 }
 
-/**
- * Use `createOpenAiConvoImageGenerator` exported from the core `@convo-lang/convo-lang` package instead.
- * @deprecated
- */
 export const createOpenAiConvoImageGenerator=({
     apiBaseUrl=openAiBaseUrlParam.get()||'https://api.openai.com',
-    model=openAiImageModelParam.get()??'dall-e-3',
+    model=openAiImageModelParam.get()??defaultOpenAiImageModel.name,
     defaultSize='1024x1024',
-    apiKey=process.env['OPENAI_API_KEY']||openAiApiKeyParam()
+    apiKey=globalThis.process?.env['OPENAI_API_KEY']||openAiApiKeyParam()
 }:OpenAiConvoImageGeneratorOptions={}):ConvoImageGenerator=>{
 
     return async (request)=>{
