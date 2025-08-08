@@ -1,4 +1,4 @@
-import { getErrorMessage, getValueByAryPath, isPromise, valueIsZodObject, zodCoerceObject } from '@iyio/common';
+import { getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation';
@@ -1182,6 +1182,21 @@ export class ConvoExecutionContext
     {
         this.setVar(true,false,convoVars.__rag);
         this.setVar(true,undefined,convoVars.__ragParams);
+    }
+
+    /**
+     * Returns the full path of the give path if the path is relative. The __cwd variable is used to
+     * determine the current working directory.
+     */
+    public getFullPath(path:string|undefined|null){
+        if(!path || (typeof path !=='string')){
+            return '.';
+        }
+        if(isRooted(path)){
+            return normalizePath(path);
+        }
+        const cwd=this.sharedVars[convoVars.__cwd];
+        return normalizePath(cwd?joinPaths(cwd,path):path);
     }
 
     /**
