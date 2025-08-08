@@ -113,7 +113,7 @@ Tell me about what kind of AI model you are
 [:open-ai.convo:]
 ``` convo
 > define
-__model='gpt-4.1'
+__model='gpt-5'
 
 > user
 Tell me about what kind of AI model you are
