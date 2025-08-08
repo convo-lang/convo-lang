@@ -150,6 +150,7 @@ export class ConvoCli
         }
         if(this.options.exeCwd){
             this.convo.unregisteredVars[convoVars.__cwd]=this.options.exeCwd;
+            globalThis.process?.chdir(this.options.exeCwd);
         }
         if(this.options.source){
             this.convo.unregisteredVars[convoVars.__file]=this.options.source;
