@@ -498,7 +498,10 @@ export class ConvoExecutionContext
                 scope[convoScopeFnDefKey]=parent[convoScopeFnDefKey];
             }
             const fn=scope[convoScopeFnKey]??(scope[convoScopeFnKey]=statement.fnPath?
-                getValueByAryPath(this.sharedVars,statement.fnPath)?.[statement.fn]:
+                (
+                    getValueByAryPath(scope.vars,statement.fnPath)?.[statement.fn]??
+                    getValueByAryPath(this.sharedVars,statement.fnPath)?.[statement.fn]
+                ):
                 this.sharedVars[statement.fn]
             )??this.dynamicFunctionCallback??this.convo.conversation?.dynamicFunctionCallback;
             if(typeof fn !== 'function'){
