@@ -1368,54 +1368,84 @@ export const defaultConvoVars={
         ctx.convo.conversation?.popTask();
     }),
 
-    [convoFunctions.fsWrite]:createConvoScopeFunction(async (scope)=>{
-        if(!scope.paramValues){
-            throw new ConvoError('invalid-args',{statement:scope.s},'fsWrite expects a file path and value')
+    [convoFunctions.fsWriteJson]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsWriteJson expects first argument to be a string');
         }
-        const path=scope.paramValues[0];
+        const path=ctx.getFullPath(scope.paramValues[0]);
         const value=scope.paramValues[1];
-        if(typeof path !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},'fsWrite expects first argument to be a string');
-        }
 
         await vfs().writeObjectAsync(path,value);
         return value;
     }),
 
-    [convoFunctions.fsRead]:createConvoScopeFunction(async (scope)=>{
-        const path=scope.paramValues?.[0];
-        if(typeof path !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},'fsRead expects first argument to be a string');
+    [convoFunctions.fsReadJson]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadJson expects first argument to be a string');
         }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
 
         return await vfs().readObjectAsync(path);
     }),
 
-    [convoFunctions.fsRemove]:createConvoScopeFunction(async (scope)=>{
-        const path=scope.paramValues?.[0];
-        if(typeof path !== 'string'){
+    [convoFunctions.fsWrite]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsWrite expects first argument to be a string');
+        }
+        const path=ctx.getFullPath(scope.paramValues[0]);
+        const value=scope.paramValues[1];
+
+        await vfs().writeStringAsync(path,(typeof value === 'string')?value:(value+''));
+        return value;
+    }),
+
+    [convoFunctions.fsRead]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsRead expects first argument to be a string');
+        }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
+
+        return await vfs().readStringAsync(path);
+    }),
+
+    [convoFunctions.fsRemove]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsRemove expects first argument to be a string');
         }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
 
         return await vfs().removeAsync(path);
     }),
 
-    [convoFunctions.fsMkDir]:createConvoScopeFunction(async (scope)=>{
-        const path=scope.paramValues?.[0];
-        if(typeof path !== 'string'){
+    [convoFunctions.fsMkDir]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsMkDir expects first argument to be a string');
         }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
 
         return await vfs().mkDirAsync(path);
     }),
 
-    [convoFunctions.fsExists]:createConvoScopeFunction(async (scope)=>{
-        const path=scope.paramValues?.[0];
-        if(typeof path !== 'string'){
+    [convoFunctions.fsExists]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsExists expects first argument to be a string');
         }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
 
         return (await vfs().getItemAsync(path))?true:false
+    }),
+
+    [convoFunctions.fsReadDir]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsExists expects first argument to be a string');
+        }
+        const path=ctx.getFullPath(scope.paramValues?.[0]);
+
+        return (await vfs().readDirAsync(path)).items.map(v=>v.path)
+    }),
+
+    [convoFunctions.fsFullPath]:createConvoScopeFunction(async (scope,ctx)=>{
+        return ctx.getFullPath(scope.paramValues?.[0]);
     }),
 
     [convoFunctions.joinPaths]:createConvoScopeFunction(async (scope)=>{

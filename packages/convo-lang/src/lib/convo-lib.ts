@@ -261,10 +261,20 @@ export const convoFunctions={
     /**
      * Reads a JSON value from the virtual file system
      */
-    fsRead:'fsRead',
+    fsReadJson:'fsReadJson',
 
     /**
      * Writes a JSON value to the virtual file system and returns the written value.
+     */
+    fsWriteJson:'fsWriteJson',
+
+    /**
+     * Reads a string value from the virtual file system
+     */
+    fsRead:'fsRead',
+
+    /**
+     * Writes a string value to the virtual file system and returns the written value.
      */
     fsWrite:'fsWrite',
 
@@ -282,6 +292,16 @@ export const convoFunctions={
      * Checks if a path exists in the virtual file system
      */
     fsExists:'fsExists',
+
+    /**
+     * Reads directory items
+     */
+    fsReadDir:'fsReadDir',
+
+    /**
+     * Returns the full and normalized path for the given value.
+     */
+    fsFullPath:'fsFullPath',
 
     /**
      * Joins file paths
