@@ -16,8 +16,6 @@
 )
 
 > local isValidPath(path:string) -> (
-    print("args" __args)
-    print("path" path)
     return(not(or(
         path.startsWith('/')
         path.includes('..')
