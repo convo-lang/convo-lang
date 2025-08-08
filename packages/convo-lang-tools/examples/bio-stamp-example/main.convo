@@ -1,0 +1,10 @@
+@import ./documents/**.md
+@import ./functions.convo
+
+> define
+__trackModel=true
+__trackTokenUsage=true
+__model="gpt-5"
+
+> user
+Create a standalone marketing webpage for the company. Save it to app/index.html
