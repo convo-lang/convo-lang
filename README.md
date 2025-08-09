@@ -3,7 +3,7 @@ The language of AI
 
 ![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/vscode-demo.gif)
 
-**Lean Convo-Lang with Live Demos**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+**Learn Convo-Lang with Live Demos**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
 
 **GitHub** - [ https://github.com/convo-lang/convo-lang](https://github.com/convo-lang/convo-lang)
 
