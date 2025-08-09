@@ -1,6 +1,6 @@
 {
     "name": "convo-lang",
-    "version": "0.7.44",
+    "version": "0.7.45",
     "license": "MIT",
     "scripts": {},
     "private": true,
@@ -116,7 +116,7 @@
         "zod": "^3.21.4"
     },
     "peerDependencies": {
-        "@aws-sdk/client-bedrock-runtime": ">=3.828.0",
+        "@aws-sdk/client-bedrock-runtime": ">=3.840.0",
         "next": ">=14 || >=15",
         "pdfjs-dist": ">=3.11",
         "react": ">=18 || >=19",

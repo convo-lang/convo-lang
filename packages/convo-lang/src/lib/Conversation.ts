@@ -3060,7 +3060,8 @@ export class Conversation
             }
         }
 
-        let content=module.content??'';
+        const contentSrc=module.content??'';
+        let content=escapeConvo(contentSrc);
         const templateMessage=content?this.getImportTemplateMessage(importStatement):null;
         let templateUsed=false;
         if(templateMessage?.content){
@@ -3071,7 +3072,7 @@ export class Conversation
         if(content){
             if(importStatement.assign){
                 const assignMessage=`> define\n${importStatement.assign} = ${
-                    importStatement.name.toLowerCase().endsWith('.json')?content:JSON.stringify(content)
+                    importStatement.name.toLowerCase().endsWith('.json')?contentSrc:JSON.stringify(contentSrc)
                 }`;
                 if(templateUsed){
                     if(!contentHasConvoRole(content)){
@@ -3147,6 +3148,8 @@ export class Conversation
 
     private getImportTemplateMessage(importStatement:ConvoImport):ConvoMessage|undefined{
 
+        let fallback:ConvoMessage|undefined;
+
         for(const msg of this.messages){
             if(msg.role!==convoRoles.importTemplate){
                 continue;
@@ -3159,9 +3162,13 @@ export class Conversation
             ){
                 return msg;
             }
+
+            if(!importStatement.templateName && !msg.importMatch){
+                fallback=msg;
+            }
         }
 
-        return undefined;
+        return fallback;
     }
 
     public async flattenSourceAsync({

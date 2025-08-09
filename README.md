@@ -26,11 +26,11 @@ The convo-lang syntax supports advanced features such as function calling, tool 
 The Convo-Lang ecosystem consists of a parser, interpreter, Typescript/Javascript/Python libraries,
 a CLI, and a vscode extension for syntax highlighting and in-editor script execution.
 
-## glossary
+## Index
 - [Quick Start with NextJS](#quick-start-with-nextjs)
 - [VSCode extension](#vscode-extension)
 - [Model Provider Support](#model-provider-support)
-- [Using Convo-Lang](#using-convo-lang)
+- [Using Convo-Lang in Javascript](#using-convo-lang-in-javascript)
 - [Using the CLI](#using-the-cli)
 - [CLI configuration](#cli-configuration)
 - [IYIO ( eye·o )](#iyio--eyeo-)
@@ -162,7 +162,7 @@ without having to start your full application.
   - us.mistral.pixtral-large-2502-v1:0
 
 
-## Using Convo-Lang
+## Using Convo-Lang in Javascript
 When using Convo-Lang in a TypeScript or JavaScript project will use the Convo-Lang Conversation Engine
 by creating instances of the `Conversation` class and appending messages and awaiting the
 completion of those messages. Conversations are made up of collections of messages that represent
@@ -170,14 +170,14 @@ messages from the user, LLM, tool definitions and more.
 
 Install Convo-Lang packages
 ``` sh
-npm install @convo-lang/convo-lang @convo-lang/convo-lang-openai
+npm install @convo-lang/convo-lang
 ```
 
 *(note - syntax highlighting for Convo-Lang embedded in string template literals is provided using the "convo-lang" VSCode extension)*
 ``` js
 // example.mjs
 import { convo } from "@convo-lang/convo-lang";
-import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
+import { initOpenAiBackend } from '@convo-lang/convo-lang';
 
 initOpenAiBackend();
 
@@ -256,6 +256,8 @@ Output:
 ]
 ```
 
+
+![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/using-convo-lang-node.png)
 
 ## Using the CLI
 The convo CLI can be used to execute convo scripts from the command line

@@ -1,5 +1,24 @@
 ## Change Log
 
+### v0.7.45
+- **VSCode Extension**: Added settings menu to vscode extension
+- **VSCode extension**: Added configuration settings
+- **VSCode extension**: Added buttons for executing common actions
+- **VSCode extension**: Imports are now linkable
+- **Error Handling**: fRead functions now catch errors for improved stability
+- **AWS Bedrock**: Added support for using Bedrock API keys
+- **Model Parameters**: Added model parameters that can be defined using tags or system variables
+  - frequencyPenalty
+  - presencePenalty
+  - logprobs
+  - reasoningEffort
+  - seed
+  - serviceTier
+  - topLogprobs
+  - responseVerbosity
+  - logitBias
+  - modelParams
+
 ### v0.7.43
 - **OpenAI Models**: Added OpenAI model definitions for gpt-5 and gpt-oss
 - **Package Deprecation**: Marked all exports from @convo-lang/convo-lang-openai as deprecated - all OpenAI support has been moved into core package

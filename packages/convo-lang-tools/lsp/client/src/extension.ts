@@ -435,7 +435,7 @@ const registerCommands=(context:ExtensionContext)=>{
             }catch(ex){
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
-                const suggestConfig=/(40\d|unauthorized|denied|api\s*key)/i.test(err);
+                const suggestConfig=/(401|403|unauthorized|denied|api\s*key)/i.test(err);
                 await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Click the settings (🛠️) icon above the top right of this file`:''}`,true,false);
                 if(suggestConfig){
                     window.showInformationMessage(

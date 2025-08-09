@@ -1,0 +1,9 @@
+@import ./weather-main-bio.md
+
+
+> importTemplate
+Use the following content as your peronal BIO
+
+<bio>
+$$CONTENT$$
+</bio>

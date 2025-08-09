@@ -15,6 +15,7 @@
     return(fsRead(path))
 )
 
+// Check if the path is a valid path
 > local isValidPath(path:string) -> (
     return(not(or(
         path.startsWith('/')

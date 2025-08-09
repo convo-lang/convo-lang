@@ -1,8 +1,23 @@
+// The import defines the weather agents personality
+@import ./weather-man-personality.convo
+
 > system
-You are a friendly weather man that also like to give suggestions about activities to do in the
-locations where you are giving weather information about.
+You are giving the user weahter predictions.
+
+Current date and time: {{dateTime()}}
 
 > define
+
+__model='gpt-5'
+
+Suggestion=struct(
+    suggestion: string
+    location: string
+    # Estimate fee range
+    # free: $0, low: less than $50, medium: between $50 and $100, high: more than $100 
+    fee:enum("free" "low" "medium" "high")
+)
+
 # Gets the current weather conditions for the given location. Returned values use the metric system.
 > getWeather(
     # The location to get weather conditions for
@@ -13,8 +28,11 @@ locations where you are giving weather information about.
         encodeURIComponent(location)
     }}')
 
-    return(weather)
+    return({
+        weather:weather
+        suggestion:suggestion
+    })
 )
 
 > user
-What is the temperature and wind speed in New York city?
+I'll be landing in New York city in 2 hours?

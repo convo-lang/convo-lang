@@ -5,7 +5,7 @@ export class ConvoDocumentLinkProvider implements DocumentLinkProvider{
 
     provideDocumentLinks(document:TextDocument):DocumentLink[]{
         const links:DocumentLink[]=[];
-        const regex=/(^[ \t]*@import[ \t]*)(.*)/g;
+        const regex=/(^[ \t]*@import[ \t]+)(.*)/g;
         for(let line=0;line<document.lineCount;line++){
             const text=document.lineAt(line).text;
             let match:RegExpExecArray|null;
