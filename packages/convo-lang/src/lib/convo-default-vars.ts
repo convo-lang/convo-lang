@@ -553,7 +553,7 @@ export const defaultConvoVars={
     }),
 
     aryJoin:createConvoScopeFunction(scope=>{
-        let ary=scope.paramValues?.[0];
+        const ary=scope.paramValues?.[0];
         if(!scope.paramValues || !Array.isArray(ary)){
             return [];
         }
@@ -1385,7 +1385,11 @@ export const defaultConvoVars={
         }
         const path=ctx.getFullPath(scope.paramValues?.[0]);
 
-        return await vfs().readObjectAsync(path);
+        try{
+            return await vfs().readObjectAsync(path);
+        }catch{
+            return undefined;
+        }
     }),
 
     [convoFunctions.fsWrite]:createConvoScopeFunction(async (scope,ctx)=>{
@@ -1405,7 +1409,11 @@ export const defaultConvoVars={
         }
         const path=ctx.getFullPath(scope.paramValues?.[0]);
 
-        return await vfs().readStringAsync(path);
+        try{
+            return await vfs().readStringAsync(path);
+        }catch{
+            return undefined;
+        }
     }),
 
     [convoFunctions.fsRemove]:createConvoScopeFunction(async (scope,ctx)=>{
@@ -1441,7 +1449,11 @@ export const defaultConvoVars={
         }
         const path=ctx.getFullPath(scope.paramValues?.[0]);
 
-        return (await vfs().readDirAsync(path)).items.map(v=>v.path)
+        try{
+            return (await vfs().readDirAsync(path)).items.map(v=>v.path);
+        }catch{
+            return [];
+        }
     }),
 
     [convoFunctions.fsFullPath]:createConvoScopeFunction(async (scope,ctx)=>{
