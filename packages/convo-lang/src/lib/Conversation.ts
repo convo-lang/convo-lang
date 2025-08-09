@@ -1,4 +1,4 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, getValueByPath, isClassInstanceObject, isRooted, joinPaths, log, normalizePath, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, shortUuid, starStringToRegex } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, getValueByPath, isClassInstanceObject, isRooted, joinPaths, log, normalizePath, parseBoolean, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, safeParseNumberOrUndefined, shortUuid, starStringToRegex } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
@@ -18,7 +18,7 @@ import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoImportService } from "./convo.deps";
 import { isConvoObject } from "./convoAsync";
@@ -1580,7 +1580,7 @@ export class Conversation
         )
 
         const lastMsg=flat.messages[flat.messages.length-1];
-        let cacheType=(
+        const cacheType=(
             (lastMsg?.tags && (convoTags.cache in lastMsg.tags) && (lastMsg.tags[convoTags.cache]??defaultConvoCacheType))??
             flat.exe.getVar(convoVars.__cache)
         );
@@ -1818,7 +1818,7 @@ export class Conversation
         options:ConvoCompletionOptions|undefined,
         inQueue:boolean
     ):Promise<ConvoCompletion|undefined>{
-        const all=await Promise.all(messages.map(async (msg,i)=>{
+        const all=await Promise.all(messages.map(async (msg)=>{
             const clone=this.clone(undefined,{disableAutoFlatten:true});
             clone.messages.splice(startIndex,clone.messages.length);
             if(clone.messages[clone.messages.length-1]?.role===convoRoles.parallel){
@@ -2913,7 +2913,7 @@ export class Conversation
         let assign:string|undefined;
         name=''
         for(let i=0;i<modifiers.length;i++){
-            let m=modifiers[i];
+            const m=modifiers[i];
             if(m?.startsWith('!')){
                 modifiers[i]=m.substring(1);
                 if(m.startsWith('!template:')){
@@ -3821,7 +3821,7 @@ export class Conversation
             if(typeof responseModel !== 'string'){
                 responseModel=undefined;
             }
-            const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel];
+            const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel]??lastUserMsg?.tags?.[convoTags.model];
             if(modelTagValue){
                 responseModel=modelTagValue;
             }
@@ -3867,12 +3867,87 @@ export class Conversation
                 parallelMessages,
                 apiKey:this.getDefaultApiKey()??undefined,
                 afterCall,
-                messageTriggers
+                messageTriggers,
             });
             exe.flat=flat;
             const apiKey=exe.getVar(convoVars.__apiKey);
             if(apiKey){
                 flat.apiKey=apiKey;
+            }
+
+            let pv:any;
+
+            pv=lastUserMsg?.tags?.[convoTags.temperature]??exe.sharedVars[convoVars.__temperature];
+            if(pv!==undefined){
+                flat.temperature=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.topP]??exe.sharedVars[convoVars.__topP];
+            if(pv!==undefined){
+                flat.topP=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.frequencyPenalty]??exe.sharedVars[convoVars.__frequencyPenalty];
+            if(pv!==undefined){
+                flat.frequencyPenalty=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.presencePenalty]??exe.sharedVars[convoVars.__presencePenalty];
+            if(pv!==undefined){
+                flat.presencePenalty=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.logprobs]??exe.sharedVars[convoVars.__logprobs];
+            if(pv!==undefined){
+                flat.logprobs=parseBoolean(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.reasoningEffort]??exe.sharedVars[convoVars.__reasoningEffort];
+            if(isConvoReasoningEffort(pv)){
+                flat.reasoningEffort=pv;
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.seed]??exe.sharedVars[convoVars.__seed];
+            if(pv!==undefined){
+                flat.seed=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.serviceTier]??exe.sharedVars[convoVars.__serviceTier];
+            if(pv!==undefined){
+                flat.serviceTier=pv+'';
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.topLogprobs]??exe.sharedVars[convoVars.__topLogprobs];
+            if(pv!==undefined){
+                flat.topLogprobs=safeParseNumberOrUndefined(pv);
+            }
+
+            pv=lastUserMsg?.tags?.[convoTags.responseVerbosity]??exe.sharedVars[convoVars.__responseVerbosity];
+            if(isConvoResponseVerbosity(pv)){
+                flat.responseVerbosity=pv;
+            }
+
+            pv=exe.sharedVars[convoVars.__logitBias];
+            if(pv!==undefined){
+                flat.logitBias=pv;
+            }
+
+            let modelParams:Record<string,any>|undefined;
+            const mp=exe.sharedVars[convoVars.__modelParams];
+            if(mp && typeof mp === 'object'){
+                modelParams={...mp};
+            }
+            pv=lastUserMsg?.tags?.[convoTags.modelParams];
+            if(pv){
+                try{
+                    const v=JSON.parse(pv);
+                    modelParams={...modelParams,...v};
+                }catch(ex){
+                    console.warn('Invalid model params tag value. Should be valid JSON object')
+                }
+            }
+            if(modelParams){
+                flat.modelParams=modelParams;;
             }
 
             let includeInTransforms:FlatConvoMessage[]|undefined;
@@ -4003,6 +4078,7 @@ export class Conversation
 
             this.mergeConvoFlatContentMessages(flat.messages);
 
+            deleteUndefined(flat);
             return flat;
         }finally{
             exe.disableInlinePrompts=false;
@@ -4613,7 +4689,6 @@ export class Conversation
         }
 
         return new Promise<ConvoCompletionMessage[]>((resolve,reject)=>{
-            let sub:Subscription|undefined;
             let submitted=false;
             const ctx:ConvoComponentCompletionCtx={
                 message,
@@ -4649,7 +4724,7 @@ export class Conversation
                 }
             };
 
-            sub=this.onComponentSubmission.subscribe(s=>{
+            const sub=this.onComponentSubmission.subscribe(s=>{
                 if(s.componentIndex===message.componentIndex){
                     ctx.submit(s);
                 }

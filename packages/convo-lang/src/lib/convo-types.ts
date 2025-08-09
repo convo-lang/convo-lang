@@ -1216,6 +1216,56 @@ export interface FlatConvoConversationBase
      */
     topP?:number;
 
+    /**
+     * Controls the penalty for repeated tokens in completions.
+     */
+    frequencyPenalty?:number;
+
+    /**
+     * Controls the penalty for new tokens based on their presence in the text so far.
+     */
+    presencePenalty?:number;
+
+    /**
+     * If set, requests log probabilities of generated tokens.
+     */
+    logprobs?:boolean;
+
+    /**
+     * Indicates the level of reasoning effort to apply.
+     */
+    reasoningEffort?:ConvoReasoningEffort;
+
+    /**
+     * Sets the random seed for reproducible completions.
+     */
+    seed?:number;
+
+    /**
+     * Specifies the service tier to use for completions.
+     */
+    serviceTier?:string;
+
+    /**
+     * Requests the log probabilities for the top tokens.
+     */
+    topLogprobs?:number;
+
+    /**
+     * Controls the verbosity of the model's response.
+     */
+    responseVerbosity?:ConvoResponseVerbosity;
+
+    /**
+     * Allows biasing the likelihood of specific tokens.
+     */
+    logitBias?:Record<number,number>;
+
+    /**
+     * Additional parameters to pass to the model
+     */
+    modelParams?:Record<string,any>;
+
     afterCall?:Record<string,(ConvoPostCompletionMessage|string)[]>;
 
     /** Array of message triggers that will be automatically evaluated for applicable messages */
@@ -1233,6 +1283,14 @@ export interface FlatConvoConversationBase
      */
     debug?:(...args:any[])=>void;
 }
+
+export const allConvoReasoningEffort=['min','minimal','md','medium','high'] as const;
+export type ConvoReasoningEffort=typeof allConvoReasoningEffort[number];
+export const isConvoReasoningEffort=(value:any):value is ConvoReasoningEffort=>allConvoReasoningEffort.includes(value);
+
+export const allConvoResponseVerbosity=['low','md','medium','high'] as const;
+export type ConvoResponseVerbosity=typeof allConvoResponseVerbosity[number];
+export const isConvoResponseVerbosity=(value:any):value is ConvoResponseVerbosity=>allConvoResponseVerbosity.includes(value);
 
 export interface ConvoExecuteResult
 {

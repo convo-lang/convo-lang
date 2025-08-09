@@ -506,6 +506,71 @@ export const convoVars={
      */
     __debugInline:'__debugInline',
 
+    /**
+     * Controls the penalty for repeated tokens in completions.
+     */
+    __frequencyPenalty:'__frequencyPenalty',
+
+    /**
+     * Controls the penalty for new tokens based on their presence in the text so far.
+     */
+    __presencePenalty:'__presencePenalty',
+
+    /**
+     * If set, requests log probabilities of generated tokens.
+     */
+    __logprobs:'__logprobs',
+
+    /**
+     * Sets the maximum number of tokens to generate in a completion.
+     */
+    __maxTokens:'__maxTokens',
+
+    /**
+     * Indicates the level of reasoning effort to apply.
+     */
+    __reasoningEffort:'__reasoningEffort',
+
+    /**
+     * Sets the random seed for reproducible completions.
+     */
+    __seed:'__seed',
+
+    /**
+     * Specifies the service tier to use for completions.
+     */
+    __serviceTier:'__serviceTier',
+
+    /**
+     * Controls the randomness of completions (temperature parameter).
+     */
+    __temperature:'__temperature',
+
+    /**
+     * Controls the nucleus sampling parameter for completions (top_p).
+     */
+    __topP:'__topP',
+
+    /**
+     * Requests the log probabilities for the top tokens.
+     */
+    __topLogprobs:'__topLogprobs',
+
+    /**
+     * Controls the verbosity of the model's response.
+     */
+    __responseVerbosity:'__responseVerbosity',
+
+    /**
+     * Allows biasing the likelihood of specific tokens.
+     */
+    __logitBias:'__logitBias',
+
+    /**
+     * Object containing additional parameters to pass to the LLM.
+     */
+    __modelParams:'__modelParams',
+
 } as const;
 
 export const convoImportModifiers={
@@ -605,6 +670,66 @@ export const convoTags={
      * a string a cache with a matching type will be used.
      */
     cache:'cache',
+
+    /**
+     * Controls the penalty for repeated tokens in completions for the message the tag is applied to.
+     */
+    frequencyPenalty:'frequencyPenalty',
+
+    /**
+     * Controls the penalty for new tokens based on their presence in the text so far for the message the tag is applied to.
+     */
+    presencePenalty:'presencePenalty',
+
+    /**
+     * If set, requests log probabilities of generated tokens for the message the tag is applied to.
+     */
+    logprobs:'logprobs',
+
+    /**
+     * Sets the maximum number of tokens to generate in a completion for the message the tag is applied to.
+     */
+    maxTokens:'maxTokens',
+
+    /**
+     * Indicates the level of reasoning effort to apply for the message the tag is applied to.
+     */
+    reasoningEffort:'reasoningEffort',
+
+    /**
+     * Sets the random seed for reproducible completions for the message the tag is applied to.
+     */
+    seed:'seed',
+
+    /**
+     * Specifies the service tier to use for completions for the message the tag is applied to.
+     */
+    serviceTier:'serviceTier',
+
+    /**
+     * Controls the randomness of completions (temperature parameter) for the message the tag is applied to.
+     */
+    temperature:'temperature',
+
+    /**
+     * Controls the nucleus sampling parameter for completions (top_p) for the message the tag is applied to.
+     */
+    topP:'topP',
+
+    /**
+     * Requests the log probabilities for the top tokens for the message the tag is applied to.
+     */
+    topLogprobs:'topLogprobs',
+
+    /**
+     * Controls the verbosity of the model's response for the message the tag is applied to.
+     */
+    responseVerbosity:'responseVerbosity',
+
+    /**
+     * Object containing additional parameters to pass to the LLM for the message the tag is applied to.
+     */
+    modelParams:'modelParams',
 
     /**
      * When applied to a function the return value of the function will not be used to generate a
@@ -1976,7 +2101,9 @@ export const parseConvoJsonMessage=(json:string,expectArray?:boolean):any=>{
             try{
                 value=parseJson5(json);
                 parsed=true;
-            }catch{}
+            }catch{
+                //
+            }
         }
 
 
@@ -1990,7 +2117,9 @@ export const parseConvoJsonMessage=(json:string,expectArray?:boolean):any=>{
                         try{
                             value=parseJson5(lines.slice(i,e).join('\n'));
                             break lines;
-                        }catch{}
+                        }catch{
+                            //
+                        }
                     }
                 }
             }
@@ -2139,7 +2268,7 @@ export const convoRagDocRefToMessage=(
     }
 
     if(template){
-        let i=template.indexOf(convoRagTemplatePlaceholder);
+        const i=template.indexOf(convoRagTemplatePlaceholder);
         if(i!==-1){
             msg.tags?.push({name:convoTags.ragContentRage,value:`${i} ${msg.content.length}`})
             msg.content=template.replace(convoRagTemplatePlaceholder,msg.content);

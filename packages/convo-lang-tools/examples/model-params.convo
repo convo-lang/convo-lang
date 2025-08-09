@@ -1,0 +1,21 @@
+> define
+__responseVerbosity='low'
+__model='gpt-5'
+
+> user
+How is a star formed
+
+
+
+> assistant
+- In a cold, dense patch of a giant molecular cloud, gravity overcomes pressure (often triggered by shocks from supernovae or spiral-arm compression).
+- The region collapses and fragments into dense cores; as it collapses, it heats, but dust cooling lets the collapse continue.
+- Conservation of angular momentum forms a rotating accretion disk; magnetic fields drive bipolar jets that shed angular momentum.
+- A protostar grows at the center by accreting from the disk/envelope.
+- When the core reaches ~10 million K, hydrogen fusion ignites (pp-chain or CNO), balancing gravity: the star enters the main sequence.
+- Winds/radiation clear the surroundings; the leftover disk can form planets.
+
+Notes: If the mass stays below ~0.075–0.08 solar masses, it becomes a brown dwarf. Formation takes ~0.1–10 million years, faster for higher mass.
+
+
+> user

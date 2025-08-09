@@ -1,6 +1,7 @@
-import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
+import { createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "./convo-lib";
+import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types";
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat';
 
 export interface BaseOpenAiConvoConverterOptions
@@ -251,6 +252,62 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 flat.toolChoice:{type:"function","function":flat.toolChoice}
             ):undefined
         };
+
+        if(flat.temperature!==undefined){
+            cParams.temperature=flat.temperature;
+        }
+
+        if(flat.topP!==undefined){
+            cParams.top_p=flat.topP;
+        }
+        if(flat.frequencyPenalty!==undefined){
+            cParams.frequency_penalty=flat.frequencyPenalty;
+        }
+        if(flat.presencePenalty!==undefined){
+            cParams.presence_penalty=flat.presencePenalty;
+        }
+        if(flat.logprobs!==undefined){
+            cParams.logprobs=flat.logprobs;
+        }
+        if(flat.reasoningEffort!==undefined){
+            cParams.reasoning_effort=(
+                flat.reasoningEffort==='min'?
+                'minimal'
+                :flat.reasoningEffort==='md'?
+                    'medium'
+                :
+                    flat.reasoningEffort
+            );
+        }
+        if(flat.seed!==undefined){
+            cParams.seed=flat.seed;
+        }
+        if(flat.serviceTier!==undefined && (
+            flat.serviceTier==='auto' ||
+            flat.serviceTier==='flex' ||
+            flat.serviceTier==='priority' ||
+            flat.serviceTier=='default'
+        )){
+            cParams.service_tier=flat.serviceTier;
+        }
+        if(flat.topLogprobs!==undefined){
+            cParams.top_logprobs=flat.topLogprobs;
+        }
+        if(flat.maxTokens!==undefined){
+            cParams.max_completion_tokens=flat.maxTokens;
+        }
+        if(flat.responseVerbosity!==undefined){
+            cParams.verbosity=flat.responseVerbosity==='md'?'medium':flat.responseVerbosity;
+        }
+        if(flat.logitBias!==undefined){
+            cParams.logit_bias=flat.logitBias;
+        }
+
+        if(flat.modelParams){
+            for(const e in flat.modelParams){
+                (cParams as any)[e]=flat.modelParams[e];
+            }
+        }
 
 
         if(this.transformInput){

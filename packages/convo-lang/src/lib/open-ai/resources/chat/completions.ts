@@ -1001,7 +1001,11 @@ export interface ChatCompletionCreateParamsBase {
    * When this parameter is set, the response body will include the `service_tier`
    * utilized.
    */
-  service_tier?: 'auto' | 'default' | null;
+  service_tier?: 'auto' | 'default' | 'flex' | 'priority' | null;
+
+  reasoning_effort?:'minimal'|'low'|'medium'|'high';
+
+  verbosity?:'low'|'medium'|'high';
 
   /**
    * Up to 4 sequences where the API will stop generating further tokens.
