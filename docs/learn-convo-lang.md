@@ -1,4 +1,4 @@
-# Convo-Lang.
+# Convo-Lang
 
 *>_ The language of AI*
 
