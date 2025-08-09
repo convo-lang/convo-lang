@@ -1,0 +1,23 @@
+@import ./docs/wwii.md
+
+> define
+__trackModel=true
+//__model="claude"
+
+> system
+You are cool
+
+> user
+What sections are in "Shadows of Valor"
+
+@model gpt-5-2025-08-07
+> assistant
+- Chapter 1: The Gathering Storm
+- Chapter 2: Occupied
+- Chapter 3: Across the Channel
+- Chapter 4: The Tide Turns
+- Chapter 5: Liberation and Aftermath
+- Epilogue: Remembrance
+
+
+> user

@@ -5,8 +5,9 @@ import { ConvoCli, ConvoCliConfig, createConvoCliAsync } from '@convo-lang/convo
 import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
-import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, window, workspace } from 'vscode';
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { ConvoDocumentLinkProvider } from './link-provider';
 
 let client:LanguageClient;
 
@@ -52,6 +53,13 @@ export function activate(context:ExtensionContext){
 
     registerCommands(context);
     startLsp(context);
+
+    context.subscriptions.push(
+  languages.registerDocumentLinkProvider(
+    { pattern: '**/*.convo' },
+    new ConvoDocumentLinkProvider()
+  )
+);
 }
 
 export function deactivate():Thenable<void>|undefined {
