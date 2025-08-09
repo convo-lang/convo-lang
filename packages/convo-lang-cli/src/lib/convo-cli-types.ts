@@ -10,7 +10,7 @@ export interface ConvoCliConfig
     allowExec?:ConvoExecAllowMode|ConvoExecConfirmCallback;
 
     /**
-     * If true values of the env property with override process.env values
+     * If true values of the env property will override process.env values
      */
     overrideEnv?:boolean;
 
@@ -25,14 +25,15 @@ export interface ConvoCliConfig
     imageModel?:string;
     visionModel?:string;
     secrets?:string;
+    defaultModel?:string;
 }
 
 export interface ConvoCliOptions
 {
     /**
-     * Path to a ConvoCliConfig file
+     * ConvoCliConfig object or path to a ConvoCliConfig file
      */
-    config?:string;
+    config?:string|ConvoCliConfig;
 
     /**
      * Inline configuration as json

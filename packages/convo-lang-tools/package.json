@@ -2,7 +2,7 @@
     "name": "convo-lang-tools",
     "displayName": "convo-lang",
     "description": "A conversational language 🤓",
-    "version": "0.7.44",
+    "version": "0.7.45",
     "type": "commonjs",
     "sideEffects": false,
     "publisher": "IYIO",
@@ -131,6 +131,48 @@
                 "mac": "cmd+shift+r",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             }
-        ]
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 5
+                }
+            }
+        }
     }
 }

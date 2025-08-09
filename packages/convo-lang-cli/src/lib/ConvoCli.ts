@@ -1,6 +1,6 @@
 import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
@@ -27,17 +27,30 @@ const _getConfigAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         return inlineConfig;
     }
 
-    let configPath=options.config??'~/.config/convo/convo.json';
+    let configPath=(typeof options.config === 'string'?options.config:null)??'~/.config/convo/convo.json';
 
     if(configPath.startsWith('~')){
         configPath=homedir()+configPath.substring(1);
     }
 
     const configExists=await pathExistsAsync(configPath);
-    if(!configExists && options.config!==undefined){
+    if(!configExists && configPath && (typeof options.config!=='object')){
         throw new Error(`Convo config file not found a path - ${configPath}`)
     }
-    return await readFileAsJsonAsync(configPath);
+    let c:ConvoCliConfig=configExists?await readFileAsJsonAsync(configPath):{};
+
+    if(options.config && (typeof options.config === 'object')){
+        c={
+            ...c,
+            ...dupDeleteUndefined(options.config),
+            env:{
+                ...c.env,
+                ...dupDeleteUndefined(options.config.env)
+            }
+        }
+    }
+
+    return c;
 }
 
 let initPromise:Promise<ConvoCliOptions>|null=null;
@@ -74,7 +87,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
             [openAiVisionModelParam.typeName]:config.visionModel,
             [openAiSecretsParam.typeName]:config.secrets,
             [convoCapabilitiesParams.typeName]:config.capabilities,
-            [convoDefaultModelParam.typeName]:'gpt-4.1',
+            [convoDefaultModelParam.typeName]:config.defaultModel?.trim()||'gpt-4.1',
         }) as Record<string,string>);
 
         reg.use(nodeCommonModule);

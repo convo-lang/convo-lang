@@ -1,7 +1,8 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, convoResultErrorName, flatConvoMessagesToTextView, parseConvoCode } from '@convo-lang/convo-lang';
-import { createConvoCliAsync } from '@convo-lang/convo-lang-cli';
-import { Lock, createJsonRefReplacer } from '@iyio/common';
+import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, openAiApiKeyParam, openAiBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from '@convo-lang/convo-lang-bedrock';
+import { ConvoCliConfig, createConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, TextDocument, Uri, commands, window, workspace } from 'vscode';
@@ -146,6 +147,7 @@ const registerCommands=(context:ExtensionContext)=>{
         }
 
         const cli=await createConvoCliAsync({
+            config:getCliConfig(),
             bufferOutput:true,
             exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
             sourcePath:document.isUntitled?undefined:document.uri.fsPath,
@@ -220,6 +222,7 @@ const registerCommands=(context:ExtensionContext)=>{
         }
 
         const cli=await createConvoCliAsync({
+            config:getCliConfig(),
             bufferOutput:true,
             exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
             sourcePath:document.isUntitled?undefined:document.uri.fsPath,
@@ -340,6 +343,7 @@ const registerCommands=(context:ExtensionContext)=>{
                 await setCodeAsync(msg,false,true);
 
                 const cli=await createConvoCliAsync({
+                    config:getCliConfig(),
                     inline:src,
                     sourcePath:document.isUntitled?undefined:document.uri.fsPath,
                     bufferOutput:true,
@@ -379,7 +383,7 @@ const registerCommands=(context:ExtensionContext)=>{
                 }
                 await setCodeAsync(cli.buffer.join('')+'\n\n> user\n',true,false);
             }catch(ex){
-                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${JSON.stringify(ex,null,4)}`,true,false);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4)}`,true,false);
             }finally{
                 done=true;
             }
@@ -460,7 +464,7 @@ const registerCommands=(context:ExtensionContext)=>{
 
     context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
 
-        const cli=await createConvoCliAsync({});
+        const cli=await createConvoCliAsync({config:getCliConfig()});
         try{
             const models=await cli.convo.getAllModelsAsync();
 
@@ -474,4 +478,44 @@ const registerCommands=(context:ExtensionContext)=>{
             cli.dispose();
         }
     }));
+
+    let configChangeId:any;
+    let showingConfigChange=false;
+    workspace.onDidChangeConfiguration((e)=>{
+        if(showingConfigChange){
+            return;
+        }
+        if(e.affectsConfiguration('convo')){
+            clearTimeout(configChangeId);
+            configChangeId=setTimeout(()=>{
+                showingConfigChange=true;
+                window.showInformationMessage('Convo-Lang setting changed. Reload window to apply changes?','Reload').then(selection => {
+                    showingConfigChange=false;
+                    if(selection==='Reload'){
+                        commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            },3000);
+        }
+    })
+
+    const getCliConfig=():ConvoCliConfig=>{
+        // Read the 'convo.openAiApiKey' setting from the extension configuration
+        const config=workspace.getConfiguration('convo');
+
+        return {
+            overrideEnv:true,
+            defaultModel:config.get<string>('defaultModel')?.trim()||undefined,
+            env:deleteUndefined({
+                [openAiApiKeyParam.typeName]:config.get<string>('openAiApiKey')?.trim()||undefined,
+                [openAiBaseUrlParam.typeName]:config.get<string>('openAiBaseUrl')?.trim()||undefined,
+
+                [awsBedrockProfileParam.typeName]:config.get<string>('awsBedrockProfile')?.trim()||undefined,
+                [awsBedrockRegionParam.typeName]:config.get<string>('awsBedrockRegion')?.trim()||undefined,
+                [awsBedrockApiKeyParam.typeName]:config.get<string>('awsBedrockApiKey')?.trim()||undefined,
+
+                [convoDefaultModelParam.typeName]:config.get<string>('defaultModel')?.trim()||undefined,
+            }) as Record<string,string>
+        };
+    }
 }
