@@ -87,35 +87,116 @@
                 }
             }
         ],
+        "menus":{
+            "editor/title":[
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@4"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@5"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@6"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@7"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@8"
+                }
+            ]
+        },
         "commands": [
             {
                 "command": "convo.complete",
-                "title": "Complete Convo",
-                "shortTitle": "convo"
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
             },
             {
                 "command": "convo.parse",
-                "title": "Parse Convo"
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
             },
             {
                 "command": "convo.text",
-                "title": "Flatten Convo"
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon":"$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Message Objects",
+                "icon":"$(code-review)"
             },
             {
                 "command": "convo.vars",
-                "title": "Convo Vars"
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon":"$(symbol-misc)"
             },
             {
                 "command": "convo.convert",
-                "title": "Convert Convo"
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
             },
             {
                 "command": "convo.split-complete",
-                "title": "Convert Convo in new file"
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
             },
             {
                 "command": "convo.list-models",
-                "title": "List Convo Models"
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon":"$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon":"$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon":"$(extensions)"
             }
         ],
         "keybindings": [
@@ -130,6 +211,11 @@
                 "key": "ctrl+shift+r",
                 "mac": "cmd+shift+r",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
             }
         ],
         "configuration": {

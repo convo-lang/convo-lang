@@ -1,11 +1,11 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, openAiApiKeyParam, openAiBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, openAiApiKeyParam, openAiBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from '@convo-lang/convo-lang-bedrock';
-import { ConvoCliConfig, createConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { ConvoCli, ConvoCliConfig, createConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
-import { ExtensionContext, ProgressLocation, Range, TextDocument, Uri, commands, window, workspace } from 'vscode';
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 let client:LanguageClient;
@@ -125,7 +125,19 @@ const registerCommands=(context:ExtensionContext)=>{
 
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+
+
+    context.subscriptions.push(commands.registerCommand('convo.new', async () => {
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:'> user\n',
+        });
+        const editor=await window.showTextDocument(doc);
+        const pos=doc.positionAt(doc.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }));
+
+    const getConvoEditorContextAsync=async ():Promise<{cli:ConvoCli,src:string,convo:Conversation,document:TextDocument}|undefined>=>{
         const document=window.activeTextEditor?.document;
         if(!document){
             return;
@@ -155,9 +167,40 @@ const registerCommands=(context:ExtensionContext)=>{
 
         const convo=cli.convo;
         convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
-        const flat=await convo.flattenAsync();
 
-        src=flatConvoMessagesToTextView(flat.messages);
+        return {
+            cli,
+            convo,
+            src,
+            document
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.modules', async () => {
+
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const src=ctx.convo.getDebuggingModulesCode();
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+        const flat=await ctx.convo.flattenAsync();
+
+        const src=flatConvoMessagesToTextView(flat.messages);
 
         const doc=await workspace.openTextDocument({
             language:'source.convo',
@@ -168,34 +211,33 @@ const registerCommands=(context:ExtensionContext)=>{
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.vars', async () => {
-        const document=window.activeTextEditor?.document;
-        if(!document){
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
             return;
         }
 
-        let src:string|undefined=undefined;
-
-        if(document.languageId==='source.convo'){
-            src=document?.getText();
-        }else{
-            const selection=window.activeTextEditor?.selection
-            if(selection){
-                src=document.getText(new Range(selection.start,selection.end));
-            }
-        }
-
-        if(!src){
-            return;
-        }
-
-        const convo=new Conversation();
-        convo.append(src,{disableAutoFlatten:true});
-        const flat=await convo.flattenAsync();
+        const flat=await ctx.convo.flattenAsync();
 
         const doc=await workspace.openTextDocument({
             language:'json',
             content:JSON.stringify(flat.exe.getUserSharedVars(),createJsonRefReplacer(),4),
         })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(getSerializableFlatConvoConversation(flat),null,4),
+        });
 
         await window.showTextDocument(doc);
     }));
@@ -386,7 +428,7 @@ const registerCommands=(context:ExtensionContext)=>{
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
                 const suggestConfig=/(40\d|unauthorized|denied|api\s*key)/i.test(err);
-                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Settings > Extensions > Convo-Lang`:''}`,true,false);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Click the settings (🛠️) icon above the top right of this file`:''}`,true,false);
                 if(suggestConfig){
                     window.showInformationMessage(
                         tryMsg,
@@ -406,11 +448,14 @@ const registerCommands=(context:ExtensionContext)=>{
 
     }
 
+    context.subscriptions.push(commands.registerCommand('convo.open-settings',()=>{
+        commands.executeCommand('workbench.action.openSettings','@ext:iyio.convo-lang-tools');
+    }));
+
     context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{
         await completeAsync();
     }));
-    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
-
+    const splitAsync=async (complete:boolean)=>{
         const document=window.activeTextEditor?.document;
         if(document?.languageId!=='source.convo'){
             return;
@@ -472,7 +517,15 @@ const registerCommands=(context:ExtensionContext)=>{
 
         await window.showTextDocument(doc);
 
-        await completeAsync();
+        if(complete){
+            await completeAsync();
+        }
+    }
+    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
+        await splitAsync(true);
+    }));
+    context.subscriptions.push(commands.registerCommand('convo.split',async ()=>{
+        await splitAsync(false);
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
@@ -492,15 +545,15 @@ const registerCommands=(context:ExtensionContext)=>{
         }
     }));
 
-    let configChangeId:any;
+    let configChangeIv:any;
     let showingConfigChange=false;
     workspace.onDidChangeConfiguration((e)=>{
         if(showingConfigChange){
             return;
         }
         if(e.affectsConfiguration('convo')){
-            clearTimeout(configChangeId);
-            configChangeId=setTimeout(()=>{
+            clearTimeout(configChangeIv);
+            configChangeIv=setTimeout(()=>{
                 showingConfigChange=true;
                 window.showInformationMessage('Convo-Lang setting changed. Reload window to apply changes?','Reload').then(selection => {
                     showingConfigChange=false;
@@ -508,7 +561,7 @@ const registerCommands=(context:ExtensionContext)=>{
                         commands.executeCommand('workbench.action.reloadWindow');
                     }
                 });
-            },3000);
+            },1600);
         }
     })
 
