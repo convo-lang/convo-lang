@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrameMate Pro — Perfect Picture Hanging Tool</title>
+    <style>
+        :root {
+            --forest-green: #2c5e1a;
+            --forest-green-light: #3a7a24;
+            --forest-green-dark: #1e4012;
+            --accent: #ffcc00;
+            --light-bg: #f5f8f3;
+            --dark-text: #333333;
+            --light-text: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            color: var(--dark-text);
+            background-color: #ffffff;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--forest-green);
+            color: var(--light-text);
+            padding: 1.5rem 0;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            font-weight: 300;
+            margin-bottom: 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .hero {
+            background: linear-gradient(rgba(44, 94, 26, 0.8), rgba(44, 94, 26, 0.9)), url('https://images.unsplash.com/photo-1595514535215-73834441f611?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
+            background-size: cover;
+            background-position: center;
+            color: var(--light-text);
+            padding: 5rem 2rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background-color: var(--accent);
+            color: var(--dark-text);
+            font-weight: 600;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        section {
+            padding: 5rem 0;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            color: var(--forest-green);
+        }
+
+        .features {
+            background-color: var(--light-bg);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-icon {
+            background-color: var(--forest-green-light);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .feature-card h3 {
+            text-align: center;
+            margin-bottom: 1rem;
+            color: var(--forest-green);
+        }
+
+        .how-it-works {
+            text-align: center;
+        }
+
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .step {
+            flex: 1;
+            min-width: 250px;
+            margin: 1rem;
+            padding: 2rem;
+        }
+
+        .step-number {
+            background-color: var(--forest-green);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 1.5rem;
+            font-size: 1.25rem;
+        }
+
+        .step h3 {
+            margin-bottom: 1rem;
+            color: var(--forest-green);
+        }
+
+        .specs {
+            background-color: var(--light-bg);
+            text-align: center;
+        }
+
+        .specs-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .specs-column {
+            flex: 1;
+            min-width: 280px;
+            text-align: left;
+        }
+
+        .spec-item {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .spec-item h4 {
+            font-size: 1.1rem;
+            color: var(--forest-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .testimonials {
+            text-align: center;
+        }
+
+        .testimonial-cards {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+        }
+
+        .testimonial-card {
+            background-color: white;
+            border-left: 4px solid var(--forest-green);
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            max-width: 350px;
+            text-align: left;
+        }
+
+        .testimonial-quote {
+            font-style: italic;
+            margin-bottom: 1rem;
+            position: relative;
+            font-size: 1.1rem;
+        }
+
+        .testimonial-quote::before {
+            content: "";
+            font-size: 3rem;
+            color: var(--forest-green);
+            opacity: 0.3;
+            position: absolute;
+            left: -15px;
+            top: -20px;
+        }
+
+        .testimonial-author {
+            font-weight: 600;
+            color: var(--forest-green);
+        }
+
+        .cta-section {
+            background-color: var(--forest-green);
+            color: white;
+            padding: 5rem 0;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            color: white;
+            margin-bottom: 1.5rem;
+        }
+
+        .guarantee {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 3rem 0;
+        }
+
+        .guarantee-badge {
+            background-color: var(--accent);
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: var(--dark-text);
+            font-weight: bold;
+            margin-right: 2rem;
+        }
+
+        .guarantee-text {
+            text-align: left;
+            max-width: 500px;
+        }
+
+        footer {
+            background-color: var(--forest-green-dark);
+            color: var(--light-text);
+            padding: 3rem 0;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+
+        .footer-links a {
+            color: var(--light-text);
+            margin: 0 1rem;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        .copyright {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .features-grid, .steps, .specs-container {
+                grid-template-columns: 1fr;
+            }
+
+            .guarantee {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .guarantee-badge {
+                margin: 0 0 2rem 0;
+            }
+
+            .guarantee-text {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">FrameMate Pro</div>
+            <div class="tagline">The Ultimate Picture Hanging Tool</div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Hang Perfectly Level Pictures, Mirrors, and Wall Décor in Seconds</h1>
+            <p>No guesswork, no extra holes — just perfect results on your first try, every time.</p>
+            <a href="#buy-now" class="cta-button">Get Your FrameMate Pro</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2>Why You'll Love It</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Perfect Level Results</h3>
+                    <p>Dual precision bubble vials ensure your frames hang exactly level on the first try — no more crooked pictures or wasted time.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Universal Compatibility</h3>
+                    <p>Works with all hanging methods: sawtooth, D-rings, keyholes, and wire-hung frames up to 24 inches wide.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Wall-Safe Marking</h3>
+                    <p>Gentle, low-tack pins create precise marks without damaging your walls — perfect for renters and homeowners alike.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Gallery Wall Mastery</h3>
+                    <p>Built-in center-finding scale and pull-out tape measure make complex layouts simple and symmetrical.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Durable Construction</h3>
+                    <p>Reinforced ABS with aluminum spine provides professional-grade accuracy without unnecessary weight.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✓</div>
+                    <h3>Time-Saving Design</h3>
+                    <p>Complete hanging projects in minutes instead of hours — with fewer holes and frustrations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="how-it-works">
+        <div class="container">
+            <h2>How It Works: 3 Easy Steps</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Hook & Measure</h3>
+                    <p>Attach your frame to FrameMate Pro using the adjustable hook guides. Slide to match the distance between your frame's hang points.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Level</h3>
+                    <p>Hold the tool against the wall and align using the dual bubble vials (horizontal and vertical) or the center-finding scale for perfect centering.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Mark & Hang</h3>
+                    <p>Press to leave precise marks with the wall-safe pins. Hammer in nails/anchors on the marks, then hang your frame — perfectly level.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="specs">
+        <div class="container">
+            <h2>Key Features & Specifications</h2>
+            <div class="specs-container">
+                <div class="specs-column">
+                    <div class="spec-item">
+                        <h4>Dual Precision Bubble Vials</h4>
+                        <p>Horizontal and vertical vials for true level and plumb alignment.</p>
+                    </div>
+                    <div class="spec-item">
+                        <h4>Adjustable Hook Guides</h4>
+                        <p>Sliding, lockable guides fit frames up to 24 in (61 cm) wide.</p>
+                    </div>
+                    <div class="spec-item">
+                        <h4>Center-Finding Scale</h4>
+                        <p>Quickly find and mark the midpoint of any frame for effortless centering.</p>
+                    </div>
+                    <div class="spec-item">
+                        <h4>Integrated Micro-Markers</h4>
+                        <p>Retractable, wall-safe pins create pinpoint marks you can paint over or erase.</p>
+                    </div>
+                </div>
+                <div class="specs-column">
+                    <div class="spec-item">
+                        <h4>Built-in Tape Measure</h4>
+                        <p>Pull-out steel tape (24 in / 60 cm) simplifies spacing for gallery walls.</p>
+                    </div>
+                    <div class="spec-item">
+                        <h4>Soft-Touch Edge</h4>
+                        <p>Non-slip, wall-safe edge protects paint and keeps the tool steady while you mark.</p>
+                    </div>
+                    <div class="spec-item">
+                        <h4>Technical Specifications</h4>
+                        <p>Length: 18 in (45.7 cm) body; 24 in (60 cm) pull-out tape<br>
+                        Materials: ABS, anodized aluminum, thermoplastic elastomer (TPE)<br>
+                        Weight: 8.6 oz (244 g)<br>
+                        Accuracy: ±0.5 mm mark precision</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonials">
+        <div class="container">
+            <h2>What Our Customers Say</h2>
+            <div class="testimonial-cards">
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">After years of crooked pictures and unnecessary wall holes, the FrameMate Pro changed everything. I hung my entire gallery wall in under 30 minutes — perfectly level on the first try!</div>
+                    <div class="testimonial-author">— Sarah M., Interior Designer</div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">As someone who rents, I was hesitant to hang anything on my walls. The FrameMate's gentle marking pins leave such tiny marks that I don't worry about my security deposit anymore.</div>
+                    <div class="testimonial-author">— James T., Apartment Dweller</div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">I've tried every picture hanging tool on the market, and the FrameMate Pro is hands-down the most versatile and accurate. Worth every penny for the time and frustration it saves.</div>
+                    <div class="testimonial-author">— Michael K., DIY Enthusiast</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section" id="buy-now">
+        <div class="container">
+            <h2>Make Every Hang a One-and-Done</h2>
+            <p>Get professional results without the professional hassle.</p>
+            <a href="#" class="cta-button">Buy FrameMate Pro Now</a>
+
+            <div class="guarantee">
+                <div class="guarantee-badge">
+                    <div>60-DAY</div>
+                    <div>GUARANTEE</div>
+                </div>
+                <div class="guarantee-text">
+                    <h3>Satisfaction Guarantee</h3>
+                    <p>Try FrameMate Pro for 60 days. If you're not thrilled with straighter, faster hangs, return it for a full refund. No questions asked.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="logo">FrameMate Pro</div>
+
+            <div class="footer-links">
+                <a href="#">About Us</a>
+                <a href="#">FAQs</a>
+                <a href="#">Contact</a>
+                <a href="#">Support</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+
+            <div class="copyright">
+                &copy; 2023 FrameMate Pro. All rights reserved.
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

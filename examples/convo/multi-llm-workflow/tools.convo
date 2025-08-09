@@ -1,0 +1,24 @@
+# Writes a file to the file system
+> writeFile(path:string,content:string) -> (
+    if(not(isValidPath(path))) then (
+        return("Invalid path. Paths must be relative")
+    )
+    fsWrite(path,content)
+    return("File written")
+)
+
+# Reads a file from the file system
+> readFile(path:string) -> (
+    if(not(isValidPath(path))) then (
+        return("Invalid path. Paths must be relative")
+    )
+    return(fsRead(path))
+)
+
+> local isValidPath(path:string) -> (
+    return(not(or(
+        path.startsWith('/')
+        path.includes('..')
+        path.includes('//')
+    )))
+)

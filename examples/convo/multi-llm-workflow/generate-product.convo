@@ -1,0 +1,28 @@
+@import ./tools.convo
+
+> define
+__model="gpt-5"
+
+> user
+Create a product description for a new hand tool that helps you hang pictures that are perfectly level.
+
+Use Markdown for formatting
+
+Save the description to product.md
+
+
+
+@toolId call_b1PCKRbbrcNXOBZGjFt4Zgbv
+> call writeFile(
+    "path": "product.md",
+    "content": "# FrameMate Pro — Picture Hanging Level Tool\n\nHang perfectly level pictures, mirrors, and wall décor in seconds — no guesswork, no extra holes.\n\n## Why You’ll Love It\n- Perfectly level results on the first try\n- Marks exact nail locations for sawtooth, D-rings, and wire-hung frames\n- Speeds up layout for gallery walls and multi-frame arrangements\n- Gentle on walls with low-tack, wall-safe marking pins\n\n## How It Works (3 Easy Steps)\n1. Hook & Measure: Attach your frame to FrameMate Pro using the adjustable hook guides. Slide to match the distance between your frame’s hang points.\n2. Level: Hold the tool against the wall and align using the dual bubble vials (horizontal and vertical) or the center-finding scale for perfect centering.\n3. Mark & Hang: Press to leave precise marks with the wall-safe pins. Hammer in nails/anchors on the marks, then hang your frame — perfectly level.\n\n## Key Features\n- Dual Precision Bubble Vials: Horizontal and vertical vials for true level and plumb alignment.\n- Adjustable Hook Guides: Sliding, lockable guides fit sawtooth hangers, D-rings, and wire-hung frames up to 24 in (61 cm) wide.\n- Center-Finding Scale: Quickly find and mark the midpoint of any frame for effortless centering.\n- Integrated Micro-Markers: Retractable, wall-safe pins create pinpoint marks you can paint over or erase.\n- Built-in Tape Measure (24 in / 60 cm): Pull-out steel tape simplifies spacing for gallery walls.\n- Soft-Touch Edge: Non-slip, wall-safe edge protects paint and keeps the tool steady while you mark.\n- Lightweight, Durable Build: Reinforced ABS with an aluminum spine for accuracy without bulk.\n\n## Ideal For\n- Single frames, mirrors, canvases, and clocks\n- Symmetrical arrangements and gallery walls\n- Renters and homeowners who want fewer holes — and faster results\n\n## Tech Specs\n- Length: 18 in (45.7 cm) body; 24 in (60 cm) pull-out tape\n- Materials: ABS, anodized aluminum, thermoplastic elastomer (TPE)\n- Weight: 8.6 oz (244 g)\n- Marking Pins: Replaceable, wall-safe micro pins (x4 installed)\n- Accuracy: ±0.5 mm mark precision; vials calibrated to 0.5 mm/m\n\n## What’s in the Box\n- FrameMate Pro tool\n- Spare micro-pin cartridge (x1)\n- Quick-start guide\n\n## Tips & Compatibility\n- Works with sawtooth, D-rings, keyholes, and wire-hung frames\n- For heavier pieces, use appropriate wall anchors; FrameMate Pro marks the spot, your hardware carries the weight\n- On textured walls, press firmly and verify level with the vials before marking\n\n## Satisfaction Guarantee\nTry FrameMate Pro for 60 days. If you’re not thrilled with straighter, faster hangs, return it for a full refund.\n\nMake every hang a one-and-done — with FrameMate Pro."
+)
+> result
+__return="File written"
+
+
+> assistant
+The product description has been created and saved to product.md.
+
+
+> user

@@ -1,0 +1,112 @@
+@import ./product.md
+
+> define
+__model="gpt-4.1"
+
+> system
+You are an expert videographer helping a user create a YouTube video.
+
+> user
+Create a script for a YouTube video that introduces customers to the product.
+
+Includes time stamps and scene descriptions
+
+> assistant
+Absolutely! Here’s a detailed YouTube video script for introducing FrameMate Pro, with time stamps and scene descriptions.
+
+---
+
+# YouTube Video Script: **Introducing FrameMate Pro — The Ultimate Picture Hanging Level Tool**
+
+## [00:00–00:08] — **Opening Shot**
+**Scene:** Clean, cozy living room with blank wall. Upbeat background music.
+
+**Narrator (on-screen):**
+"Struggling to hang pictures straight? Tired of extra holes in your walls?"
+
+---
+
+## [00:09–00:22] — **Product Reveal/Hook**
+**Scene:** Close-up, slow pan across the FrameMate Pro tool on a table. Hands lift it up.
+
+**Narrator (voiceover):**
+"Meet the new FrameMate Pro — the smarter, faster way to get perfectly level frames every time."
+
+---
+
+## [00:23–00:39] — **Features Montage**
+**Scene:** Quick shots of the tool: adjustable hook guides, bubble vials, tape measure, and marking pins. Split-screen with close-ups and animated icons highlighting each feature.
+
+**Narrator (voiceover):**
+"It’s designed with dual bubble vials, sliding hooks for any hanger style, a pull-out tape measure, and wall-safe marking pins—for one-and-done results."
+
+---
+
+## [00:40–01:10] — **How It Works: Step-by-Step Demo**
+**Scene:** Presenter holding a picture frame and FrameMate Pro, ready to use.
+
+**Narrator (on-screen, demo):**
+"Let me show you how easy it is."
+1. "Just hook your frame onto the adjustable guides."
+2. "Align perfectly using the bubble vials — and even center your frame with the built-in ruler."
+3. "Press to mark exact nail spots—then just hammer, hang, and admire!"
+
+**Scene:** Fast-forward montage of the process, finishing with a leveled picture on the wall.
+
+---
+
+## [01:11–01:28] — **Comparison/Problems Solved**
+**Scene:** Split-screen: left side shows frustrated attempts with a tape measure and pencil; right side shows smooth, quick hanging with FrameMate Pro.
+
+**Narrator (voiceover):**
+"Forget the guesswork, uneven frames, and messy markings. FrameMate Pro works every time — with any frame style!"
+
+---
+
+## [01:29–01:50] — **Versatility & Ideal Uses**
+**Scene:** Gallery wall arrangement, mirrors, clocks, single small art, renter gently hanging a frame.
+
+**Narrator (on-screen):**
+"Perfect for gallery walls, renters, and anyone who wants perfect results without all the hassle—or extra holes!"
+
+---
+
+## [01:51–02:05] — **What’s in the Box + Specs**
+**Scene:** Overhead unboxing: Tool, spare micro-pin cartridge, and quick-start guide laid out neatly.
+
+**Narrator (voiceover):**
+"FrameMate Pro comes complete with everything you need: the tool, replaceable marking pins, and a quick-start guide. Lightweight but tough, it’s ready for any home project."
+
+---
+
+## [02:06–02:19] — **Tips & Compatibility**
+**Scene:** Presenter points out hook types (sawtooth, D-rings, wire) on different frames; demonstrates on a textured wall.
+
+**Narrator (on-screen):**
+"No matter the hanger style—or even on textured walls—just press and hang. For heavy pieces, mark with FrameMate Pro, use anchors, and you’re set."
+
+---
+
+## [02:20–02:38] — **Satisfaction Guarantee Call-Out**
+**Scene:** Close-up of '60 Day Guarantee' badge, user happily admiring finished gallery wall.
+
+**Narrator (voiceover):**
+"Try it risk-free for 60 days! If you’re not loving your straighter, faster hangs, return FrameMate Pro for a full refund."
+
+---
+
+## [02:39–02:50] — **Closing & CTA**
+**Scene:** Presenter hangs the last frame, steps back, proud result. Logo and website appear.
+
+**Narrator (on-screen):**
+"Make every hang a one-and-done—with FrameMate Pro. Grab yours today and transform the way you decorate!"
+
+---
+
+**[End Screen: Channel Logo, Subscribe Button, and 'See FrameMate Pro in Action' Playlist]**
+---
+
+Let me know if you need a shorter or longer version, or want to focus on a specific use case!
+
+
+> user
