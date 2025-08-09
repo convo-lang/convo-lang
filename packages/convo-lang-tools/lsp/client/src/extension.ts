@@ -383,7 +383,20 @@ const registerCommands=(context:ExtensionContext)=>{
                 }
                 await setCodeAsync(cli.buffer.join('')+'\n\n> user\n',true,false);
             }catch(ex){
-                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4)}`,true,false);
+                const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
+                const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
+                const suggestConfig=/(40\d|unauthorized|denied|api\s*key)/i.test(err);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Settings > Extensions > Convo-Lang`:''}`,true,false);
+                if(suggestConfig){
+                    window.showInformationMessage(
+                        tryMsg,
+                        'Open Convo-Lang Settings'
+                    ).then(selection => {
+                        if (selection === 'Open Convo-Lang Settings') {
+                            commands.executeCommand('workbench.action.openSettings','@ext:iyio.convo-lang-tools');
+                        }
+                    });
+                }
             }finally{
                 done=true;
             }
@@ -451,7 +464,7 @@ const registerCommands=(context:ExtensionContext)=>{
 
         if(saveTo){
             const uri=Uri.file(saveTo);
-            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8'));
+            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8') as Uint8Array);
             doc=await workspace.openTextDocument(uri);
         }else{
             doc=await workspace.openTextDocument({language:'source.convo',content:text});
