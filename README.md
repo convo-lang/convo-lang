@@ -1,23 +1,19 @@
 # Convo-Lang
 The language of AI
 
-![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/learn-convo-demo.webp)
+![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/vscode-demo.gif)
 
-**Interactive Demo** - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)
-
-**Convo-Lang Tutorial**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+**Lean Convo-Lang with Live Demos**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
 
 **GitHub** - [ https://github.com/convo-lang/convo-lang](https://github.com/convo-lang/convo-lang)
 
 **NPM** - [https://www.npmjs.com/package/@convo-lang/convo-lang](https://www.npmjs.com/package/@convo-lang/convo-lang)
 
-**VSCode Extension** - [https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools](https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools)
-
 
 ## What is Convo-Lang?
-Convo-Lang is a programming language built from the ground up for prompt engineers and AI application
-developers. The goal of Convo-Lang is to simplify to development of LLM based applications and 
-provided a uniform syntax for working with all LLMs.
+Convo-Lang is an open source AI-native programming language and ecosystem designed specifically for
+building powerful, structured prompts and agent workflows for large language models (LLMs) like
+GPT-4, Claude, Llama, DeepSeek, and more.
 
 Convo-Lang is a mixture between a procedural programming language, prompting template system and 
 conversation state management system. You can execute convo-lang in Javascript, Python,
@@ -30,20 +26,17 @@ The convo-lang syntax supports advanced features such as function calling, tool 
 The Convo-Lang ecosystem consists of a parser, interpreter, Typescript/Javascript/Python libraries,
 a CLI, and a vscode extension for syntax highlighting and in-editor script execution.
 
-
-## Packages
-- @convo-lang/convo-lang - Contains the Convo-Lang Conversation Engine, and a Typescript/Javascript library to use Convo-Lang in your application.
-- @convo-lang/convo-lang-react - Contains UI pre-built UI components including a fully functional chat component.
-- @convo-lang/convo-lang-openai - Conversation adapter for OpenAI.
-- @convo-lang/convo-lang-bedrock - Conversation adapter for AWS Bedrock.
-- @convo-lang/convo-lang-pinecone - Rag service provider using Pinecone
-- @convo-lang/convo-lang-aws-cdk - AWS CDK construct for deploying convo-lang compatible api endpoints
-- @convo-lang/convo-lang-api-routes - A backend for relaying messages between the browser and LLM backends such as OpenAI.
-- @convo-lang/convo-vfs - Used to integrate Convo-Lang into virtual file systems.
-- @convo-lang/convo-lang-cli - A CLI interface that allows you to execute and parse convo-lang files.
-- @convo-lang/convo-lang-tools - Contains the convo-lang vscode extension, which includes syntax highlighting,
-  in-editor script execution, script parsing, and other helpful tools for working with convo-lang.
-  In most cases, you will not install this package but instead install the vscode convo-lang extension.
+## glossary
+- [Quick Start with NextJS](#quick-start-with-nextjs)
+- [VSCode extension](#vscode-extension)
+- [Model Provider Support](#model-provider-support)
+- [Using Convo-Lang](#using-convo-lang)
+- [Using the CLI](#using-the-cli)
+- [CLI configuration](#cli-configuration)
+- [IYIO ( eye·o )](#iyio--eyeo-)
+- [Learn More](#learn-more)
+- [Contact](#contact)
+- [Change Log](#change-log)
 
 
 ## Quick Start with NextJS
@@ -90,9 +83,33 @@ npm run dev
 - pages/agent/weather.tsx: A weather man agent that can tell you the weather anywhere in the world
 
 
+## VSCode extension
+You will also probably want to install the vscode extension for syntax highlighting and other
+developer niceties. You can install the vscode extension by searching for "convo-lang" in the
+vscode extension tab.
+
+https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools
+
+After installing the extension add an OpenAI or AWS Bedrock API key to run prompts directly in the editor.
+
+![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/vscode-settings.png)
+
+With the Convo-Lang vscode extension installed and configured, you can execute convo scripts directly in vscode
+by pressing the play button at the top right of a `.convo` file or using the `(CMD+R)` hotkey.
+
+You can also run snippets of convo scripts that are embedded in other
+document types. Just highlight the convo code you want to run, open the command palette, and
+search for "Complete Convo Conversation" and press enter. Then the snippet will be opened in a new
+convo file and completed. This is great for quick prototyping and testing prompts in your application
+without having to start your full application.
+
+
 ## Model Provider Support
 
 - OpenAI - https://platform.openai.com/docs/models
+  - gpt-5
+  - gpt-5-mini
+  - gpt-5-nano
   - gpt-4.1
   - gpt-4
   - gpt-4-0125-preview
@@ -145,14 +162,6 @@ npm run dev
   - us.mistral.pixtral-large-2502-v1:0
 
 
-## VSCode extension
-You will also probably want to install the vscode extension for syntax highlighting and other
-developer niceties. You can install the vscode extension by searching for "convo-lang" in the
-vscode extension tab.
-
-https://marketplace.visualstudio.com/items?itemName=iyio.convo-lang-tools 
-
-
 ## Using Convo-Lang
 When using Convo-Lang in a TypeScript or JavaScript project will use the Convo-Lang Conversation Engine
 by creating instances of the `Conversation` class and appending messages and awaiting the
@@ -167,14 +176,13 @@ npm install @convo-lang/convo-lang @convo-lang/convo-lang-openai
 *(note - syntax highlighting for Convo-Lang embedded in string template literals is provided using the "convo-lang" VSCode extension)*
 ``` js
 // example.mjs
-import { Conversation } from "@convo-lang/convo-lang";
+import { convo } from "@convo-lang/convo-lang";
 import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
 
 initOpenAiBackend();
-const conversation=new Conversation();
 
 
-await conversation.completeAsync(/*convo*/`
+const planets=await convo`
 > system
 You are a super smart and funny astronomer that love make funny quotes
 
@@ -188,10 +196,10 @@ Planet = struct(
 @json Planet[]
 > user
 List the planets in our solar system
-`);
+`;
 
 
-console.log(conversation.convo);
+console.log(planets);
 ```
 
 ``` sh
@@ -203,9 +211,7 @@ node example.mjs
 ```
 
 Output:
-``` convo
-@format json
-> assistant
+``` json
 [
     {
         "name": "Mercury",
@@ -250,125 +256,6 @@ Output:
 ]
 ```
 
-## NodeJs example project
-The `convo-lang/convo-lang-node-example` repo contains a full featured CLI tool that can load
-Convo-Lang scripts, accept messages over HTTP and accept live input.
-
-https://github.com/convo-lang/convo-lang-node-example
-
-![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-node-example.webp?raw=true)
-
-
-
-## Using convo-lang in a existing NextJs project
-Follow the step below to you Convo-Lang in an existing NextJS project
-
-
-Install packages:
-``` sh
-npm i \
-    @convo-lang/convo-lang \
-    @convo-lang/convo-lang-react \
-    @convo-lang/convo-lang-openai \
-    @convo-lang/convo-lang-api-routes \
-    @iyio/nextjs-common \
-    @iyio/react-common \
-    @iyio/node-common
-```
-
-Add API endpoint to `/pages/api/convo-lang/[convo-api-action].ts`. This API endpoint will be used
-to relay messages between LLMs while keep your API secrets safe.
-``` ts
-import { createRequestHandler } from "@/lib/api-handler";
-import { createConvoLangApiRoutes } from "@convo-lang/convo-lang-api-routes";
-import { initOpenAiBackend } from '@convo-lang/convo-lang-openai';
-
-initOpenAiBackend();
-
-const routes=createConvoLangApiRoutes({prefix:'/api/convo-lang/'});
-
-const handler=createRequestHandler({routes});
-
-export default handler;
-
-```
-
-The code below creates a fully functional chat interface with a website assistant agent
-``` tsx
-import { ConversationView } from "@convo-lang/convo-lang-react";
-import { NextJsBaseLayoutView } from "@iyio/nextjs-common";
-
-// For syntax highlighting of Convo-Lang install the Convo-Lang VSCode extension.
-// Search for "convo-lang" in the extensions window.
-const exampleConvo=/*convo*/`
-
-> define
-agentName='Doc'
-
-> system
-Your name is {{agentName}} and you're helping a user navigate a website
-
-Pages:
-- Dashboard: path = /
-- Contact: path = /contact
-- News: path = /news
-- Profile: path = /users-place
-- Projects: path = /project-jobs
-
-> extern openPage(
-    # Path of page to open
-    path:string
-)
-
-> assistant
-Hi 👋, I'm {{agentName}}. I'm here to help you navigate this awesome website
-
-`
-
-
-export function AgentView(){
-
-    return (
-        <NextJsBaseLayoutView>
-            <ConversationView
-                theme="dark"
-                showInputWithSource
-                enabledSlashCommands
-                template={exampleConvo}
-                httpEndpoint="/api/convo-lang"
-                externFunctions={{
-                    openPage:async (path:string)=>{
-                        window.history.pushState(null,'',path);
-                    },
-                }}
-            />
-        </NextJsBaseLayoutView>
-    )
-
-}
-
-```
-
-## NextJs example project
-The `convo-lang/convo-lang-nextjs-example` repo contains a fully functional example of using Convo-Lang 
-in a NextJs project to create a collection of agents that can manipulate an interactive canvas.
-
-https://github.com/convo-lang/convo-lang-nextjs-example
-
-![NextJS example](https://github.com/convo-lang/convo-lang/blob/main/assets/convo-lang-nextjs-example.webp?raw=true)
-
-
-
-## Using the convo-lang extension
-With the convo vscode extension installed, you can execute convo scripts directly in vscode. Just
-press **(CMD+R)** to run a script.
-
-You can also run snippets of convo scripts that are embedded in other
-document types. Just highlight the convo code you want to run, open the command palette, and
-search for "Complete Convo Conversation" and press enter. Then the snippet will be opened in a new
-convo file and completed. This is great for quick prototyping and testing prompts in your application
-without having to start your full application.
-
 
 ## Using the CLI
 The convo CLI can be used to execute convo scripts from the command line
@@ -392,25 +279,51 @@ convo talky-time.convo --out something.convo
 convo talky-time.convo --out .
 ```
 
-There is currently only one way to configure the convo cli and vscode extension. This will be extended
-soon to include reading configuration files from your current workspace. 
+### CLI Arguments
 
+| argument                 | description                                                                    |
+|--------------------------|--------------------------------------------------------------------------------|
+| --config                 | ConvoCliConfig object or path to a ConvoCliConfig file                         |
+| --inline-config          | Inline configuration as JSON                                                   |
+| --source                 | Path to a source convo file                                                    |
+| --stdin                  | If present, the source will be read from stdin                                 |
+| --inline                 | Inline convo code                                                              |
+| --source-path            | Used to set or overwrite the source path of executed files                     |
+| --cmd-mode               | If present, CLI operates in command mode for function calling via stdin/stdout |
+| --repl                   | If present, CLI enters REPL mode for chat                                      |
+| --prefix-output          | If present, each output line is prefixed to indicate its relation              |
+| --print-state            | If present, prints the shared variable state                                   |
+| --print-flat             | If present, prints the flattened messages                                      |
+| --print-messages         | If present, prints the messages                                                |
+| --parse                  | If present, parses convo code and outputs as JSON instead of executing         |
+| --parse-format           | JSON formatting used if parse option is present                                |
+| --convert                | If present, converts input to target LLM format and writes as output           |
+| --out                    | Function or path for output; if ".", writes to source path                     |
+| --buffer-output          | If present, buffers executor output for later use                              |
+| --allow-exec             | Controls shell command execution permissions                                   |
+| --prepend                | Conversation content to prepend to source                                      |
+| --exe-cwd                | Current working directory for context execution                                |
+| --sync-ts-config         | Path(s) to tsconfig for TypeScript project synchronization                     |
+| --sync-watch             | If present, updates TypeScript projects in real time during scan               |
+| --sync-out               | Directory for generated sync output files                                      |
+| --spawn                  | Command line to run in parallel with actions like sync watching                |
+| --spawn-dir              | Directory where spawn command runs                                             |
+| --create-next-app        | If present, creates a new Next.js app using the template                       |
+| --create-app-dir         | Directory where apps will be created                                           |
+| --create-app-working-dir | Directory where the create app command will be run                             |
+| --list-models            | If present, lists all known models as JSON                                     |
 
-## CLI and extension configuration
-To allow convo to access OpenAI, create a JSON file called ~/.config/convo/convo.json and add the
+## CLI configuration
+To allow the Convo-Lang CLI to access OpenAI and other model providers, create a JSON file called ~/.config/convo/convo.json and add the
 following contents. Remember to replace the API key with your OpenAI api key.
 
 ``` json
 {
     "env":{
-        "openAiApiKey":"YOUR_OPEN_AI_KEY",
-        "openAiChatModel":"gpt-4o",
-        "openAiVisionModel":"gpt-4o",
-        "openAiAudioModel":"whisper-1",
-        "openAiImageModel":"dall-e-3",
-
-        "awsBedrockProfile":"{optional - AWS profile to use for Bedrock models}"
-    }
+        "openAiApiKey":"{API key for using OpenAI models}",
+        "awsBedrockApiKey":"{API key for using AWS Bedrock models}"
+    },
+    "defaultModel":"{Default LLM model to use - gpt-5, gpt-4.1, claude, llama, deepseek, etc}"
 }
 ```
 
@@ -421,19 +334,48 @@ IYIO is a collection of utilities and frameworks useful for many different situa
 IYIO - https://github.com/iyioio/common
 
 ## Learn More
-You can check out an interactive demo of Convo-Lang here - [https://learn.convo-lang.ai/playground](https://learn.convo-lang.ai/playground)
 
-If you want to learn the Convo-Lang language check out this tutorial  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+If you want to learn the Convo-Lang language check out this tutorial  - [https://learn.convo-lang.ai](https://learn.convo-lang.ai)
 
 ## Contact
 
 Email - doc@convo-lang.ai
 
-X - https://x.com/ConvoLang
+Join our sub Reddit - https://www.reddit.com/r/ConvoLang/
 
 Join our Discord Server - https://discord.gg/GyXp8Dsa
 
+X - https://x.com/ConvoLang
+
 ## Change Log
+
+### v0.7.45
+- **VSCode Extension**: Added settings menu to vscode extension
+- **VSCode extension**: Added configuration settings
+- **VSCode extension**: Added buttons for executing common actions
+- **VSCode extension**: Imports are now linkable
+- **Error Handling**: fRead functions now catch errors for improved stability
+- **AWS Bedrock**: Added support for using Bedrock API keys
+- **Model Parameters**: Added model parameters that can be defined using tags or system variables
+  - frequencyPenalty
+  - presencePenalty
+  - logprobs
+  - reasoningEffort
+  - seed
+  - serviceTier
+  - topLogprobs
+  - responseVerbosity
+  - logitBias
+  - modelParams
+
+### v0.7.43
+- **OpenAI Models**: Added OpenAI model definitions for gpt-5 and gpt-oss
+- **Package Deprecation**: Marked all exports from @convo-lang/convo-lang-openai as deprecated - all OpenAI support has been moved into core package
+- **Markdown & JSON Imports**: Markdown and JSON files can now be directly imported and use import templates
+- **Virtual File System**: Added ConvoVfsImportService to handle imports using the virtual file system
+- **HTTP Imports**: Added ConvoHttpImportService to handle imports over http
+- **CLI Improvements**: Replaced the custom ConvoCli import handler with the ConvoHttpImportService and ConvoVfsImportService services
+- **VSCode Extension**: Fixed issues with converting and flattening relative imports
 
 ### v0.7.39
 - **Bug Fix**: Replaced all uses of instanceof operator on Zod objects to fix issues with using different versions of Zod in the same project
