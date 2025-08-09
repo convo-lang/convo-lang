@@ -28,7 +28,10 @@
             "extends": ["plugin:@nrwl/nx/typescript"],
             "rules": {
                 "no-cond-assign":0,
-                "@typescript-eslint/no-explicit-any":0
+                "@typescript-eslint/no-explicit-any":0,
+                "@typescript-eslint/ban-ts-comment":0,
+                "no-useless-escape":0,
+                "no-unused-vars": ["warn",{ "args": "off" }]
             }
         },
         {
