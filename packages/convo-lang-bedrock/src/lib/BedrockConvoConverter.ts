@@ -252,6 +252,12 @@ export class BedrockConvoConverter implements ConvoConversationConverter<Convers
             },
             messages:oMsgs,
             system:systemMessages,
+            inferenceConfig:deleteUndefined({
+                topP:flat.topP,
+                temperature:flat.temperature,
+                maxTokens:flat.maxTokens
+            }),
+            ...flat.modelParams,
         };
 
         flat.debug?.('convo > ConverseCommandInput',input);

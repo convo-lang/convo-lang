@@ -1,14 +1,15 @@
 import { BedrockRuntimeClient, ConverseCommand, ConverseCommandInput, ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
 import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
-import { Scope } from "@iyio/common";
+import { deleteUndefined, Scope } from "@iyio/common";
 import { convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib";
 import { bedrockModels } from "./bedrock-models";
-import { awsBedrockProfileParam, awsBedrockRegionParam, awsProfileParam, awsRegionParam } from "./bedrock-params";
+import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam, awsProfileParam, awsRegionParam } from "./bedrock-params";
 
 export interface BedrockConvoCompletionServiceOptions
 {
     region:string;
     profile?:string;
+    apiKey?:string;
 }
 
 export class BedrockConvoCompletionService implements ConvoCompletionService<ConverseCommandInput,ConverseCommandOutput>
@@ -18,7 +19,8 @@ export class BedrockConvoCompletionService implements ConvoCompletionService<Con
     public static fromScope(scope:Scope){
         return new BedrockConvoCompletionService({
             region:awsBedrockRegionParam.get()??awsRegionParam.get()??'us-east-1',
-            profile:awsBedrockProfileParam.get()??awsProfileParam.get()
+            profile:awsBedrockProfileParam.get()??awsProfileParam.get(),
+            apiKey:awsBedrockApiKeyParam.get(),
         })
     }
 
@@ -28,12 +30,15 @@ export class BedrockConvoCompletionService implements ConvoCompletionService<Con
 
     private readonly region:string;
     private readonly profile?:string;
+    private readonly apiKey?:string;
     public constructor({
         region,
         profile,
+        apiKey,
     }:BedrockConvoCompletionServiceOptions){
         this.region=region;
         this.profile=profile;
+        this.apiKey=apiKey;
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -49,10 +54,16 @@ export class BedrockConvoCompletionService implements ConvoCompletionService<Con
     private getClient(
         region=this.region,
         profile=this.profile,
+        apiKey=this.apiKey,
     ):BedrockRuntimeClient{
-        const key=`${region}:::${profile??'.'}`;
+        const key=`${region}:::${profile??'.'}:::${apiKey??'.'}`;
 
-        return this.clients[key]??(this.clients[key]=new BedrockRuntimeClient({region,profile}));
+        return this.clients[key]??(this.clients[key]=new BedrockRuntimeClient(deleteUndefined({
+            region,
+            profile,
+            token:apiKey?{token:apiKey}:undefined,
+            authSchemePreference:apiKey?["httpBearerAuth"]:undefined,
+        })));
     }
 
     public async completeConvoAsync(
