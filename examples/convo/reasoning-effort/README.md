@@ -6,4 +6,4 @@ effort and response verbosity.
 
 | Reasoning Effort   |  Response Verbosity | Result |
 |--------------------|--------|-----|
-| minimal | low | (link)[./min-high.convo]
+| Minimal | Low | [Open](./min-high.convo)
