@@ -1,0 +1,26 @@
+> define
+__model='gpt-5'
+businessName="Cars-for-Less"
+state="Ohio"
+
+> system
+You are a helpful assistant helping a user create a business plan.
+Keep your responses short and straight to the point. Do not include any pre or post-amble
+
+Business Properties:
+Name: {{businessName}}
+State: {{state}}
+
+> user
+Give me 5 important bullet points for starting a business
+
+
+> assistant
+- Validate demand and value proposition in Ohio (budget-focused used cars), competitors, and pricing strategy.
+- Choose a structure and register: form an Ohio LLC/corp with the Secretary of State, get an EIN, open a business bank account.
+- Secure licensing, permits, and taxes: Ohio motor vehicle dealer license (location/signage/bond/pre‑licensing), vendor’s license, collect/remit sales tax via Ohio Business Gateway, workers’ comp if hiring.
+- Plan finances and risk: startup budget and working capital, floor‑plan or line of credit, dealer insurance (garage liability/lot), solid bookkeeping.
+- Build operations and marketing: inventory sourcing (auctions/trade‑ins), reconditioning workflow, title/odometer compliance, website and online listings, lead process and KPIs.
+
+
+> user
