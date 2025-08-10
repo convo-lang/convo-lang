@@ -4,6 +4,17 @@ effort and response verbosity.
 
 ![reasoning-effort](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/examples/convo/reasoning-effort/reasoning-effort.png)
 
-| Reasoning Effort   |  Response Verbosity | Result |
-|--------------------|--------|-----|
-| Minimal | Low | [Open](./min-high.convo)
+| Reasoning Effort | Response Verbosity | Result                         |
+|------------------|--------------------|--------------------------------|
+| Minimal          | Low                | [Open](./minimal-low.convo)    |
+| Minimal          | Medium             | [Open](./minimal-medium.convo) |
+| Minimal          | High               | [Open](./minimal-high.convo)   |
+| Low              | Low                | [Open](./low-low.convo)        |
+| Low              | Medium             | [Open](./low-medium.convo)     |
+| Low              | High               | [Open](./low-high.convo)       |
+| Medium           | Low                | [Open](./medium-low.convo)     |
+| Medium           | Medium             | [Open](./medium-medium.convo)  |
+| Medium           | High               | [Open](./medium-high.convo)    |
+| High             | Low                | [Open](./high-low.convo)       |
+| High             | Medium             | [Open](./high-medium.convo)    |
+| High             | High               | [Open](./high-high.convo)      |

@@ -1,6 +1,6 @@
 > define
 __model='gpt-5'
-__reasoningEffort='min'
+__reasoningEffort='minimal'
 __responseVerbosity='high'
 
 > user
@@ -49,3 +49,5 @@ Putting it together:
 - That field nudges electrons, creating a current through the wires and the load.
 - The load resists the current, converting electrical energy into light, heat, or motion.
 - The current returns to the source, completing the loop. If the loop is broken, the field and current vanish and the device turns off.
+
+> user

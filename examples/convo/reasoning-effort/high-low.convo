@@ -1,0 +1,20 @@
+> define
+__model='gpt-5'
+__reasoningEffort='high'
+__responseVerbosity='low'
+
+> user
+Describe how electricity flows through a circuit.
+
+
+> assistant
+- A source (battery or generator) creates a potential difference (voltage) between two points.
+- When a closed conductive path connects them, an electric field is established around the loop.
+- That field pushes mobile charges: in metals, electrons move; in electrolytes, ions; in semiconductors, electrons and holes.
+- Conventional current is defined from + to −; electrons in metals drift the opposite way and slowly, while the field propagates much faster.
+- Collisions with the material cause resistance, limiting current: I = V / R. Components drop voltage and convert electrical energy to heat, light, or motion: P = V × I.
+- Conservation laws apply: currents at a junction sum to zero (KCL), and voltage rises equal drops around any loop (KVL).
+- Open circuit (broken path) → no current; short circuit (very low resistance path) → very large current.
+- DC keeps one direction; AC reverses direction periodically.
+
+> user

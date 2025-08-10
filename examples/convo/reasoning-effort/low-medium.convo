@@ -1,0 +1,7 @@
+> define
+__model='gpt-5'
+__reasoningEffort='low'
+__responseVerbosity='medium'
+
+> user
+Describe how electricity flows through a circuit.

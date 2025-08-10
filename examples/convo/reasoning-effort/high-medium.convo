@@ -1,0 +1,24 @@
+> define
+__model='gpt-5'
+__reasoningEffort='high'
+__responseVerbosity='medium'
+
+> user
+Describe how electricity flows through a circuit.
+
+
+> assistant
+- Electricity is the flow of electric charge through a closed loop (circuit). In metals the moving charges are electrons; in liquids they can be ions; in semiconductors also “holes.”
+- A source (battery, generator) creates a potential difference called voltage by separating charges. Voltage is like “pressure” that pushes charges.
+- When the circuit is closed (switch on), an electric field forms around and along the conductors almost instantly. This field pushes the charge carriers, producing current (the rate of charge flow, in amperes).
+- Electrons in metal drift slowly (millimeters per second or less), but the electric signal/field propagates near the speed of light, so devices respond almost immediately.
+- Conventional current is defined as flowing from the source’s positive terminal to its negative; electron motion in metals is the opposite direction.
+- Components resist or control the flow. Resistance opposes current; for many materials I = V/R (Ohm’s law). As current passes through a load, electrical energy is converted to heat, light, motion, etc. Charges aren’t “used up”; the source keeps doing work to keep them moving.
+- Circuit rules:
+  - Series: same current through each element; voltage drops add to the source voltage.
+  - Parallel: same voltage across branches; currents in branches add at junctions (Kirchhoff’s laws).
+- DC circuits have current in one direction; AC circuits reverse direction periodically (50/60 Hz), yet energy still flows from source to load each half-cycle.
+- If the loop is broken (open circuit), current stops. A very low-resistance path (short circuit) allows excessive current, causing heating and possible damage.
+
+
+> user

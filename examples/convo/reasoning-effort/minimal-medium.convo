@@ -1,0 +1,23 @@
+> define
+__model='gpt-5'
+__reasoningEffort='minimal'
+__responseVerbosity='medium'
+
+> user
+Describe how electricity flows through a circuit.
+
+
+> assistant
+Electricity is the movement of electric charge, usually electrons, through a closed path called a circuit. Here’s the basic flow:
+
+- Source: A power source (battery, generator) creates an electric potential difference (voltage) between its terminals.
+- Electric field: This voltage sets up an electric field in the conductors almost instantly, pushing free electrons.
+- Current: Electrons drift from the negative terminal toward the positive terminal through the external circuit. By convention, current direction is defined as from positive to negative (opposite electron flow).
+- Components: As current passes through components (resistors, bulbs, motors), electrical energy is converted into other forms (heat, light, motion). The amount of current depends on the circuit’s total resistance and the source voltage (Ohm’s law: I = V/R).
+- Return path: The current completes the loop back to the source. In DC circuits, the voltage is constant in direction; in AC circuits, the voltage and current alternate direction periodically.
+- Conservation: Charge is conserved. The same current entering a junction equals the total leaving it (Kirchhoff’s current law), and the sum of voltage rises equals the sum of drops around any loop (Kirchhoff’s voltage law).
+
+In short, a voltage creates an electric field that drives charges around a closed loop, delivering energy to components along the way.
+
+
+> user
