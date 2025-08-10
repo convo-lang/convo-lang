@@ -1,0 +1,51 @@
+> define
+__model='gpt-5'
+__reasoningEffort='min'
+__responseVerbosity='high'
+
+> user
+Describe how electricity flows through a circuit.
+
+> assistant
+Electricity is the movement of electric charge through a material. In most everyday circuits, that charge is carried by electrons moving through a metal wire. Here’s how it flows through a simple circuit with a battery, wires, and a light bulb:
+
+1) Source of energy (the battery or power supply)
+- A battery has two terminals: a positive (+) and a negative (−).
+- Inside the battery, chemical reactions create an electric potential difference (voltage) between the terminals. This voltage is like a “pressure” that pushes charges.
+
+2) Conductive path (wires)
+- Wires provide a low-resistance path for electrons to move. In metal wires, electrons are free to move through the lattice of metal atoms.
+
+3) Load (the device that uses energy, like a bulb, motor, or resistor)
+- The load resists the flow of charge to some degree. As current passes through it, electrical energy is converted into other forms (light and heat in a bulb, motion in a motor, etc.).
+
+4) Closed loop requirement
+- For continuous current, the circuit must be a closed loop. If there is a break (an open switch, a cut wire), the charges can’t circulate and current stops.
+
+5) Direction of current vs electron flow
+- Conventional current is defined as flowing from the positive terminal to the negative terminal through the external circuit. This is a historical convention.
+- Electrons actually drift in the opposite direction: from the negative terminal to the positive terminal.
+- Both descriptions predict the same circuit behavior if used consistently.
+
+6) What makes the charges move
+- The battery’s electric field sets up almost instantaneously along the conductive path when the circuit is closed. This field exerts a force on free electrons, causing them to drift.
+- Although the drift speed of individual electrons is slow (millimeters per second), the signal (the electric field) propagates through the circuit at a significant fraction of the speed of light, so devices respond almost instantly when you flip a switch.
+
+7) Energy transfer
+- Energy is not carried primarily by electrons like little trucks; instead, energy flows through the electromagnetic field around the wires (described by the Poynting vector).
+- The battery maintains an electric field; the arrangement of fields around the wires directs energy into the load where it’s converted to other forms.
+
+8) Resistance and Ohm’s law
+- All real materials resist current to some extent. Resistance converts electrical energy to heat.
+- Ohm’s law (V = I × R) relates voltage (V), current (I), and resistance (R). For a given resistance, more voltage pushes more current.
+- In series circuits, resistances add; in parallel circuits, currents split according to the branch resistances.
+
+9) AC vs DC
+- DC (direct current): charges steadily flow in one direction (battery circuits).
+- AC (alternating current): the direction of current reverses periodically (mains power). Charges oscillate back and forth, but energy still flows from source to loads.
+
+Putting it together:
+- Close the switch. The battery’s voltage establishes an electric field around the circuit almost instantly.
+- That field nudges electrons, creating a current through the wires and the load.
+- The load resists the current, converting electrical energy into light, heat, or motion.
+- The current returns to the source, completing the loop. If the loop is broken, the field and current vanish and the device turns off.
