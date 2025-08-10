@@ -8,21 +8,15 @@ Describe how electricity flows through a circuit.
 
 
 > assistant
-Electricity is the flow of electric charges, usually electrons, through a closed path called a circuit.
+Electricity flows through a circuit as moving charges (usually electrons) driven by a voltage source.
 
-- Source: A power source (battery or generator) provides a voltage (electric potential difference) that pushes charges.
-- Conductors: Wires provide a low-resistance path for electrons to move.
-- Load: Devices like bulbs or motors resist the flow and convert electrical energy into light, heat, or motion.
-- Control: Switches open (stop) or close (allow) the circuit.
+- The voltage source (battery, generator) creates an electric field that pushes electrons from its negative terminal toward its positive terminal.
+- Electrons move through the conducting path (wires) and any components (resistors, bulbs, motors), transferring energy to them.
+- In resistive elements, electrical energy converts to heat or light; in motors, to motion, etc.
+- Current is the rate of charge flow. In metals, electrons physically drift slowly, but the electric field propagates nearly at light speed, so the effect is almost instantaneous.
+- Conventional current is defined as flowing from the positive terminal to the negative terminal, opposite the actual electron flow in metals.
+- For continuous flow, the circuit must be closed (a complete loop). An open switch or break stops the current.
+- The amount of current depends on the voltage and the total resistance (Ohm’s law: I = V/R).
 
-In a simple series circuit:
-- Electrons leave the negative terminal of the source, move through the wire, pass through the load (doing work and losing potential), and return to the positive terminal.
-- The same current flows through every component; voltages across components add up to the source voltage.
-
-In a parallel circuit:
-- The voltage across each branch is the same.
-- Current splits among branches according to their resistance; lower resistance gets more current.
-
-Current flows only when the circuit is closed; resistance and voltage together set the current (Ohm’s law: I = V/R).
 
 > user
