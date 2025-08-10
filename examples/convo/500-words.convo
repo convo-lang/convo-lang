@@ -1,0 +1,34 @@
+> define
+__model="gpt-5"
+__trackModel=true
+wordCount=500
+
+> system
+You are helping a user write long form documents. You should always respond with generated documents
+that are around {{wordCount}} words.
+
+> user
+Generate a story about the history of base ball.
+
+Make sure to include the following:
+- Babe Ruths famous home run where he points to the out field
+- Pete Rose's removal from the hall of fame
+
+
+
+@model gpt-5-2025-08-07
+> assistant
+They used to spell my name with a space: base ball. I was young then, stitched into afternoons at Elysian Fields where the grass lapped at trouser cuffs and rules were still suggestions. Gentlemen in straw hats traced the first diamonds, and a new rhythm took hold: the long breath between a windup and a swing; the explosion of a well-struck ball; the soft applause that sounded like the sea.
+
+War came and scattered my players, but soldiers carried me in their knapsacks. I traveled camp to camp, learned the dialects of dust and pine tar, returned to cities with a new swagger. The dead-ball years were my wintering, full of slyness—scraped balls, scuffed seams, bunts that tiptoed down a chalk line. Then a big man from Baltimore stepped out of the shadows and swung like he meant to realign the constellations.
+
+In 1932, in a Chicago wind, the stands were restless and the air itself seemed to heckle. Babe Ruth stood at the plate, all appetite and grin. He lifted his arm, pointing—whether to the bleachers or at a pitcher’s future is still argued in barbershops—and then he turned on a pitch and sent it high into center field, a home run that arced like a signature. In that instant, myth stepped in and pulled a chair. My heartbeat became the crowd’s roar, and for years afterward fathers taught sons how to point, not with arrogance, but with belief.
+
+I asked more of myself after that. In 1947, when Jackie Robinson bent to tie his laces and straightened into the jeers, I felt a hinge creak and then give. The game widened and clarified; the measure of a hero changed. Willie raced backward with his cap flying, Hank passed a number as heavy as a century, Roberto ran through rain and distance to where the ball was always falling.
+
+Time kept inventing new eras: expansion and polyester, free agency and night games that glowed like street lamps. Records thickened, were questioned, were re-understood. And I learned the cost of devotion. In 1989, Pete Rose—Charlie Hustle, who ran out every grounder—agreed to a permanent ban from baseball for betting on the game. Two years later, the Hall of Fame adopted a rule that made anyone on baseball’s permanently ineligible list ineligible for induction. He wasn’t removed from the Hall—he had never been elected—but the door was shut, firmly, and the echo of it still startles some hearts. In diners and on message boards, people argued about sin and redemption, about whether a game could be both a sanctuary and a stern judge.
+
+I changed my posture again—sabermetrics sifted me like flour, revealing shapes in the dust. A book about improbable winners taught front offices to love patience and on-base percentage. There were summers that smelled of suspicion, when power swelled beyond proportion and numbers felt like funhouse mirrors. Still, every spring a white ball cut a clean line against a blue sky, and a kid learned how leather stings and heals at the same time.
+
+Call me baseball, base ball, the old game, the new. I am the laughter on a bleacher and the quiet before a pitch. I live in certainty—ninety feet is still a long way—and in the doubts that make legends necessary. Somewhere, right now, someone is pointing. Somewhere, a door waits to be opened.
+
