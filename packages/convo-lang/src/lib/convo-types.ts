@@ -1284,7 +1284,7 @@ export interface FlatConvoConversationBase
     debug?:(...args:any[])=>void;
 }
 
-export const allConvoReasoningEffort=['min','minimal','md','medium','high'] as const;
+export const allConvoReasoningEffort=['min','minimal','low','md','medium','high'] as const;
 export type ConvoReasoningEffort=typeof allConvoReasoningEffort[number];
 export const isConvoReasoningEffort=(value:any):value is ConvoReasoningEffort=>allConvoReasoningEffort.includes(value);
 
