@@ -5,3 +5,14 @@ __responseVerbosity='low'
 
 > user
 Describe how electricity flows through a circuit.
+
+
+> assistant
+Electricity flows when a voltage source creates an electric field around a closed loop, pushing
+mobile charges through the conductors. In metal wires, electrons drift slowly, opposite to conventional
+current (defined from + to −), while the field that drives them establishes almost instantly. Components offer
+resistance/impedance, causing voltage drops and converting electrical energy into heat, light, or motion (V=IR; power P=VI).
+Opening the loop stops current; a short path causes excessive current. In DC the current is one direction; in AC it reverses periodically.
+
+
+> user

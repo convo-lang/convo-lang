@@ -5,3 +5,17 @@ __responseVerbosity='low'
 
 > user
 Describe how electricity flows through a circuit.
+
+
+> assistant
+Electricity flows as electric current—mobile charges moving through a closed loop under an electric field created by a voltage source.
+
+- A source (battery/generator) sets up a voltage difference, establishing an electric field in the conductors almost instantly.
+- In metals, electrons drift toward the positive terminal; conventional current is defined from positive to negative.
+- The current I depends on the circuit’s opposition (resistance/impedance). For DC, Ohm’s law: I = V/R. In AC, capacitance and inductance also matter.
+- Electrons move slowly (drift velocity), but energy is delivered quickly: the electromagnetic field around the wires carries energy from source to load.
+- A complete (closed) path is required; opening the circuit stops current, while a short circuit allows excessive current limited only by source/internal resistance.
+- DC: charges flow one way steadily. AC: charges oscillate back and forth; energy still flows from source to load each cycle.
+
+
+> user
