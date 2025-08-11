@@ -1,0 +1,32 @@
+> define
+__model="pixtral"
+__trackModel=true
+wordCount=200
+
+> user
+Tell me about what kind of AI model you are in {{wordCount}} words.
+
+
+
+@model us.mistral.pixtral-large-2502-v1:0
+> assistant
+I'm a text-based AI model known as a Large Language Model (LLM). I'm designed to understand and generate human-like text based on patterns I've learned from a vast amount of text data. Here are some key aspects of my design:
+
+1. **Architecture**: I'm built on the transformer architecture, which is particularly good at handling sequential data like text.
+
+2. **Training**: I've been trained on a diverse range of texts from the internet, up until 2023, using a process called unsupervised learning. This helps me predict the next word(s) in a sentence.
+
+3. **Capabilities**: I can generate text, answer questions, provide explanations, and even create code or translate languages to some extent.
+
+4. **Limitations**: I don't have real-time knowledge (only data up to 2023), personal experiences, or feelings. I also don't have the ability to browse the internet or access any databases beyond what I've been trained on.
+
+5. **Interaction**: You can interact with me by typing in natural language, and I'll respond in kind.
+
+
+> user
+Does your model have a name?
+
+@model us.mistral.pixtral-large-2502-v1:0
+> assistant
+The specific name of my model is not publicly disclosed by Mistral AI, the company that created me. However, you can think of me as Mistral's language model or simply as a Large Language Model (LLM). If you'd like to give me a name to make our interactions more personal, you're welcome to do so! Some people enjoy naming AI models to enhance their conversational experience. For example, you could call me "Assistant" or any other name you prefer.
+
