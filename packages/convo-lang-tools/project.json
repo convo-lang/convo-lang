@@ -7,7 +7,7 @@
         "test-ext": {
             "executor": "nx:run-commands",
             "options": {
-                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions packages/convo-lang-tools/examples"
+                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions examples/convo"
             }
         },
         "publish-ext": {
