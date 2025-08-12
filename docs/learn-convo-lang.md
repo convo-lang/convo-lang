@@ -144,7 +144,6 @@ Tell me about what kind of AI model you are
 <__send/>
 ```
 
-
 ### Ease of Readability
 A defining attribute of Convo-Lang is it easy to read syntax. For basic prompts it is nothing more
 than plain English, but even when using features like tool calling Convo-Lang is clear and concise,
@@ -464,6 +463,89 @@ written in Convo-Lang lives in Convo-Lang.
 - Edit agents in any software that supports plain text.
 - Send agents through software messaging software like Slack and WhatsApp.
 
+## Supported Models
+
+### OpenAI
+Full OpenAI model list - [https://platform.openai.com/docs/models](https://platform.openai.com/docs/models)
+
+- gpt-5
+- gpt-5-mini
+- gpt-5-nano
+- gpt-4.1
+- gpt-4
+- gpt-4-0125-preview
+- gpt-4-0613
+- gpt-4-1106-preview
+- gpt-4-turbo
+- gpt-4-turbo-2024-04-09
+- gpt-4-turbo-preview
+- gpt-4o
+- gpt-4o-2024-05-13
+- gpt-4o-2024-08-06
+- gpt-4o-mini
+- gpt-4o-mini-2024-07-18
+- chatgpt-4o-latest
+- o1-mini
+- o1-mini-2024-09-12
+- o1-preview
+- o1-preview-2024-09-12
+- gpt-3.5-turbo
+- gpt-3.5-turbo-0125
+- gpt-3.5-turbo-1106
+- gpt-3.5-turbo-16k
+
+### Local LLMs and OpenAI Compatible
+Any OpenAI chat completions compatible API can be used with Convo-Lang including locally hosted LLMs
+
+- [LM Studio](https://lmstudio.ai/docs/app/api/endpoints/openai)
+- [Ollama](https://ollama.com/blog/openai-compatibility)
+- [Llama.cpp](https://github.com/ggml-org/llama.cpp/tree/master/tools/server)
+
+### Open Router
+Convo-Lang can be used with [Open Router's 400+ models](https://openrouter.ai/models).
+ - [Claude](https://openrouter.ai/models?arch=Claude)
+ - [Gemini](https://openrouter.ai/models?arch=Gemini)
+ - [Grok](https://openrouter.ai/models?arch=Grok)
+ - [DeepSeek](https://openrouter.ai/models?arch=DeepSeek)
+ - [Mistral](https://openrouter.ai/models?arch=Mistral)
+ - [Llama2](https://openrouter.ai/models?arch=Llama2)
+ - [Llama3](https://openrouter.ai/models?arch=Llama3)
+ - [Llama4](https://openrouter.ai/models?arch=Llama4)
+ - [OpenAI](https://openrouter.ai/models?arch=GPT)
+ - [Cohere](https://openrouter.ai/models?arch=Cohere)
+ - [Nova](https://openrouter.ai/models?arch=Nova)
+ - [Yi](https://openrouter.ai/models?arch=Yi)
+ - [RWKV](https://openrouter.ai/models?arch=RWKV)
+ - [Qwen](https://openrouter.ai/models?arch=Qwen)
+ - [Qwen3](https://openrouter.ai/models?arch=Qwen3)
+ - [PaLM](https://openrouter.ai/models?arch=PaLM)
+ - [more](https://openrouter.ai/models)
+
+
+### AWS Bedrock
+[Learn more about Bedrock](https://aws.amazon.com/bedrock/)
+
+  - us.amazon.nova-lite-v1:0
+  - us.amazon.nova-micro-v1:0
+  - us.amazon.nova-pro-v1:0
+  - us.anthropic.claude-3-5-haiku-20241022-v1:0
+  - us.anthropic.claude-3-5-sonnet-20240620-v1:0
+  - us.anthropic.claude-3-5-sonnet-20241022-v2:0
+  - us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  - us.anthropic.claude-3-haiku-20240307-v1:0
+  - us.anthropic.claude-opus-4-20250514-v1:0
+  - us.anthropic.claude-sonnet-4-20250514-v1:0
+  - us.deepseek.r1-v1:0
+  - us.meta.llama3-1-70b-instruct-v1:0
+  - us.meta.llama3-1-8b-instruct-v1:0
+  - us.meta.llama3-2-11b-instruct-v1:0
+  - us.meta.llama3-2-1b-instruct-v1:0
+  - us.meta.llama3-2-3b-instruct-v1:0
+  - us.meta.llama3-2-90b-instruct-v1:0
+  - us.meta.llama3-3-70b-instruct-v1:0
+  - us.meta.llama4-maverick-17b-instruct-v1:0
+  - us.meta.llama4-scout-17b-instruct-v1:0
+  - us.mistral.pixtral-large-2502-v1:0
 
 ## Integration
 Convo-Lang can be integrated into any TypeScript/JavaScript or Python application. We won't go into
