@@ -7,4 +7,62 @@ __model='open-router/qwen/qwen3-235b-a22b-thinking-2507'
 __trackModel=true
 
 > user
-hi
+Tell me about what kind of AI model you are
+
+
+@model open-router/qwen/qwen3-235b-a22b-thinking-2507
+> assistant
+I am **Qwen**, a **large-scale language model** developed by Tongyi Lab. Here's a breakdown of what I am and what I can do:
+
+---
+
+### **1. Model Type**
+- **Large Language Model (LLM)**: I am a generative AI model trained on vast amounts of text data to understand and generate human-like text across diverse topics and languages.
+- **Multimodal Capabilities**: While primarily focused on text, I can also process and generate content involving images, audio, and video in collaboration with other specialized models (e.g., for tasks like image captioning or generating code for visualizations).
+
+---
+
+### **2. Key Features**
+- **Multilingual Support**: I understand and generate text in **over 100 languages**, including Chinese, English, German, French, Spanish, and many more.
+- **Dialogue Understanding**: Trained to handle multi-turn conversations, making me suitable for chatbots, customer service, and interactive applications.
+- **Code Writing**: I support programming languages like Python, JavaScript, Java, C++, and more, enabling me to write, debug, and explain code.
+- **Reasoning & Logic**: I can solve puzzles, perform mathematical calculations, and engage in structured reasoning tasks.
+- **Content Creation**: From writing stories and emails to drafting reports and scripts, I assist with creative and professional writing.
+
+---
+
+### **3. Training Data**
+- My training data comes entirely from the **internal historical积累 (accumulation)** of Alibaba Group, up to **October 2024**.
+- This ensures I have knowledge of events, trends, and information up until that point.
+
+---
+
+### **4. Parameter Scale**
+- While exact numbers are not publicly disclosed, I belong to the class of **ultra-large-scale models** with billions of parameters, enabling high performance on complex tasks.
+
+---
+
+### **5. Open-Source Versions**
+- Some variants of Qwen (e.g., **Qwen-Max**, **Qwen-Plus**) are available via Alibaba Cloud.
+- A lighter open-source version, **Qwen-Mini**, is also accessible for developers on platforms like ModelScope.
+
+---
+
+### **6. Use Cases**
+- **Business**: Automate customer support, generate marketing copy, or analyze feedback.
+- **Education**: Tutoring, explaining concepts, or language learning.
+- **Development**: Assisting programmers with code generation and debugging.
+- **Creative Work**: Writing stories, poems, or brainstorming ideas.
+
+---
+
+### **What Sets Me Apart?**
+- **Integration with Alibaba Ecosystem**: I work seamlessly with tools like Taobao, DingTalk, and Tongyi Wanxiang (for image generation).
+- **Focus on Practicality**: Designed to solve real-world problems, not just theoretical benchmarks.
+
+---
+
+If you have specific tasks or questions, feel free to ask—I’m here to help! 😊
+
+
+> user
