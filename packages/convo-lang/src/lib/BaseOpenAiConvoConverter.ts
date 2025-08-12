@@ -30,7 +30,7 @@ export interface BaseOpenAiConvoConverterOptions
      */
     functionRoles?:string[];
 
-    models:ConvoModelInfo[];
+    models?:ConvoModelInfo[];
 
     hasVision?:(modelName:string)=>boolean;
 
@@ -54,11 +54,13 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public readonly functionRoles:string[];
     public readonly chatModel?:string;
     public readonly visionModel?:string;
-    public readonly models:ConvoModelInfo[];
+    public readonly models?:ConvoModelInfo[];
     public readonly hasVision?:(modelName:string)=>boolean;
 
     public readonly transformInput?:(input:ChatCompletionCreateParamsNonStreaming)=>ChatCompletionCreateParamsNonStreaming;
     public readonly transformOutput?:(output:ChatCompletion)=>ChatCompletion;
+    public readonly getModelsAsync?:()=>Promise<ConvoModelInfo[]>
+
 
     public constructor({
         chatModel,
@@ -88,7 +90,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         Object.freeze(this.systemRoles);
         this.functionRoles=functionRoles?[...functionRoles]:['function'];
         Object.freeze(this.functionRoles);
-        this.models=[...models];
+        this.models=models?[...models]:undefined;
         Object.freeze(this.models);
         this.hasVision=hasVision;
         this.transformInput=transformInput;
@@ -176,7 +178,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
             throw new Error('Chat AI model not defined');
         }
 
-        const info=this.models.find(m=>m.name===model);
+        const info=this.models?.find(m=>m.name===model);
         if(info && info.inputCapabilities?.includes('image') || this.hasVision?.(model)){
             visionCapable=true;
         }

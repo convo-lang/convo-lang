@@ -1,4 +1,4 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
@@ -86,6 +86,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
             [openAiImageModelParam.typeName]:config.imageModel,
             [openAiVisionModelParam.typeName]:config.visionModel,
             [openAiSecretsParam.typeName]:config.secrets,
+
             [convoCapabilitiesParams.typeName]:config.capabilities,
             [convoDefaultModelParam.typeName]:config.defaultModel?.trim()||'gpt-4.1',
         }) as Record<string,string>);
@@ -93,6 +94,9 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
         reg.use(nodeCommonModule);
         reg.use(convoOpenAiModule);
         reg.use(convoBedrockModule);
+        if(config.env?.[openRouterApiKeyParam.typeName]){
+            reg.use(convoOpenRouterModule);
+        }
 
         reg.implementService(convoImportService,()=>new ConvoVfsImportService());
         reg.implementService(convoImportService,()=>new ConvoHttpImportService());

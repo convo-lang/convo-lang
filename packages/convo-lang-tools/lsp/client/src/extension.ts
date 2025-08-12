@@ -1,5 +1,5 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, openAiApiKeyParam, openAiBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from '@convo-lang/convo-lang-bedrock';
 import { ConvoCli, ConvoCliConfig, createConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
@@ -589,6 +589,10 @@ const registerCommands=(context:ExtensionContext)=>{
                 [awsBedrockApiKeyParam.typeName]:config.get<string>('awsBedrockApiKey')?.trim()||undefined,
 
                 [convoDefaultModelParam.typeName]:config.get<string>('defaultModel')?.trim()||undefined,
+
+                [openRouterApiKeyParam.typeName]:config.get<string>('openRouterApiKey')?.trim()||undefined,
+                [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
+
             }) as Record<string,string>
         };
     }

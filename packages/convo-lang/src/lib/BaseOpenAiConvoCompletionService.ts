@@ -9,7 +9,8 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     completionsEndpoint?:string;
     secretManager?:SecretManager;
     secretsName?:string;
-    models:ConvoModelInfo[];
+    models?:ConvoModelInfo[];
+    getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
     inputType:string;
     outputType:string;
     apiKeyHeader?:string;
@@ -21,6 +22,7 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     serviceId:string;
     /** Whether to log HTTP requests and responses for debugging purposes */
     logRequests?:boolean;
+    canComplete?:(model:string|undefined,flat:FlatConvoConversationBase)=>boolean;
 }
 
 export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
@@ -34,7 +36,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     private readonly apiBaseUrl:string;
     private readonly completionsEndpoint:string;
     private readonly secretsName?:string;
-    private readonly models:ConvoModelInfo[];
+    private readonly models?:ConvoModelInfo[];
     private readonly apiKeyHeader:string;
     private readonly apiKeyHeaderValuePrefix?:string;
     private readonly headers:Record<string,string>;
@@ -42,6 +44,8 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     private readonly logRequests:boolean;
     private readonly updateRequest?:(requestBody:Record<string,any>,headers:Record<string,string|undefined>)=>void;
     private readonly completeAsync?:(input:ChatCompletionCreateParamsNonStreaming,flat:FlatConvoConversationBase,apiKey:string|undefined,url:string)=>Promise<ChatCompletion|undefined>;
+    private readonly _getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
+    private readonly _canComplete?:(model:string|undefined,flat:FlatConvoConversationBase)=>boolean;
 
     public constructor({
         apiKey,
@@ -62,6 +66,8 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         logRequests=false,
         completeAsync,
         updateRequest,
+        getModelsAsync,
+        canComplete
     }:BaseOpenAiConvoCompletionServiceOptions){
         this.serviceId=serviceId;
         this.apiKey=apiKey;
@@ -79,6 +85,8 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         this.completeAsync=completeAsync;
         this.headers=headers;
         this.updateRequest=updateRequest;
+        this._getModelsAsync=getModelsAsync;
+        this._canComplete=canComplete;
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -86,7 +94,10 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         if(!model){
             return this.isFallback;
         }
-        return this.models.some(m=>m.name===model);
+        if(this._canComplete){
+            return this._canComplete(model,flat);
+        }
+        return this.models?.some(m=>m.name===model)??false;
     }
 
     private clientPromises:Record<string,Promise<ApiClient>>={};
@@ -151,8 +162,14 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         return r;
     }
 
-    public getModelsAsync(){
-        return Promise.resolve([...this.models]);
+    public async getModelsAsync(){
+        if(this.models){
+            return [...this.models];
+        }
+        if(this._getModelsAsync){
+            return await this._getModelsAsync();
+        }
+        return [];
     }
 }
 

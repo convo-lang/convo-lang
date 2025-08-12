@@ -1,0 +1,10 @@
+> define
+//__model='open-router/openai/gpt-oss-20b:free'
+//__model='open-router/google/gemini-2.5-pro'
+//__model='open-router'
+//__model='open-router/auto'
+__model='open-router/qwen/qwen3-235b-a22b-thinking-2507'
+__trackModel=true
+
+> user
+hi

@@ -1,7 +1,7 @@
 import { BedrockRuntimeClient, ConverseCommand, ConverseCommandInput, ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
-import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
+import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase, isConvoModelAliasMatch } from "@convo-lang/convo-lang";
 import { deleteUndefined, Scope } from "@iyio/common";
-import { convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib";
+import { bedrockModelPrefix, convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib";
 import { bedrockModels } from "./bedrock-models";
 import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam, awsProfileParam, awsRegionParam } from "./bedrock-params";
 
@@ -43,11 +43,13 @@ export class BedrockConvoCompletionService implements ConvoCompletionService<Con
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
     {
-        // if(!model){
-        //     return this.isFallback;
-        // }
-        // return this.models.some(m=>m.name===model);
-        return true;
+        if(!model){
+            return false;
+        }
+        return (
+            model.startsWith(bedrockModelPrefix) ||
+            bedrockModels.some(m=>m.name===model || m.aliases?.some(a=>isConvoModelAliasMatch))
+        );
     }
 
     private clients:Record<string,BedrockRuntimeClient>={};

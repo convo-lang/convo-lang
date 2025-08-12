@@ -1706,7 +1706,8 @@ export interface ConvoModelAlias
     priority?:number;
 }
 
-export type ConvoModelCapability='text'|'image'|'audio'|'video'|'embedding';
+export const allConvoModelCapability=['text','image','audio','video','embedding'] as const;
+export type ConvoModelCapability=typeof allConvoModelCapability[number];
 export interface ConvoModelInfo
 {
     /**

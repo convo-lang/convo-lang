@@ -256,7 +256,19 @@
                     "type": "string",
                     "default": "us-east-1",
                     "description": "AWS region to use with for Bedrock",
-                    "order": 5
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
                 }
             }
         }
