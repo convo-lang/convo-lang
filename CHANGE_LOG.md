@@ -1,5 +1,8 @@
 ## Change Log
 
+### v0.7.46
+- **OpenRouter Integration**: Added support for OpenRouter API as a model provider
+
 ### v0.7.45
 - **VSCode Extension**: Added settings menu to vscode extension
 - **VSCode extension**: Added configuration settings

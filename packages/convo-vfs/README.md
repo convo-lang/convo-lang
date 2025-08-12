@@ -3,7 +3,7 @@ The language of AI
 
 ![convo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/vscode-demo.gif)
 
-**Lean Convo-Lang with Live Demos**  - [https://learn.convo-lang.ai/learn](https://learn.convo-lang.ai/learn)
+**Learn Convo-Lang with Live Demos**  - [https://learn.convo-lang.ai](https://learn.convo-lang.ai)
 
 **GitHub** - [ https://github.com/convo-lang/convo-lang](https://github.com/convo-lang/convo-lang)
 
@@ -350,6 +350,9 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 X - https://x.com/ConvoLang
 
 ## Change Log
+
+### v0.7.46
+- **OpenRouter Integration**: Added support for OpenRouter API as a model provider
 
 ### v0.7.45
 - **VSCode Extension**: Added settings menu to vscode extension

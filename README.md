@@ -138,6 +138,8 @@ without having to start your full application.
   - Ollama - https://ollama.com/blog/openai-compatibility
   - Llama.cpp - https://github.com/ggml-org/llama.cpp/tree/master/tools/server
 
+- Open Router - 400+ models - https://openrouter.ai/models
+
 - AWS Bedrock - https://aws.amazon.com/bedrock/
   - us.amazon.nova-lite-v1:0
   - us.amazon.nova-micro-v1:0
@@ -350,6 +352,9 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 X - https://x.com/ConvoLang
 
 ## Change Log
+
+### v0.7.46
+- **OpenRouter Integration**: Added support for OpenRouter API as a model provider
 
 ### v0.7.45
 - **VSCode Extension**: Added settings menu to vscode extension
