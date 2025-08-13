@@ -1,0 +1,46 @@
+> define
+personType='funny'
+
+__model='gpt-5'
+
+Person = struct(
+    name:string
+    birthDate:number
+    personality:string
+    bestKnownQuote:string
+)
+
+@json = array(Person)
+> user
+List 4 {{personType}} people
+
+
+@format json
+> assistant
+[
+    {
+        "name": "Mitch Hedberg",
+        "birthDate": 1968,
+        "personality": "Laid-back, deadpan surrealist; quirky observational humor built from concise one-liners.",
+        "bestKnownQuote": "I used to do drugs. I still do, but I used to, too."
+    },
+    {
+        "name": "Groucho Marx",
+        "birthDate": 1890,
+        "personality": "Quick-witted, sarcastic, fast-talking with razor-sharp one-liners and wordplay.",
+        "bestKnownQuote": "I refuse to join any club that would have me as a member."
+    },
+    {
+        "name": "Joan Rivers",
+        "birthDate": 1933,
+        "personality": "Acerbic, fearless, self-deprecating and incisive insult-comic style.",
+        "bestKnownQuote": "I don't exercise. If God had wanted me to bend over, he would have put diamonds on the floor."
+    },
+    {
+        "name": "Steve Martin",
+        "birthDate": 1945,
+        "personality": "Absurdist, playful, and brainy with a dry, offbeat sensibility.",
+        "bestKnownQuote": "A day without sunshine is like, you know, night."
+    }
+]
+
