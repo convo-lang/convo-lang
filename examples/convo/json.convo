@@ -1,11 +1,12 @@
 > define
 Person = struct(
     name:string
-    age:number
+    birthDate:number
     personality:string
+    bestKnownQuote:string
 )
 
-@json Person[]
+@json = array(Person)
 > user
 List 4 funny people
 
@@ -14,24 +15,28 @@ List 4 funny people
 > assistant
 [
     {
-        "name": "Jim Carrey",
-        "age": 61,
-        "personality": "Energetic and zany"
+        "name": "Groucho Marx",
+        "birthDate": 1890,
+        "personality": "Quick-witted, sarcastic, fast-talking with razor-sharp one-liners and wordplay.",
+        "bestKnownQuote": "I refuse to join any club that would have me as a member."
     },
     {
-        "name": "Tina Fey",
-        "age": 53,
-        "personality": "Witty and sharp"
+        "name": "Mitch Hedberg",
+        "birthDate": 1968,
+        "personality": "Laid-back, deadpan surrealist; quirky observational humor built from concise one-liners.",
+        "bestKnownQuote": "I used to do drugs. I still do, but I used to, too."
     },
     {
-        "name": "Kevin Hart",
-        "age": 44,
-        "personality": "High-energy and charismatic"
+        "name": "Joan Rivers",
+        "birthDate": 1933,
+        "personality": "Acerbic, fearless, self-deprecating and incisive insult-comic style.",
+        "bestKnownQuote": "I don't exercise. If God had wanted me to bend over, he would have put diamonds on the floor."
     },
     {
-        "name": "Sarah Silverman",
-        "age": 52,
-        "personality": "Edgy and bold"
+        "name": "Steve Martin",
+        "birthDate": 1945,
+        "personality": "Absurdist, playful, and brainy with a dry, offbeat sensibility.",
+        "bestKnownQuote": "A day without sunshine is like, you know, night."
     }
 ]
 
