@@ -6,25 +6,27 @@ Person = struct(
     bestKnownQuote:string
 )
 
+personType='funny'
+
 @json = array(Person)
 > user
-List 4 funny people
+List 4 {{personType}} people
 
 
 @format json
 > assistant
 [
     {
-        "name": "Groucho Marx",
-        "birthDate": 1890,
-        "personality": "Quick-witted, sarcastic, fast-talking with razor-sharp one-liners and wordplay.",
-        "bestKnownQuote": "I refuse to join any club that would have me as a member."
-    },
-    {
         "name": "Mitch Hedberg",
         "birthDate": 1968,
         "personality": "Laid-back, deadpan surrealist; quirky observational humor built from concise one-liners.",
         "bestKnownQuote": "I used to do drugs. I still do, but I used to, too."
+    },
+    {
+        "name": "Groucho Marx",
+        "birthDate": 1890,
+        "personality": "Quick-witted, sarcastic, fast-talking with razor-sharp one-liners and wordplay.",
+        "bestKnownQuote": "I refuse to join any club that would have me as a member."
     },
     {
         "name": "Joan Rivers",
