@@ -1,12 +1,14 @@
 > define
+personType='funny'
+
+__model='gpt-5'
+
 Person = struct(
     name:string
     birthDate:number
     personality:string
     bestKnownQuote:string
 )
-
-personType='funny'
 
 @json = array(Person)
 > user
