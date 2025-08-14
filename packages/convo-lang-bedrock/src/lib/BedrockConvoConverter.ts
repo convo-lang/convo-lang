@@ -1,5 +1,5 @@
 import { ContentBlock, ConversationRole, ConverseCommandInput, ConverseCommandOutput, Message, SystemContentBlock, Tool, ToolChoice } from "@aws-sdk/client-bedrock-runtime";
-import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { deleteUndefined, log, parseMarkdownImages, uuid, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { convoBedrockInputType, convoBedrockOutputType, defaultBedrockModel } from "./bedrock-lib";
@@ -151,7 +151,7 @@ export class BedrockConvoConverter implements ConvoConversationConverter<Convers
 
         const visionCapable=flat.capabilities?.includes('vision');
 
-        const lastContentMessage=getLastNonCalledConvoFlatMessage(messages);
+        const lastContentMessage=getLastConvoContentMessage(messages);
         const jsonMode=lastContentMessage?.responseFormat==='json';
 
         const model=flat.responseModel??defaultBedrockModel;

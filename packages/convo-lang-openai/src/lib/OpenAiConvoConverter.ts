@@ -1,4 +1,4 @@
-import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
+import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { Scope, asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
@@ -114,7 +114,7 @@ export class OpenAiConvoConverter implements ConvoConversationConverter<ChatComp
         const messages=getNormalizedFlatMessageList(flat);
 
         let visionCapable=flat.capabilities?.includes('vision');
-        const lastContentMessage=getLastNonCalledConvoFlatMessage(messages);
+        const lastContentMessage=getLastConvoContentMessage(messages);
 
         const model=flat?.responseModel??(visionCapable?this._visionModel:this._chatModel);
         if(!model){

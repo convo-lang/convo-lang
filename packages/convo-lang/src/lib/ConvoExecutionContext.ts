@@ -837,7 +837,7 @@ export class ConvoExecutionContext
                 if(isConvoMessageModification(prompt.action)){
                     this.parentConvo.appendModification(prompt.action,content,this.flat);
                 }else if(prompt.action==='respond' && this.flat){
-                    this.parentConvo.appendResponse(prompt.hasRole?content:`> assistant\n${escapeConvo(content)}`,this.flat)
+                    this.parentConvo.appendResponse((prompt.hasRole && prompt.isStatic)?content:`> assistant\n${escapeConvo(content)}`,this.flat)
                 }
             }
         }

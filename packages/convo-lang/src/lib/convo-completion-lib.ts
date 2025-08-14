@@ -193,7 +193,7 @@ export const applyConvoModelConfigurationToInputAsync=async (
             i--;
             continue;
         }
-        if(msg.responseFormat==='json'){
+        if(msg.responseFormat==='json' && msg===lastMsg){
             applyJsonModeToMessage(msg,model,flat);
         }
         if(msg.fn && !msg.called){
@@ -440,11 +440,11 @@ const applyJsonModeToMessage=(msg:FlatConvoMessage,model:ConvoModelInfo,flat:Fla
             }
         }
 
-        appendFlatConvoMessageSuffix(msg,`Return a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} that conforms to the following JSON Schema:\n${
+        appendFlatConvoMessageSuffix(msg,`<response-format>\nReturn a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} that conforms to the following JSON Schema for this message:\n${
             JSON.stringify(scheme)
-        }`);
+        }</response-format>`);
     }else{
-        appendFlatConvoMessageSuffix(msg,`Return a well formatted JSON ${msg.responseFormatIsArray?'array':'object'}.`);
+        appendFlatConvoMessageSuffix(msg,`<response-format>Return a well formatted JSON ${msg.responseFormatIsArray?'array':'object'} for this message.</response-format>`);
     }
 
     if(model.jsonModeInstructWrapInCodeBlock){

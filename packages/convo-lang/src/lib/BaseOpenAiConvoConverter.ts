@@ -1,6 +1,6 @@
 import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
-import { createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastNonCalledConvoFlatMessage, getNormalizedFlatMessageList } from "./convo-lib";
+import { createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib";
 import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types";
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat';
 
@@ -171,7 +171,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         const messages=getNormalizedFlatMessageList(flat);
 
         let visionCapable=flat.capabilities?.includes('vision');
-        const lastContentMessage=getLastNonCalledConvoFlatMessage(messages);
+        const lastContentMessage=getLastConvoContentMessage(messages);
 
         const model=flat?.responseModel??(visionCapable?this.visionModel:this.chatModel);
         if(!model){
@@ -310,7 +310,6 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 (cParams as any)[e]=flat.modelParams[e];
             }
         }
-
 
         if(this.transformInput){
             return this.transformInput(cParams);

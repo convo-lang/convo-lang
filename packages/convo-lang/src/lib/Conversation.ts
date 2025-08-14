@@ -3819,6 +3819,10 @@ export class Conversation
                 lastMsg?.tags?(convoTags.call in lastMsg.tags)?'required':undefined:undefined
             );
 
+            let updatedMessages=this.mergeConvoFlatContentMessages(messages);
+            for(const u of updatedMessages){
+                this.applyTagsAndState(u,messages,explicitlyEnabledTransforms,exe,false,mdVarCtx)
+            }
 
             const lastUserMsg=this.getLastUserMessage(messages);
             let responseEndpoint:string|undefined=exe.getVar(convoVars.__endpoint);
@@ -4079,13 +4083,17 @@ export class Conversation
                 delete flat.transformFilterMessages;
             }
 
+            updatedMessages=this.mergeConvoFlatContentMessages(messages);
+            for(const u of updatedMessages){
+                this.applyTagsAndState(u,messages,explicitlyEnabledTransforms,exe,false,mdVarCtx)
+            }
+
+            deleteUndefined(flat);
+
             if(setCurrent){
                 this.setFlat(flat);
             }
 
-            this.mergeConvoFlatContentMessages(flat.messages);
-
-            deleteUndefined(flat);
             return flat;
         }finally{
             exe.disableInlinePrompts=false;
@@ -4987,9 +4995,10 @@ export class Conversation
      *
      * @param messages - Array of flat conversation messages to process in-place
      */
-    private mergeConvoFlatContentMessages(messages:FlatConvoMessage[]){
+    private mergeConvoFlatContentMessages(messages:FlatConvoMessage[]):FlatConvoMessage[]{
 
 
+        const updated:FlatConvoMessage[]=[];
         let lastContentMessage:FlatConvoMessage|undefined;
         let lastContentMessageI=0;
 
@@ -5009,6 +5018,11 @@ export class Conversation
                     }
                     lastContentMessage={...lastContentMessage};
                     messages[lastContentMessageI]=lastContentMessage;
+                    updated.push(lastContentMessage);
+
+                    if(msg.tags){
+                        lastContentMessage.tags={...lastContentMessage.tags,...msg.tags}
+                    }
 
                     switch(msg.role){
                         case convoRoles.replace:
@@ -5041,6 +5055,8 @@ export class Conversation
             }
 
         }
+
+        return updated;
     }
 }
 

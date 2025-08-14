@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoDocumentReference } from "./convo-rag-types";
 import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker, isConvoMessageModificationAction } from "./convo-types";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -2386,7 +2386,17 @@ export const getLastConvoMessageWithRole=<T extends ConvoMessage|FlatConvoMessag
 export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
     for(let i=messages.length-1;i>=0;i--){
         const msg=messages[i];
-        if(msg && !msg.called && !isConvoMessageModificationAction(msg.role) && msg.role!==convoRoles.system){
+        if(msg && !msg.called && msg.role!==convoRoles.system){
+            return msg;
+        }
+    }
+    return undefined;
+}
+
+export const getLastConvoContentMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
+    for(let i=messages.length-1;i>=0;i--){
+        const msg=messages[i];
+        if(msg && !msg.called && msg.content!==undefined && msg.role!==convoRoles.system){
             return msg;
         }
     }
@@ -2427,7 +2437,7 @@ export const createTextConvoCompletionMessage=({
     tokenPrice,
     defaults,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
-    const lastContentMessage=getLastNonCalledConvoFlatMessage(flat.messages);
+    const lastContentMessage=getLastConvoContentMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
 
     return {
