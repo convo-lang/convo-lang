@@ -29,7 +29,7 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 ## Index
 - [Quick Start with NextJS](#quick-start-with-nextjs)
 - [VSCode extension](#vscode-extension)
-- [Model Provider Support](#model-provider-support)
+- [Model Support](#model-support)
 - [Using Convo-Lang in Javascript](#using-convo-lang-in-javascript)
 - [Using the CLI](#using-the-cli)
 - [CLI configuration](#cli-configuration)
@@ -104,41 +104,61 @@ convo file and completed. This is great for quick prototyping and testing prompt
 without having to start your full application.
 
 
-## Model Provider Support
+## Model Support
 
-- OpenAI - https://platform.openai.com/docs/models
-  - gpt-5
-  - gpt-5-mini
-  - gpt-5-nano
-  - gpt-4.1
-  - gpt-4
-  - gpt-4-0125-preview
-  - gpt-4-0613
-  - gpt-4-1106-preview
-  - gpt-4-turbo
-  - gpt-4-turbo-2024-04-09
-  - gpt-4-turbo-preview
-  - gpt-4o
-  - gpt-4o-2024-05-13
-  - gpt-4o-2024-08-06
-  - gpt-4o-mini
-  - gpt-4o-mini-2024-07-18
-  - chatgpt-4o-latest
-  - o1-mini
-  - o1-mini-2024-09-12
-  - o1-preview
-  - o1-preview-2024-09-12
-  - gpt-3.5-turbo
-  - gpt-3.5-turbo-0125
-  - gpt-3.5-turbo-1106
-  - gpt-3.5-turbo-16k
+### OpenAI
+https://platform.openai.com/docs/models
 
-- OpenAI Chat Completions Compatible APIs
-  - LM Studio - https://lmstudio.ai/docs/app/api/endpoints/openai
-  - Ollama - https://ollama.com/blog/openai-compatibility
-  - Llama.cpp - https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+- gpt-5
+- gpt-5-mini
+- gpt-5-nano
+- gpt-4.1
+- gpt-4
+- gpt-4-turbo
+- gpt-4o
+- gpt-4o-mini
+- o4-mini-deep-research
+- o4-mini
+- o3
+- o3-pro
+- o3-mini
+- o3-deep-research
+- o1-mini
+- o1-preview
+- gpt-3.5-turbo
+- gpt-3.5-turbo-16k
 
-- AWS Bedrock - https://aws.amazon.com/bedrock/
+### Local LLMs & OpenAI Compatible
+Any OpenAI chat completions compatible API can be used with Convo-Lang including locally hosted LLMs
+
+- LM Studio - https://lmstudio.ai/docs/app/api/endpoints/openai
+- Ollama - https://ollama.com/blog/openai-compatibility
+- Llama.cpp - https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+
+### Open Router
+Convo-Lang can be used with Open Router's 400+ models - https://openrouter.ai/models
+ - Claude - https://openrouter.ai/models?arch=Claude
+ - Gemini - https://openrouter.ai/models?arch=Gemini
+ - Grok - https://openrouter.ai/models?arch=Grok
+ - DeepSeek - https://openrouter.ai/models?arch=DeepSeek
+ - Mistral - https://openrouter.ai/models?arch=Mistral
+ - Llama2 - https://openrouter.ai/models?arch=Llama2
+ - Llama3 - https://openrouter.ai/models?arch=Llama3
+ - Llama4 - https://openrouter.ai/models?arch=Llama4
+ - OpenAI GPT - https://openrouter.ai/models?arch=GPT
+ - Cohere - https://openrouter.ai/models?arch=Cohere
+ - Nova - https://openrouter.ai/models?arch=Nova
+ - Yi - https://openrouter.ai/models?arch=Yi
+ - RWKV - https://openrouter.ai/models?arch=RWKV
+ - Qwen - https://openrouter.ai/models?arch=Qwen
+ - Qwen3 - https://openrouter.ai/models?arch=Qwen3
+ - PaLM - https://openrouter.ai/models?arch=PaLM
+ - more - https://openrouter.ai/models
+
+
+### AWS Bedrock
+https://aws.amazon.com/bedrock/
+
   - us.amazon.nova-lite-v1:0
   - us.amazon.nova-micro-v1:0
   - us.amazon.nova-pro-v1:0
@@ -350,6 +370,10 @@ Join our Discord Server - https://discord.gg/GyXp8Dsa
 X - https://x.com/ConvoLang
 
 ## Change Log
+
+### v0.7.48
+- **Bug Fixes**: Fixed inline prompting bugs
+- **JSON Mode**: JSON response request message is now only appended if the message is the last message in the conversation
 
 ### v0.7.46
 - **OpenRouter Integration**: Added support for OpenRouter API as a model provider

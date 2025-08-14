@@ -1,5 +1,9 @@
 ## Change Log
 
+### v0.7.48
+- **Bug Fixes**: Fixed inline prompting bugs
+- **JSON Mode**: JSON response request message is now only appended if the message is the last message in the conversation
+
 ### v0.7.46
 - **OpenRouter Integration**: Added support for OpenRouter API as a model provider
 
