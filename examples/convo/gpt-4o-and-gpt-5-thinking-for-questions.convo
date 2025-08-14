@@ -5,7 +5,7 @@ __model='gpt-4o'
 > local thinkHardForQuestions() -> (
 
     if( ??? (+ boolean /m task:Analyzing message)
-        Did the user ask a question
+        Was the users last message a question?
     ???) then (
         ??? (+ respond task:Thinking hard)
             > define
