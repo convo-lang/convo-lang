@@ -1,7 +1,7 @@
-import { ConvoEdge, ConvoGraphEntityRef, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "@convo-lang/convo-lang";
+import { ConvoLangTheme } from "@convo-lang/convo-lang-react";
 import { Point, Rect } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { ConvoLangTheme } from "../convo-lang-theme";
+import { ConvoEdge, ConvoGraphEntityRef, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types";
 
 export interface ConvoEntityLayoutCtrl
 {

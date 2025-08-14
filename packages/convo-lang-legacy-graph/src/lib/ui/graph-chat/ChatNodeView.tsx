@@ -1,8 +1,8 @@
-import { ConvoNode } from "@convo-lang/convo-lang";
+import { ConversationView } from "@convo-lang/convo-lang-react";
 import { atDotCss } from "@iyio/at-dot-css";
 import { SlimButton, View, useSubject } from "@iyio/react-common";
 import { useState } from "react";
-import { ConversationView } from "../ConversationView";
+import { ConvoNode } from "../../convo-graph-types";
 import { convoGraphEntityDragClass, useConvoGraphViewCtrl } from "../graph/convo-graph-react-lib";
 
 export interface ChatNodeViewProps

@@ -1,8 +1,10 @@
-import { ConvoGraphCtrl, ConvoNode, getConvoGraphEventString } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Point, asArray, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomState, PanZoomView, SlimButton, View, useDeepCompareItem, useElementSize, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ConvoGraphCtrl } from "../../ConvoGraphCtrl";
+import { getConvoGraphEventString } from "../../convo-graph-lib";
+import { ConvoNode } from "../../convo-graph-types";
 import { convoGraphChatRenderer } from "../graph-chat/graph-chat-renderer";
 import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
 import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";

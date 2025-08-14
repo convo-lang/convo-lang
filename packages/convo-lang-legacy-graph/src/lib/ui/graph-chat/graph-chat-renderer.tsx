@@ -1,4 +1,4 @@
-import { ConvoGraphEntityRef } from "@convo-lang/convo-lang";
+import { ConvoGraphEntityRef } from "../../convo-graph-types";
 import { ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer } from "../graph/convo-graph-react-type";
 import { ChatNodeView } from "./ChatNodeView";
 

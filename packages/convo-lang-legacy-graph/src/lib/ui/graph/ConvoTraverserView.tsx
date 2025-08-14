@@ -1,8 +1,8 @@
-import { ConvoTraverser } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { wAryRemove, wSetProp } from "@iyio/common";
 import { JsonView, SlimButton, Text, View } from "@iyio/react-common";
 import { useEffect, useState } from "react";
+import { ConvoTraverser } from "../../convo-graph-types";
 import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
 
 export interface ConvoTraverserViewProps

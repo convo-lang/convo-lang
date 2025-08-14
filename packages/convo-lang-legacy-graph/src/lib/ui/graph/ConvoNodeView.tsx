@@ -1,8 +1,8 @@
-import { ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { wAryRemove } from "@iyio/common";
 import { SlimButton, View, useWProp, useWatchDeep } from "@iyio/react-common";
 import { useState } from "react";
+import { ConvoNode } from "../../convo-graph-types";
 import { ConvoNodeStepView } from "./ConvoNodeStepView";
 import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
 

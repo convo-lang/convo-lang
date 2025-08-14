@@ -1,7 +1,7 @@
-import { ConvoNode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { useWatchPath } from "@iyio/react-common";
 import { useEffect, useState } from "react";
+import { ConvoNode } from "../../convo-graph-types";
 import { ConvoGraphEntityView } from "./ConvoGraphEntityView";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
 const svgSpan=6000;
@@ -60,23 +60,23 @@ export function ConvoGraphCanvas({
                 <g ref={setLineGroup}/>
             </svg>
 
-            {ctrl.graph.nodes.map((n)=>(
+            {ctrl.graph.nodes.map((n:any)=>(
                 <ConvoGraphEntityView key={n.id} node={n} ctrl={ctrl} getNodeLink={getNodeLink}/>
             ))}
 
-            {ctrl.graph.edges.map((n)=>(
+            {ctrl.graph.edges.map((n:any)=>(
                 <ConvoGraphEntityView key={n.id} edge={n} ctrl={ctrl}/>
             ))}
 
-            {ctrl.graph.inputs.map((n)=>(
+            {ctrl.graph.inputs.map((n:any)=>(
                 <ConvoGraphEntityView key={n.id} input={n} ctrl={ctrl}/>
             ))}
 
-            {ctrl.graph.sourceNodes.map((n)=>(
+            {ctrl.graph.sourceNodes.map((n:any)=>(
                 <ConvoGraphEntityView key={n.id} sourceNode={n} ctrl={ctrl}/>
             ))}
 
-            {ctrl.graph.traversers.map((n)=>(
+            {ctrl.graph.traversers.map((n:any)=>(
                 <ConvoGraphEntityView key={n.id} traverser={n} ctrl={ctrl}/>
             ))}
 

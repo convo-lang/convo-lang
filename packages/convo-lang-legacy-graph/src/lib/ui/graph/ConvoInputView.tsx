@@ -1,9 +1,9 @@
-import { ConvoInputTemplate } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { wAryRemove, wSetProp, wSetPropOrDeleteFalsy } from "@iyio/common";
 import { ScrollView, SlimButton, Text, View, useSubject, useWProp } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback, useState } from "react";
+import { ConvoInputTemplate } from "../../convo-graph-types";
 import { ConvoNodeSelector } from "./ConvoNodeSelector";
 import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
 import { ConvoInputSource } from "./convo-graph-react-type";

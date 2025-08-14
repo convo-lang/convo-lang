@@ -1,9 +1,10 @@
-import { ConvoSourceNode, parseConvoCode } from "@convo-lang/convo-lang";
+import { parseConvoCode } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { wAryRemove, wSetProp, wSetPropOrDeleteFalsy } from "@iyio/common";
 import { SlimButton, View, useWProp } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback } from "react";
+import { ConvoSourceNode } from "../../convo-graph-types";
 import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
 
 export interface ConvoSourceNodeViewProps

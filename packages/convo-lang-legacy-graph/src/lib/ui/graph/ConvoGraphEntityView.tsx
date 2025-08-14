@@ -1,10 +1,11 @@
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser, createConvoGraphEntity } from "@convo-lang/convo-lang";
+import { convoLangReactIcons } from "@convo-lang/convo-lang-react";
 import { atDotCss } from "@iyio/at-dot-css";
 import { stopWatchingObj, wSetProp, wSetPropOrDeleteFalsy, watchObj } from "@iyio/common";
 import { SlimButton, Text, View, useElementSize, useSubject, useWProp } from "@iyio/react-common";
 import { useEffect, useMemo, useState } from "react";
 import { BehaviorSubject } from "rxjs";
-import { convoLangReactIcons } from "../convo-lang-react-icons";
+import { createConvoGraphEntity } from "../../convo-graph-lib";
+import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types";
 import { ConvoEdgeView } from "./ConvoEdgeView";
 import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
 import { ConvoInputView } from "./ConvoInputView";
