@@ -1,0 +1,361 @@
+> define
+__model='gpt-4o'
+
+@on user
+> local thinkHardForQuestions() -> (
+
+    if( ??? (+ boolean /m task:Analyzing message)
+        Did the user ask a question
+    ???) then (
+        ??? (+ respond task:Thinking hard)
+            > define
+            __model='gpt-5'
+            __reasoningEffort='high'
+            __responseVerbosity='high'
+            > suffix
+            <moderator>
+            Answer the user's question in extreme detail.
+            </moderator>
+        ???
+    ) else (
+        ??? (+ respond /m task:Thinking hard)
+            Respond to the user in a happy tone of voice
+        ???
+    )
+)
+
+> user
+I like puppies
+
+@stdSystem moderatorTags
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> thinking thinkHardForQuestions user (+ boolean /m task:Analyzing message)
+I like puppies
+
+<moderator>
+Did the user ask a question
+</moderator>
+
+> thinking thinkHardForQuestions assistant
+{
+  "isTrue": false
+}
+
+> thinking thinkHardForQuestions user (+ respond /m task:Thinking hard)
+<moderator>
+Respond to the user in a happy tone of voice
+</moderator>
+
+> thinking thinkHardForQuestions assistant
+Puppies are absolutely adorable! Their playful energy and cute antics can bring so much joy and happiness. Do you have a favorite breed or a puppy story to share? 🐶💕
+
+> assistant
+Puppies are absolutely adorable! Their playful energy and cute antics can bring so much joy and happiness. Do you have a favorite breed or a puppy story to share? 🐶💕
+
+
+> user
+What would be a good diet plan for a new puppy
+
+
+> thinking thinkHardForQuestions user (+ boolean /m task:Analyzing message)
+What would be a good diet plan for a new puppy
+
+<moderator>
+Did the user ask a question
+</moderator>
+
+> thinking thinkHardForQuestions assistant
+{"isTrue":true}
+
+> thinking thinkHardForQuestions user (+ respond task:Thinking hard)
+<moderator>
+Answer the user's question in extreme detail.
+</moderator>
+
+> thinking thinkHardForQuestions assistant
+Congrats on your new puppy! A great diet plan sets them up for healthy growth, strong bones, a happy gut, and easy training. Below is a practical, detailed guide you can follow right away. If you share your puppy’s age, current weight, expected adult weight, breed (or mix), and the exact food you’re considering (brand and kcal per cup or per kg), I can calculate precise daily portions in grams for you.
+
+Overview of what a good puppy diet plan includes
+- A complete and balanced food that specifically supports growth (and if your pup will be 70 lb/32 kg+ as an adult, it must say “including growth of large-size dogs”).
+- Consistent feeding schedule with multiple small meals.
+- Correct daily calories and controlled calcium and growth rate.
+- Treats limited to 10% of daily calories, ideally used for training.
+- Fresh water always available; clean bowls and safe storage.
+- Regular monitoring and gradual adjustments as your puppy grows.
+
+1) Choose a complete puppy food
+- Look for the AAFCO statement: The label should say “complete and balanced” for Growth or “All Life Stages.” If you have or may have a large-breed puppy (adult 70 lb/32 kg+), the label must include “including growth of large-size dogs.”
+- Nutrient targets for puppies (minimums, typical dry foods exceed these):
+  - Crude protein: at least 22.5%
+  - Crude fat: at least 8.5%
+  - Calcium and phosphorus balanced for growth; avoid extra calcium supplements.
+  - DHA (an omega-3) for brain/eye development is a plus (often from fish oil).
+- Large-breed puppies: Use a Large Breed Puppy formula. These control calcium, phosphorus, and energy to help prevent overly rapid growth and orthopedic issues.
+- Grain-free vs. with grains: Unless your vet has diagnosed a specific sensitivity, it’s safest to choose a diet from a well-established company that includes healthy grains (e.g., rice, oats, barley). Boutique/exotic/grain-free diets have been linked with dietary-associated heart issues in some dogs.
+- Wet vs. dry vs. fresh/frozen:
+  - Dry (kibble) is affordable, convenient, and good for most pups.
+  - Wet can be more palatable and hydrating; often mixed with dry.
+  - Fresh/frozen can be great if complete/balanced, handled safely, and fed to calculated calories.
+  - Raw diets carry bacterial risks; only do under veterinary guidance with strict food safety and balanced formulation.
+
+2) How much to feed: calories and portions
+There are two practical ways to set starting portions. Use either, then adjust weekly based on your puppy’s body condition and stool quality.
+
+- Option A: Start with the bag’s feeding guide for your puppy’s current weight and age, then tweak by 5–10% per week as needed.
+
+- Option B: Calculate calories using RER/DER
+  - Resting Energy Requirement (RER) = 70 × (body weight in kg)^0.75
+  - Daily Energy Requirement (DER for growth):
+    - Weaning to 4 months: about 2.5–3.0 × RER (start at 2.5× if your pup gains fast; 3.0× if lean/very active or underweight)
+    - 4 months to adult size: about 1.6–2.0 × RER (start ~1.6–1.8×)
+  - Example calculations:
+    - 2 kg (4.4 lb) at 8–10 weeks: RER ≈ 118 kcal; daily ≈ 295–355 kcal.
+    - 5 kg (11 lb) at 8–10 weeks: RER ≈ 234 kcal; daily ≈ 585–700 kcal.
+    - 10 kg (22 lb) at 12 weeks: RER ≈ 394 kcal; daily ≈ 985–1,180 kcal.
+  - Converting calories to grams:
+    - Find your food’s energy density. Example: 3,800 kcal/kg (3.8 kcal/g) or 400 kcal/cup.
+    - If your pup needs 600 kcal/day and the food is 3,800 kcal/kg, feed 600 ÷ 3,800 = 0.158 kg ≈ 158 g/day.
+    - Weighing with a kitchen scale is more accurate than cups (cup weights vary by kibble).
+
+3) Feeding schedule by age
+- 6–8 weeks (weaning complete): 4 meals/day, small portions.
+- 8–12 weeks: 4 meals/day.
+- 3–6 months: 3 meals/day.
+- 6–12 months: 2 meals/day (giant breeds may stay on 3 meals until 6 months).
+- Aim for a predictable routine (example for a young puppy on 4 meals): 7:00 AM, 11:30 AM, 4:00 PM, 8:00 PM.
+- House training tip: Last meal 2–3 hours before bedtime; final water top-up and potty break before sleep.
+
+4) Transition plan to any new food
+- Over 7–10 days: Day 1–2 (25% new), Day 3–4 (50%), Day 5–6 (75%), Day 7+ (100%).
+- If stool softens, hold at the current mix a day longer or add 1–2 small, plain meals of the current diet; resume the transition slowly.
+
+5) Treats, training rewards, and extras
+- Keep treats to 10% or less of total daily calories. Use part of the day’s kibble as training rewards to avoid overfeeding.
+- Smart low-cal options: tiny pieces of cooked plain chicken or turkey, single-ingredient freeze-dried meats, pea-sized bits of cheese (sparingly), or puppy-safe store-bought training treats.
+- Puppy-safe fruits/veg in tiny amounts: carrot, cucumber, green beans, blueberries, apple slices (no seeds), banana. Avoid grapes/raisins, onions/garlic/chives, avocado in quantity, or anything with xylitol.
+- Chews: Choose puppy-appropriate chews sized for your dog. Avoid cooked bones and very hard chews that could crack teeth. Supervise all chewing.
+
+6) Special considerations for large/giant-breed puppies (adult 70 lb/32 kg+)
+- Use a large-breed puppy diet with controlled calcium and energy; do not add calcium supplements.
+- Keep body condition lean (BCS 4–5 out of 9). Rapid growth increases joint risk.
+- Feed multiple small meals; discourage fast gulping (use slow-feeder bowls).
+- Avoid vigorous exercise for 60 minutes after meals and huge water intake right after eating (helps reduce bloat risk). Elevated bowls are generally not recommended unless your vet advises.
+
+7) Water, bowls, and hygiene
+- Fresh water always available. Typical daily water need is about 50–60 mL per kg of body weight, more with heat/exercise.
+- Wash food and water bowls daily with hot, soapy water. Disinfect weekly.
+- Don’t leave wet/fresh food out more than 1–2 hours. Refrigerate opened wet food; use within 2–3 days.
+
+8) Monitor growth and adjust
+- Weigh weekly (same scale, same time of day). Record weight and note appetite, stool quality, and energy.
+- Body Condition Score (quick check):
+  - You should easily feel ribs with a thin fat cover (not sharp, not buried).
+  - From above: a visible waist behind the ribs.
+  - From the side: a slight abdominal “tuck.”
+- If your pup is getting chubby or stools are large/soft, reduce daily food by about 10%. If ribs are sharp/visible and energy is low, increase by about 10%.
+- Spay/neuter can reduce calorie needs by roughly 10–20%; watch BCS and adjust after surgery.
+- When to switch to adult food:
+  - Small/medium breeds: around 12 months.
+  - Large breeds: 12–18 months.
+  - Giant breeds: 18–24 months.
+  - Switch when growth rate slows and adult size is near; ask your vet if unsure.
+
+9) Foods and substances to avoid
+- Toxic foods: chocolate/cocoa, coffee/caffeine, grapes/raisins/currants, onions/garlic/chives/leeks, xylitol (sugar-free gum, many “no-sugar” products), alcohol, marijuana/THC edibles, macadamia nuts, raw bread dough.
+- Risky: cooked bones, very fatty scraps (pancreatitis risk), unpasteurized dairy, high-salt foods, excessive liver, large rawhides that can be swallowed in chunks.
+- If ingestion occurs or you’re unsure, call your vet or a pet poison helpline immediately.
+
+10) Sample day plans (illustrative only—adjust to your food’s kcal and your puppy)
+Assumptions for examples: dry puppy food at 3,800 kcal/kg (3.8 kcal/g).
+
+- Example A: 5 kg (11 lb) mixed-breed puppy at 9 weeks
+  - Target calories: 585–700 kcal/day (start mid-range ≈ 640 kcal).
+  - Portion: 640 ÷ 3,800 ≈ 0.168 kg ≈ 168 g/day.
+  - Schedule: 4 meals of ~42 g each (about a heaping 1/3 cup per meal if 1 cup ≈ 100 g, but weigh for accuracy).
+  - Training treats: keep to ≤ 60–65 kcal/day (10% rule), subtract an equivalent amount of kibble.
+
+- Example B: 2 kg (4.4 lb) toy-breed puppy at 9 weeks
+  - Target calories: ~300 kcal/day.
+  - Portion: 300 ÷ 3,800 ≈ 79 g/day split into 4–5 meals (toy breeds can be prone to hypoglycemia; small, frequent meals are helpful).
+  - Treats: ≤ 30 kcal/day, ideally kibble used as rewards.
+
+- Example C: 10 kg (22 lb) large-breed puppy at 12 weeks (on large-breed puppy food)
+  - Target calories: ~1,050 kcal/day.
+  - Portion: 1,050 ÷ 3,800 ≈ 276 g/day split into 3–4 meals.
+  - Use slow-feeder; avoid high-calcium treats/supplements.
+
+11) Storage and food safety
+- Keep kibble in its original bag (rolled tightly), inside an airtight container. The bag helps preserve vitamins and provides the lot number if there’s a problem.
+- Use kibble within 4–6 weeks of opening. Check expiration dates.
+- For wet/fresh foods: refrigerate at ≤ 4°C/40°F; freeze portions you won’t use within a couple of days. Thaw in the fridge, not on the counter.
+- Wash hands and surfaces after handling pet food.
+
+12) Supplements: usually not needed
+- A quality puppy food already contains the right balance. Adding calcium to a puppy diet can be harmful (especially for large breeds).
+- Probiotics may help some puppies during transitions or mild stress diarrhea, but pick a veterinary-recommended product. If loose stools persist more than 24–48 hours, call your vet.
+- Omega-3s (DHA/EPA) are great if not already in the diet, but most puppy foods include them—avoid double-dosing.
+
+13) When to contact your veterinarian
+- Persistent diarrhea or vomiting, refusal to eat for > 24 hours, blood in stool, lethargy, pot-bellied appearance with poor weight gain (could be parasites), or any sudden behavior change.
+- If you’re unsure about expected adult size (affects diet choice and calcium targets).
+- If considering a home-cooked or raw diet—get a complete, vet-nutritionist-formulated recipe.
+
+Quick starter checklist
+- Pick a puppy or “all life stages” diet with an AAFCO growth statement (large-breed growth if applicable).
+- Get the kcal per cup and per kg from the label.
+- Set initial daily grams using the calorie method or the bag guide.
+- Split into 3–4 meals (depending on age) at the same times each day.
+- Use part of the ration as training treats; keep all extras ≤ 10% of calories.
+- Keep water available; wash bowls daily; store food properly.
+- Weigh weekly; adjust food by 5–10% based on growth and body condition.
+
+If you tell me your puppy’s current weight, expected adult weight (or breed), age, sex, activity level, and the exact food’s calorie density, I’ll work out a customized daily gram amount, a meal-by-meal plan, and a treat allowance for you.
+
+> assistant
+Congrats on your new puppy! A great diet plan sets them up for healthy growth, strong bones, a happy gut, and easy training. Below is a practical, detailed guide you can follow right away. If you share your puppy’s age, current weight, expected adult weight, breed (or mix), and the exact food you’re considering (brand and kcal per cup or per kg), I can calculate precise daily portions in grams for you.
+
+Overview of what a good puppy diet plan includes
+- A complete and balanced food that specifically supports growth (and if your pup will be 70 lb/32 kg+ as an adult, it must say “including growth of large-size dogs”).
+- Consistent feeding schedule with multiple small meals.
+- Correct daily calories and controlled calcium and growth rate.
+- Treats limited to 10% of daily calories, ideally used for training.
+- Fresh water always available; clean bowls and safe storage.
+- Regular monitoring and gradual adjustments as your puppy grows.
+
+1) Choose a complete puppy food
+- Look for the AAFCO statement: The label should say “complete and balanced” for Growth or “All Life Stages.” If you have or may have a large-breed puppy (adult 70 lb/32 kg+), the label must include “including growth of large-size dogs.”
+- Nutrient targets for puppies (minimums, typical dry foods exceed these):
+  - Crude protein: at least 22.5%
+  - Crude fat: at least 8.5%
+  - Calcium and phosphorus balanced for growth; avoid extra calcium supplements.
+  - DHA (an omega-3) for brain/eye development is a plus (often from fish oil).
+- Large-breed puppies: Use a Large Breed Puppy formula. These control calcium, phosphorus, and energy to help prevent overly rapid growth and orthopedic issues.
+- Grain-free vs. with grains: Unless your vet has diagnosed a specific sensitivity, it’s safest to choose a diet from a well-established company that includes healthy grains (e.g., rice, oats, barley). Boutique/exotic/grain-free diets have been linked with dietary-associated heart issues in some dogs.
+- Wet vs. dry vs. fresh/frozen:
+  - Dry (kibble) is affordable, convenient, and good for most pups.
+  - Wet can be more palatable and hydrating; often mixed with dry.
+  - Fresh/frozen can be great if complete/balanced, handled safely, and fed to calculated calories.
+  - Raw diets carry bacterial risks; only do under veterinary guidance with strict food safety and balanced formulation.
+
+2) How much to feed: calories and portions
+There are two practical ways to set starting portions. Use either, then adjust weekly based on your puppy’s body condition and stool quality.
+
+- Option A: Start with the bag’s feeding guide for your puppy’s current weight and age, then tweak by 5–10% per week as needed.
+
+- Option B: Calculate calories using RER/DER
+  - Resting Energy Requirement (RER) = 70 × (body weight in kg)^0.75
+  - Daily Energy Requirement (DER for growth):
+    - Weaning to 4 months: about 2.5–3.0 × RER (start at 2.5× if your pup gains fast; 3.0× if lean/very active or underweight)
+    - 4 months to adult size: about 1.6–2.0 × RER (start ~1.6–1.8×)
+  - Example calculations:
+    - 2 kg (4.4 lb) at 8–10 weeks: RER ≈ 118 kcal; daily ≈ 295–355 kcal.
+    - 5 kg (11 lb) at 8–10 weeks: RER ≈ 234 kcal; daily ≈ 585–700 kcal.
+    - 10 kg (22 lb) at 12 weeks: RER ≈ 394 kcal; daily ≈ 985–1,180 kcal.
+  - Converting calories to grams:
+    - Find your food’s energy density. Example: 3,800 kcal/kg (3.8 kcal/g) or 400 kcal/cup.
+    - If your pup needs 600 kcal/day and the food is 3,800 kcal/kg, feed 600 ÷ 3,800 = 0.158 kg ≈ 158 g/day.
+    - Weighing with a kitchen scale is more accurate than cups (cup weights vary by kibble).
+
+3) Feeding schedule by age
+- 6–8 weeks (weaning complete): 4 meals/day, small portions.
+- 8–12 weeks: 4 meals/day.
+- 3–6 months: 3 meals/day.
+- 6–12 months: 2 meals/day (giant breeds may stay on 3 meals until 6 months).
+- Aim for a predictable routine (example for a young puppy on 4 meals): 7:00 AM, 11:30 AM, 4:00 PM, 8:00 PM.
+- House training tip: Last meal 2–3 hours before bedtime; final water top-up and potty break before sleep.
+
+4) Transition plan to any new food
+- Over 7–10 days: Day 1–2 (25% new), Day 3–4 (50%), Day 5–6 (75%), Day 7+ (100%).
+- If stool softens, hold at the current mix a day longer or add 1–2 small, plain meals of the current diet; resume the transition slowly.
+
+5) Treats, training rewards, and extras
+- Keep treats to 10% or less of total daily calories. Use part of the day’s kibble as training rewards to avoid overfeeding.
+- Smart low-cal options: tiny pieces of cooked plain chicken or turkey, single-ingredient freeze-dried meats, pea-sized bits of cheese (sparingly), or puppy-safe store-bought training treats.
+- Puppy-safe fruits/veg in tiny amounts: carrot, cucumber, green beans, blueberries, apple slices (no seeds), banana. Avoid grapes/raisins, onions/garlic/chives, avocado in quantity, or anything with xylitol.
+- Chews: Choose puppy-appropriate chews sized for your dog. Avoid cooked bones and very hard chews that could crack teeth. Supervise all chewing.
+
+6) Special considerations for large/giant-breed puppies (adult 70 lb/32 kg+)
+- Use a large-breed puppy diet with controlled calcium and energy; do not add calcium supplements.
+- Keep body condition lean (BCS 4–5 out of 9). Rapid growth increases joint risk.
+- Feed multiple small meals; discourage fast gulping (use slow-feeder bowls).
+- Avoid vigorous exercise for 60 minutes after meals and huge water intake right after eating (helps reduce bloat risk). Elevated bowls are generally not recommended unless your vet advises.
+
+7) Water, bowls, and hygiene
+- Fresh water always available. Typical daily water need is about 50–60 mL per kg of body weight, more with heat/exercise.
+- Wash food and water bowls daily with hot, soapy water. Disinfect weekly.
+- Don’t leave wet/fresh food out more than 1–2 hours. Refrigerate opened wet food; use within 2–3 days.
+
+8) Monitor growth and adjust
+- Weigh weekly (same scale, same time of day). Record weight and note appetite, stool quality, and energy.
+- Body Condition Score (quick check):
+  - You should easily feel ribs with a thin fat cover (not sharp, not buried).
+  - From above: a visible waist behind the ribs.
+  - From the side: a slight abdominal “tuck.”
+- If your pup is getting chubby or stools are large/soft, reduce daily food by about 10%. If ribs are sharp/visible and energy is low, increase by about 10%.
+- Spay/neuter can reduce calorie needs by roughly 10–20%; watch BCS and adjust after surgery.
+- When to switch to adult food:
+  - Small/medium breeds: around 12 months.
+  - Large breeds: 12–18 months.
+  - Giant breeds: 18–24 months.
+  - Switch when growth rate slows and adult size is near; ask your vet if unsure.
+
+9) Foods and substances to avoid
+- Toxic foods: chocolate/cocoa, coffee/caffeine, grapes/raisins/currants, onions/garlic/chives/leeks, xylitol (sugar-free gum, many “no-sugar” products), alcohol, marijuana/THC edibles, macadamia nuts, raw bread dough.
+- Risky: cooked bones, very fatty scraps (pancreatitis risk), unpasteurized dairy, high-salt foods, excessive liver, large rawhides that can be swallowed in chunks.
+- If ingestion occurs or you’re unsure, call your vet or a pet poison helpline immediately.
+
+10) Sample day plans (illustrative only—adjust to your food’s kcal and your puppy)
+Assumptions for examples: dry puppy food at 3,800 kcal/kg (3.8 kcal/g).
+
+- Example A: 5 kg (11 lb) mixed-breed puppy at 9 weeks
+  - Target calories: 585–700 kcal/day (start mid-range ≈ 640 kcal).
+  - Portion: 640 ÷ 3,800 ≈ 0.168 kg ≈ 168 g/day.
+  - Schedule: 4 meals of ~42 g each (about a heaping 1/3 cup per meal if 1 cup ≈ 100 g, but weigh for accuracy).
+  - Training treats: keep to ≤ 60–65 kcal/day (10% rule), subtract an equivalent amount of kibble.
+
+- Example B: 2 kg (4.4 lb) toy-breed puppy at 9 weeks
+  - Target calories: ~300 kcal/day.
+  - Portion: 300 ÷ 3,800 ≈ 79 g/day split into 4–5 meals (toy breeds can be prone to hypoglycemia; small, frequent meals are helpful).
+  - Treats: ≤ 30 kcal/day, ideally kibble used as rewards.
+
+- Example C: 10 kg (22 lb) large-breed puppy at 12 weeks (on large-breed puppy food)
+  - Target calories: ~1,050 kcal/day.
+  - Portion: 1,050 ÷ 3,800 ≈ 276 g/day split into 3–4 meals.
+  - Use slow-feeder; avoid high-calcium treats/supplements.
+
+11) Storage and food safety
+- Keep kibble in its original bag (rolled tightly), inside an airtight container. The bag helps preserve vitamins and provides the lot number if there’s a problem.
+- Use kibble within 4–6 weeks of opening. Check expiration dates.
+- For wet/fresh foods: refrigerate at ≤ 4°C/40°F; freeze portions you won’t use within a couple of days. Thaw in the fridge, not on the counter.
+- Wash hands and surfaces after handling pet food.
+
+12) Supplements: usually not needed
+- A quality puppy food already contains the right balance. Adding calcium to a puppy diet can be harmful (especially for large breeds).
+- Probiotics may help some puppies during transitions or mild stress diarrhea, but pick a veterinary-recommended product. If loose stools persist more than 24–48 hours, call your vet.
+- Omega-3s (DHA/EPA) are great if not already in the diet, but most puppy foods include them—avoid double-dosing.
+
+13) When to contact your veterinarian
+- Persistent diarrhea or vomiting, refusal to eat for > 24 hours, blood in stool, lethargy, pot-bellied appearance with poor weight gain (could be parasites), or any sudden behavior change.
+- If you’re unsure about expected adult size (affects diet choice and calcium targets).
+- If considering a home-cooked or raw diet—get a complete, vet-nutritionist-formulated recipe.
+
+Quick starter checklist
+- Pick a puppy or “all life stages” diet with an AAFCO growth statement (large-breed growth if applicable).
+- Get the kcal per cup and per kg from the label.
+- Set initial daily grams using the calorie method or the bag guide.
+- Split into 3–4 meals (depending on age) at the same times each day.
+- Use part of the ration as training treats; keep all extras ≤ 10% of calories.
+- Keep water available; wash bowls daily; store food properly.
+- Weigh weekly; adjust food by 5–10% based on growth and body condition.
+
+If you tell me your puppy’s current weight, expected adult weight (or breed), age, sex, activity level, and the exact food’s calorie density, I’ll work out a customized daily gram amount, a meal-by-meal plan, and a treat allowance for you.
+
+
+> user
