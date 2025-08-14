@@ -18,7 +18,7 @@ __model='gpt-4o'
             </moderator>
         ???
     ) else (
-        ??? (+ respond /m task:Thinking hard)
+        ??? (+ respond /m task:Responding quickly)
             Respond to the user in a happy tone of voice
         ???
     )
