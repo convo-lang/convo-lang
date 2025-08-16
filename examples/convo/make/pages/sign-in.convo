@@ -1,0 +1,5 @@
+@import ../docs/sign-in-providers.md
+
+> user
+Generate a sign-in page with support for all the sign-in providers
+and basic email and password sign-in

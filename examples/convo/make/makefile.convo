@@ -1,0 +1,12 @@
+@import ./app-description.md
+@import ./docs/coding-rules.md
+@import ./docs/styling-rules.md
+
+> make app/pages/index.tsx: pages/index.convo
+
+> make app/pages/profile.tsx: pages/profile.convo
+
+> make app/pages/sign-in.tsx: pages/sign-in.convo
+
+> make app/pages/terms.md: docs/terms-conditions.md
+Generate a NextJS page for terms and conditions
