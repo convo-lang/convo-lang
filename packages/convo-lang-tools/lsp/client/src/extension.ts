@@ -7,6 +7,7 @@ import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { extensionPublisher } from './build-const';
 import { ConvoDocumentLinkProvider } from './link-provider';
 
 let client:LanguageClient;
@@ -443,7 +444,7 @@ const registerCommands=(context:ExtensionContext)=>{
                         'Open Convo-Lang Settings'
                     ).then(selection => {
                         if (selection === 'Open Convo-Lang Settings') {
-                            commands.executeCommand('workbench.action.openSettings','@ext:iyio.convo-lang-tools');
+                            commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
                         }
                     });
                 }
@@ -457,7 +458,7 @@ const registerCommands=(context:ExtensionContext)=>{
     }
 
     context.subscriptions.push(commands.registerCommand('convo.open-settings',()=>{
-        commands.executeCommand('workbench.action.openSettings','@ext:iyio.convo-lang-tools');
+        commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{

@@ -17,6 +17,13 @@
                 "command": "./publish.sh"
             }
         },
+        "publish-ext-ovsx": {
+            "executor": "nx:run-commands",
+            "options": {
+                "cwd": "packages/convo-lang-tools",
+                "command": "./publish-ovsx.sh"
+            }
+        },
         "mate-build": {
             "executor": "nx:run-commands",
             "options": {
