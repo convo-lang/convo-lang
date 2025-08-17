@@ -3,6 +3,7 @@ export * from './lib/convo-graph-lib';
 export * from './lib/convo-graph-parser';
 export * from './lib/convo-graph-types';
 export * from './lib/ConvoGraphCtrl';
+export * from './lib/ConvoMemoryGraphStore';
 export * from './lib/ui/graph/convo-graph-react-lib';
 export * from './lib/ui/graph/convo-graph-react-type';
 export * from './lib/ui/graph/ConvoEdgeView';
