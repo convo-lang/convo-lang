@@ -180,6 +180,11 @@ export interface ConvoCliOptions
      * If true all known models will be listed as JSON
      */
     listModels?:boolean;
+
+    /**
+     * If true make targets should be built
+     */
+    make?:boolean;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

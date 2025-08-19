@@ -19,6 +19,9 @@
         "skipDefaultLibCheck": true,
         "baseUrl": ".",
         "paths": {
+            "@convo-lang/convo-lang-browser": [
+                "packages/convo-lang-browser/src/index.ts"
+            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
@@ -36,6 +39,9 @@
             ],
             "@convo-lang/convo-lang-doc-query": [
                 "packages/convo-lang-doc-query/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-make": [
+                "packages/convo-lang-make/src/index.ts"
             ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"

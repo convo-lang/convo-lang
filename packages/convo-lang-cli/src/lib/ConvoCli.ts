@@ -1,5 +1,7 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoVars, createConversationFromScope, escapeConvo, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
+import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
+import { ConvoMakeCtrl, getConvoMakeOptionsFromVars, initConvoMakeConversation } from "@convo-lang/convo-lang-make";
 import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
@@ -63,6 +65,24 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
 {
 
     const config=await getConvoCliConfigAsync(options);
+    const vfsCtrl=new VfsCtrl({
+        config:{
+            mountPoints:[
+                {
+                    type:vfsMntTypes.file,
+                    mountPath:'/',
+                    sourceUrl:'/',
+                }
+            ],
+        },
+        mntProviderConfig:{
+            ctrls:[new VfsDiskMntCtrl()]
+        },
+    });
+    const projectConfig=await loadConvoProjectConfigFromVfsAsync({
+        vfs:vfsCtrl,
+        basePath:options.exeCwd||globalThis.process?.cwd?.()
+    });
 
     initRootScope(reg=>{
 
@@ -101,20 +121,10 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
         reg.implementService(convoImportService,()=>new ConvoVfsImportService());
         reg.implementService(convoImportService,()=>new ConvoHttpImportService());
 
-        reg.implementService(vfs,()=>new VfsCtrl({
-            config:{
-                mountPoints:[
-                    {
-                        type:vfsMntTypes.file,
-                        mountPath:'/',
-                        sourceUrl:'/',
-                    }
-                ],
-            },
-            mntProviderConfig:{
-                ctrls:[new VfsDiskMntCtrl()]
-            },
-        }));
+        reg.implementService(vfs,()=>vfsCtrl);
+        if(projectConfig){
+            reg.implementService(convoProjectConfig,()=>projectConfig);
+        }
     })
     await rootScope.getInitPromise();
     return config;
@@ -170,7 +180,7 @@ export class ConvoCli
             globalThis.process?.chdir(this.options.exeCwd);
         }
         if(this.options.source){
-            this.convo.unregisteredVars[convoVars.__file]=this.options.source;
+            this.convo.unregisteredVars[convoVars.__mainFile]=this.options.source;
 
         }
     }
@@ -329,28 +339,31 @@ The current date and time is: "{{dateTime()}}"
             this.allowExec=config.allowExec??'ask';
         }
 
+        let source:string|undefined;
+
         if(this.options.inline){
-            if(this.options.convert){
-                this.convertCodeAsync(this.options.inline);
-            }else if(this.options.parse){
-                await this.parseCodeAsync(this.options.inline);
-            }else{
-                await this.executeSourceCode(this.options.inline);
-            }
-            this.writeOutputAsync();
+            source=this.options.inline;
         }else if(this.options.source || this.options.stdin){
-            const source=this.options.stdin?
+            source=this.options.stdin?
                 await readStdInAsStringAsync():
                 await readFileAsStringAsync(this.options.source??'');
+        }
 
-            if(this.options.convert){
-                this.convertCodeAsync(source);
+        if(source!==undefined){
+            let writeOut=true;
+            if(this.options.make){
+                writeOut=false;
+                await this.makeAsync(source);
+            }else if(this.options.convert){
+                await this.convertCodeAsync(source);
             }else if(this.options.parse){
                 await this.parseCodeAsync(source);
             }else{
                 await this.executeSourceCode(source);
             }
-            this.writeOutputAsync();
+            if(writeOut){
+                this.writeOutputAsync();
+            }
         }
 
         if(this.options.repl){
@@ -423,6 +436,29 @@ The current date and time is: "{{dateTime()}}"
             throw r.error;
         }
         await this.outAsync(this.convo.convo);
+    }
+
+    private async makeAsync(code:string){
+        if(!this.options.exeCwd){
+            return;
+        }
+
+        initConvoMakeConversation(this.convo);
+        await this.appendCodeAsync(code);
+        const flat=await this.convo.flattenAsync();
+        const options=getConvoMakeOptionsFromVars(this.options.exeCwd,flat.exe.sharedVars);
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            browserInf:new ConvoBrowserCtrl(),
+            ...options,
+        });
+        try{
+            await ctrl.buildAsync();
+        }finally{
+            ctrl.dispose();
+        }
     }
 
     private async convertCodeAsync(code:string){

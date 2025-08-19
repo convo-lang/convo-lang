@@ -7,7 +7,7 @@
         "test-ext": {
             "executor": "nx:run-commands",
             "options": {
-                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions examples/convo"
+                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions ../mindark-knowledge"
             }
         },
         "publish-ext": {

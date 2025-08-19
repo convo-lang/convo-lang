@@ -39,7 +39,7 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
         if(!msg.fn){
             return {}
         }
-        const argsResult=exe.paramsToObj(msg.fn.params);
+        const argsResult=exe.paramsToObj(msg.fn.params,msg);
 
         if(argsResult.valuePromise){
             return 'message args using async';

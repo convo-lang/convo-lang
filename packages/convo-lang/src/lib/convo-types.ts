@@ -80,6 +80,28 @@ export const allConvoComponentModeAry=['render','input'] as const;
 export type ConvoComponentMode=typeof allConvoComponentModeAry[number];
 export const isConvoComponentMode=(value:any):value is ConvoComponentMode=>allConvoComponentModeAry.includes(value);
 
+/**
+ * Configuration settings for a convo project (convo-config.json)
+ */
+export interface ConvoProjectConfig
+{
+    /**
+     * Path or paths to another convo config file this config file extends
+     */
+    extends?:string|string[];
+
+    /**
+     * Is true by default unless this config extends another, and in that case the extended config
+     * is the root.
+     */
+    isRoot?:boolean;
+
+    /**
+     * Full path to the project. Do not manually specify.
+     */
+    path?:string;
+}
+
 
 /**
  * Can be a text message or function definition
@@ -670,7 +692,7 @@ export type ConvoScopeFunction=(scope:ConvoScope,ctx:ConvoExecutionContext)=>any
 
 export const convoScopeFnKey=Symbol('convoScopeFnKey');
 export const convoScopeFnDefKey=Symbol('convoScopeFnDefKey');
-export const convoScopeParentKey=Symbol('convoScopeParentKey');
+export const convoScopeMsgKey=Symbol('convoScopeMsgKey');
 
 export interface ConvoScope
 {
@@ -733,6 +755,16 @@ export interface ConvoScope
      * The root Convo function being called
      */
     [convoScopeFnDefKey]?:ConvoFunction;
+
+    /**
+     * The root Convo function being called
+     */
+    [convoScopeFnDefKey]?:ConvoFunction;
+
+    /**
+     * The message the scope is in
+     */
+    [convoScopeMsgKey]?:ConvoMessage;
 
     /**
      * Param values used with function statements
@@ -1463,6 +1495,11 @@ export interface FlattenConvoOptions
     disableTransforms?:boolean;
 
     messageStartIndex?:number;
+
+    /**
+     * If true only import messages should be evaluated
+     */
+    importOnly?:boolean;
 }
 
 export interface ConvoSubTask

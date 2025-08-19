@@ -3,6 +3,7 @@ import { vfs } from "@iyio/vfs";
 import { ConvoHashCacheBase } from "./ConvoHashCacheBase";
 import { commonConvoCacheTypes } from "./convo-lib";
 import { ConvoCompletionMessage } from "./convo-types";
+import { convoProjectConfig } from "./convo.deps";
 
 
 export const defaultVfsConvoCacheDir='/cache/conversations'
@@ -28,10 +29,18 @@ export class ConvoVfsCache extends ConvoHashCacheBase
     public logErrors:boolean;
 
     public constructor({
-        cacheDir=defaultVfsConvoCacheDir,
+        cacheDir,
         logErrors=true,
     }:ConvoVfsCacheOptions={}){
         super(commonConvoCacheTypes.vfs);
+        if(!cacheDir){
+            const projectPath=convoProjectConfig().path;
+            if(projectPath){
+                cacheDir=joinPaths(projectPath,'.convo-cache');
+            }else{
+                cacheDir=defaultVfsConvoCacheDir;
+            }
+        }
         this.cacheDir=cacheDir;
         this.logErrors=logErrors;
     }

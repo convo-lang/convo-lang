@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoScopeFnDefKey, convoScopeFnKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -15,9 +15,9 @@ const argsCacheKey=Symbol('argsCacheKey');
 const returnCacheKey=Symbol('returnCacheKey');
 
 
-export const executeConvoFunction=(fn:ConvoFunction,args:Record<string,any>={}):Promise<any>|any=>{
+export const executeConvoFunction=(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage):Promise<any>|any=>{
     const exe=new ConvoExecutionContext();
-    const r=exe.executeFunction(fn,args);
+    const r=exe.executeFunction(fn,args,message);
     return r.valuePromise??r.value;
 }
 
@@ -113,7 +113,7 @@ export class ConvoExecutionContext
                     sourceFn:msg.fn
                 },(scope,ctx)=>{
                     if(msg.fn?.body){
-                        const r=this.executeFunction(msg.fn,convoLabeledScopeFnParamsToObj(scope,msg.fn.params));
+                        const r=this.executeFunction(msg.fn,convoLabeledScopeFnParamsToObj(scope,msg.fn.params),msg);
                         return r.valuePromise??r.value;
                     }else{
                         const externFn=externFunctions?.[msg.fn?.name??''];
@@ -142,7 +142,7 @@ export class ConvoExecutionContext
         this.sharedSetters.splice(0,this.sharedSetters.length);
     }
 
-    public executeStatement(statement:ConvoStatement):ConvoExecuteResult
+    public executeStatement(statement:ConvoStatement,message?:ConvoMessage):ConvoExecuteResult
     {
 
         const vars:Record<string,any>={}
@@ -151,11 +151,14 @@ export class ConvoExecutionContext
             vars,
             s:statement,
         }
+        if(message){
+            scope[convoScopeMsgKey]=message;
+        }
 
         return this.execute(scope,vars);
     }
 
-    public executeFunction(fn:ConvoFunction,args:Record<string,any>={}):ConvoExecuteResult
+    public executeFunction(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage):ConvoExecuteResult
     {
         if(fn.call){
             throw new ConvoError(
@@ -235,13 +238,17 @@ export class ConvoExecutionContext
             }
         }
 
+        if(message){
+            scope[convoScopeMsgKey]=message;
+        }
+
         return this.execute(scope,vars,this.getConvoFunctionReturnScheme(fn));
     }
 
-    public async executeFunctionAsync(fn:ConvoFunction,args:Record<string,any>={}):Promise<any>
+    public async executeFunctionAsync(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage):Promise<any>
     {
 
-        const result=await this.executeFunctionResultAsync(fn,args);
+        const result=await this.executeFunctionResultAsync(fn,args,message);
 
         if(result.valuePromise){
             return await result.valuePromise
@@ -250,7 +257,7 @@ export class ConvoExecutionContext
         }
     }
 
-    public async executeFunctionResultAsync(fn:ConvoFunction,args:Record<string,any>={}):Promise<ConvoExecuteResult>
+    public async executeFunctionResultAsync(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage):Promise<ConvoExecuteResult>
     {
 
         if(fn.call){
@@ -258,7 +265,7 @@ export class ConvoExecutionContext
             const callee=(v?.[convoFlowControllerKey] as ConvoFlowController|undefined)?.sourceFn;
 
             if(!callee && isConvoScopeFunction(v)){
-                args=await this.paramsToObjAsync(fn.params);
+                args=await this.paramsToObjAsync(fn.params,message);
                 const paramValues:any[]=[];
                 const labels:Record<string,number>={};
                 for(const e in args){
@@ -296,16 +303,16 @@ export class ConvoExecutionContext
                     {fn},
                     `executeFunctionResultAsync - No function defined by the name ${fn.name}`);
             }
-            args=await this.paramsToObjAsync(fn.params);
+            args=await this.paramsToObjAsync(fn.params,message);
             fn=callee;
 
         }
 
-        return this.executeFunction(fn,args);
+        return this.executeFunction(fn,args,message);
     }
 
-    public getConvoFunctionArgsValue(fn:ConvoFunction):any{
-        const r=this.paramsToObj(fn.params??[]);
+    public getConvoFunctionArgsValue(fn:ConvoFunction,message?:ConvoMessage):any{
+        const r=this.paramsToObj(fn.params??[],message);
         if(r.valuePromise){
             throw new ConvoError('function-call-args-suspended')
         }
@@ -373,7 +380,7 @@ export class ConvoExecutionContext
         return convoValueToZodType(typeVar);
     }
 
-    public paramsToObj(params:ConvoStatement[]):ConvoExecuteResult{
+    public paramsToObj(params:ConvoStatement[],message?:ConvoMessage):ConvoExecuteResult{
         const vars:Record<string,any>={}
         const scope=this.executeScope({
             i:0,
@@ -386,11 +393,15 @@ export class ConvoExecutionContext
             }
         },undefined,createDefaultScope(vars));
 
+        if(message){
+            scope[convoScopeMsgKey]=message;
+        }
+
         return this.execute(scope,vars);
     }
 
-    public async paramsToObjAsync(params:ConvoStatement[]):Promise<Record<string,any>>{
-        const r=this.paramsToObj(params);
+    public async paramsToObjAsync(params:ConvoStatement[],message?:ConvoMessage):Promise<Record<string,any>>{
+        const r=this.paramsToObj(params,message);
         if(r.valuePromise){
             return await r.valuePromise;
         }else{
@@ -489,6 +500,10 @@ export class ConvoExecutionContext
     private executeScope(scope:ConvoScope,parent:ConvoScope|undefined,defaultScope:ConvoScope,resumeParamScope?:ConvoScope,prevPi?:string):ConvoScope{
 
         const statement=scope.s;
+
+        if(!scope[convoScopeMsgKey]){
+            scope[convoScopeMsgKey]=parent?.[convoScopeMsgKey];
+        }
 
         let value:any=undefined;
 
@@ -933,7 +948,7 @@ export class ConvoExecutionContext
             value=getValueByAryPath(value,path);
         }
         if(!path && value===undefined){
-            return this.getVarAlias(name);
+            return this.getVarAlias(name,scope);
         }else{
             return value;
         }
@@ -1137,14 +1152,14 @@ export class ConvoExecutionContext
 
     }
 
-    public getTagStatementValue(tag:ConvoTag):any[]{
+    public getTagStatementValue(tag:ConvoTag,message?:ConvoMessage):any[]{
         if(!tag.statement?.length){
             return [];
         }
         this.isReadonly++;
         try{
             const values=tag.statement.map(s=>{
-                const r=this.executeStatement(s);
+                const r=this.executeStatement(s,message);
                 if(r.valuePromise){
                     throw new Error('Tag value statements are not allowed to return promises');
                 }
@@ -1206,9 +1221,19 @@ export class ConvoExecutionContext
      * @param name - The name of the type alias to retrieve
      * @returns The type definition, or undefined if the alias doesn't exist
      */
-    public getVarAlias(name:string)
+    public getVarAlias(name:string,scope?:ConvoScope)
     {
         switch(name){
+
+            case convoVars.__file:{
+                const msgFile=scope?.[convoScopeMsgKey]?.[convoMessageSourcePathKey];
+                if(msgFile){
+                    return msgFile
+                }
+
+                return this.getVar(convoVars.__mainFile);
+            }
+
             case 'TrueFalse':
                 return parseConvoType('TrueFalse',/*convo*/`
                     > define

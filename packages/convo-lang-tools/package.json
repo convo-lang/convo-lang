@@ -95,39 +95,44 @@
                     "group": "navigation@1"
                 },
                 {
-                    "command": "convo.split",
+                    "command": "convo.open-settings",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "convo.convert",
+                    "command": "convo.split",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@3"
                 },
                 {
-                    "command": "convo.text",
+                    "command": "convo.convert",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@4"
                 },
                 {
-                    "command": "convo.flat",
+                    "command": "convo.text",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@5"
                 },
                 {
-                    "command": "convo.vars",
+                    "command": "convo.flat",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@6"
                 },
                 {
-                    "command": "convo.open-settings",
+                    "command": "convo.vars",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@7"
                 },
                 {
-                    "command": "convo.list-models",
+                    "command": "convo.make",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@8"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@9"
                 }
             ]
         },
@@ -177,6 +182,12 @@
                 "command": "convo.split-complete",
                 "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
                 "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon":"$(combine)"
             },
             {
                 "command": "convo.list-models",

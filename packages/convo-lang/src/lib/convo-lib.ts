@@ -341,7 +341,17 @@ export const convoFunctions={
     /**
      * Removes the first matching item in an array using shallow comparison.
      */
-    aryRemoveMatch:'aryRemoveMatch'
+    aryRemoveMatch:'aryRemoveMatch',
+
+    /**
+     * Used by the convo make build system to define a output to make
+     */
+    make:'make',
+
+    /**
+     * Defines a make app
+     */
+    defineApp:'defineApp',
 } as const;
 
 /**
@@ -362,6 +372,11 @@ export const convoVars={
      * In environments that have access to the filesystem __cwd defines the current working directory.
      */
     __cwd:'__cwd',
+
+    /**
+     * Path to the main file that loaded the conversation
+     */
+    __mainFile:'__mainFile',
 
     /**
      * Path to the current convo file
@@ -570,6 +585,16 @@ export const convoVars={
      * Object containing additional parameters to pass to the LLM.
      */
     __modelParams:'__modelParams',
+
+    /**
+     * Array of ConvoMakeTargetDeclaration objects
+     */
+    __makeTargets:'__makeTargets',
+
+    /**
+     * Array of ConvoMakeApp objects
+     */
+    __makeApps:'__makeApps',
 
 } as const;
 

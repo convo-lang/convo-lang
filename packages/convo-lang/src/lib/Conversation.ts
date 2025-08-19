@@ -246,6 +246,9 @@ export class Conversation
     private readonly _onAppend=new Subject<ConvoAppend>();
     public get onAppend():Observable<ConvoAppend>{return this._onAppend}
 
+    private readonly _onImportSource=new Subject<string>();
+    public get onImportSource():Observable<string>{return this._onImportSource}
+
     private readonly _openTasks:BehaviorSubject<ConvoTask[]>=new BehaviorSubject<ConvoTask[]>([]);
     public get openTasksSubject():ReadonlySubject<ConvoTask[]>{return this._openTasks}
     public get openTasks(){return this._openTasks.value}
@@ -1581,7 +1584,7 @@ export class Conversation
 
         const lastMsg=flat.messages[flat.messages.length-1];
         const cacheType=(
-            (lastMsg?.tags && (convoTags.cache in lastMsg.tags) && (lastMsg.tags[convoTags.cache]??defaultConvoCacheType))??
+            (lastMsg?.tags && (convoTags.cache in lastMsg.tags) && (lastMsg.tags[convoTags.cache]??defaultConvoCacheType))||
             flat.exe.getVar(convoVars.__cache)
         );
 
@@ -2026,7 +2029,7 @@ export class Conversation
                     }
                     return [{
                         callFn:lastMsg.fn.name,
-                        callParams:exe.getConvoFunctionArgsValue(lastMsg.fn),
+                        callParams:exe.getConvoFunctionArgsValue(lastMsg.fn,lastMsg),
                         tags:{toolId:getConvoTag(lastMsg.tags,convoTags.toolId)?.value??''}
                     }]
                 }else if(lastFlatMsg?.eval){
@@ -2171,7 +2174,7 @@ export class Conversation
                     let callResult:ConvoExecuteResult|undefined;
                     let callResultValue:any;
                     try{
-                        callResult=await exe.executeFunctionResultAsync(callMessage.fn);
+                        callResult=await exe.executeFunctionResultAsync(callMessage.fn,undefined,callMessage);
                         if(this._isDisposed){
                             return {messages:[],status:'disposed',task}
                         }
@@ -2308,6 +2311,7 @@ export class Conversation
                                 exe,
                                 cm.evalMessage.statement,
                                 flatMsg,
+                                cm.evalMessage,
                                 false
                             );
                             content=flatMsg.content;
@@ -3113,6 +3117,8 @@ export class Conversation
             throw r.error;
         }
 
+        this._onImportSource.next(convo);
+
         const {system,ignoreContent}=importStatement;
 
         if(r.result){
@@ -3239,6 +3245,7 @@ export class Conversation
             flatMessages,
             excludeMessages,
             excludeMessageSetters,
+            importOnly,
         }:FlattenConvoOptions={}
     ):Promise<FlatConvoConversation>{
 
@@ -3300,6 +3307,10 @@ export class Conversation
                 if(msg && containsConvoTag(msg.tags,convoTags.import) && !this.importMessages.includes(msg)){
                     await this.loadImportsAsync(msg,exe);
                     i--;
+                    continue;
+                }
+
+                if(importOnly){
                     continue;
                 }
 
@@ -3491,7 +3502,7 @@ export class Conversation
                             exe.varPrefix=prefix;
                         }
                         exe.clearSharedSetters();
-                        const r=exe.executeFunction(msg.fn);
+                        const r=exe.executeFunction(msg.fn,undefined,msg);
                         if(r.valuePromise){
                             await r.valuePromise;
                         }
@@ -3511,7 +3522,7 @@ export class Conversation
                             flat.role='function';
                             flat.called=prev.fn;
                             flat.calledReturn=exe.getVarEx(prevVarPrefix+convoResultReturnName,undefined,undefined,false);
-                            flat.calledParams=exe.getConvoFunctionArgsValue(prev.fn);
+                            flat.calledParams=exe.getConvoFunctionArgsValue(prev.fn,prev);
                             // if(prev.component){
                             //     flat.component=prev.component;
                             //     flat.componentIndex=componentIndex;
@@ -3536,6 +3547,7 @@ export class Conversation
                         exe,
                         msg.statement,
                         flat,
+                        msg,
                         shouldParseMd
                     );
                 }else if(msg.content!==undefined){
@@ -3666,7 +3678,7 @@ export class Conversation
 
             for(const pair of edgePairs){
                 if(pair.msg.statement){
-                    await flattenMsgAsync(exe,pair.msg.statement,pair.flat,pair.shouldParseMd);
+                    await flattenMsgAsync(exe,pair.msg.statement,pair.flat,pair.msg,pair.shouldParseMd);
                 }else{
                     pair.flat.content=pair.msg.content;
                 }
@@ -4890,7 +4902,7 @@ export class Conversation
                     isUser,
                     isAssistant:!isUser
                 }
-                const r=await flat.exe.executeFunctionAsync(fnMsg.fn,evt);
+                const r=await flat.exe.executeFunctionAsync(fnMsg.fn,evt,fnMsg);
 
                 this.appendFunctionSetters(flat.exe,true,undefined,convoRoles.thinkingResult,false,true);
                 flat.exe.setVar(true,undefined,convoVars.__trigger);
@@ -5073,9 +5085,10 @@ const flattenMsgAsync=async (
     exe:ConvoExecutionContext,
     statement:ConvoStatement,
     flat:FlatConvoMessage,
+    msg:ConvoMessage,
     parseMd:boolean
 )=>{
-    const r=exe.executeStatement(statement);
+    const r=exe.executeStatement(statement,msg);
     let value:any;
     if(r.valuePromise){
         value=await r.valuePromise;

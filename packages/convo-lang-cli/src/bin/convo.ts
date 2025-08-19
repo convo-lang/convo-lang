@@ -41,6 +41,7 @@ const args=parseCliArgsT<Args>({
         createNextApp:args=>args.length?true:false,
         createAppWorkingDir:args=>args[0],
         listModels:args=>args.length?true:false,
+        make:args=>args.length?true:false,
     }
 }).parsed as Args;
 

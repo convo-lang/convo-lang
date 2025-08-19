@@ -58,8 +58,9 @@ const typeCache:Record<string,any>={};
  */
 export const parseConvoType=(typeName:string,convo:string)=>{
     const r=parseConvoCachedKeyed(convo);
-    const fn=r.result.result?.[0]?.fn;
-    if(!fn){
+    const msg=r.result.result?.[0];
+    const fn=msg?.fn;
+    if(!fn || !msg){
         return undefined;
     }
     const key=r.key+':'+typeName;
@@ -68,7 +69,7 @@ export const parseConvoType=(typeName:string,convo:string)=>{
         return cached??undefined;
     }
     const exe=new ConvoExecutionContext();
-    exe.executeFunction(fn)
+    exe.executeFunction(fn,undefined,msg)
     const type=exe.getVar(typeName);
     typeCache[key]=type??null;
     return type;
