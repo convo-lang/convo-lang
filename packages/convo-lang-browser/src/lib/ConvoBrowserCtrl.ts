@@ -46,6 +46,7 @@ export class ConvoBrowserCtrl implements ConvoBrowserInf
         const browser=await this.getBrowserAsync();
 
         const page=await browser.newPage();
+        page.setViewport({width:1024,height:1024});
 
         const ctrl=new ConvoBrowserPageCtrl(this,page);
 

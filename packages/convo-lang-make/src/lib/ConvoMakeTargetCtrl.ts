@@ -1,5 +1,5 @@
-import { Conversation, ConvoAppend, convoVars } from "@convo-lang/convo-lang";
-import { createPromiseSource, delayAsync, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
+import { AppendConvoOptions, Conversation, convoVars, escapeConvo } from "@convo-lang/convo-lang";
+import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeStateDir, convoMakeTargetHasProps, getConvoMakeTargetInHash } from "./convo-make-lib";
 import { ConvoMakeAppTargetRef, ConvoMakeTarget } from "./convo-make-types";
@@ -10,6 +10,11 @@ export interface ConvoMakeTargetCtrlOptions
 {
     parent:ConvoMakeCtrl;
     target:ConvoMakeTarget;
+}
+
+interface Append{
+    content:string;
+    options?:AppendConvoOptions;
 }
 
 
@@ -44,7 +49,6 @@ export class ConvoMakeTargetCtrl
         this.conversation=new Conversation({disableAutoFlatten:true});
         this.conversation.unregisteredVars[convoVars.__cwd]=getDirectoryName(this.outPath);
         this.conversation.unregisteredVars[convoVars.__mainFile]=this.outPath;
-        this.disposables.addSub(this.conversation.onAppend.subscribe(this.onConvoAppend));
         this.appRef=parent.getAppRef(target);
 
     }
@@ -62,39 +66,23 @@ export class ConvoMakeTargetCtrl
         this.disposables.dispose();
     }
 
-    private readonly onConvoAppend=(append:ConvoAppend)=>{
-        if(this.isDisposed || this.parent.options.dryRun || this.parent.options.echoMode){
-            return;
+    public async appendAsync(append:Append|Append[]){
+        if(Array.isArray(append)){
+            for(const a of append){
+                this.conversation.append(a.content,a.options);
+            }
+        }else{
+            this.conversation.append(append.content,append.options);
         }
-        this.writeConvoOutputAsync(this.conversation.convo);
+        console.log('hio 👋 👋 👋 appended',append,this.isDisposed , this.parent.options.dryRun , this.parent.options.echoMode,'convo',this.conversation.convo);
+        if(!this.isDisposed && !this.parent.options.dryRun && !this.parent.options.echoMode){
+            await this.writeConvoOutputAsync(this.conversation.convo);
+        }
     }
 
-    private writingConvoOut=false;
-    private nextConvoOut:string|undefined;
     private async writeConvoOutputAsync(outConvo:string){
-        if(this.writingConvoOut){
-            this.nextConvoOut=outConvo;
-            return;
-        }
-        try{
-            this.writingConvoOut=true;
-            await delayAsync(200);
-
-            if(this.nextConvoOut){
-                outConvo=this.nextConvoOut;
-                this.nextConvoOut=undefined;
-            }
-
-            await this.parent.options.vfsCtrl.writeStringAsync(this.convoFile,outConvo);
-
-        }finally{
-            this.writingConvoOut=false;
-            if(this.nextConvoOut){
-                outConvo=this.nextConvoOut;
-                this.nextConvoOut=undefined;
-                this.writeConvoOutputAsync(outConvo);
-            }
-        }
+        console.log('hio 👋 👋 👋 write convo out',this.convoFile,outConvo);
+        await this.parent.options.vfsCtrl.writeStringAsync(this.convoFile,outConvo);
     }
 
     private buildPromiseSource=createPromiseSource<void>();
@@ -115,34 +103,61 @@ export class ConvoMakeTargetCtrl
         this.isBuilding=true;
 
         const upToDateContent=await this.getUpToDateContent();
+        let continueConvo:string|undefined;
         if(upToDateContent!==undefined){
             console.log('hio 👋 👋 👋 NO changes ',this.outPath);
-            this.commitOutputAsync(upToDateContent,false);
-            return;
+            if(this.parent.options.continueReview){
+                try{
+                    continueConvo=await this.parent.options.vfsCtrl.readStringAsync(this.convoFile);
+                }catch{}
+            }
+            if(!continueConvo){
+                continueConvo=undefined;
+            }
+
+            if(continueConvo===undefined){
+                this.commitOutputAsync(upToDateContent);
+                return;
+            }
         }
 
         if(this.parent.options.echoMode){
-            await this.commitOutputAsync(this.target.in.map(t=>t.convo??'').join('\n\n'),true);
+            const output=this.target.in.map(t=>t.convo??'').join('\n\n');
+            await this.writeOutputAsync(output);
+            await this.commitOutputAsync(output);
             return;
         }
 
+        const initConvo:Append[]=[];
         for(const i of this.target.in){
             if(!i.convo){
                 continue;
             }
-            this.conversation.append(
-                i.convo,
-                {filePath:i.path?normalizePath(joinPaths(this.parent.options.dir,i.path)):undefined}
-            );
+            initConvo.push({content:i.convo,options:{filePath:i.path?normalizePath(joinPaths(this.parent.options.dir,i.path)):undefined}});
         }
+        initConvo.push({content:`> system\nYour responses will be used verbatium to create files and other resources. DO NOT INCLUDE a preamble or postamble.`})
+        if(continueConvo){
+            continueConvo=continueConvo.substring(this.conversation.convo.length);
+            if(continueConvo.trim()){
+                initConvo.push({content:continueConvo});
+            }
+        }
+
+        await this.appendAsync(initConvo);
         let viewer:ConvoMakeAppViewer|undefined;
         try{
 
             while(true){
 
-                const r=await this.conversation.completeAsync();
-
-                this.writeOutputAsync(r.message?.content??'')
+                let output:string|false|undefined;
+                if(!continueConvo){
+                    const r=await this.conversation.completeAsync();
+                    output=r.message?.content;
+                    this.writeOutputAsync(r.message?.content??'');
+                }else{
+                    continueConvo=undefined;
+                    output=false;
+                }
 
                 let feedback:string|undefined;
 
@@ -166,16 +181,25 @@ export class ConvoMakeTargetCtrl
                                 feedback=(feedback?feedback+'\n\n':'')+`<error>\n${review.error}\n</error>`;
                             }
                             if(review.screenshotBase64Url){
-                                feedback=(feedback?feedback+'\n\n':'')+`\n\nScreenshot:\n![screenshot](${review.screenshotBase64Url})`
+                                feedback=`${
+                                    feedback?feedback+'\n\n':''
+                                }${review.message?.trim()?
+                                    'Use the following screenshot for additional context:':
+                                    'Follow the instructions in the following screenshot:'
+                                }\n![screenshot](${
+                                    review.screenshotBase64Url
+                                })`
                             }
                         }
                     }
                 }
 
                 if(feedback){
-                    this.conversation.appendUserMessage(feedback);
+                    await this.appendAsync({content:`> user\n${escapeConvo(feedback)}`})
                 }else{
-                    await this.commitOutputAsync(r.message?.content??'',false);
+                    if(output!==false){
+                        await this.commitOutputAsync(output??'');
+                    }
                     break;
                 }
             }
@@ -201,11 +225,7 @@ export class ConvoMakeTargetCtrl
         }
     }
 
-    private async commitOutputAsync(output:string,writeOutput:boolean){
-
-        if(writeOutput){
-            await this.writeOutputAsync(output);
-        }
+    private async commitOutputAsync(output:string){
 
         this.buildPromiseSource.resolve();
 

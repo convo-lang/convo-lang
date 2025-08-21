@@ -64,11 +64,8 @@ export class ConvoBrowserPageCtrl implements ConvoBrowserPage
                 content:`(()=>{
                     const div=document.createElement('div');
                     div.innerHTML=${JSON.stringify(options.html)};
-                    for(let i=0;i<div.children.length;i++){
-                        const c=div.children.item(i);
-                        if(!c){
-                            continue;
-                        }
+                    while(div.children.length){
+                        const c=div.children.item(0);
                         c.remove();
                         document.body.append(c);
                     }
@@ -76,8 +73,15 @@ export class ConvoBrowserPageCtrl implements ConvoBrowserPage
             })
         }
         if(options.javascript){
+            let js=options.javascript.trim();
+            if(js.startsWith('<script>')){
+                js=js.substring('<script>'.length);
+            }
+            if(js.endsWith('</script>')){
+                js=js.substring(0,js.length-'</script>'.length)
+            }
             await this.page.addScriptTag({
-                content:options.javascript
+                content:js
             })
         }
     }

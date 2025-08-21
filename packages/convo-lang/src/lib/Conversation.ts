@@ -2975,32 +2975,38 @@ export class Conversation
             system=modifiers.includes(convoImportModifiers.system);
             ignoreContent=modifiers.includes(convoImportModifiers.ignoreContent);
 
-            const result=await handler({
-                ...context,
-                name,
-                modifiers,
-                sourceDirectory:context.sourceFilepath?getDirectoryName(context.sourceFilepath):undefined,
-                system,
-                ignoreContent,
-                templateName,
-                targetPath,
-                role,
-                assign
-            });
-            if(result){
-                if(Array.isArray(result)){
+            try{
+                const result=await handler({
+                    ...context,
+                    name,
+                    modifiers,
+                    sourceDirectory:context.sourceFilepath?getDirectoryName(context.sourceFilepath):undefined,
+                    system,
+                    ignoreContent,
+                    templateName,
+                    targetPath,
+                    role,
+                    assign
+                });
+                if(result){
+                    if(Array.isArray(result)){
 
-                    const first=result[0];
-                    if(first && result.every(r=>r.convo===undefined && r.content!==undefined)){
-                        result.sort((a,b)=>(a.filePath??a.name).localeCompare(b.filePath??b.name));
-                        first.content=result.map(r=>r.content).join('\n\n\n');
-                        imports.push(first)
+                        const first=result[0];
+                        if(first && result.every(r=>r.convo===undefined && r.content!==undefined)){
+                            result.sort((a,b)=>(a.filePath??a.name).localeCompare(b.filePath??b.name));
+                            first.content=result.map(r=>r.content).join('\n\n\n');
+                            imports.push(first)
+                        }else{
+                            imports.push(...result);
+                        }
                     }else{
-                        imports.push(...result);
+                        imports.push(result);
                     }
-                }else{
-                    imports.push(result);
                 }
+            }catch(ex){
+                const msg=`Convo Import failed. import:${name}, from:${context.sourceFilepath}, error:${getErrorMessage(ex)}`;
+                console.error(msg,{name,context,index});
+                throw new Error(msg);
             }
         }
 

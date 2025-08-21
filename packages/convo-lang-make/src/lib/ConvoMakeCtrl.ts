@@ -22,6 +22,11 @@ export interface ConvoMakeCtrlOptions
 
     dryRun?:boolean;
 
+    /**
+     * If true cached outputs will be reviewed
+     */
+    continueReview?:boolean;
+
     previewPort?:number;
 }
 
@@ -47,7 +52,8 @@ export class ConvoMakeCtrl
         shell,
         browserInf,
         apps=[],
-        previewPort=defaultConvoMakePreviewPort
+        previewPort=defaultConvoMakePreviewPort,
+        continueReview=false,
     }:ConvoMakeCtrlOptions){
         this.options={
             vfsCtrl,
@@ -59,6 +65,7 @@ export class ConvoMakeCtrl
             shell,
             browserInf,
             previewPort,
+            continueReview,
         }
         console.log('hio 👋 👋 👋 make ctrl',this);
     }
@@ -355,6 +362,15 @@ export class ConvoMakeCtrl
             const i=appPath.lastIndexOf('.');
             if(i!==-1){
                 appPath=appPath.substring(0,i);
+            }
+        }
+
+        if(appPath==='index' || !appPath){
+            appPath='/'
+        }else if(appPath?.endsWith('/index')){
+            appPath=appPath.substring(0,appPath.length-'/index'.length);
+            if(!appPath){
+                appPath='/'
             }
         }
 
