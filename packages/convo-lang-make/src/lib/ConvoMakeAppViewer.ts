@@ -38,7 +38,6 @@ export class ConvoMakeAppViewer
 
     private async getPageAsync(browser:ConvoBrowserInf){
         const page=await browser.createPageAsync();
-        const instName=this.instName;
         try{
             if(this.reviewRequest.reviewType==='http'){
                 await page.openUrlAsync(`http://${this.appCtrl.app.host??'localhost'}:${this.appCtrl.app.port}/${this.reviewRequest.appPath}`);
@@ -50,11 +49,92 @@ export class ConvoMakeAppViewer
                 return page;
             }
 
-            const ctrl=`window.${this.instName}_ctrl`;
+            await this.injectAsync(page);
 
-            await page.injectAsync({
-                css:style.getParsed(),
-                html:/*html*/`
+            // do not await
+            this.monitorInjectAsync(page);
+
+            return page;
+        }catch(ex){
+            page.dispose();
+            throw ex;
+        }
+    }
+
+    private firstView=true;
+    private reviewSource?:PromiseSource<ConvoMakeOutputReview>;
+    public async reviewAsync():Promise<ConvoMakeOutputReview>{
+        const browser=this.appCtrl.parent.options.browserInf;
+        if(!browser || !this.appCtrl.app.port){
+            return {approved:true};
+        }
+
+        const ctrl=`window.${this.instName}_ctrl`;
+
+        const page=await (this.pagePromise??(this.pagePromise=this.getPageAsync(browser)));
+
+        try{
+
+            if(this.firstView){
+                this.firstView=false;
+            }
+
+            while(true){
+                try{
+                    await page.evalAsync(`${ctrl}.reset()`);
+                    break;
+                }catch{}
+                await delayAsync(30);
+            }
+
+            const reviewSource=createPromiseSource<ConvoMakeOutputReview>();
+            this.reviewSource=reviewSource;
+
+            const review=await reviewSource.promise;
+
+            await page.evalAsync(`${ctrl}.hideMenu()`);
+
+            const s=await page.getScreenShotAsync({screenshotBase64Url:true,screenshot:true});
+            review.screenshot=s?.screenshot;
+            review.screenshotBase64Url=s?.screenshotBase64Url;
+
+            await page.evalAsync(`${ctrl}.showBusy()`);
+
+            return review;
+        }finally{
+            if(this.isDisposed){
+                page.dispose();
+            }
+        }
+
+    }
+
+    private async monitorInjectAsync(page:ConvoBrowserPage)
+    {
+        const ctrl=`window.${this.instName}_ctrl`;
+        while(!this.isDisposed){
+            await delayAsync(2000);
+
+            let mounted=false;
+            try{
+                mounted=await page.evalAsync(`${ctrl}.isMounted()`);
+            }catch{}
+
+            if(!mounted && !this.isDisposed){
+                await this.injectAsync(page);
+                await delayAsync(3000);
+            }
+        }
+    }
+
+    private async injectAsync(page:ConvoBrowserPage)
+    {
+        const ctrl=`window.${this.instName}_ctrl`;
+        const instName=this.instName;
+
+        await page.injectAsync({
+            css:style.getParsed(),
+            html:/*html*/`
 
 
 <div id="${instName}" class="${style.root(null,'approveMode')}" style="${style.varsCss({
@@ -159,8 +239,8 @@ export class ConvoMakeAppViewer
         if (!canvas) return;
 
         const updateSize=()=>{
-            const w=document.body.clientWidth;
-            const h=document.body.clientHeight;
+            const w=Math.max(document.body.clientWidth,window.innerWidth);
+            const h=Math.max(document.body.clientHeight,window.innerHeight);
             canvas.setAttribute('viewport','0 0 '+w+' '+h);
             canvas.style.width=w+'px';
             canvas.style.height=h+'px';
@@ -353,6 +433,7 @@ export class ConvoMakeAppViewer
         },
         submit,
         reset,
+        isMounted:()=>true,
     }
 
 })()
@@ -367,60 +448,6 @@ export class ConvoMakeAppViewer
                     }
                 ]
             });
-
-            return page;
-        }catch(ex){
-            page.dispose();
-            throw ex;
-        }
-    }
-
-    private firstView=true;
-    private reviewSource?:PromiseSource<ConvoMakeOutputReview>;
-    public async reviewAsync():Promise<ConvoMakeOutputReview>{
-        const browser=this.appCtrl.parent.options.browserInf;
-        if(!browser || !this.appCtrl.app.port){
-            return {approved:true};
-        }
-
-        const ctrl=`window.${this.instName}_ctrl`;
-
-        const page=await (this.pagePromise??(this.pagePromise=this.getPageAsync(browser)));
-
-        try{
-
-            if(this.firstView){
-                this.firstView=false;
-            }
-
-            while(true){
-                try{
-                    await page.evalAsync(`${ctrl}.reset()`);
-                    break;
-                }catch{}
-                await delayAsync(30);
-            }
-
-            const reviewSource=createPromiseSource<ConvoMakeOutputReview>();
-            this.reviewSource=reviewSource;
-
-            const review=await reviewSource.promise;
-
-            await page.evalAsync(`${ctrl}.hideMenu()`);
-
-            const s=await page.getScreenShotAsync({screenshotBase64Url:true,screenshot:true});
-            review.screenshot=s?.screenshot;
-            review.screenshotBase64Url=s?.screenshotBase64Url;
-
-            await page.evalAsync(`${ctrl}.showBusy()`);
-
-            return review;
-        }finally{
-            if(this.isDisposed){
-                page.dispose();
-            }
-        }
-
     }
 }
 
@@ -437,6 +464,9 @@ const style=atDotCss({name:'ConvoMakeAppViewer',disableAutoInsert:true,css:`
     @.root > *{
         font-size:@@fontSize;
         line-height:calc( @@fontSize * 1.2 );
+    }
+    @.root *{
+        color:@@color;
     }
     @.menu{
         display:flex;

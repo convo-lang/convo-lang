@@ -1,5 +1,6 @@
-import { convoVars } from "@convo-lang/convo-lang";
-import { ConvoMakeTarget } from "./convo-make-types";
+import { convoTypeToJsonScheme, convoVars, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { valueIsZodType } from "@iyio/common";
+import { ConvoMakeTarget, ConvoMakeTargetDeclaration } from "./convo-make-types";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
 
 export const convoMakeStateDir='.convo-make'
@@ -26,11 +27,12 @@ export const convoMakeTargetHasProps:(keyof ConvoMakeTarget)[]=[
     'app',
     'appPath',
     'keepAppPathExt',
+    'outType'
 ];
 convoMakeTargetHasProps.sort();
 
 
-export const  getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
+export const getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
 {
     const targets=vars[convoVars.__makeTargets];
     if(!Array.isArray(targets) || !targets.length){
@@ -43,3 +45,25 @@ export const  getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):C
     }
     return options;
 }
+
+export const getConvoMakeTargetOutType=(dec:ConvoMakeTargetDeclaration):string|undefined=>{
+    const isList=dec.outListType?true:false;
+    let type=isList?dec.outListType:dec.outType;
+    if(!type){
+        return undefined;
+    }
+    if(typeof type !== 'string'){
+        if(valueIsZodType(type)){
+            type=schemeToConvoTypeString(type);
+        }else{
+            const json=convoTypeToJsonScheme(type);
+            if(!json){
+                throw new Error('Unable to convert type to JSON schema');
+            }
+            type=schemeToConvoTypeString(json);
+        }
+    }
+    return isList?`array(${type})`:type;
+}
+
+export const convoMakeOutputTypeName='ConvoMakeOutputType';
