@@ -1898,7 +1898,7 @@ export const convoDescriptionToCommentOut=(description:string,tab='',out:string[
     const lines=description.split('\n');
     for(let i=0;i<lines.length;i++){
         const line=lines[i];
-        out.push(`${tab}# ${line}`);
+        out.push(`${i?'\n':''}${tab}# ${line}`);
     }
 }
 export const convoDescriptionToComment=(description:string,tab=''):string=>{
