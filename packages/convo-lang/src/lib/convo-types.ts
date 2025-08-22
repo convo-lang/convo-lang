@@ -971,6 +971,7 @@ export interface FlatConvoMessage
     responseFormat?:string;
     responseFormatTypeName?:string;
     responseFormatIsArray?:boolean;
+    responseFormatWrapArray?:boolean;
     responseAssignTo?:string;
 
     task?:string;

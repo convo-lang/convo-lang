@@ -306,7 +306,7 @@ you would respond with the following JSON object.
     }
 
     if(jsonMode && model.jsonModeImplementAsFunction){
-        const isAry=lastMsg?.responseFormatIsArray;
+        const isAry=lastMsg?.responseFormatWrapArray;
         const convoType=`${isAry?'array(':''}${lastMsg?.responseFormatTypeName??'any'}${isAry?')':''}`;
         await convo.flattenSourceAsync({
             appendTo:flat,
@@ -432,10 +432,10 @@ const applyJsonModeToMessage=(msg:FlatConvoMessage,model:ConvoModelInfo,flat:Fla
                 type:'object',
                 required:['values'],
                 properties:{
-                    values:{
+                    values:msg.responseFormatWrapArray?{
                         type:'array',
                         items:scheme
-                    }
+                    }:scheme
                 }
             }
         }

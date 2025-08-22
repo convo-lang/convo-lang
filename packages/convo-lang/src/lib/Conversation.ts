@@ -4342,13 +4342,17 @@ export class Conversation
         if(!typeName){
             return;
         }
-        const isArray=typeName.endsWith('[]')
-        if(isArray){
+        const isBracketAry=typeName.endsWith('[]');
+        const isArray=isBracketAry || Array.isArray(exe.getVar(typeName))
+        if(isBracketAry){
             typeName=typeName.substring(0,typeName.length-2);
         }
 
         flat.responseFormatTypeName=typeName;
         flat.responseFormatIsArray=isArray;
+        if(isBracketAry){
+            flat.responseFormatWrapArray=true;
+        }
     }
 
     public shouldDebug(exe?:ConvoExecutionContext)
