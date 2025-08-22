@@ -190,6 +190,12 @@
                 "icon":"$(combine)"
             },
             {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon":"$(combine)"
+            },
+            {
                 "command": "convo.list-models",
                 "title": "Convo: List Models - Lists registered LLM models",
                 "shortTitle": "Convo: List Models",

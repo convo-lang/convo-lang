@@ -256,14 +256,7 @@ const registerCommands=(context:ExtensionContext)=>{
         await window.showTextDocument(doc);
     }));
 
-    const __TEST__=false;
-    context.subscriptions.push(commands.registerCommand('convo.make', async () => {
-        if(__TEST__){
-            const browser=new ConvoBrowserCtrl();
-            const page=await browser.createPageAsync();
-            await page.openUrlAsync('http://localhost:7713');
-            return;
-        }
+    context.subscriptions.push(commands.registerCommand('convo.make-targets', async () => {
         const document=window.activeTextEditor?.document;
         if(!document){
             return;
@@ -289,13 +282,71 @@ const registerCommands=(context:ExtensionContext)=>{
         const ctrl=new ConvoMakeCtrl({
             ...options,
             echoMode:false,
+            continueReview:true,
             browserInf:new ConvoBrowserCtrl(),
         });
         try{
-            await ctrl.buildAsync();
+            const targets=await ctrl.getTargetsAsync();
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify({apps:ctrl.options.apps,targets,sourceTargets:ctrl.options.targets},null,4),
+            });
+
+            await window.showTextDocument(doc);
         }finally{
             ctrl.dispose();
         }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make', async () => {
+        await window.withProgress({
+            location: ProgressLocation.Notification,
+            title: "Building targets",
+            cancellable: true
+        }, async (progress,token)=>{
+            const document=window.activeTextEditor?.document;
+            if(!document){
+                return;
+            }
+            await initConvoCliAsync({
+                config:getCliConfig(),
+                sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+                bufferOutput:true,
+                exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            })
+            if(token.isCancellationRequested){return}
+
+            const ctx=await getConvoEditorContextAsync();
+            if(token.isCancellationRequested){return}
+
+            if(!ctx?.cwd){
+                return;
+            }
+
+            initConvoMakeConversation(ctx.convo);
+
+            const flat=await ctx.convo.flattenAsync();
+            if(token.isCancellationRequested){return}
+
+            const options=getConvoMakeOptionsFromVars(ctx.cwd,flat.exe.sharedVars);
+            if(!options){
+                return;
+            }
+            const ctrl=new ConvoMakeCtrl({
+                ...options,
+                //echoMode:true,
+                continueReview:true,
+                browserInf:new ConvoBrowserCtrl(),
+            });
+            token.onCancellationRequested(()=>{
+                ctrl.dispose();
+            })
+            try{
+                await ctrl.buildAsync();
+            }finally{
+                ctrl.dispose();
+            }
+        });
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
