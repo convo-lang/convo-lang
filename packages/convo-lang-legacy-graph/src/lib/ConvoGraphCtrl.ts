@@ -12,6 +12,7 @@ export interface ConvoGraphCtrlOptions
     convoOptions?:ConversationOptions;
     maxConcurrentStepExe?:number;
     logEventsToConsole?:boolean;
+    stopOnReturnFalse?:boolean;
     beforeNext?:ConvoGraphBeforeNextCallback;
 }
 
@@ -83,12 +84,15 @@ export class ConvoGraphCtrl
 
     private readonly stepLock:Lock;
 
+    public readonly stopOnReturnFalse:boolean;
+
     public constructor({
         store=convoGraphStore(),
         convoOptions={},
         maxConcurrentStepExe=maxConvoGraphConcurrentStepExe,
         logEventsToConsole=false,
         beforeNext,
+        stopOnReturnFalse=false,
     }:ConvoGraphCtrlOptions){
         this.store=store;
         this.defaultConvoOptions=convoOptions;
@@ -96,6 +100,7 @@ export class ConvoGraphCtrl
         this.stepLock=new Lock(this.maxConcurrentStepExe);
         this.logEventsToConsole=logEventsToConsole;
         this.beforeNext=beforeNext;
+        this.stopOnReturnFalse=stopOnReturnFalse;
     }
 
     private readonly disposables=new DisposeContainer();
@@ -525,6 +530,11 @@ export class ConvoGraphCtrl
                 return 'failed';
             }
 
+            if(this.stopOnReturnFalse && invokeCall?.value===false){
+                tv.exeState='stopped';
+                return 'stopped';
+            }
+
             await checkProxyAsync(false);
         }
         tv.currentStepIndex=0;
@@ -779,6 +789,7 @@ export class ConvoGraphCtrl
                 resetConvoNodeExecCtxConvo(exeCtx);
             }
             const msgCount=exeCtx.convo.messages.length;
+            console.log('hio 👋 👋 👋 append convo',step.nodeStep.convo);
             exeCtx.convo.append(step.nodeStep.convo);
             const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,exeCtx.convo,msgCount,stepIndex===exeCtx.steps.length-1);
             if(call){
