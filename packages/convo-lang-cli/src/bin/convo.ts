@@ -1,9 +1,26 @@
-import { CancelToken, getObjKeyCount, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
+import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
+import { realpath } from "node:fs/promises";
 import { createConvoCliAsync } from "../lib/ConvoCli";
 import { ConvoCliOptions } from "../lib/convo-cli-types";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter";
 import { createNextAppAsync } from "../lib/create-next-app";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const flags=['make'] as const;
 
 type Args=ConvoCliOptions;
 const args=parseCliArgsT<Args>({
@@ -11,6 +28,23 @@ const args=parseCliArgsT<Args>({
     startIndex:2,
     defaultKey:'source',
     restKey:'spawn',
+    flags:[
+        'parse',
+        'convert',
+        'bufferOutput',
+        'cmdMode',
+        'repl',
+        'stdin',
+        'syncWatch',
+        'printState',
+        'printFlat',
+        'printMessages',
+        'prefixOutput',
+        'createNextApp',
+        'listModels',
+        'make',
+        'makeTargets',
+    ],
     converter:{
         source:args=>args[0],
         inline:args=>args[0],
@@ -42,6 +76,7 @@ const args=parseCliArgsT<Args>({
         createAppWorkingDir:args=>args[0],
         listModels:args=>args.length?true:false,
         make:args=>args.length?true:false,
+        makeTargets:args=>args.length?true:false,
     }
 }).parsed as Args;
 
@@ -61,6 +96,16 @@ const main=async()=>{
             }
         },3000);
     });
+    process.on('unhandledRejection',(reason,promise)=>{
+        console.error('Unhandled Rejection at:',promise,'reason:',reason);
+        process.exit(1);
+    });
+    process.on('uncaughtException',(ex,origin)=>{
+        console.error('Unhandled Exception',ex,'origin',origin);
+        process.exit(1);
+    });
+
+    args.exeCwd=normalizePath(args.exeCwd?await realpath(args.exeCwd):globalThis.process.cwd());
 
     let toolPromises:Promise<any>[]=[];
 

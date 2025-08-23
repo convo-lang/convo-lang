@@ -2,7 +2,7 @@ import { AppendConvoOptions, Conversation, convoVars, escapeConvo } from "@convo
 import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeStateDir, convoMakeTargetHasProps, getConvoMakeTargetInHash } from "./convo-make-lib";
-import { ConvoMakeAppTargetRef, ConvoMakeTarget } from "./convo-make-types";
+import { ConvoMakeAppTargetRef, ConvoMakeTarget, ConvoMakeTargetState } from "./convo-make-types";
 import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer";
 import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
 
@@ -36,6 +36,10 @@ export class ConvoMakeTargetCtrl
     public get outputSubject():ReadonlySubject<string|undefined>{return this._output}
     public get output(){return this._output.value}
 
+    private readonly _state:BehaviorSubject<ConvoMakeTargetState>=new BehaviorSubject<ConvoMakeTargetState>('waiting');
+    public get stateSubject():ReadonlySubject<ConvoMakeTargetState>{return this._state}
+    public get state(){return this._state.value}
+
     public constructor({
         makeCtrl,
         target,
@@ -68,6 +72,9 @@ export class ConvoMakeTargetCtrl
         this._isDisposed=true;
         this.buildPromiseSource.resolve();
         this.disposables.dispose();
+        if(this.state!=='complete'){
+            this._state.next('cancelled');
+        }
     }
 
     public async appendAsync(append:Append|Append[]){
@@ -84,7 +91,7 @@ export class ConvoMakeTargetCtrl
     }
 
     private async writeConvoOutputAsync(outConvo:string){
-        console.log('hio 👋 👋 👋 write convo out',this.convoFile,outConvo);
+        console.log('hio 👋 👋 👋 write convo out',this.convoFile);
         await this.makeCtrl.options.vfsCtrl.writeStringAsync(this.convoFile,outConvo);
     }
 
@@ -99,18 +106,22 @@ export class ConvoMakeTargetCtrl
 
     private async tryBuildAsync(){
 
-        if(this.isBuilding || this.isDisposed || this.target.in.some(i=>!i.ready || (i.path && !this.makeCtrl.areDynamicDependenciesReady(i.path)))){
+        if( this.isBuilding ||
+            this.isDisposed ||
+            this.target.in.some(i=>!i.ready || (i.path && !this.makeCtrl.areDependenciesReady(this.target.stage,i.path)))
+        ){
             return;
         }
 
         this.isBuilding=true;
+        this._state.next('building');
 
-        if(this.target.outIsList){
+        if(this.target.outFromList){
             await Promise.all(this.target.in.filter(i=>i.listIndex!==undefined).map(async (input,index)=>{
                 const ctrl=this.makeCtrl.forkTargetList(this,input,index);
                 await ctrl.buildAsync();
-            }))
-            this.buildPromiseSource.resolve();
+            }));
+            this.commit();
             return;
         }
 
@@ -128,15 +139,16 @@ export class ConvoMakeTargetCtrl
             }
 
             if(continueConvo===undefined){
-                this.commitOutputAsync(upToDateContent);
+                this.commit(upToDateContent);
                 return;
             }
         }
+        console.log('hio 👋 👋 👋 start build ',this.outPath);
 
         if(this.makeCtrl.options.echoMode){
             const output=this.target.in.map(t=>t.convo??'').join('\n\n');
             await this.writeOutputAsync(output);
-            await this.commitOutputAsync(output);
+            await this.commit(output);
             return;
         }
 
@@ -222,7 +234,7 @@ DO NOT include a preamble or postamble.
                     await this.appendAsync({content:`> user\n${escapeConvo(feedback)}`})
                 }else{
                     if(output!==false){
-                        await this.commitOutputAsync(output??'');
+                        this.commit(output??'');
                     }
                     break;
                 }
@@ -249,15 +261,19 @@ DO NOT include a preamble or postamble.
         }
     }
 
-    private async commitOutputAsync(output:string){
+    private commit(output:string=''){
 
+        this._state.next('complete');
         this.buildPromiseSource.resolve();
 
+        const reg=this.target.dynamicOutReg;
         for(const t of this.makeCtrl.targets){
-            if(t.target.in.some(t=>t.path===this.target.out)){
+            if(t.target.in.some(t=>t.path?reg?reg.test(t.path):t.path===this.target.out:false)){
                 t.onInputWrittenAsync(this.target.out,this.target.dynamicOutReg,output);
             }
         }
+
+        this.makeCtrl.getStage(this.target.stage)?.checkReady();
     }
 
     private async writeOutputAsync(output:string){
@@ -304,9 +320,12 @@ DO NOT include a preamble or postamble.
             if(!(input?.path===relPath || (input?.path && pathReg?.test(input.path)))){
                 continue;
             }
+            tryBuild=true;
+            if(input.ready){
+                continue;
+            }
             const updated=await this.makeCtrl.contentToConvoAsync(relPath,input.isList,input,input.isContext??false,input.isCommand,content,input.isConvoFile);
             this.target.in.splice(i,1,...updated);
-            tryBuild=true;
             if(updated.length){
                 i+=updated.length-1;
             }else{

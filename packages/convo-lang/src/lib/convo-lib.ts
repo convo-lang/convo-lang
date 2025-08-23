@@ -351,7 +351,12 @@ export const convoFunctions={
     /**
      * Defines a make app
      */
-    defineApp:'defineApp',
+    makeApp:'makeApp',
+
+    /**
+     * Defines a make stage
+     */
+    makeStage:'makeStage',
 } as const;
 
 /**
@@ -595,6 +600,11 @@ export const convoVars={
      * Array of ConvoMakeApp objects
      */
     __makeApps:'__makeApps',
+
+    /**
+     * Array of ConvoMakeStage objects
+     */
+    __makeStages:'__makeStages',
 
 } as const;
 

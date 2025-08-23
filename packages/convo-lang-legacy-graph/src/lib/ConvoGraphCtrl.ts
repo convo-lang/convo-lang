@@ -789,7 +789,6 @@ export class ConvoGraphCtrl
                 resetConvoNodeExecCtxConvo(exeCtx);
             }
             const msgCount=exeCtx.convo.messages.length;
-            console.log('hio 👋 👋 👋 append convo',step.nodeStep.convo);
             exeCtx.convo.append(step.nodeStep.convo);
             const call=await this.callTargetAsync(step.nodeStep.name??`Step ${stepIndex}`,tv,exeCtx.convo,msgCount,stepIndex===exeCtx.steps.length-1);
             if(call){

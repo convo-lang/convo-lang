@@ -16,6 +16,7 @@ export const getConvoMakeTargetInHash=(value:string)=>{
 }
 
 export const defaultConvoMakeAppName='default';
+export const defaultConvoMakeStageName='default';
 
 export const defaultConvoMakePreviewPort=55222;
 
@@ -42,6 +43,10 @@ export const getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):Co
     const apps=vars[convoVars.__makeApps];
     if(Array.isArray(apps)){
         options.apps=apps;
+    }
+    const stages=vars[convoVars.__makeStages];
+    if(Array.isArray(stages)){
+        options.stages=stages;
     }
     return options;
 }

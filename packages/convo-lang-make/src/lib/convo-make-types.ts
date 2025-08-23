@@ -47,6 +47,11 @@ export interface ConvoMakeApp
 export interface ConvoMakeTargetDeclaration extends ConvoMakeContentTemplate, ConvoMakeTargetAppProps
 {
     /**
+     * Name of the build state the target belongs to.
+     */
+    stage?:string;
+
+    /**
      * Path or paths to input files. Any file other than a .convo file will be treated as context
      * and be inserted into context. Input paths can use a wildcard (*) character that is used
      * to map multiple inputs to matching outputs.
@@ -180,6 +185,11 @@ export interface ConvoMakeInput extends ConvoMakeContentTemplate
 
 export interface ConvoMakeTarget extends ConvoMakeTargetAppProps
 {
+    /**
+     * Name of the build state the target belongs to.
+     * @default "default"
+     */
+    stage:string;
 
     /**
      * Inputs of the target
@@ -192,9 +202,9 @@ export interface ConvoMakeTarget extends ConvoMakeTargetAppProps
     out:string;
 
     /**
-     * If true the target will output a list
+     * Is true if the target's output is based on a list
      */
-    outIsList?:boolean;
+    outFromList?:boolean;
     /**
      * The output type of the target expressed as an convo struct or other convo type
      */
@@ -342,3 +352,26 @@ export interface ConvoMakeShellProc
     exitCode?:number;
 }
 
+export const allConvoMakeTargetState=['waiting','building','complete','cancelled'] as const;
+export type ConvoMakeTargetState=typeof allConvoMakeTargetState[number];
+
+/**
+ * Stages allow groups of targets to be generated in partitioned stages.
+ */
+export interface ConvoMakeStage
+{
+    /**
+     * Name of the stage. Stages with the same name will be merged at runtime
+     */
+    name:string;
+
+    /**
+     * Array of stages that this stage depends on and will be blocked by
+     */
+    deps?:string[];
+
+    /**
+     * Array of states this stage blocks
+     */
+    blocks?:string[];
+}

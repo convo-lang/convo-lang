@@ -2,7 +2,7 @@ import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, C
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars, initConvoMakeConversation } from "@convo-lang/convo-lang-make";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
@@ -81,7 +81,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
     });
     const projectConfig=await loadConvoProjectConfigFromVfsAsync({
         vfs:vfsCtrl,
-        basePath:options.exeCwd||globalThis.process?.cwd?.()
+        basePath:options.exeCwd??globalThis.process.cwd()
     });
 
     initRootScope(reg=>{
@@ -176,8 +176,8 @@ export class ConvoCli
             this.convo.append(options.prepend);
         }
         if(this.options.exeCwd){
-            this.convo.unregisteredVars[convoVars.__cwd]=this.options.exeCwd;
-            globalThis.process?.chdir(this.options.exeCwd);
+            globalThis.process.chdir(this.options.exeCwd);
+            this.convo.unregisteredVars[convoVars.__cwd]=normalizePath(globalThis.process.cwd());
         }
         if(this.options.source){
             this.convo.unregisteredVars[convoVars.__mainFile]=this.options.source;
@@ -351,7 +351,7 @@ The current date and time is: "{{dateTime()}}"
 
         if(source!==undefined){
             let writeOut=true;
-            if(this.options.make){
+            if(this.options.make || this.options.makeTargets){
                 writeOut=false;
                 await this.makeAsync(source);
             }else if(this.options.convert){
@@ -455,7 +455,12 @@ The current date and time is: "{{dateTime()}}"
             ...options,
         });
         try{
-            await ctrl.buildAsync();
+            if(this.options.makeTargets){
+                const debugOutput=await ctrl.getDebugOutputAsync();
+                await this.outAsync(JSON.stringify(debugOutput,null,4));
+            }else{
+                await ctrl.buildAsync();
+            }
         }finally{
             ctrl.dispose();
         }

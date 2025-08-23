@@ -286,10 +286,10 @@ const registerCommands=(context:ExtensionContext)=>{
             browserInf:new ConvoBrowserCtrl(),
         });
         try{
-            const targets=await ctrl.getTargetsAsync();
+            const debugOutput=await ctrl.getDebugOutputAsync();
             const doc=await workspace.openTextDocument({
                 language:'json',
-                content:JSON.stringify({apps:ctrl.options.apps,targets,sourceTargets:ctrl.options.targets},null,4),
+                content:JSON.stringify(debugOutput,null,4),
             });
 
             await window.showTextDocument(doc);
@@ -335,7 +335,7 @@ const registerCommands=(context:ExtensionContext)=>{
             const ctrl=new ConvoMakeCtrl({
                 ...options,
                 //echoMode:true,
-                continueReview:true,
+                //continueReview:true,
                 browserInf:new ConvoBrowserCtrl(),
             });
             token.onCancellationRequested(()=>{

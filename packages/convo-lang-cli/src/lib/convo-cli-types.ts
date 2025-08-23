@@ -185,6 +185,11 @@ export interface ConvoCliOptions
      * If true make targets should be built
      */
     make?:boolean;
+
+    /**
+     * If true make targets will be printed as JSON
+     */
+    makeTargets?:boolean;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

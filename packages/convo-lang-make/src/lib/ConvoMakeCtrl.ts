@@ -1,11 +1,12 @@
 import { Conversation, ConvoBrowserInf, convoVars, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, getDirectoryName, getFileExt, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs } from "@iyio/common";
-import { vfs, VfsCtrl } from "@iyio/vfs";
+import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs } from "@iyio/common";
+import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject } from "rxjs";
-import { convoMakeOutputTypeName, defaultConvoMakePreviewPort, getConvoMakeTargetOutType } from "./convo-make-lib";
-import { ConvoMakeApp, ConvoMakeAppTargetRef, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakeShell, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "./convo-make-types";
+import { convoMakeOutputTypeName, defaultConvoMakePreviewPort, defaultConvoMakeStageName, getConvoMakeTargetOutType } from "./convo-make-lib";
+import { ConvoMakeApp, ConvoMakeAppTargetRef, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakeShell, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
+import { ConvoMakeStageCtrl } from "./ConvoStageCtrl";
 
 export interface ConvoMakeCtrlOptions
 {
@@ -14,6 +15,7 @@ export interface ConvoMakeCtrlOptions
     browserInf?:ConvoBrowserInf;
     targets:ConvoMakeTargetDeclaration[];
     apps?:ConvoMakeApp[];
+    stages?:ConvoMakeStage[];
     dir:string;
     /**
      * If true input content is echoed in to outputs instead of being generated
@@ -28,6 +30,11 @@ export interface ConvoMakeCtrlOptions
     continueReview?:boolean;
 
     previewPort?:number;
+
+    /**
+     * If input inputs will not have their whitespace trimmed.
+     */
+    disableInputTrimming?:boolean;
 }
 
 export class ConvoMakeCtrl
@@ -43,6 +50,8 @@ export class ConvoMakeCtrl
     public get appsSubject():ReadonlySubject<ConvoMakeAppCtrl[]>{return this._apps}
     public get apps(){return this._apps.value}
 
+    public readonly stages:ConvoMakeStageCtrl[];
+
     public constructor({
         vfsCtrl=vfs(),
         targets,
@@ -54,6 +63,8 @@ export class ConvoMakeCtrl
         apps=[],
         previewPort=defaultConvoMakePreviewPort,
         continueReview=false,
+        disableInputTrimming=false,
+        stages=[],
     }:ConvoMakeCtrlOptions){
         this.options={
             vfsCtrl,
@@ -66,7 +77,10 @@ export class ConvoMakeCtrl
             browserInf,
             previewPort,
             continueReview,
+            disableInputTrimming,
+            stages,
         }
+        this.stages=stages.map(stage=>new ConvoMakeStageCtrl({makeCtrl:this,stage}));
         console.log('hio 👋 👋 👋 make ctrl',this);
     }
 
@@ -101,6 +115,10 @@ export class ConvoMakeCtrl
             return;
         }
 
+        for(const stage of this.stages){
+            stage.checkReady();
+        }
+
         const ctrls=targets.map(target=>new ConvoMakeTargetCtrl({
             target,
             makeCtrl:this,
@@ -108,9 +126,14 @@ export class ConvoMakeCtrl
 
         this._targets.next(ctrls);
 
-        console.log('hio 👋 👋 👋 targets',targets,ctrls);
+        console.log('hio 👋 👋 👋 targets',targets);
 
-        await Promise.all(ctrls.map(t=>t.buildAsync()));
+        await Promise.all(this.targets.map(t=>t.buildAsync()));
+
+        while(this.targets.filter(t=>!(t.state==='complete' || t.state==='cancelled')).length){
+            console.log('hio 👋 👋 👋 build all',this.targets.length);
+            await Promise.all(this.targets.map(t=>t.buildAsync()));
+        }
 
         console.log('hio 👋 👋 👋 DONE',);
     }
@@ -118,11 +141,11 @@ export class ConvoMakeCtrl
     public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
     {
         console.log('hio 👋 👋 👋 fork input',listInput);
-        if(!parent.target.outIsList){
-            throw new Error('Only targets that outIsList is true should be forked')
+        if(!parent.target.outFromList){
+            throw new Error('Only targets that outFromList is true should be forked')
         }
         const target:ConvoMakeTarget={...parent.target,in:[]};
-        delete target.outIsList;
+        delete target.outFromList;
         delete target.dynamicOutReg;
         for(let i=0;i<parent.target.in.length;i++){
             const input=parent.target.in[i];
@@ -187,7 +210,10 @@ export class ConvoMakeCtrl
             input=normalizePath(joinPaths(dir,input));
             if(input.includes('*')){
                 const star=parseStarPath(input);
-                const items=await this.options.vfsCtrl.readDirAsync({path:input});
+                const items=await (star?.recursiveBase?
+                    this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
+                    this.options.vfsCtrl.readDirAsync({path:input})
+                );
                 const inputs:PathAndStarPath[]=[];
                 for(const item of items.items){
                     if(item.type==='file'){
@@ -212,10 +238,10 @@ export class ConvoMakeCtrl
             keepAppPathExt:dec.keepAppPathExt,
             outType:getConvoMakeTargetOutType(dec),
             outNameProp:dec.outNameProp,
-            outIsList:dec.inList?true:undefined,
+            outFromList:dec.inList?true:undefined,
         }
 
-        if(multiOut && !sharedProps.outIsList){
+        if(multiOut && !sharedProps.outFromList){
             for(let i=0;i<inputs.length;i++){
                 const input=inputs[i];
                 let output=outputs[i%outputs.length];
@@ -235,6 +261,7 @@ export class ConvoMakeCtrl
                 }
                 const target:ConvoMakeTarget={
                     ...sharedProps,
+                    stage:dec.stage??defaultConvoMakeStageName,
                     in:await this.createInputAryAsync({...input,path:removeDir(input.path,cwd)},dir,cwd,dec),
                     out:removeDir(output,cwd),
                 }
@@ -248,6 +275,7 @@ export class ConvoMakeCtrl
             for(const out of outputs){
                 const target:ConvoMakeTarget={
                     ...sharedProps,
+                    stage:dec.stage??defaultConvoMakeStageName,
                     in:await this.createInputAryAsync(inputs.map(i=>({...i,path:removeDir(i.path,cwd)})),dir,cwd,dec),
                     out:removeDir(out,cwd),
                 }
@@ -263,7 +291,9 @@ export class ConvoMakeCtrl
         if(dec.instructions){
             inputAry.push(...await this.contentToConvoAsync(
                 undefined,undefined,dec,false,true,
-                `${dec.outType || dec.outListType?`@json = ${convoMakeOutputTypeName}\n`:''}> user\n${escapeConvo(dec.instructions)}`,true)
+                `${dec.outType || dec.outListType?`@json = ${convoMakeOutputTypeName}\n`:''}> user\n${
+                    escapeConvo(this.options.disableInputTrimming?dec.instructions:dec.instructions.trim())
+                }`,true)
             );
         }
 
@@ -276,14 +306,12 @@ export class ConvoMakeCtrl
             }
         }
 
-        if(Array.isArray(inputFile)){
-            for(const f of inputFile){
+        if(inputFile){
+            const ary=asArray(inputFile);
+            for(const f of ary){
                 const content=await this.loadFileAsync(f.path);
                 inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content))
             }
-        }else if(inputFile){
-            const content=await this.loadFileAsync(inputFile.path);
-            inputAry.push(...await this.contentToConvoAsync(inputFile.path,inputFile.isList,dec,false,undefined,content));
         }
 
         return inputAry;
@@ -295,7 +323,8 @@ export class ConvoMakeCtrl
         const path=normalizePath(joinPaths(this.options.dir,relPath));
         return this.fileCache[relPath]??(this.fileCache[relPath]=(async ()=>{
             try{
-                return await this.options.vfsCtrl.readStringAsync(path);
+                const content=await this.options.vfsCtrl.readStringAsync(path);
+                return this.options.disableInputTrimming?content:content?.trim();
             }catch(ex){
                 return undefined;
             }
@@ -310,20 +339,32 @@ export class ConvoMakeCtrl
         this.fileCache[relPath]=Promise.resolve(content);
     }
 
-    public getDynamicDependencies(relPath:string):ConvoMakeTargetCtrl[]
+    public getDependencies(stage:string|undefined,relPath:string):ConvoMakeTargetCtrl[]
     {
         const deps:ConvoMakeTargetCtrl[]=[];
         for(const ctrl of this.targets){
-            if(ctrl.target.dynamicOutReg?.test(relPath) && ctrl.target.in.some(t=>!t.ready)){
+            if( (stage?ctrl.target.stage===stage:true) &&
+                (
+                    ctrl.target.dynamicOutReg?
+                    ctrl.target.dynamicOutReg.test(relPath) && ctrl.target.in.some(t=>!t.ready):
+                    ctrl.target.out===relPath
+                )
+            ){
                 deps.push(ctrl);
             }
         }
         return deps;
     }
 
-    public areDynamicDependenciesReady(relPath:string):boolean{
-        const deps=this.getDynamicDependencies(relPath);
-        return !deps.length || deps.every(d=>d.target.in.every(i=>i.ready))
+    public areDependenciesReady(stage:string|undefined,relPath:string):boolean{
+        if(stage){
+            const s=this.stages.find(s=>s.stage.name===stage);
+            if(s && !s.isReady){
+                return false;
+            }
+        }
+        const deps=this.getDependencies(stage,relPath);
+        return !deps.length || deps.every(d=>d.state==='complete' && d.target.in.every(i=>i.ready))
     }
 
     public async contentToConvoAsync(
@@ -397,10 +438,6 @@ export class ConvoMakeCtrl
 
         let hash:string|undefined;
 
-        if(isConvoFile && content){
-            content=content.trim();
-        }
-
         if(isConvoFile && relPath && content && importReg.test(content)){
             const conversation=this.createConversation(relPath);
             const imports:string[]=[];
@@ -436,7 +473,6 @@ export class ConvoMakeCtrl
 
     private createConversation(relPath:string):Conversation{
         const conversation=new Conversation({disableAutoFlatten:true});
-        console.log('hio 👋 👋 👋 convo',conversation);
         const fullPath=normalizePath(joinPaths(this.options.dir,relPath));
         conversation.unregisteredVars[convoVars.__cwd]=getDirectoryName(fullPath);
         conversation.unregisteredVars[convoVars.__mainFile]=fullPath;
@@ -524,12 +560,28 @@ export class ConvoMakeCtrl
         pushBehaviorSubjectAry(this._apps,appCtrl);
         return appCtrl;
     }
+
+    public getStage(name:string):ConvoMakeStageCtrl|undefined{
+        return this.stages.find(s=>s.stage.name===name);
+    }
+
+    public async getDebugOutputAsync(){
+        const targets=await this.getTargetsAsync();
+        return {
+            apps:this.options.apps,
+            stages:this.options.stages,
+            targets,
+            sourceTargets:this.options.targets
+        }
+    }
 }
 
 interface StarPath
 {
     start:string;
     end:string;
+    recursiveBase?:string;
+    recursiveFilter?:VfsFilter;
 }
 
 interface PathAndStarPath
@@ -544,9 +596,29 @@ const parseStarPath=(path:string):StarPath|undefined=>{
     if(parts.length!==2){
         return undefined;
     }
+    const recursive=path.includes('**');
+    let recursiveFilter:VfsFilter|undefined;
+    let recursiveBase:string|undefined;
+    if(recursive){
+        recursiveBase=parts[0];
+        if(recursiveBase){
+            if(recursiveBase.endsWith('/')){
+                recursiveBase=recursiveBase.substring(0,recursiveBase.length-1);
+            }else{
+                const i=recursiveBase.lastIndexOf('/');
+                if(i!==-1){
+                    recursiveBase=recursiveBase.substring(0,i);
+                }
+            }
+        }
+        const name=getFileName(path).replace(/\*+/g,'*');
+        recursiveFilter={match:starStringToRegex(name)}
+    }
     return {
         start:parts[0] as string,
         end:parts[1] as string,
+        recursiveBase,
+        recursiveFilter,
     }
 }
 

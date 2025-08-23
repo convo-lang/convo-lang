@@ -1,7 +1,7 @@
 import { Conversation, convoFunctions, convoLabeledScopeParamsToObj, convoVars, createConvoScopeFunction } from "@convo-lang/convo-lang";
-import { getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
-import { defaultConvoMakeAppName } from "./convo-make-lib";
-import { ConvoMakeApp, ConvoMakeTargetDeclaration } from "./convo-make-types";
+import { aryUnique, getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
+import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-lib";
+import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration } from "./convo-make-types";
 
 
 export const convoMakeScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
@@ -67,7 +67,57 @@ export const convoDefineMakeAppScopeFunction=createConvoScopeFunction({usesLabel
 
 });
 
+export const convoDefineMakeStageScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
+
+    const stage=convoLabeledScopeParamsToObj(scope) as ConvoMakeStage|undefined;
+    if(!stage){
+        return;
+    }
+    if(!stage.name){
+        stage.name=defaultConvoMakeStageName;
+    }
+
+    let list=ctx.getVar(convoVars.__makeStages) as ConvoMakeStage[]|undefined;
+    if(!Array.isArray(list)){
+        list=[];
+        ctx.setVar(true,list,convoVars.__makeStages);
+    }
+
+    const match=list.find(s=>s.name===stage.name);
+
+    if(match){
+        match.deps=aryUnique([...(match.deps??[]),...(stage.deps??[])]);
+        match.blocks=aryUnique([...(match.blocks??[]),...(stage.blocks??[])]);
+        if(!match.deps.length){
+            delete match.deps;
+        }
+        if(!match.blocks.length){
+            delete match.blocks;
+        }
+    }else{
+        const prev=list[list.length-1];
+        if(prev && !stage.deps && !stage.blocks){
+            stage.deps=[prev.name];
+        }
+        list.push(stage);
+    }
+
+    if(scope.paramValues){
+        const targets:ConvoMakeTargetDeclaration[]=ctx.getVar(convoVars.__makeTargets)??[];
+        for(const target of scope.paramValues as ConvoMakeTargetDeclaration[]){
+            if(targets.includes(target) && !target.stage){
+                target.stage=stage.name;
+            }
+        }
+    }
+
+
+    return stage;
+
+});
+
 export const initConvoMakeConversation=(conversation:Conversation)=>{
     conversation.externFunctions[convoFunctions.make]=convoMakeScopeFunction;
-    conversation.externFunctions[convoFunctions.defineApp]=convoDefineMakeAppScopeFunction;
+    conversation.externFunctions[convoFunctions.makeApp]=convoDefineMakeAppScopeFunction;
+    conversation.externFunctions[convoFunctions.makeStage]=convoDefineMakeStageScopeFunction;
 }
