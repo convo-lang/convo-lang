@@ -264,6 +264,28 @@ export const convoFunctions={
     fsReadJson:'fsReadJson',
 
     /**
+     * Reads a file from the virtual file system and returns it as a base64 string
+     */
+    fsReadBase64:'fsReadBase64',
+
+    /**
+     * Reads a file from the virtual file system and returns it as a base64 url. This function can
+     * be used to read files as images or other assets that get embedded as base 64 urls.
+     *
+     * @signature (path:string contentType?:string) -> string
+     *
+     * @example This is an image: ![image description]({{fsReadBase64Url("./images/example.png")}})
+     */
+    fsReadBase64Url:'fsReadBase64Url',
+
+    /**
+     * Similar to fsReadBase64Url but returns an image formatted as markdown
+     *
+     * @signature (path:string description?:string contentType?:string) -> string
+     */
+    fsReadBase64Image:'fsReadBase64Image',
+
+    /**
      * Writes a JSON value to the virtual file system and returns the written value.
      */
     fsWriteJson:'fsWriteJson',

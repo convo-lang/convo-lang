@@ -1,4 +1,4 @@
-import { SceneCtrl, aryRandomize, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
+import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
 import { ConvoError } from "./ConvoError";
@@ -1389,6 +1389,57 @@ export const defaultConvoVars={
             return await vfs().readObjectAsync(path);
         }catch{
             return undefined;
+        }
+    }),
+
+    [convoFunctions.fsReadBase64]:createConvoScopeFunction(async (scope,ctx)=>{
+        const [url]=scope.paramValues??[];
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64 expects first argument to be a string');
+        }
+        const path=ctx.getFullPath(url);
+
+        const data=await vfs().readStringAsync(path);
+        return base64Encode(data??'');
+    }),
+
+    [convoFunctions.fsReadBase64Url]:createConvoScopeFunction(async (scope,ctx)=>{
+        const [url,_contentType]=scope.paramValues??[];
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects fist argument to be a string');
+        }
+        let contentType=_contentType;
+        if(!contentType){
+            contentType=getContentType(url);
+        }
+        if(typeof contentType !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects second argument to be a string');
+        }
+        const path=ctx.getFullPath(url);
+
+        const data=await vfs().readBufferAsync(path);
+        return base64EncodeUrl(contentType,data);
+    }),
+
+    [convoFunctions.fsReadBase64Image]:createConvoScopeFunction(async (scope,ctx)=>{
+        const [url,description='image',contentType=getContentType(url)]=scope.paramValues??[];
+        try{
+            if(typeof url !== 'string'){
+                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects first argument to be a string');
+            }
+            if(typeof description !== 'string'){
+                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects second argument to be a string');
+            }
+            if(typeof contentType !== 'string'){
+                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects third argument to be a string');
+            }
+            const path=ctx.getFullPath(url);
+
+            const data=await vfs().readBufferAsync(path);
+            return base64EncodeMarkdownImage(description,contentType,data);
+        }catch(ex){
+            console.error('ERROR',ex);
+            return ''
         }
     }),
 
