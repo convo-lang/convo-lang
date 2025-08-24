@@ -1,4 +1,4 @@
-import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, ConvoMakeTargetDeclaration, convoVars, escapeConvo } from "@convo-lang/convo-lang";
+import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
 import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
@@ -58,7 +58,12 @@ export class ConvoMakeTargetCtrl
         this.targetDeclaration=targetDeclaration;
         this.parent=parent;
         this.outPath=normalizePath(joinPaths(this.makeCtrl.options.dir,this.target.out));
-        const metaOutBase=normalizePath(joinPaths(this.makeCtrl.options.dir,convoMakeStateDir,this.target.out)).replace(/~/g,'~~').replace(/\*/g,'~star~');
+        const metaOutBase=normalizePath(joinPaths(
+            this.makeCtrl.options.dir,
+            convoMakeStateDir,
+            this.target.stage??defaultConvoMakeStageName,
+            this.target.out
+        )).replace(/~/g,'~~').replace(/\*/g,'~star~');
         this.metaOutBase=metaOutBase;
         this.cacheFile=metaOutBase+'.~.convo-hash';
         this.convoFile=metaOutBase+'.~.convo';
