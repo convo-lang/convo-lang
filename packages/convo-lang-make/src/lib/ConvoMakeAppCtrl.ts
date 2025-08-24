@@ -1,6 +1,7 @@
+import { ConvoMakeApp } from "@convo-lang/convo-lang";
 import { createPromiseSource, delayAsync, DisposeContainer, ReadonlySubject } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { ConvoMakeApp, ConvoMakeOutputReviewRequest, ConvoMakeShellProc } from "./convo-make-types";
+import { ConvoMakeOutputReviewRequest, ConvoMakeShellProc } from "./convo-make-types";
 import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer";
 import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
 

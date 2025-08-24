@@ -1,9 +1,8 @@
-import { convoTypeToJsonScheme, convoVars, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { valueIsZodType } from "@iyio/common";
-import { ConvoMakeTarget, ConvoMakeTargetDeclaration } from "./convo-make-types";
+import { ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { asArray, valueIsZodType } from "@iyio/common";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
 
-export const convoMakeStateDir='.convo-make'
+
 
 const outReg=/(^|\n)\[out\]/
 export const getConvoMakeTargetInHash=(value:string)=>{
@@ -15,10 +14,7 @@ export const getConvoMakeTargetInHash=(value:string)=>{
 
 }
 
-export const defaultConvoMakeAppName='default';
-export const defaultConvoMakeStageName='default';
 
-export const defaultConvoMakePreviewPort=55222;
 
 /**
  * Props that should effect the target's hash
@@ -72,3 +68,91 @@ export const getConvoMakeTargetOutType=(dec:ConvoMakeTargetDeclaration):string|u
 }
 
 export const convoMakeOutputTypeName='ConvoMakeOutputType';
+
+
+/**
+ * Applies stage defaults to targets. The targets will not be mutated. Defaults will be applied to copies of target objects.
+ */
+export const applyConvoMakeStageDefaults=(targets:ConvoMakeTargetDeclaration[],stages:ConvoMakeStage[]):ConvoMakeTargetDeclaration[]=>{
+    if(!stages.length){
+        return targets;
+    }
+
+    const updated:ConvoMakeTargetDeclaration[]=[];
+
+    for(const target of targets){
+        const sn=target.stage??defaultConvoMakeStageName;
+        const stage=stages.find(s=>s.name===sn);
+        if(!stage){
+            updated.push(target);
+            continue;
+        }
+
+        let t=target;
+        let copied=false;
+        for(const prop of stageTargetDefaults){
+            const v=stage[prop];
+            if(v===undefined){
+                continue;
+            }
+            if(t[prop]===undefined){
+                if(!copied){
+                    t={...t}
+                    copied=true;
+                }
+                t[prop]=v as any;
+            }else if(stageTargetArrays.includes(prop)){
+                if(!copied){
+                    t={...t}
+                    copied=true;
+                }
+                t[prop]=[
+                    ...(asArray(t[prop]??[])),
+                    ...(asArray(v))
+                ] as any;
+            }
+        }
+        updated.push(t);
+    }
+
+    return updated;
+}
+const stageTargetDefaults:(keyof ConvoMakeTargetSharedProps)[]=[
+    'app',
+    'appPath',
+    'context',
+    'contextTag',
+    'contextTemplate',
+    'inputTag',
+    'inputTemplate',
+    'instructions',
+    'keepAppPathExt',
+    'model',
+    'review'
+]
+const stageTargetArrays:(keyof ConvoMakeTargetSharedProps)[]=[
+    'context',
+    'instructions',
+]
+
+export const getConvoMakeStageDeps=(checkStage:ConvoMakeStage,allStages:ConvoMakeStage[]):ConvoMakeStage[]=>{
+    const deps:ConvoMakeStage[]=[];
+    for(const stage of allStages){
+        if(stage.name===checkStage.name){
+            continue;
+        }
+        if( checkStage.deps?.some(d=>d===stage.name) ||
+            stage.blocks?.some(b=>b===checkStage.name)
+        ){
+            deps.push(stage);
+        }
+    }
+    return deps;
+}
+
+export const getConvoMakeInputSortKey=(input:ConvoMakeInput):string=>{
+    if(input.listIndex===undefined){
+        return input.path??'';
+    }
+    return `${input.path??''}///[${(input.listIndex??0).toString().padStart(7,'0')}]`
+}

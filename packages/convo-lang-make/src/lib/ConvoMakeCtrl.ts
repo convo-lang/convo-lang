@@ -1,12 +1,11 @@
-import { Conversation, ConvoBrowserInf, convoVars, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { contentHasConvoRole, Conversation, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject } from "rxjs";
-import { convoMakeOutputTypeName, defaultConvoMakePreviewPort, defaultConvoMakeStageName, getConvoMakeTargetOutType } from "./convo-make-lib";
-import { ConvoMakeApp, ConvoMakeAppTargetRef, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakeShell, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "./convo-make-types";
+import { applyConvoMakeStageDefaults, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType } from "./convo-make-lib";
+import { ConvoMakeAppTargetRef, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
-import { ConvoMakeStageCtrl } from "./ConvoStageCtrl";
 
 export interface ConvoMakeCtrlOptions
 {
@@ -50,7 +49,14 @@ export class ConvoMakeCtrl
     public get appsSubject():ReadonlySubject<ConvoMakeAppCtrl[]>{return this._apps}
     public get apps(){return this._apps.value}
 
-    public readonly stages:ConvoMakeStageCtrl[];
+    private activePassRef:ConvoMakeActivePass|null=null;
+    private readonly _activePass:BehaviorSubject<ConvoMakeActivePass|null>=new BehaviorSubject<ConvoMakeActivePass|null>(null);
+    public get activePassSubject():ReadonlySubject<ConvoMakeActivePass|null>{return this._activePass}
+    public get activePass(){return this._activePass.value}
+
+    private readonly _passes:BehaviorSubject<ConvoMakePass[]>=new BehaviorSubject<ConvoMakePass[]>([]);
+    public get passesSubject():ReadonlySubject<ConvoMakePass[]>{return this._passes}
+    public get passes(){return this._passes.value}
 
     public constructor({
         vfsCtrl=vfs(),
@@ -68,7 +74,7 @@ export class ConvoMakeCtrl
     }:ConvoMakeCtrlOptions){
         this.options={
             vfsCtrl,
-            targets,
+            targets:applyConvoMakeStageDefaults(targets,stages),
             dir,
             echoMode,
             dryRun,
@@ -80,7 +86,6 @@ export class ConvoMakeCtrl
             disableInputTrimming,
             stages,
         }
-        this.stages=stages.map(stage=>new ConvoMakeStageCtrl({makeCtrl:this,stage}));
         console.log('hio 👋 👋 👋 make ctrl',this);
     }
 
@@ -110,37 +115,114 @@ export class ConvoMakeCtrl
     private async _buildAsync()
     {
 
-        const targets=await this.getTargetsAsync();
-        if(this.isDisposed){
-            return;
-        }
-
-        for(const stage of this.stages){
-            stage.checkReady();
-        }
-
-        const ctrls=targets.map(target=>new ConvoMakeTargetCtrl({
-            target,
-            makeCtrl:this,
-        }));
-
-        this._targets.next(ctrls);
-
-        console.log('hio 👋 👋 👋 targets',targets);
-
-        await Promise.all(this.targets.map(t=>t.buildAsync()));
-
-        while(this.targets.filter(t=>!(t.state==='complete' || t.state==='cancelled')).length){
-            console.log('hio 👋 👋 👋 build all',this.targets.length);
-            await Promise.all(this.targets.map(t=>t.buildAsync()));
+        while(!this.isDisposed){
+            const pass=await this.makePassAsync();
+            console.log('hio 👋 👋 👋 Pass complete',pass);
+            pushBehaviorSubjectAry(this._passes,pass);
+            if(pass.genCount<=0 && pass.skipCount<=0){
+                break;
+            }
         }
 
         console.log('hio 👋 👋 👋 DONE',);
     }
 
+    private async makePassAsync():Promise<ConvoMakePass>
+    {
+        const pass:ConvoMakeActivePass={
+            index:this.passes.length,
+            startTime:Date.now(),
+            genCount:0,
+            skipCount:0,
+            cachedCount:0,
+            forkedCount:0,
+        }
+        console.log('hio 👋 👋 👋 start pass',pass);
+        this.activePassRef=pass;
+        this._activePass.next({...pass});
+        //this._stages.next(this.options.stages.map(stage=>new ConvoMakeStageCtrl({makeCtrl:this,stage})));
+        const targets=await this.getTargetPairsAsync();
+        if(this.isDisposed){
+            return {
+                ...pass,
+                endTime:Date.now(),
+            };
+        }
+
+        // for(const stage of this.stages){
+        //     stage.checkReady();
+        // }
+
+        const ctrls=targets.map(t=>new ConvoMakeTargetCtrl({
+            target:t.target,
+            targetDeclaration:t.declaration,
+            makeCtrl:this,
+        }));
+
+        for(let i=0;i<ctrls.length;i++){
+            const ctrl=ctrls[i];
+            if(!ctrl?.target.outFromList || !ctrl.target.in.every(i=>i.ready)){
+                continue;
+            }
+
+            const forked=ctrl.target.in.filter(i=>i.listIndex!==undefined).map((input,index)=>{
+                return this.forkTargetList(ctrl,input,index);
+            });
+
+            ctrls.splice(i+1,0,...forked);
+        }
+
+        this._targets.next(ctrls);
+
+        console.log('hio 👋 👋 👋 targets',targets);
+
+        await Promise.all(this.targets.map(t=>t.checkReadyAsync()));
+
+        await Promise.all(this.targets.map(t=>t.buildAsync()));
+
+        const clearCtrls=this.targets;
+        this._targets.next([]);
+        for(const c of clearCtrls){
+            c.dispose();
+        }
+
+        return {
+            ...pass,
+            endTime:Date.now(),
+        };
+    }
+
+    public updatePass({
+        addGenCount=0,
+        addSkipCount=0,
+        addCachedCount=0,
+        addForked=0,
+    }:ConvoMakePassUpdate){
+        const update:ConvoMakeActivePass={
+            index:this.activePassRef?.index??0,
+            startTime:Date.now(),
+            genCount:0,
+            skipCount:0,
+            cachedCount:0,
+            forkedCount:0,
+            ...this.activePassRef,
+        }
+        update.genCount+=addGenCount;
+        update.skipCount+=addSkipCount;
+        update.cachedCount+=addCachedCount;
+        update.forkedCount+=addForked;
+        if(this.activePassRef){
+            this.activePassRef.genCount=update.genCount;
+            this.activePassRef.skipCount=update.skipCount;
+            this.activePassRef.cachedCount=update.cachedCount;
+            this.activePassRef.forkedCount=update.forkedCount;
+        }
+        this._activePass.next(update);
+    }
+
     public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
     {
-        console.log('hio 👋 👋 👋 fork input',listInput);
+        console.log(`hio 👋 👋 👋 fork input [${index}]`,listInput.path);
         if(!parent.target.outFromList){
             throw new Error('Only targets that outFromList is true should be forked')
         }
@@ -173,23 +255,28 @@ export class ConvoMakeCtrl
         }
         const targetCtrl=new ConvoMakeTargetCtrl({
             target:target,
+            targetDeclaration:parent.targetDeclaration,
             makeCtrl:this,
             parent,
         });
-        pushBehaviorSubjectAry(this._targets,targetCtrl);
         return targetCtrl;
     }
 
     public async getTargetsAsync():Promise<ConvoMakeTarget[]>{
 
-        const targets:ConvoMakeTarget[]=[];
+        return (await this.getTargetPairsAsync()).map(t=>t.target);
+    }
+
+    public async getTargetPairsAsync():Promise<ConvoMakeTargetPair[]>{
+
+        const targets:ConvoMakeTargetPair[]=[];
 
         await Promise.all(this.options.targets.map(t=>this.resolveTargetAsync(t,targets)));
 
         return targets;
     }
 
-    private async resolveTargetAsync(dec:ConvoMakeTargetDeclaration,targets:ConvoMakeTarget[]){
+    private async resolveTargetAsync(dec:ConvoMakeTargetDeclaration,targets:ConvoMakeTargetPair[]){
         if(!dec.out){
             return;
         }
@@ -210,10 +297,15 @@ export class ConvoMakeCtrl
             input=normalizePath(joinPaths(dir,input));
             if(input.includes('*')){
                 const star=parseStarPath(input);
+                console.log('hio 👋 👋 👋 STAR',star);
                 const items=await (star?.recursiveBase?
                     this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
                     this.options.vfsCtrl.readDirAsync({path:input})
                 );
+                if(this.isDisposed){
+                    return []
+                }
+                console.log('hio 👋 👋 👋 ITEMS',items);
                 const inputs:PathAndStarPath[]=[];
                 for(const item of items.items){
                     if(item.type==='file'){
@@ -225,6 +317,10 @@ export class ConvoMakeCtrl
                 return [{path:input,isList}];
             }
         }))
+
+        if(this.isDisposed){
+            return;
+        }
 
         const inputs:PathAndStarPath[]=[];
         for(const g of inGroups){
@@ -239,6 +335,7 @@ export class ConvoMakeCtrl
             outType:getConvoMakeTargetOutType(dec),
             outNameProp:dec.outNameProp,
             outFromList:dec.inList?true:undefined,
+            model:dec.model,
         }
 
         if(multiOut && !sharedProps.outFromList){
@@ -268,7 +365,7 @@ export class ConvoMakeCtrl
                 if(isDynamic){
                     target.dynamicOutReg=starStringToRegex(output);
                 }
-                targets.push(target)
+                targets.push({target,declaration:dec})
 
             }
         }else{
@@ -280,7 +377,7 @@ export class ConvoMakeCtrl
                     out:removeDir(out,cwd),
                 }
 
-                targets.push(target);
+                targets.push({target,declaration:dec});
             }
         }
     }
@@ -289,12 +386,19 @@ export class ConvoMakeCtrl
         const inputAry:ConvoMakeInput[]=[];
 
         if(dec.instructions){
-            inputAry.push(...await this.contentToConvoAsync(
-                undefined,undefined,dec,false,true,
-                `${dec.outType || dec.outListType?`@json = ${convoMakeOutputTypeName}\n`:''}> user\n${
-                    escapeConvo(this.options.disableInputTrimming?dec.instructions:dec.instructions.trim())
-                }`,true)
-            );
+            const ary=asArray(dec.instructions);
+            for(const i of ary){
+                const instruction=this.options.disableInputTrimming?i:i.trim();
+                inputAry.push(...await this.contentToConvoAsync(
+                    undefined,
+                    undefined,
+                    dec,
+                    false,
+                    true,
+                    contentHasConvoRole(i)?instruction:`> user\n${instruction}`,
+                    true
+                ));
+            }
         }
 
         if(dec.context){
@@ -313,6 +417,8 @@ export class ConvoMakeCtrl
                 inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content))
             }
         }
+
+        inputAry.sort((a,b)=>getConvoMakeInputSortKey(a).localeCompare(getConvoMakeInputSortKey(b)));
 
         return inputAry;
     }
@@ -346,8 +452,9 @@ export class ConvoMakeCtrl
             if( (stage?ctrl.target.stage===stage:true) &&
                 (
                     ctrl.target.dynamicOutReg?
-                    ctrl.target.dynamicOutReg.test(relPath) && ctrl.target.in.some(t=>!t.ready):
-                    ctrl.target.out===relPath
+                        ctrl.target.dynamicOutReg.test(relPath)
+                    :
+                        ctrl.target.out===relPath
                 )
             ){
                 deps.push(ctrl);
@@ -356,15 +463,67 @@ export class ConvoMakeCtrl
         return deps;
     }
 
-    public areDependenciesReady(stage:string|undefined,relPath:string):boolean{
-        if(stage){
-            const s=this.stages.find(s=>s.stage.name===stage);
-            if(s && !s.isReady){
-                return false;
+    private getStageDepsRecursive(stage:ConvoMakeStage,deps:ConvoMakeTargetCtrl[],checked:ConvoMakeStage[],skipTargets:boolean){
+        if(checked.includes(stage)){
+            return;
+        }
+        checked.push(stage);
+        if(!skipTargets){
+            for(const target of this.targets){
+                if(!deps.includes(target) && target.target.stage===stage.name){
+                    deps.push(target)
+                }
             }
         }
+        const depStages=getConvoMakeStageDeps(stage,this.options.stages);
+        for(const s of depStages){
+            this.getStageDepsRecursive(s,deps,checked,false);
+        }
+
+    }
+
+    public getTargetDeps(stage:string|undefined,relPath:string):ConvoMakeTargetCtrl[]{
         const deps=this.getDependencies(stage,relPath);
-        return !deps.length || deps.every(d=>d.state==='complete' && d.target.in.every(i=>i.ready))
+        const s=this.options.stages.find(s=>s.name===stage);
+        if(s){
+            this.getStageDepsRecursive(s,deps,[],true);
+        }
+        return deps;
+    }
+
+    public getTargetDepsRecursive(stage:string|undefined,relPath:string):ConvoMakeTargetCtrl[]{
+        const deps:ConvoMakeTargetCtrl[]=[];
+        this._getTargetDepsRecursive(stage,relPath,deps);
+        return deps;
+    }
+
+    public _getTargetDepsRecursive(stage:string|undefined,relPath:string,deps:ConvoMakeTargetCtrl[]){
+
+        const sub=this.getTargetDeps(stage,relPath);
+        for(let i=0;i<sub.length;i++){
+            const d=sub[i];
+            if(!d || deps.includes(d)){
+                sub.splice(i,1);
+                i--;
+            }else{
+                deps.push(d);
+            }
+        }
+
+        for(const d of sub){
+            for(const i of d.target.in){
+                if(i.path){
+                    this._getTargetDepsRecursive(d.target.stage,i.path,deps);
+                }
+            }
+        }
+
+    }
+
+    public areTargetDepsReady(stage:string|undefined,relPath:string):boolean{
+        const deps=this.getTargetDepsRecursive(stage,relPath);
+        console.log('hio 👋 👋 👋 \nDEPS ------------------------\n',relPath,'\n----------------\n',deps.map(d=>d.outPath).join('\n'),'-------------------');
+        return !deps.length || deps.every(d=>d.contentReady && d.target.in.every(i=>i.ready))
     }
 
     public async contentToConvoAsync(
@@ -561,9 +720,9 @@ export class ConvoMakeCtrl
         return appCtrl;
     }
 
-    public getStage(name:string):ConvoMakeStageCtrl|undefined{
-        return this.stages.find(s=>s.stage.name===name);
-    }
+    // public getStage(name:string):ConvoMakeStageCtrl|undefined{
+    //     return this.stages.find(s=>s.stage.name===name);
+    // }
 
     public async getDebugOutputAsync(){
         const targets=await this.getTargetsAsync();
@@ -588,6 +747,9 @@ interface PathAndStarPath
 {
     path:string;
     star?:StarPath;
+    /**
+     * True if the path was created from an input from a list. (from the inList of a target)
+     */
     isList?:boolean;
 }
 
@@ -669,3 +831,5 @@ const splitMarkdown=(md:string):string[]=>{
     }
     return parts;
 }
+
+

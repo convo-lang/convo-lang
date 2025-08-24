@@ -3,7 +3,7 @@ import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMe
 import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from '@convo-lang/convo-lang-bedrock';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliConfig, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
-import { ConvoMakeCtrl, getConvoMakeOptionsFromVars, initConvoMakeConversation } from "@convo-lang/convo-lang-make";
+import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
 import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
@@ -272,8 +272,6 @@ const registerCommands=(context:ExtensionContext)=>{
             return;
         }
 
-        initConvoMakeConversation(ctx.convo);
-
         const flat=await ctx.convo.flattenAsync();
         const options=getConvoMakeOptionsFromVars(ctx.cwd,flat.exe.sharedVars);
         if(!options){
@@ -322,8 +320,6 @@ const registerCommands=(context:ExtensionContext)=>{
             if(!ctx?.cwd){
                 return;
             }
-
-            initConvoMakeConversation(ctx.convo);
 
             const flat=await ctx.convo.flattenAsync();
             if(token.isCancellationRequested){return}

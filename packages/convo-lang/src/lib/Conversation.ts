@@ -13,10 +13,11 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
+import { convoStdImportHandler } from "./convo-std-imports";
 import { convoScript } from "./convo-template";
 import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
@@ -2902,12 +2903,13 @@ export class Conversation
             if(t.name!==convoTags.import || !t.value){
                 continue;
             }
-            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index);
-            exe?.loadFunctions(imported,this.externFunctions);
+            const externFunctions:Record<string,ConvoScopeFunction>={}
+            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions);
+            exe?.loadFunctions(imported,externFunctions);
         }
     }
 
-    public async importAsync(name:string,context:ConvoImportContext,index?:number):Promise<ConvoMessage[]>
+    public async importAsync(name:string,context:ConvoImportContext,index?:number,externFunctions?:Record<string,ConvoScopeFunction>):Promise<ConvoMessage[]>
     {
 
         const modifiers=name.split(' ');
@@ -2950,7 +2952,7 @@ export class Conversation
         const sourceDirectory=context.sourceFilepath?getDirectoryName(context.sourceFilepath):undefined;
         const targetPath=isRooted(name)?name:sourceDirectory?normalizePath(joinPaths(sourceDirectory,name)):name;
 
-        let handler=this.defaultOptions.importHandler;
+        let handler=name.startsWith(convoStdImportPrefix)?convoStdImportHandler:this.defaultOptions.importHandler;
         if(!handler){
             const importServices=(this.defaultOptions.importServices===null?
                 undefined
@@ -2992,7 +2994,7 @@ export class Conversation
                     if(Array.isArray(result)){
 
                         const first=result[0];
-                        if(first && result.every(r=>r.convo===undefined && r.content!==undefined)){
+                        if(first && modifiers.includes(convoImportModifiers.merge)){
                             result.sort((a,b)=>(a.filePath??a.name).localeCompare(b.filePath??b.name));
                             first.content=result.map(r=>r.content).join('\n\n\n');
                             imports.push(first)
@@ -3019,7 +3021,7 @@ export class Conversation
         const messages:ConvoMessage[]=[];
         for(const i of imports){
             if(!this.importedModules[i.name]){
-                messages.push(...this.registerModule(i,{name:i.name,modifiers,system,ignoreContent,templateName,targetPath,role,assign},index));
+                messages.push(...this.registerModule(i,{name:i.name,modifiers,system,ignoreContent,templateName,targetPath,role,assign},index,externFunctions));
             }
         }
         return messages;
@@ -3027,13 +3029,17 @@ export class Conversation
 
     public readonly importedModules:Record<string,ConvoModule>={};
 
-    private registerModule(module:ConvoModule,importStatement:ConvoImport={
-        name:module.name,
-        modifiers:[],
-        system:false,
-        ignoreContent:false,
-    },insertIndex?:number){
-
+    private registerModule(
+        module:ConvoModule,
+        importStatement:ConvoImport={
+            name:module.name,
+            modifiers:[],
+            system:false,
+            ignoreContent:false,
+        },
+        insertIndex?:number,
+        externFunctions?:Record<string,ConvoScopeFunction>
+    ){
         if(this.importedModules[module.name]){
             throw new Error(`ConvoModule already registered by name - ${module.name}`);
         }
@@ -3056,17 +3062,23 @@ export class Conversation
                 if(!fn){
                     continue;
                 }
-                this.implementExternFunction(name,fn);
+                const f=this.implementExternFunction(name,fn);
+                if(externFunctions){
+                    externFunctions[name]=f;
+                }
             }
         }
 
         if(module.externScopeFunctions){
-            for(const name in module.externFunctions){
+            for(const name in module.externScopeFunctions){
                 const fn=module.externScopeFunctions[name];
                 if(!fn){
                     continue;
                 }
                 this.externFunctions[name]=fn;
+                if(externFunctions){
+                    externFunctions[name]=fn;
+                }
             }
         }
 
@@ -3306,6 +3318,7 @@ export class Conversation
             let messageTriggers:ConvoTrigger[]|undefined;
             const parallelPairs:{msg:ConvoMessage,flat:FlatConvoMessage}[]=[];
             const explicitlyEnabledTransforms:string[]=[];
+            const messageHandlers:Record<string,ConvoMessage>={};
 
             messagesLoop: for(let i=messageStartIndex;i<sourceMessages.length;i++){
                 const msg=sourceMessages[i];
@@ -3486,6 +3499,12 @@ export class Conversation
                     }
                 }
                 if(msg.fn){
+                    if(msg.fn.handlesMessageRoles){
+                        for(const role of msg.fn.handlesMessageRoles){
+                            messageHandlers[role]=msg;
+                        }
+                        continue;
+                    }
                     if(msg.messageTriggers){
                         if(!messageTriggers){
                             messageTriggers=[];
@@ -3508,7 +3527,14 @@ export class Conversation
                             exe.varPrefix=prefix;
                         }
                         exe.clearSharedSetters();
-                        const r=exe.executeFunction(msg.fn,undefined,msg);
+                        const handlerMsg=messageHandlers[msg.fn.name];
+                        const handlerName=handlerMsg?.fn?.name;
+                        const r=exe.executeFunction(msg.fn,undefined,msg,handlerName?{
+                            handlerName:handlerName,
+                            handlerHead:msg.head,
+                            handlerHeadName:getConvoTag(handlerMsg.tags,convoTags.messageHandlerHeadProp)?.value,
+                            locationOverride:containsConvoTag(handlerMsg.tags,convoTags.assumeHandledMessageLocation)?msg:undefined,
+                        }:undefined);
                         if(r.valuePromise){
                             await r.valuePromise;
                         }
@@ -4256,57 +4282,64 @@ export class Conversation
         }
 
 
+        let responseFormat:string|undefined;
+        if(flat.isUser){
+            const defaultFormat=exe.getVar(convoVars.__defaultResponseType);
+            responseFormat=(typeof defaultFormat === 'string')?'json '+defaultFormat:undefined;
+        }
 
-        if(!flat.tags){
+        if(!flat.tags && !responseFormat){
             return;
         }
 
-        let responseFormat:string|undefined;
+
         let enabledTransforms:string[]|undefined;
-        for(const name in flat.tags){
-            switch(name){
+        if(flat.tags){
+            for(const name in flat.tags){
+                switch(name){
 
-                case convoTags.responseFormat:
-                    responseFormat=flat.tags[name];
-                    break;
+                    case convoTags.responseFormat:
+                        responseFormat=flat.tags[name];
+                        break;
 
-                case convoTags.json:
-                    responseFormat=flat.tags[name]?'json '+flat.tags[name]:'json';
-                    break;
+                    case convoTags.json:
+                        responseFormat=flat.tags[name]?'json '+flat.tags[name]:'json';
+                        break;
 
-                case convoTags.assign:
-                    flat.responseAssignTo=flat.tags[name];
-                    break;
+                    case convoTags.assign:
+                        flat.responseAssignTo=flat.tags[name];
+                        break;
 
-                case convoTags.responseModel:
-                    flat.responseModel=flat.tags[name];
-                    break;
+                    case convoTags.responseModel:
+                        flat.responseModel=flat.tags[name];
+                        break;
 
-                case convoTags.responseEndpoint:
-                    flat.responseEndpoint=flat.tags[name];
-                    break;
+                    case convoTags.responseEndpoint:
+                        flat.responseEndpoint=flat.tags[name];
+                        break;
 
-                case convoTags.enableTransform:{
-                    const t=flat.tags[name]?.split(' ');
-                    if(t){
-                        for(const trans of t){
-                            if(trans){
-                                if(!enabledTransforms){
-                                    enabledTransforms=[];
+                    case convoTags.enableTransform:{
+                        const t=flat.tags[name]?.split(' ');
+                        if(t){
+                            for(const trans of t){
+                                if(trans){
+                                    if(!enabledTransforms){
+                                        enabledTransforms=[];
+                                    }
+                                    enabledTransforms.push(trans);
                                 }
-                                enabledTransforms.push(trans);
                             }
                         }
+                        break;
                     }
-                    break;
-                }
 
-                case convoTags.rag:{
-                    const ragSources=getFlatConvoTagValues(convoTags.rag,flat.tags);
-                    exe.enableRag(ragSources.length?ragSources:undefined)
-                    break;
-                }
+                    case convoTags.rag:{
+                        const ragSources=getFlatConvoTagValues(convoTags.rag,flat.tags);
+                        exe.enableRag(ragSources.length?ragSources:undefined)
+                        break;
+                    }
 
+                }
             }
         }
         if(responseFormat){
@@ -4571,7 +4604,7 @@ export class Conversation
     }
 
     public implementExternFunction(name:string,func:(...param:any[])=>any){
-        this.externFunctions[name]=scope=>func(...(scope.paramValues??[]))
+        return this.externFunctions[name]=scope=>func(...(scope.paramValues??[]))
     }
 
     public defineLocalFunctions(funcs:Record<string,(...args:any[])=>any>){

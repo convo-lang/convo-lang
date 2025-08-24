@@ -5,9 +5,9 @@ import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
 import { defaultConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
+import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
 import { convoValueToZodType } from './convo-zod';
 
 
@@ -113,7 +113,7 @@ export class ConvoExecutionContext
                     sourceFn:msg.fn
                 },(scope,ctx)=>{
                     if(msg.fn?.body){
-                        const r=this.executeFunction(msg.fn,convoLabeledScopeFnParamsToObj(scope,msg.fn.params),msg);
+                        const r=this.executeFunction(msg.fn,convoLabeledScopeFnParamsToObj(scope,msg.fn.params),msg,{locationOverride:scope[convoScopeLocationMsgKey]});
                         return r.valuePromise??r.value;
                     }else{
                         const externFn=externFunctions?.[msg.fn?.name??''];
@@ -158,7 +158,7 @@ export class ConvoExecutionContext
         return this.execute(scope,vars);
     }
 
-    public executeFunction(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage):ConvoExecuteResult
+    public executeFunction(fn:ConvoFunction,args:Record<string,any>={},message?:ConvoMessage,options?:ConvoExecuteFunctionOptions):ConvoExecuteResult
     {
         if(fn.call){
             throw new ConvoError(
@@ -197,9 +197,27 @@ export class ConvoExecutionContext
                 [convoScopeFnDefKey]:fn,
                 s:{
                     fn:convoBodyFnName,
-                    params:fn.body,
-                    s:0,
-                    e:0,
+                    s:0,e:0,
+                    params:options?.handlerName?[
+                        {
+                            fn:options.handlerName,
+                            s:0,e:0,
+                            params:[
+                                {
+                                    fn:convoFunctions.mapWithCapture,
+                                    s:0,e:0,
+                                    params:options.handlerHead?[
+                                        {
+                                            s:0,e:0,
+                                            label:options.handlerHeadName??'name',
+                                            value:options.handlerHead
+                                        },
+                                        ...fn.body
+                                    ]:fn.body,
+                                }
+                            ]
+                        }
+                    ]:fn.body,
                 },
             }
 
@@ -240,6 +258,9 @@ export class ConvoExecutionContext
 
         if(message){
             scope[convoScopeMsgKey]=message;
+        }
+        if(options?.locationOverride){
+            scope[convoScopeLocationMsgKey]=options.locationOverride;
         }
 
         return this.execute(scope,vars,this.getConvoFunctionReturnScheme(fn));
@@ -503,6 +524,7 @@ export class ConvoExecutionContext
 
         if(!scope[convoScopeMsgKey]){
             scope[convoScopeMsgKey]=parent?.[convoScopeMsgKey];
+            scope[convoScopeLocationMsgKey]=parent?.[convoScopeLocationMsgKey];
         }
 
         let value:any=undefined;
@@ -635,7 +657,7 @@ export class ConvoExecutionContext
                         value=fn(scope,this);
                     }
                     if(statement.prompt){
-                        if(this.disableInlinePrompts){
+                        if(this.disableInlinePrompts && !statement.prompt.isStatic){
                             setConvoScopeError(scope,{
                                 message:`Inline prompts not allowed in current content. Inline prompts can not be used in content messages or top level statements`,
                                 statement,
@@ -673,7 +695,7 @@ export class ConvoExecutionContext
         }else if(statement.ref){
             value=this.getVarEx(statement.ref,statement.refPath,scope);
         }else if(statement.prompt){
-            if(this.disableInlinePrompts){
+            if(this.disableInlinePrompts && !statement.prompt.isStatic){
                 setConvoScopeError(scope,{
                     message:`Inline prompts not allowed in current content. Inline prompts can not be used in content messages or top level statements`,
                     statement,
@@ -1226,7 +1248,7 @@ export class ConvoExecutionContext
         switch(name){
 
             case convoVars.__file:{
-                const msgFile=scope?.[convoScopeMsgKey]?.[convoMessageSourcePathKey];
+                const msgFile=(scope?.[convoScopeLocationMsgKey]??scope?.[convoScopeMsgKey])?.[convoMessageSourcePathKey];
                 if(msgFile){
                     return msgFile
                 }

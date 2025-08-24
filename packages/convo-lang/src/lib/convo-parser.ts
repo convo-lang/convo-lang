@@ -1,14 +1,14 @@
 import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getErrorMessage, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, starStringToRegex, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, parseConvoBooleanTag } from "./convo-lib";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib";
 import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
-const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*([*?!]*)\s*(\()/gs;
-const topLevelMessageReg=/(>)\s*(do|thinkingResult|result|define|debug|end)/gs;
-const roleReg=/(>)[ \t]*(\w+)[ \t]*([*?!]*)/g;
+const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*(\()/gs;
+const topLevelMessageReg=/(>)[ \t]*(do|thinkingResult|result|define|debug|end|make|stage|app|\w+[ \t]*!)([ \t]+[^\n\r]*)?/g;
+const roleReg=/(>)[ \t]*(\w+)([ \t]+[^\n\r]*)?/g;
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
 const spaceIndex=1;
@@ -946,6 +946,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 match=topLevelMessageReg.exec(code);
                 if(match && match.index===index){
                     msgName=match[2]??'topLevelStatements';
+                    if(msgName.endsWith('!')){
+                        msgName=msgName.substring(0,msgName.length-1).trim();
+                    }
                     debug?.(`NEW TOP LEVEL ${msgName}`,lastComment,match);
                     currentFn={
                         name:msgName,
@@ -962,6 +965,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         role:msgName,
                         fn:currentFn,
                         description:lastComment||undefined,
+                        head:match[3]?.trim()||undefined,
                     }
                     if(includeLineNumbers){
                         setLineNumber(currentMessage);
@@ -992,6 +996,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     currentMessage={
                         role:msgName,
                         description:lastComment||undefined,
+                        head:match[3]?.trim()||undefined,
                     }
                     if(includeLineNumbers){
                         setLineNumber(currentMessage);
@@ -1122,6 +1127,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
             for(let t=0;t<msg.tags.length;t++){
                 const tag=msg.tags[t];
                 if(!tag){continue}
+                if(msg.fn && localFunctionTags.includes(tag.name)){
+                    msg.fn.local=true;
+                }
                 switch(tag.name){
 
                     case convoTags.markdown:
@@ -1216,6 +1224,24 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                             if(jsonAryMatch){
                                 tag.srcValue=tag.value;
                                 tag.value=jsonAryMatch[1]+'[]';
+                            }
+                        }
+                        break;
+
+                    case convoTags.messageHandler:
+                        if(tag.value && msg.fn){
+                            const roles=tag.value.split(/\s+/g);
+                            if(!msg.fn.handlesMessageRoles){
+                                msg.fn.handlesMessageRoles=[];
+                            }
+                            for(const role of roles){
+                                if((role in convoRoles) && !convoHandlerAllowedRoles.includes(role as any)){
+                                    error=`Registering message handlers for role (${role}) is not allowed`;
+                                    break finalPass;
+                                }
+                                if(!msg.fn.handlesMessageRoles.includes(role)){
+                                    msg.fn.handlesMessageRoles.push(role);
+                                }
                             }
                         }
                         break;

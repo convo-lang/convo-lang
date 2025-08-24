@@ -63,7 +63,7 @@
             ]
         },
         "role": {
-            "match": "^\\s*(>)\\s*(\\w+)\\s*([\\*\\?!]*)",
+            "match": "^\\s*(>)\\s*(\\w+)([ \\t]+[^\\n\\r]*)?",
             "captures": {
                 "1":{
                     "name":"keyword.control"
@@ -72,7 +72,7 @@
                     "name":"storage.modifier"
                 },
                 "3":{
-                    "name":"entity.name.type"
+                    "name":"variable"
                 }
             }
         },
@@ -132,7 +132,7 @@
             "patterns":[{"include":"#lineExpression"}]
         },
         "topLevelStatements":{
-            "begin": "^\\s*(>)\\s*(do|thinkingResult|result|define|debug|end)",
+            "begin": "^\\s*(>)\\s*(do|thinkingResult|result|define|debug|end|make|stage|app|\\w+[ \\t]*(!))( |\\t|$)([ \\t]*[^\\n\\r]*)?",
             "end": "(?=\\s*>)",
             "beginCaptures": {
                 "1":{
@@ -140,6 +140,12 @@
                 },
                 "2":{
                     "name":"keyword.control"
+                },
+                "3":{
+                    "name":"storage.modifier"
+                },
+                "5":{
+                    "name":"variable"
                 }
             },
             "patterns": [
@@ -430,6 +436,8 @@
                 {"include":"#tagEvent"},
                 {"include":"#tagImport"},
                 {"include":"#tagImportMatch"},
+                {"include":"#tagMessageRef"},
+                {"include":"#tagVarRef"},
                 {"include":"#tagCondition"},
                 {"include":"#tagName"},
                 {"include":"#tagLabeledCondition"},
@@ -463,6 +471,45 @@
                 "1":{"name":"entity.name.tag"},
                 "2":{"name":"storage.modifier"},
                 "3":{"name":"string.regexp"}
+            }
+        },
+
+        "tagMessageRef":{
+            "match":"^\\s*(@(messageHandler))\\s+(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"patterns": [
+                    {"include":"#tagRefRole"},
+                    {"include":"#tagRefInvalid"}
+                ]}
+            }
+        },
+        "tagVarRef":{
+            "match":"^\\s*(@(dep|block|messageHandlerHeadProp))\\s+(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"patterns": [
+                    {"include":"#tagRefVar"},
+                    {"include":"#tagRefInvalid"}
+                ]}
+            }
+        },
+        "tagRefRole":{
+            "match":"[\\w \\t]",
+            "captures":{
+                "0":{"name":"keyword.control"}
+            }
+        },
+        "tagRefVar":{
+            "match":"[\\w \\t]",
+            "captures":{
+                "0":{"name":"variable"}
+            }
+        },
+        "tagRefInvalid":{
+            "match":".",
+            "captures":{
+                "0":{"name":"invalid"}
             }
         },
 
@@ -816,7 +863,7 @@
             "name":"entity.name.type"
         },
         "constValue":{
-            "match":"\\b(true|false|null|undefined|convo|__args|__return|__error|__debug|__disableAutoComplete)\\b",
+            "match":"\\b(true|false|null|undefined|convo|__args|__return|__error|__debug|__disableAutoComplete|__file|__cwd)\\b",
             "name":"constant.language"
         },
         "heredoc":{

@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoForm } from "./convo-forms-types";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { createConvoSceneDescription } from "./convo-scene-lib";
 import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
@@ -105,6 +105,9 @@ export const defaultConvoVars={
         const metadata=createConvoMetadataForStatement(scope.s);
         (type as any)[convoMetadataKey]=metadata;
         return type;
+    }),
+    [convoFunctions.mapWithCapture]:createConvoScopeFunction({usesLabels:true},(scope)=>{
+        return convoParamsToObj(scope,undefined,'_');
     }),
     is:createConvoScopeFunction(scope=>{
         if(!scope.paramValues || scope.paramValues.length<2){

@@ -127,6 +127,11 @@ export interface ConvoMessage
     label?:string;
 
     /**
+     * text content following the role of the message
+     */
+    head?:string;
+
+    /**
      * The target render area of the message.
      */
     renderTarget?:string;
@@ -538,6 +543,12 @@ export interface ConvoFunction
     local?:boolean;
 
     /**
+     * List of message roles the function handles. The `@messageHandler` tag is used to mark message
+     * roles the function handles
+     */
+    handlesMessageRoles?:string[];
+
+    /**
      * If true the implementation of the function is external from the conversation.
      */
     extern?:boolean;
@@ -693,6 +704,7 @@ export type ConvoScopeFunction=(scope:ConvoScope,ctx:ConvoExecutionContext)=>any
 export const convoScopeFnKey=Symbol('convoScopeFnKey');
 export const convoScopeFnDefKey=Symbol('convoScopeFnDefKey');
 export const convoScopeMsgKey=Symbol('convoScopeMsgKey');
+export const convoScopeLocationMsgKey=Symbol('convoScopeLocationMsgKey');
 
 export interface ConvoScope
 {
@@ -765,6 +777,11 @@ export interface ConvoScope
      * The message the scope is in
      */
     [convoScopeMsgKey]?:ConvoMessage;
+
+    /**
+     * A message that can be used to override the file location of the scope
+     */
+    [convoScopeLocationMsgKey]?:ConvoMessage;
 
     /**
      * Param values used with function statements
@@ -2130,3 +2147,11 @@ export interface ConvoObject<T>
  * A locked convo object that can more safely be passed around without the concern of it being awaited.
  */
 export type LockedConvoObject<T>=Pick<ConvoObject<T>,'dependencies'|'zodType'|'clone'|'debug'|'isFinalized'|'getOutputOptions'>
+
+export interface ConvoExecuteFunctionOptions
+{
+    handlerName?:string;
+    handlerHead?:string;
+    handlerHeadName?:string;
+    locationOverride?:ConvoMessage;
+}

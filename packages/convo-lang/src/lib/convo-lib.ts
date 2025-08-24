@@ -174,7 +174,34 @@ export const convoRoles={
     define:'define',
     debug:'debug',
     end:'end',
+
+    /**
+     * Used by the convo make build system to define a make target. `std://make.convo` must
+     * be imported to function correctly
+     */
+    make:'make',
+
+    /**
+     * Used by the convo make build system to define an app. `std://make.convo` must
+     * be imported to function correctly
+     */
+    app:'app',
+
+    /**
+     * Used by the convo make build system to define a build stage. `std://make.convo` must
+     * be imported to function correctly
+     */
+    stage:'stage',
 } as const;
+
+/**
+ * List of built-in role that are allowed to be used with custom message handlers
+ */
+export const convoHandlerAllowedRoles=[
+    convoRoles.make,
+    convoRoles.app,
+    convoRoles.stage,
+] as const;
 
 /**
  * Reserved role names in Convo-Lang that have special meaning and cannot be used as custom roles.
@@ -368,7 +395,7 @@ export const convoFunctions={
     /**
      * Used by the convo make build system to define a output to make
      */
-    make:'make',
+    makeTarget:'makeTarget',
 
     /**
      * Defines a make app
@@ -379,6 +406,13 @@ export const convoFunctions={
      * Defines a make stage
      */
     makeStage:'makeStage',
+
+    /**
+     * Similar to the map function except unlabeled values are place the the `_` property
+     */
+    mapWithCapture:'mapWithCapture'
+
+
 } as const;
 
 /**
@@ -628,6 +662,16 @@ export const convoVars={
      */
     __makeStages:'__makeStages',
 
+    /**
+     * Maps custom messages to handler functions
+     */
+    __messageHandlers:'__messageHandlers',
+
+    /**
+     * Name of a type to be used as the default json response type
+     */
+    __defaultResponseType:'__defaultResponseType'
+
 } as const;
 
 export const convoImportModifiers={
@@ -639,7 +683,13 @@ export const convoImportModifiers={
     /**
      * Content messages should be ignored
      */
-    ignoreContent:'ignoreContent'
+    ignoreContent:'ignoreContent',
+
+    /**
+     * Merges the contents of multiple files into a single imports. This is useful when importing
+     * multiple content files using a glob.
+     */
+    merge:'merge'
 } as const;
 
 export const defaultConvoRagTol=1.2;
@@ -686,7 +736,8 @@ export const convoTags={
     name:'name',
 
     /**
-     * Defines an event listener for a message
+     * Defines an event listener for a message. Functions tagged with `@on` will
+     * be made local and not visible to LLMs.
      */
     on:'on',
 
@@ -1280,9 +1331,36 @@ export const convoTags={
 
     routeTo:'routeTo',
 
-    routeFrom:'routeFrom'
+    routeFrom:'routeFrom',
+
+    /**
+     * Use to mark a function as a message handler. Functions tagged with `@messageHandler` will
+     * be made local and not visible to LLMs.
+     */
+    messageHandler:'messageHandler',
+
+    /**
+     * Name of the prop that the head value of handles messages are passed to.
+     * @default "name"
+     */
+    messageHandlerHeadProp:'messageHandlerHeadProp',
+
+    /**
+     * When applied to a message handler the handler will assume the location of the message
+     * the handler is handling
+     */
+    assumeHandledMessageLocation:'assumeHandledMessageLocation',
 
 } as const;
+
+/**
+ * Functions marked with tags defined in `localFunctionTags` will be marked as local and not visible
+ * to LLMs.
+ */
+export const localFunctionTags:string[]=[
+    convoTags.on,
+    convoTags.messageHandler,
+]
 
 /**
  * Tags that are allowed to have dynamic expressions as the value when using the equals operator.
@@ -1374,6 +1452,8 @@ export const defaultConvoRenderTarget='default';
 
 export const defaultConvoTransformGroup='default';
 
+export const convoStdImportPrefix='std://';
+
 export const getConvoDateString=(date:Date|number=new Date()):string=>{
     return format(date,convoDateFormat);
 }
@@ -1391,6 +1471,7 @@ export const allowedConvoDefinitionFunctions=[
     convoNewFnName,
     convoStructFnName,
     convoMapFnName,
+    convoFunctions.mapWithCapture,
     convoArrayFnName,
     convoEnumFnName,
     convoJsonMapFnName,
@@ -1414,6 +1495,7 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.dayMs,
     convoFunctions.aryFindMatch,
     convoFunctions.aryRemoveMatch,
+    'print',
     'setObjDefaults',
     'is',
     'and',

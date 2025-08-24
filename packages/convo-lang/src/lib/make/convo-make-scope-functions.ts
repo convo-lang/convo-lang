@@ -1,12 +1,12 @@
-import { Conversation, convoFunctions, convoLabeledScopeParamsToObj, convoVars, createConvoScopeFunction } from "@convo-lang/convo-lang";
 import { aryUnique, getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
-import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-lib";
-import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration } from "./convo-make-types";
+import { convoVars, createConvoScopeFunction } from "../convo-lib";
+import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib";
+import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration } from "./convo-make-common-types";
 
 
 export const convoMakeScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
 
-    const target=convoLabeledScopeParamsToObj(scope) as ConvoMakeTargetDeclaration|undefined;
+    const target=scope.paramValues?.[0] as ConvoMakeTargetDeclaration|undefined;
     if(!target){
         return;
     }
@@ -30,7 +30,7 @@ export const convoMakeScopeFunction=createConvoScopeFunction({usesLabels:true},(
 
 export const convoDefineMakeAppScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
 
-    const app=convoLabeledScopeParamsToObj(scope) as ConvoMakeApp|undefined;
+    const app=scope.paramValues?.[0] as ConvoMakeApp|undefined;
     if(!app){
         return;
     }
@@ -69,7 +69,7 @@ export const convoDefineMakeAppScopeFunction=createConvoScopeFunction({usesLabel
 
 export const convoDefineMakeStageScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
 
-    const stage=convoLabeledScopeParamsToObj(scope) as ConvoMakeStage|undefined;
+    const stage=scope.paramValues?.[0] as ConvoMakeStage|undefined;
     if(!stage){
         return;
     }
@@ -115,9 +115,3 @@ export const convoDefineMakeStageScopeFunction=createConvoScopeFunction({usesLab
     return stage;
 
 });
-
-export const initConvoMakeConversation=(conversation:Conversation)=>{
-    conversation.externFunctions[convoFunctions.make]=convoMakeScopeFunction;
-    conversation.externFunctions[convoFunctions.makeApp]=convoDefineMakeAppScopeFunction;
-    conversation.externFunctions[convoFunctions.makeStage]=convoDefineMakeStageScopeFunction;
-}
