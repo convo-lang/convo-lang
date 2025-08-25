@@ -15,7 +15,7 @@ export class ConvoMakeExtTargetDecList extends ConvoMakeExtTreeItem<ConvoMakeCtr
         super({
             ...options,
             id:'target-dec-list',
-            name:'target declarations',
+            name:'declarations',
             type:'targetDecList',
         });
     }

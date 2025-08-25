@@ -1,3 +1,4 @@
+import { ThemeColor, ThemeIcon } from "vscode";
 import { ConvoMakeExtItemMetadata } from "./convo-make-ext-types";
 
 const metadataKey=Symbol('ConvoExtMetadata');
@@ -20,4 +21,11 @@ export const getConvoExtMakeMetadataOrCreateValue=<K extends keyof ConvoMakeExtI
         metadata[key]=v=create();
     }
     return v as any;
+}
+
+export const createConvoExtIcon=(icon:string)=>{
+    return new ThemeIcon(
+        icon,
+        icon==='check'?new ThemeColor('charts.green'):undefined
+    )
 }

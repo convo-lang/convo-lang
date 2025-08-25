@@ -1,5 +1,5 @@
 import { ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { asArray, getObjKeyCount, valueIsZodType } from "@iyio/common";
+import { asArray, getDirectoryName, getFileName, getObjKeyCount, normalizePath, valueIsZodType } from "@iyio/common";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
 
 
@@ -29,13 +29,17 @@ export const convoMakeTargetHasProps:(keyof ConvoMakeTarget)[]=[
 convoMakeTargetHasProps.sort();
 
 
-export const getConvoMakeOptionsFromVars=(name:string|undefined,dir:string,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
+export const getConvoMakeOptionsFromVars=(filePath:string,dir:string|undefined,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
 {
+    filePath=normalizePath(filePath);
+    if(!dir){
+        dir=getDirectoryName(filePath);
+    }
     const targets=vars[convoVars.__makeTargets];
     if(!Array.isArray(targets) || !targets.length){
         return undefined;
     }
-    const options:ConvoMakeCtrlOptions={name:name??'(untitled).convo',targets,dir};
+    const options:ConvoMakeCtrlOptions={name:getFileName(filePath),filePath,dir,targets};
     const apps=vars[convoVars.__makeApps];
     if(Array.isArray(apps)){
         options.apps=apps;

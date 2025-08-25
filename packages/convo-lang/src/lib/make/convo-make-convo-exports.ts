@@ -20,6 +20,8 @@ export const convoMakeExports=(name:string):ConvoModule|undefined=>{
 @assumeHandledMessageLocation
 @messageHandler make
 > makeHandler(defaults:any) -> (
+    default.instructions=switch(default._.length default._ undefined)
+    default._=undefined
     makeDefaults(defaults);
 )
 
@@ -35,6 +37,8 @@ export const convoMakeExports=(name:string):ConvoModule|undefined=>{
 @assumeHandledMessageLocation
 @messageHandler stage
 > stageHandler(stage:any) -> (
+    stage.instructions=switch(stage._.length stage._ undefined)
+    stage._=undefined
     @shared
     __currentMakeStage=or(stage.name "default")
     makeStage(stage)
@@ -43,6 +47,7 @@ export const convoMakeExports=(name:string):ConvoModule|undefined=>{
 @assumeHandledMessageLocation
 @messageHandler app
 > appHandler(app:any) -> (
+    app._=undefined
     makeApp(app)
 )
 

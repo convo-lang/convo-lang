@@ -1,4 +1,4 @@
-import { contentHasConvoRole, Conversation, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -19,6 +19,10 @@ export interface ConvoMakeCtrlOptions
     targetDefaults?:ConvoMakeTargetSharedProps;
     dir:string;
     /**
+     * Full path to the convo make file the controller is building
+     */
+    filePath:string;
+    /**
      * If true input content is echoed in to outputs instead of being generated
      */
     echoMode?:boolean;
@@ -36,11 +40,19 @@ export interface ConvoMakeCtrlOptions
      * If input inputs will not have their whitespace trimmed.
      */
     disableInputTrimming?:boolean;
+
+    /**
+     * If true the controller will be loaded as a preview when the build is tarted
+     */
+    preview?:boolean;
 }
 
 export class ConvoMakeCtrl
 {
     public readonly name:string;
+    public readonly dir:string;
+    public readonly filePath:string;
+    public readonly preview:boolean;
 
     public readonly id:string;
 
@@ -75,6 +87,7 @@ export class ConvoMakeCtrl
         vfsCtrl=vfs(),
         targets,
         dir,
+        filePath,
         echoMode=false,
         dryRun=false,
         shell,
@@ -85,12 +98,14 @@ export class ConvoMakeCtrl
         disableInputTrimming=false,
         stages=[],
         targetDefaults,
+        preview=false,
     }:ConvoMakeCtrlOptions){
         this.options={
             name,
             vfsCtrl,
             targets:applyConvoMakeTargetSharedProps(targets,stages,targetDefaults),
             dir,
+            filePath,
             echoMode,
             dryRun,
             apps,
@@ -101,9 +116,13 @@ export class ConvoMakeCtrl
             disableInputTrimming,
             stages,
             targetDefaults,
+            preview,
         }
         this.id=uuid();
         this.name=name;
+        this.dir=dir;
+        this.filePath=filePath;
+        this.preview=preview;
         console.log('hio 👋 👋 👋 make ctrl',this);
     }
 
@@ -138,21 +157,28 @@ export class ConvoMakeCtrl
 
     private async _buildAsync()
     {
-
-        while(!this.isDisposed){
-            const pass=await this.makePassAsync();
-            console.log('hio 👋 👋 👋 Pass complete',pass);
-            pushBehaviorSubjectAry(this._passes,pass);
-            this.triggerBuildEvent({
-                type:'pass-end',
-                target:pass,
-                eventTarget:pass,
-                ctrl:this,
-            })
-            if(pass.genCount<=0 && pass.skipCount<=0){
-                break;
+        if(this.preview){
+            await this.loadAsPreviewAsync();
+        }else{
+            while(!this.isDisposed){
+                const pass=await this.makePassAsync();
+                if(this.isDisposed){
+                    pass.cancelled=true;
+                }
+                console.log('hio 👋 👋 👋 Pass complete',pass);
+                pushBehaviorSubjectAry(this._passes,pass);
+                this.triggerBuildEvent({
+                    type:'pass-end',
+                    target:pass,
+                    eventTarget:pass,
+                    ctrl:this,
+                })
+                if(pass.genCount<=0 && pass.skipCount<=0){
+                    break;
+                }
             }
         }
+
 
         console.log('hio 👋 👋 👋 DONE',);
         if(!this.isDisposed){
@@ -188,36 +214,13 @@ export class ConvoMakeCtrl
             eventTarget:pass,
             ctrl:this,
         })
-        //this._stages.next(this.options.stages.map(stage=>new ConvoMakeStageCtrl({makeCtrl:this,stage})));
-        const targets=await this.getTargetPairsAsync();
+
+        const ctrls=await this.getBuildTargetsAsync();
         if(this.isDisposed){
             return {
                 ...pass,
                 endTime:Date.now(),
             };
-        }
-
-        // for(const stage of this.stages){
-        //     stage.checkReady();
-        // }
-
-        const ctrls=targets.map(t=>new ConvoMakeTargetCtrl({
-            target:t.target,
-            targetDeclaration:t.declaration,
-            makeCtrl:this,
-        }));
-
-        for(let i=0;i<ctrls.length;i++){
-            const ctrl=ctrls[i];
-            if(!ctrl?.target.outFromList || !ctrl.target.in.every(i=>i.ready)){
-                continue;
-            }
-
-            const forked=ctrl.target.in.filter(i=>i.listIndex!==undefined).map((input,index)=>{
-                return this.forkTargetList(ctrl,input,index);
-            });
-
-            ctrls.splice(i+1,0,...forked);
         }
 
         this.clearTargets();
@@ -239,6 +242,66 @@ export class ConvoMakeCtrl
             ...pass,
             endTime:Date.now(),
         };
+    }
+
+    private async getBuildTargetsAsync(){
+        const targets=await this.getTargetPairsAsync();
+        if(this.isDisposed){
+            return [];
+        }
+
+        const ctrls=targets.map(t=>new ConvoMakeTargetCtrl({
+            target:t.target,
+            targetDeclaration:t.declaration,
+            makeCtrl:this,
+        }));
+
+        for(let i=0;i<ctrls.length;i++){
+            const ctrl=ctrls[i];
+            if(!ctrl?.target.outFromList || !ctrl.target.in.every(i=>i.ready)){
+                continue;
+            }
+
+            const forked=ctrl.target.in.filter(i=>i.listIndex!==undefined).map((input,index)=>{
+                return this.forkTargetList(ctrl,input,index);
+            });
+
+            ctrls.splice(i+1,0,...forked);
+        }
+
+        ctrls.sort((a,b)=>a.outPath.localeCompare(b.outPath))
+
+        return ctrls;
+    }
+
+    private previewPromise:Promise<void>|undefined;
+    public loadAsPreviewAsync()
+    {
+        return this.previewPromise??(this.previewPromise=this._loadAsPreviewAsync())
+    }
+
+    private async _loadAsPreviewAsync()
+    {
+        console.log('hio 👋 👋 👋 load preview',);
+        const ctrls=await this.getBuildTargetsAsync();
+        console.log('hio 👋 👋 👋 preview ctrls',ctrls);
+        this.clearTargets();
+        this._targets.next(ctrls);
+        for(const ctrl of ctrls){
+            this.triggerBuildEvent({
+                type:'target-add',
+                target:ctrl,
+                eventTarget:ctrl,
+                ctrl:this,
+            })
+        }
+        await Promise.all(this.targets.map(t=>t.checkReadyAsync()));
+        this.triggerBuildEvent({
+            type:'ctrl-preview',
+            target:this,
+            eventTarget:this,
+            ctrl:this,
+        })
     }
 
     private clearTargets(){
@@ -756,8 +819,18 @@ export class ConvoMakeCtrl
         };
     }
 
+    public getDefaultConversationOptions():ConversationOptions{
+        return {
+            sandboxMode:this.preview,
+            trackModel:true,
+            trackTime:true,
+            trackTokens:true,
+            disableAutoFlatten:true,
+        }
+    }
+
     private createConversation(relPath:string):Conversation{
-        const conversation=new Conversation({disableAutoFlatten:true});
+        const conversation=new Conversation(this.getDefaultConversationOptions());
         const fullPath=normalizePath(joinPaths(this.options.dir,relPath));
         conversation.unregisteredVars[convoVars.__cwd]=getDirectoryName(fullPath);
         conversation.unregisteredVars[convoVars.__mainFile]=fullPath;

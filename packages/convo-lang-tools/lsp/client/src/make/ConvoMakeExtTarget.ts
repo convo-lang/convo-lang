@@ -1,7 +1,8 @@
 import { ConvoMakeCtrl, ConvoMakeTargetCtrl } from "@convo-lang/convo-lang-make";
-import { ProviderResult, ThemeIcon } from "vscode";
+import { ProviderResult } from "vscode";
 import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
 import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
+import { createConvoExtIcon } from "./convo-make-ext-lib";
 
 
 
@@ -42,9 +43,9 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
             type:'target',
             icon:getIcon(options.obj)
         });
-        // this.obj.stateSubject.subscribe(()=>{
-        //     this.iconPath=getIcon(this.obj);
-        // })
+        this.obj.reviewingSubject.subscribe(()=>{
+            this.iconPath=getIcon(this.obj);
+        })
     }
 
     public getChildren():ProviderResult<any[]>
@@ -54,16 +55,18 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
 }
 
 const getIcon=(target:ConvoMakeTargetCtrl)=>{
-    return new ThemeIcon(
-        target.state==='complete'?
+    return createConvoExtIcon(
+        target.reviewing?
+            'open-preview'
+        :target.state==='complete'?
             'check'
         :target.isDisposed?
-            'debug-stop'
+            (target.makeCtrl.preview?'circle':'debug-stop')
         :target.state==='building'?
-            'debug-start'
+            'sync~spin'
         :target.state==='skipped'?
             'watch'
         :
             'debug-stop'
-    )
+    );
 }

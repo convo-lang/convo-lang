@@ -3,7 +3,7 @@ import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, nor
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
 import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts";
-import { ConvoMakeAppTargetRef, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types";
+import { ConvoMakeAppTargetRef, ConvoMakeOutputReview, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types";
 import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer";
 import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
 
@@ -47,6 +47,10 @@ export class ConvoMakeTargetCtrl
     public get contentReadySubject():ReadonlySubject<boolean>{return this._contentReady}
     public get contentReady(){return this._contentReady.value}
 
+    private readonly _reviewing:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get reviewingSubject():ReadonlySubject<boolean>{return this._reviewing}
+    public get reviewing(){return this._reviewing.value}
+
     public constructor({
         makeCtrl,
         target,
@@ -68,7 +72,7 @@ export class ConvoMakeTargetCtrl
         this.cacheFile=metaOutBase+'.~.convo-hash';
         this.convoFile=metaOutBase+'.~.convo';
         this.imageFile=metaOutBase+'.~.convo-screenshot.png';
-        this.conversation=new Conversation({disableAutoFlatten:true});
+        this.conversation=new Conversation(makeCtrl.getDefaultConversationOptions());
         this.conversation.unregisteredVars[convoVars.__cwd]=getDirectoryName(this.outPath);
         this.conversation.unregisteredVars[convoVars.__mainFile]=this.outPath;
         this.appRef=makeCtrl.getAppRef(target);
@@ -123,6 +127,9 @@ export class ConvoMakeTargetCtrl
         const ready=await this.isUpToDateAsync();
         if(ready){
             this._contentReady.next(true);
+            if(this.makeCtrl.preview){
+                this.commit('complete',{addCachedCount:1})
+            }
         }
     }
 
@@ -267,7 +274,13 @@ export class ConvoMakeTargetCtrl
                         if(!viewer){
                             viewer=await appCtrl.getViewerAsync(this.appRef);
                         }
-                        const review=await viewer.reviewAsync();
+                        this._reviewing.next(true);
+                        let review:ConvoMakeOutputReview|undefined;
+                        try{
+                            review=await viewer.reviewAsync();
+                        }finally{
+                            this._reviewing.next(false);
+                        }
                         if(this.isDisposed){
                             return;
                         }

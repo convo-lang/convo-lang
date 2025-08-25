@@ -1,7 +1,7 @@
-import { ConvoMakeActivePass } from "@convo-lang/convo-lang";
+import { ConvoMakeActivePass, ConvoMakePass } from "@convo-lang/convo-lang";
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
-import { ProviderResult, ThemeIcon } from "vscode";
-import { getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib";
+import { ProviderResult } from "vscode";
+import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib";
 import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
 import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
 
@@ -38,16 +38,16 @@ export class ConvoMakeExtPassList extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
     }
 }
 
-export class ConvoMakeExtPass extends ConvoMakeExtTreeItem<ConvoMakeActivePass>
+export class ConvoMakeExtPass extends ConvoMakeExtTreeItem<ConvoMakeActivePass|ConvoMakePass>
 {
 
-    public constructor(options:ConvoMakeExtTreeItemOptionsBase<ConvoMakeActivePass>){
+    public constructor(options:ConvoMakeExtTreeItemOptionsBase<ConvoMakeActivePass|ConvoMakePass>){
         super({
             ...options,
             id:`pass::${options.obj.index}::${options.obj.endTime}`,
             name:`pass ${options.obj.index+1}${options.obj.endTime===undefined?'':` (${Math.round((options.obj.endTime-options.obj.startTime)/1000)}s)`}`,
             type:'pass',
-            icon:new ThemeIcon((options.obj.endTime || options.ctrl.isDisposed)?'check':'debug-start'),
+            icon:createConvoExtIcon((options.obj as ConvoMakePass).cancelled?'debug-stop':(options.obj.endTime || options.ctrl.isDisposed)?'check':'sync~spin'),
             expand:options.obj.endTime?false:true,
         });
     }

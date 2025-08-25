@@ -1,6 +1,12 @@
-import { ConvoMakeBuildEvt, ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
-import { pushBehaviorSubjectAry, ReadonlySubject } from "@iyio/common";
+import { convoDefaultModelParam, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam } from "@convo-lang/convo-lang";
+import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from "@convo-lang/convo-lang-bedrock";
+import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
+import { ConvoCliConfig, createConvoCliAsync } from "@convo-lang/convo-lang-cli";
+import { ConvoMakeBuildEvt, ConvoMakeCtrl, ConvoMakeCtrlOptions, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { deleteUndefined, getDirectoryName, normalizePath, ReadonlySubject } from "@iyio/common";
+import { vfs } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { RelativePattern, workspace } from "vscode";
 
 export class ConvoExt
 {
@@ -19,8 +25,102 @@ export class ConvoExt
 
     public addMakeCtrl(ctrl:ConvoMakeCtrl)
     {
-        pushBehaviorSubjectAry(this._makeCtrls,ctrl);
+        const update=[...this._makeCtrls.value];
+        for(let i=0;i<update.length;i++){
+            const m=update[i];
+            if(m?.filePath===ctrl.filePath){
+                m.dispose();
+                update.splice(i,1);
+                i--;
+            }
+        }
+        update.push(ctrl);
+        update.sort((a,b)=>a.filePath.localeCompare(b.filePath));
+        console.log('hio 👋 👋 👋 updates',update);
+        this._makeCtrls.next(update);
         this.bindMakeCtrl(ctrl);
+    }
+
+    public async scanMakeCtrlsAsync()
+    {
+        const folder=workspace.workspaceFolders?.[0];
+        if(!folder){
+            return;
+        }
+        const glob=new RelativePattern(folder,'**/*make.convo')
+        const makeFiles=await workspace.findFiles(glob);
+        console.log('hio 👋 👋 👋 scan result',makeFiles);
+        if(!makeFiles.length){
+            return;
+        }
+
+        await Promise.all(makeFiles.map(f=>this.createMakeCtrlAsync({
+            filePath:f.path,
+            preview:true,
+            autoAdd:true,
+            skipActiveBuild:true,
+            startBuild:true,
+        })))
+
+    }
+
+    public async createMakeCtrlAsync(opts:ConvoExtCreateMakeCtrlOptions):Promise<ConvoMakeCtrl|undefined>{
+        const {
+            filePath:_filePath,
+            startBuild,
+            autoAdd,
+            skipActiveBuild,
+            ...ctrlOptions
+        }=opts;
+        try{
+            const filePath=normalizePath(_filePath);
+
+            if(skipActiveBuild){
+                const active=this.makeCtrls.find(c=>!c.preview && !c.isDisposed && c.filePath===filePath);
+                if(active){
+                    return active;
+                }
+            }
+
+            const cwd=getDirectoryName(filePath);
+            const cli=await createConvoCliAsync({
+                config:this.getCliConfig(),
+                bufferOutput:true,
+                exeCwd:cwd,
+                sourcePath:filePath,
+            });
+
+            const convo=cli.convo;
+            convo.append(await vfs().readStringAsync(filePath),{disableAutoFlatten:true,filePath});
+            const flat=await convo.flattenAsync();
+
+            const options=getConvoMakeOptionsFromVars(
+                filePath,
+                cwd,
+                flat.exe.sharedVars
+            );
+            console.log('hio 👋 👋 👋 options for path',filePath,options);
+            if(!options){
+                return;
+            }
+            const ctrl=new ConvoMakeCtrl({
+                ...options,
+                ...ctrlOptions,
+                //echoMode:true,
+                //continueReview:true,
+                browserInf:new ConvoBrowserCtrl(),
+            });
+            if(autoAdd){
+                this.addMakeCtrl(ctrl);
+            }
+            if(startBuild){
+                ctrl.buildAsync();
+            }
+            return ctrl;
+        }catch(ex){
+            console.error('Failed to create ctrl',opts,'error',ex);
+            return undefined;
+        }
     }
 
     private bindMakeCtrl(ctrl:ConvoMakeCtrl){
@@ -34,4 +134,36 @@ export class ConvoExt
             this._onBuildEvent.next(evt);
         })
     }
+
+    public getCliConfig():ConvoCliConfig{
+
+        const config=workspace.getConfiguration('convo');
+
+        return {
+            overrideEnv:true,
+            defaultModel:config.get<string>('defaultModel')?.trim()||undefined,
+            env:deleteUndefined({
+                [openAiApiKeyParam.typeName]:config.get<string>('openAiApiKey')?.trim()||undefined,
+                [openAiBaseUrlParam.typeName]:config.get<string>('openAiBaseUrl')?.trim()||undefined,
+
+                [awsBedrockProfileParam.typeName]:config.get<string>('awsBedrockProfile')?.trim()||undefined,
+                [awsBedrockRegionParam.typeName]:config.get<string>('awsBedrockRegion')?.trim()||undefined,
+                [awsBedrockApiKeyParam.typeName]:config.get<string>('awsBedrockApiKey')?.trim()||undefined,
+
+                [convoDefaultModelParam.typeName]:config.get<string>('defaultModel')?.trim()||undefined,
+
+                [openRouterApiKeyParam.typeName]:config.get<string>('openRouterApiKey')?.trim()||undefined,
+                [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
+
+            }) as Record<string,string>
+        };
+    }
+}
+
+export interface ConvoExtCreateMakeCtrlOptions extends Omit<Partial<ConvoMakeCtrlOptions>,'filePath'>
+{
+    startBuild?:boolean;
+    autoAdd?:boolean;
+    skipActiveBuild?:boolean;
+    filePath:string
 }

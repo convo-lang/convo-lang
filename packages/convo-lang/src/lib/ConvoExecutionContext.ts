@@ -4,7 +4,7 @@ import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation';
 import { ConvoError } from './ConvoError';
 import { parseConvoType } from './convo-cached-parsing';
-import { defaultConvoVars } from "./convo-default-vars";
+import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars";
 import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
 import { doesConvoContentHaveMessage } from './convo-parser';
 import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
@@ -78,7 +78,7 @@ export class ConvoExecutionContext
                 this.print('CONVO_PIPE <<',value);
             })
         }
-        this.sharedVars={...defaultConvoVars,[convoGlobalRef]:this.convo}
+        this.sharedVars={...(parentConvo?.sandboxMode?sandboxConvoVars:defaultConvoVars),[convoGlobalRef]:this.convo}
         this.parentConvo=parentConvo;
     }
 

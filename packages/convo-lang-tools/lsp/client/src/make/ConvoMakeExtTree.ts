@@ -22,13 +22,14 @@ export class ConvoMakeExtTree implements TreeDataProvider<ConvoMakeExtTreeItem<a
         this.ext=ext;
 
         let iv:any=0;
-        this.disposables.addSub(ext.onBuildEvent.subscribe((e)=>{
+        const update=()=>{
             clearInterval(iv);
             iv=setTimeout(()=>{
-                console.log('hio 👋 👋 👋 make events',e);
                 this._onDidChangeTreeData.fire(null);
             },50);
-        }))
+        }
+        this.disposables.addSub(ext.onBuildEvent.subscribe(update));
+        this.disposables.addSub(ext.makeCtrlsSubject.subscribe(update));
     }
 
     private readonly disposables=new DisposeContainer();

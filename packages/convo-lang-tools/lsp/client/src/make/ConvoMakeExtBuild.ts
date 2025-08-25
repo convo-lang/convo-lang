@@ -1,6 +1,8 @@
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
-import { ProviderResult, ThemeIcon } from "vscode";
-import { getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib';
+import { normalizePath } from "@iyio/common";
+import { ProviderResult, workspace } from "vscode";
+import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib';
+import { ConvoMakeExtAppList } from "./ConvoMakeExtApp";
 import { ConvoMakeExtPassList } from "./ConvoMakeExtPass";
 import { ConvoMakeExtStageList } from "./ConvoMakeExtStage";
 import { ConvoMakeExtTargetList } from "./ConvoMakeExtTarget";
@@ -13,10 +15,21 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
 {
 
     public constructor(options:ConvoMakeExtTreeItemOptionsBase<ConvoMakeCtrl>){
+        let name=normalizePath(options.ctrl.filePath);
+        let dir=workspace.workspaceFolders?.[0]?.uri.path
+        if(dir){
+            dir=normalizePath(dir);
+            if(!dir.endsWith('/')){
+                dir+='/';
+            }
+            if(name.startsWith(dir)){
+                name=name.substring(dir.length);
+            }
+        }
         super({
             ...options,
             id:options.ctrl.id,
-            name:options.ctrl.name,
+            name,
             type:'build',
             expand:true,
             icon:getIcon(options.ctrl)
@@ -31,26 +44,38 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
     public getChildren():ProviderResult<ConvoMakeExtTreeItem<any>[]>
     {
         return [
+            getConvoExtMakeMetadataOrCreateValue(this.obj,'appList',()=>new ConvoMakeExtAppList({
+                ...this.getBaseParams(),
+                obj:this.obj,
+            })),
+
             getConvoExtMakeMetadataOrCreateValue(this.obj,'stageList',()=>new ConvoMakeExtStageList({
                 ...this.getBaseParams(),
                 obj:this.obj,
             })),
+
+            this.ctrl.preview?null:
             getConvoExtMakeMetadataOrCreateValue(this.obj,'passList',()=>new ConvoMakeExtPassList({
                 ...this.getBaseParams(),
                 obj:this.obj,
             })),
+
             getConvoExtMakeMetadataOrCreateValue(this.obj,'targetDecList',()=>new ConvoMakeExtTargetDecList({
                 ...this.getBaseParams(),
                 obj:this.obj,
             })),
+
             getConvoExtMakeMetadataOrCreateValue(this.obj,'targetList',()=>new ConvoMakeExtTargetList({
                 ...this.getBaseParams(),
                 obj:this.obj,
             })),
-        ]
+        ].filter(v=>v) as ConvoMakeExtTreeItem<any>[];
     }
 }
 
 const getIcon=(ctrl:ConvoMakeCtrl)=>{
-    return new ThemeIcon(ctrl.complete?'check':ctrl.isDisposed?'debug-stop':'debug-start')
+    if(ctrl.preview){
+        return undefined;
+    }
+    return createConvoExtIcon(ctrl.complete?'check':ctrl.isDisposed?'debug-stop':'sync~spin')
 }

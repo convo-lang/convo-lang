@@ -1,10 +1,9 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, convoDefaultModelParam, convoResultErrorName, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam, parseConvoCode } from '@convo-lang/convo-lang';
-import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from '@convo-lang/convo-lang-bedrock';
+import { Conversation, convoResultErrorName, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
-import { ConvoCli, ConvoCliConfig, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage, getFileName } from '@iyio/common';
+import { Lock, createJsonRefReplacer, getErrorMessage } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
@@ -61,9 +60,14 @@ export function activate(context:ExtensionContext){
     registerCommands(context,ext);
     startLsp(context);
 
-    window.createTreeView('convoMakeBuild',{
+    const treeView=window.createTreeView('convoMakeBuild',{
         treeDataProvider:new ConvoMakeExtTree({ext})
     });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
     context.subscriptions.push(languages.registerDocumentLinkProvider(
         {pattern: '**/*.convo'},
         new ConvoDocumentLinkProvider()
@@ -176,7 +180,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
         const cwd=document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined;
         const cli=await createConvoCliAsync({
-            config:getCliConfig(),
+            config:ext.getCliConfig(),
             bufferOutput:true,
             exeCwd:cwd,
             sourcePath:document.isUntitled?undefined:document.uri.fsPath,
@@ -267,7 +271,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
         await initConvoCliAsync({
-            config:getCliConfig(),
+            config:ext.getCliConfig(),
             sourcePath:document.isUntitled?undefined:document.uri.fsPath,
             bufferOutput:true,
             exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
@@ -279,7 +283,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
         const flat=await ctx.convo.flattenAsync();
         const options=getConvoMakeOptionsFromVars(
-            document.uri.fsPath?getFileName(document.uri.fsPath):undefined,
+            document.uri.fsPath,
             ctx.cwd,
             flat.exe.sharedVars
         );
@@ -314,7 +318,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                 return;
             }
             await initConvoCliAsync({
-                config:getCliConfig(),
+                config:ext.getCliConfig(),
                 sourcePath:document.isUntitled?undefined:document.uri.fsPath,
                 bufferOutput:true,
                 exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
@@ -332,7 +336,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             if(token.isCancellationRequested){return}
 
             const options=getConvoMakeOptionsFromVars(
-                document.uri.fsPath?getFileName(document.uri.fsPath):undefined,
+                document.uri.fsPath,
                 ctx.cwd,
                 flat.exe.sharedVars
             );
@@ -341,7 +345,6 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             }
             const ctrl=new ConvoMakeCtrl({
                 ...options,
-                name:document.uri.fsPath?getFileName(document.uri.fsPath):'(untitled).convo',
                 //echoMode:true,
                 //continueReview:true,
                 browserInf:new ConvoBrowserCtrl(),
@@ -380,7 +383,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
 
         const cli=await createConvoCliAsync({
-            config:getCliConfig(),
+            config:ext.getCliConfig(),
             bufferOutput:true,
             exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
             sourcePath:document.isUntitled?undefined:document.uri.fsPath,
@@ -501,7 +504,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                 await setCodeAsync(msg,false,true);
 
                 const cli=await createConvoCliAsync({
-                    config:getCliConfig(),
+                    config:ext.getCliConfig(),
                     inline:src,
                     sourcePath:document.isUntitled?undefined:document.uri.fsPath,
                     bufferOutput:true,
@@ -646,9 +649,13 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         await splitAsync(false);
     }));
 
+    context.subscriptions.push(commands.registerCommand('convo.refresh-make-targets', async () => {
+        await ext.scanMakeCtrlsAsync();
+    }));
+
     context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
 
-        const cli=await createConvoCliAsync({config:getCliConfig()});
+        const cli=await createConvoCliAsync({config:ext.getCliConfig()});
         try{
             const models=await cli.convo.getAllModelsAsync();
 
@@ -682,28 +689,4 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             },1600);
         }
     })
-
-    const getCliConfig=():ConvoCliConfig=>{
-        // Read the 'convo.openAiApiKey' setting from the extension configuration
-        const config=workspace.getConfiguration('convo');
-
-        return {
-            overrideEnv:true,
-            defaultModel:config.get<string>('defaultModel')?.trim()||undefined,
-            env:deleteUndefined({
-                [openAiApiKeyParam.typeName]:config.get<string>('openAiApiKey')?.trim()||undefined,
-                [openAiBaseUrlParam.typeName]:config.get<string>('openAiBaseUrl')?.trim()||undefined,
-
-                [awsBedrockProfileParam.typeName]:config.get<string>('awsBedrockProfile')?.trim()||undefined,
-                [awsBedrockRegionParam.typeName]:config.get<string>('awsBedrockRegion')?.trim()||undefined,
-                [awsBedrockApiKeyParam.typeName]:config.get<string>('awsBedrockApiKey')?.trim()||undefined,
-
-                [convoDefaultModelParam.typeName]:config.get<string>('defaultModel')?.trim()||undefined,
-
-                [openRouterApiKeyParam.typeName]:config.get<string>('openRouterApiKey')?.trim()||undefined,
-                [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
-
-            }) as Record<string,string>
-        };
-    }
 }

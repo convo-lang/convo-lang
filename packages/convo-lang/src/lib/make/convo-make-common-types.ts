@@ -354,4 +354,6 @@ export interface ConvoMakeActivePass
     forkedCount:number;
 }
 
-export type ConvoMakePass=Required<ConvoMakeActivePass>;
+export type ConvoMakePass=Required<ConvoMakeActivePass> & {
+    cancelled?:boolean;
+}

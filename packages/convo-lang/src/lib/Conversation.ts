@@ -217,6 +217,12 @@ export interface ConversationOptions
      * A template used to wrap imported content such as markdown files.
      */
     defaultImportTemplate?:string;
+
+    /**
+     * If true the conversation will not able to call standard library functions to access external
+     * resources or tools
+     */
+    sandboxMode?:boolean;
 }
 
 export class Conversation
@@ -404,6 +410,7 @@ export class Conversation
     public print:ConvoPrintFunction=defaultConvoPrintFunction;
 
     private readonly defaultOptions:ConversationOptions;
+    public get sandboxMode(){return this.defaultOptions.sandboxMode??false}
 
     public readonly defaultVars:Record<string,any>;
 

@@ -134,6 +134,14 @@
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@9"
                 }
+            ],
+            "view/title":[
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                }
+
             ]
         },
         "commands": [
@@ -142,6 +150,11 @@
                 "title": "Convo: Complete - Submits conversation to LLM and append response",
                 "shortTitle": "Convo: Complete",
                 "icon": "$(play)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
             },
             {
                 "command": "convo.parse",
@@ -294,7 +307,7 @@
                 {
                     "id":"convo-lang-tools",
                     "title":"Convo-Lang",
-                    "icon":"$(tools)"
+                    "icon":"$(github-action)"
                 }
             ]
         },
@@ -303,7 +316,7 @@
                 {
                     "id":"convoMakeBuild",
                     "name":"Make Build",
-                    "icon":"$(tools)"
+                    "icon":"$(github-action)"
                 }
             ]
         }

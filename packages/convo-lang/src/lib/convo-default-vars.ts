@@ -61,7 +61,7 @@ const describeStruct=createConvoScopeFunction(scope=>{
     return describeConvoScheme(type,scope.paramValues?.[1]);
 });
 
-export const defaultConvoVars={
+export const defaultConvoVarsBase={
 
     [convoBodyFnName]:createConvoScopeFunction({
         discardParams:true,
@@ -866,80 +866,6 @@ export const defaultConvoVars={
         return obj;
     }),
 
-    httpGet:createConvoScopeFunction(async scope=>{
-        let url=scope.paramValues?.[0];
-        let options=scope.paramValues?.[1];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        if(options && (typeof options !== 'object')){
-            url+=`${url.includes('?')?'&':'?'}__input=${encodeURIComponent(options.toString())}`;
-            options=undefined;
-        }
-
-        return await httpClient().getAsync(url,options)
-    }),
-
-    httpGetString:createConvoScopeFunction(async scope=>{
-        const url=scope.paramValues?.[0];
-        const options=scope.paramValues?.[1];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        return await httpClient().getStringAsync(url,options)
-    }),
-
-    httpPost:createConvoScopeFunction(async scope=>{
-        const url=scope.paramValues?.[0];
-        const body=scope.paramValues?.[1];
-        const options=scope.paramValues?.[2];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        return await httpClient().postAsync(url,body,options)
-    }),
-
-    httpPut:createConvoScopeFunction(async scope=>{
-        const url=scope.paramValues?.[0];
-        const body=scope.paramValues?.[1];
-        const options=scope.paramValues?.[2];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        return await httpClient().putAsync(url,body,options)
-    }),
-
-    httpPatch:createConvoScopeFunction(async scope=>{
-        const url=scope.paramValues?.[0];
-        const body=scope.paramValues?.[1];
-        const options=scope.paramValues?.[2];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        return await httpClient().patchAsync(url,body,options)
-    }),
-
-    httpDelete:createConvoScopeFunction(async scope=>{
-        const url=scope.paramValues?.[0];
-        const options=scope.paramValues?.[1];
-
-        if(typeof url !== 'string'){
-            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
-        }
-
-        return await httpClient().deleteAsync(url,options)
-    }),
-
     encodeURI:createConvoScopeFunction(scope=>{
         return encodeURI(scope.paramValues?.[0]?.toString()??'');
     }),
@@ -1186,16 +1112,6 @@ export const defaultConvoVars={
         }
     }),
 
-    openBrowserWindow:createConvoScopeFunction((scope)=>{
-        const url=scope.paramValues?.[0];
-        const target=scope.paramValues?.[1]??'_blank';
-        if((typeof url !== 'string') || (typeof target !== 'string')){
-            return false;
-        }
-        globalThis.window?.open(url,target);
-        return true;
-    }),
-
     [convoFunctions.enableRag]:createConvoScopeFunction((scope,ctx)=>{
         ctx.enableRag(Array.isArray(scope.paramValues)?scope.paramValues:undefined);
     }),
@@ -1252,8 +1168,6 @@ export const defaultConvoVars={
             return 'Unable to see scene';
         }
     }),
-
-    [convoFunctions.readDoc]:convoScopeFunctionReadDoc,
 
     [convoFunctions.getAgentList]:createConvoScopeFunction((scope,ctx)=>{
         const agents=ctx.convo.conversation?.agents;
@@ -1370,6 +1284,175 @@ export const defaultConvoVars={
     [convoFunctions.popConvoTask]:createConvoScopeFunction((scope,ctx)=>{
         ctx.convo.conversation?.popTask();
     }),
+
+    [convoFunctions.fsFullPath]:createConvoScopeFunction(async (scope,ctx)=>{
+        return ctx.getFullPath(scope.paramValues?.[0]);
+    }),
+
+    [convoFunctions.joinPaths]:createConvoScopeFunction(async (scope)=>{
+        if(!scope.paramValues){
+            return '.';
+        }
+        const paths=scope.paramValues.filter(v=>v && (typeof v === 'string'));
+
+        return joinPaths(...paths);
+    }),
+
+    [convoFunctions.isUndefined]:createConvoScopeFunction(async (scope)=>{
+        if(!scope.paramValues){
+            return true;
+        }
+        for(const v of scope.paramValues){
+            if(v!==undefined){
+                return false;
+            }
+        }
+        return true;
+    }),
+
+    [convoFunctions.secondMs]:createConvoScopeFunction(async (scope)=>{
+        return (scope.paramValues?.[0]??0)*1000;
+    }),
+
+    [convoFunctions.minuteMs]:createConvoScopeFunction(async (scope)=>{
+        return (scope.paramValues?.[0]??0)*60000;
+    }),
+
+    [convoFunctions.hourMs]:createConvoScopeFunction(async (scope)=>{
+        return (scope.paramValues?.[0]??0)*3600000;
+    }),
+
+    [convoFunctions.dayMs]:createConvoScopeFunction(async (scope)=>{
+        return (scope.paramValues?.[0]??0)*86400000;
+    }),
+
+    [convoFunctions.aryFindMatch]:createConvoScopeFunction(async (scope)=>{
+        const ary=scope.paramValues?.[0];
+        const match=scope.paramValues?.[1];
+
+        if(!Array.isArray(ary)){
+            return undefined;
+        }
+
+        for(let i=0;i<ary.length;i++){
+            const item=ary[i];
+            if(isShallowEqualTo(match,item)){
+                return item;
+            }
+        }
+
+        return undefined;
+    }),
+
+    [convoFunctions.aryRemoveMatch]:createConvoScopeFunction(async (scope)=>{
+        const ary=scope.paramValues?.[0];
+        const match=scope.paramValues?.[1];
+
+        if(!Array.isArray(ary)){
+            return false;
+        }
+
+        for(let i=0;i<ary.length;i++){
+            const item=ary[i];
+            if(isShallowEqualTo(match,item)){
+                ary.splice(i,1);
+                return true;
+            }
+        }
+
+        return false;
+    }),
+
+} as const;
+Object.freeze(defaultConvoVarsBase);
+
+export const extendedConvoVars={
+
+    httpGet:createConvoScopeFunction(async scope=>{
+        let url=scope.paramValues?.[0];
+        let options=scope.paramValues?.[1];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        if(options && (typeof options !== 'object')){
+            url+=`${url.includes('?')?'&':'?'}__input=${encodeURIComponent(options.toString())}`;
+            options=undefined;
+        }
+
+        return await httpClient().getAsync(url,options)
+    }),
+
+    httpGetString:createConvoScopeFunction(async scope=>{
+        const url=scope.paramValues?.[0];
+        const options=scope.paramValues?.[1];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        return await httpClient().getStringAsync(url,options)
+    }),
+
+    httpPost:createConvoScopeFunction(async scope=>{
+        const url=scope.paramValues?.[0];
+        const body=scope.paramValues?.[1];
+        const options=scope.paramValues?.[2];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        return await httpClient().postAsync(url,body,options)
+    }),
+
+    httpPut:createConvoScopeFunction(async scope=>{
+        const url=scope.paramValues?.[0];
+        const body=scope.paramValues?.[1];
+        const options=scope.paramValues?.[2];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        return await httpClient().putAsync(url,body,options)
+    }),
+
+    httpPatch:createConvoScopeFunction(async scope=>{
+        const url=scope.paramValues?.[0];
+        const body=scope.paramValues?.[1];
+        const options=scope.paramValues?.[2];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        return await httpClient().patchAsync(url,body,options)
+    }),
+
+    httpDelete:createConvoScopeFunction(async scope=>{
+        const url=scope.paramValues?.[0];
+        const options=scope.paramValues?.[1];
+
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},"First arg must be a string URL");
+        }
+
+        return await httpClient().deleteAsync(url,options)
+    }),
+
+    openBrowserWindow:createConvoScopeFunction((scope)=>{
+        const url=scope.paramValues?.[0];
+        const target=scope.paramValues?.[1]??'_blank';
+        if((typeof url !== 'string') || (typeof target !== 'string')){
+            return false;
+        }
+        globalThis.window?.open(url,target);
+        return true;
+    }),
+
+    [convoFunctions.readDoc]:convoScopeFunctionReadDoc,
 
     [convoFunctions.fsWriteJson]:createConvoScopeFunction(async (scope,ctx)=>{
         if(typeof scope.paramValues?.[0] !== 'string'){
@@ -1509,86 +1592,23 @@ export const defaultConvoVars={
             return [];
         }
     }),
-
-    [convoFunctions.fsFullPath]:createConvoScopeFunction(async (scope,ctx)=>{
-        return ctx.getFullPath(scope.paramValues?.[0]);
-    }),
-
-    [convoFunctions.joinPaths]:createConvoScopeFunction(async (scope)=>{
-        if(!scope.paramValues){
-            return '.';
-        }
-        const paths=scope.paramValues.filter(v=>v && (typeof v === 'string'));
-
-        return joinPaths(...paths);
-    }),
-
-    [convoFunctions.isUndefined]:createConvoScopeFunction(async (scope)=>{
-        if(!scope.paramValues){
-            return true;
-        }
-        for(const v of scope.paramValues){
-            if(v!==undefined){
-                return false;
-            }
-        }
-        return true;
-    }),
-
-    [convoFunctions.secondMs]:createConvoScopeFunction(async (scope)=>{
-        return (scope.paramValues?.[0]??0)*1000;
-    }),
-
-    [convoFunctions.minuteMs]:createConvoScopeFunction(async (scope)=>{
-        return (scope.paramValues?.[0]??0)*60000;
-    }),
-
-    [convoFunctions.hourMs]:createConvoScopeFunction(async (scope)=>{
-        return (scope.paramValues?.[0]??0)*3600000;
-    }),
-
-    [convoFunctions.dayMs]:createConvoScopeFunction(async (scope)=>{
-        return (scope.paramValues?.[0]??0)*86400000;
-    }),
-
-    [convoFunctions.aryFindMatch]:createConvoScopeFunction(async (scope)=>{
-        const ary=scope.paramValues?.[0];
-        const match=scope.paramValues?.[1];
-
-        if(!Array.isArray(ary)){
-            return undefined;
-        }
-
-        for(let i=0;i<ary.length;i++){
-            const item=ary[i];
-            if(isShallowEqualTo(match,item)){
-                return item;
-            }
-        }
-
-        return undefined;
-    }),
-
-    [convoFunctions.aryRemoveMatch]:createConvoScopeFunction(async (scope)=>{
-        const ary=scope.paramValues?.[0];
-        const match=scope.paramValues?.[1];
-
-        if(!Array.isArray(ary)){
-            return false;
-        }
-
-        for(let i=0;i<ary.length;i++){
-            const item=ary[i];
-            if(isShallowEqualTo(match,item)){
-                ary.splice(i,1);
-                return true;
-            }
-        }
-
-        return false;
-    }),
-
 } as const;
+Object.freeze(extendedConvoVars);
+
+export const defaultConvoVars={
+    ...defaultConvoVarsBase,
+    ...extendedConvoVars
+}
+Object.freeze(defaultConvoVars);
+
+export const sandboxConvoVars:Record<string,any>={
+    ...defaultConvoVarsBase
+}
+const nopFn=createConvoScopeFunction(()=>null)
+for(const e in extendedConvoVars){
+    sandboxConvoVars[e]=nopFn;
+}
+Object.freeze(sandboxConvoVars);
 
 const enableTransform=(name:string,ctx:ConvoExecutionContext)=>{
     let enabledList:string[]=ctx.getVar(convoVars.__explicitlyEnabledTransforms);
@@ -1602,7 +1622,6 @@ const enableTransform=(name:string,ctx:ConvoExecutionContext)=>{
     }
 }
 
-Object.freeze(defaultConvoVars);
 
 
 export const getConvoMarkdownVar=(name:string,format:string,ctx:ConvoExecutionContext)=>{
@@ -1642,6 +1661,8 @@ const isShallowEqualTo=<T=any>(a:T, b:T, shouldTestKey?:(key:keyof T)=>boolean):
     }
     return true;
 }
+
+
 
 const isPrimitiveArray=(value:any)=>{
     if(!Array.isArray(value)){
