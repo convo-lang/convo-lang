@@ -54,13 +54,15 @@ export class ConvoExt
             return;
         }
 
-        await Promise.all(makeFiles.map(f=>this.createMakeCtrlAsync({
+        const all=await Promise.all(makeFiles.map(f=>this.createMakeCtrlAsync({
             filePath:f.path,
             preview:true,
             autoAdd:true,
             skipActiveBuild:true,
             startBuild:true,
-        })))
+        })));
+
+        this._makeCtrls.next(all.filter(c=>c) as ConvoMakeCtrl[]);
 
     }
 

@@ -8,6 +8,7 @@ import type { ConvoMakeExtPass, ConvoMakeExtPassList } from "./ConvoMakeExtPass"
 import type { ConvoMakeExtStage, ConvoMakeExtStageList, ConvoMakeExtStageTarget } from "./ConvoMakeExtStage";
 import type { ConvoMakeExtTarget, ConvoMakeExtTargetList } from "./ConvoMakeExtTarget";
 import type { ConvoMakeExtTargetDec, ConvoMakeExtTargetDecList } from "./ConvoMakeExtTargetDec";
+import { ConvoMakeExtTokenUsage } from "./ConvoMakeExtTokenUsage";
 
 
 export interface ConvoMakeExtItemMetadata
@@ -27,6 +28,7 @@ export interface ConvoMakeExtItemMetadata
     target?:ConvoMakeExtTarget;
     appList?:ConvoMakeExtAppList;
     app?:ConvoMakeExtApp;
+    tokenUsage?:ConvoMakeExtTokenUsage;
 }
 
 export type ConvoMakeExtTreeItemType=keyof ConvoMakeExtItemMetadata;

@@ -1,4 +1,4 @@
-import { contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -81,6 +81,10 @@ export class ConvoMakeCtrl
     private readonly _complete:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
     public get completeSubject():ReadonlySubject<boolean>{return this._complete}
     public get complete(){return this._complete.value}
+
+    private readonly _usage:BehaviorSubject<ConvoTokenUsage>=new BehaviorSubject<ConvoTokenUsage>(createEmptyConvoTokenUsage());
+    public get usageSubject():ReadonlySubject<ConvoTokenUsage>{return this._usage}
+    public get usage(){return this._usage.value}
 
     public constructor({
         name,
@@ -826,7 +830,14 @@ export class ConvoMakeCtrl
             trackTime:true,
             trackTokens:true,
             disableAutoFlatten:true,
+            onTokenUsage:(usage)=>this.addTokenUsage(usage),
         }
+    }
+
+    public addTokenUsage(usage:ConvoTokenUsage){
+        const update={...this.usage}
+        addConvoUsageTokens(update,usage);
+        this._usage.next(update);
     }
 
     private createConversation(relPath:string):Conversation{

@@ -287,7 +287,7 @@ export class Conversation
     private readonly _onTokenUsage?:(usage:ConvoTokenUsage)=>void;
 
     /**
-     * Tracks the token usages of the Conversation
+     * Tracks the token usages of the Conversation. Includes tokens use by children and clones of the conversation.
      */
     public readonly usage:ConvoTokenUsage;
 

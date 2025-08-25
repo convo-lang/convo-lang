@@ -7,6 +7,7 @@ import { ConvoMakeExtPassList } from "./ConvoMakeExtPass";
 import { ConvoMakeExtStageList } from "./ConvoMakeExtStage";
 import { ConvoMakeExtTargetList } from "./ConvoMakeExtTarget";
 import { ConvoMakeExtTargetDecList } from "./ConvoMakeExtTargetDec";
+import { ConvoMakeExtTokenUsage } from "./ConvoMakeExtTokenUsage";
 import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
 
 
@@ -44,6 +45,13 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
     public getChildren():ProviderResult<ConvoMakeExtTreeItem<any>[]>
     {
         return [
+
+            this.ctrl.preview?null:
+            getConvoExtMakeMetadataOrCreateValue(this.obj,'tokenUsage',()=>new ConvoMakeExtTokenUsage({
+                ...this.getBaseParams(),
+                obj:this.obj,
+            })),
+
             getConvoExtMakeMetadataOrCreateValue(this.obj,'appList',()=>new ConvoMakeExtAppList({
                 ...this.getBaseParams(),
                 obj:this.obj,
