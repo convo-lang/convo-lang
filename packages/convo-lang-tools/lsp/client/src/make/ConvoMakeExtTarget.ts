@@ -24,7 +24,6 @@ export class ConvoMakeExtTargetList extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
 
     public getChildren():ProviderResult<any[]>
     {
-        console.log('hio 👋 👋 👋 GET TARGETS',this.obj.targets);
         return this.obj.targets.map((target,index)=>new ConvoMakeExtTarget({
             ...this.getBaseParams(),
             obj:target,

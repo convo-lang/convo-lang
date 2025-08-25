@@ -127,7 +127,7 @@ export class ConvoMakeCtrl
         this.dir=dir;
         this.filePath=filePath;
         this.preview=preview;
-        console.log('hio 👋 👋 👋 make ctrl',this);
+        console.log('ConvoMakeCtrl',this);
     }
 
     private _isDisposed=false;
@@ -169,7 +169,6 @@ export class ConvoMakeCtrl
                 if(this.isDisposed){
                     pass.cancelled=true;
                 }
-                console.log('hio 👋 👋 👋 Pass complete',pass);
                 pushBehaviorSubjectAry(this._passes,pass);
                 this.triggerBuildEvent({
                     type:'pass-end',
@@ -184,7 +183,6 @@ export class ConvoMakeCtrl
         }
 
 
-        console.log('hio 👋 👋 👋 DONE',);
         if(!this.isDisposed){
             this._complete.next(true);
             this.triggerBuildEvent({
@@ -196,6 +194,8 @@ export class ConvoMakeCtrl
         }
         this._activePass.next(null);
         this.dispose();
+
+        console.log('ConvoMakeCtrl done',this.filePath);
     }
 
     private async makePassAsync():Promise<ConvoMakePass>
@@ -209,7 +209,6 @@ export class ConvoMakeCtrl
             cachedCount:0,
             forkedCount:0,
         }
-        console.log('hio 👋 👋 👋 start pass',pass);
         this.activePassRef=pass;
         this._activePass.next({...pass});
         this.triggerBuildEvent({
@@ -286,9 +285,7 @@ export class ConvoMakeCtrl
 
     private async _loadAsPreviewAsync()
     {
-        console.log('hio 👋 👋 👋 load preview',);
         const ctrls=await this.getBuildTargetsAsync();
-        console.log('hio 👋 👋 👋 preview ctrls',ctrls);
         this.clearTargets();
         this._targets.next(ctrls);
         for(const ctrl of ctrls){
@@ -362,7 +359,6 @@ export class ConvoMakeCtrl
 
     public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
     {
-        console.log(`hio 👋 👋 👋 fork input [${index}]`,listInput.path);
         if(!parent.target.outFromList){
             throw new Error('Only targets that outFromList is true should be forked')
         }
@@ -437,7 +433,6 @@ export class ConvoMakeCtrl
             input=normalizePath(joinPaths(dir,input));
             if(input.includes('*')){
                 const star=parseStarPath(input);
-                console.log('hio 👋 👋 👋 STAR',star);
                 const items=await (star?.recursiveBase?
                     this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
                     this.options.vfsCtrl.readDirAsync({path:input})
@@ -445,7 +440,6 @@ export class ConvoMakeCtrl
                 if(this.isDisposed){
                     return []
                 }
-                console.log('hio 👋 👋 👋 ITEMS',items);
                 const inputs:PathAndStarPath[]=[];
                 for(const item of items.items){
                     if(item.type==='file'){
@@ -672,7 +666,6 @@ export class ConvoMakeCtrl
 
     public isTargetDepsPathReady(stage:string|undefined,relPath:string):boolean{
         const deps=this.getTargetDepsRecursive(stage,relPath);
-        console.log('hio 👋 👋 👋 \nDEPS ------------------------\n',relPath,'\n----------------\n',deps.map(d=>d.outPath).join('\n'),'-------------------');
         return !deps.length || deps.every(d=>d.contentReady && d.target.in.every(i=>i.ready))
     }
 

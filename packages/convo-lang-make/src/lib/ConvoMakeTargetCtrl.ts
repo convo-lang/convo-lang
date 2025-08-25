@@ -115,7 +115,6 @@ export class ConvoMakeTargetCtrl
     }
 
     private async writeConvoOutputAsync(outConvo:string){
-        console.log('hio 👋 👋 👋 write convo out',this.convoFile);
         await this.makeCtrl.options.vfsCtrl.writeStringAsync(this.convoFile,outConvo);
     }
 
@@ -187,7 +186,6 @@ export class ConvoMakeTargetCtrl
         const upToDateContent=await this.isUpToDateAsync();
         let continueConvo:string|undefined;
         if(upToDateContent){
-            console.log('hio 👋 👋 👋 NO changes ',this.outPath);
             if(this.makeCtrl.options.continueReview && this.target.review){
                 try{
                     continueConvo=await this.makeCtrl.options.vfsCtrl.readStringAsync(this.convoFile);
@@ -202,7 +200,6 @@ export class ConvoMakeTargetCtrl
                 return;
             }
         }
-        console.log('hio 👋 👋 👋 start build ',this.outPath);
 
         if(this.makeCtrl.options.echoMode){
             const output=this.target.in.map(t=>t.convo??'').join('\n\n');

@@ -36,7 +36,6 @@ export class ConvoExt
         }
         update.push(ctrl);
         update.sort((a,b)=>a.filePath.localeCompare(b.filePath));
-        console.log('hio 👋 👋 👋 updates',update);
         this._makeCtrls.next(update);
         this.bindMakeCtrl(ctrl);
     }
@@ -49,7 +48,6 @@ export class ConvoExt
         }
         const glob=new RelativePattern(folder,'**/*make.convo')
         const makeFiles=await workspace.findFiles(glob);
-        console.log('hio 👋 👋 👋 scan result',makeFiles);
         if(!makeFiles.length){
             return;
         }
@@ -101,7 +99,6 @@ export class ConvoExt
                 cwd,
                 flat.exe.sharedVars
             );
-            console.log('hio 👋 👋 👋 options for path',filePath,options);
             if(!options){
                 return;
             }
