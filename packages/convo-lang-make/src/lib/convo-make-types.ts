@@ -1,5 +1,7 @@
-import { ConvoMakeApp, ConvoMakeExplicitReviewType, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
+import { ConvoMakeActivePass, ConvoMakeApp, ConvoMakeExplicitReviewType, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
 import { Observable } from "rxjs";
+import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
+import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
 
 export interface ConvoMakeTargetPair{
     target:ConvoMakeTarget;
@@ -111,3 +113,29 @@ export interface ConvoMakePassUpdate
     addCachedCount?:number;
     addForked?:number;
 }
+
+type ConvoMakeBuildEvtParams=(
+    {
+        type:'ctrl-dispose';
+        target:ConvoMakeCtrl;
+    }|{
+        type:'target-add'|'target-remove'|'target-dispose';
+        target:ConvoMakeTargetCtrl;
+    }|{
+        type:'target-state-change';
+        state:ConvoMakeTargetState;
+        target:ConvoMakeTargetCtrl;
+    }|{
+        type:'pass-start'|'pass-update';
+        target:ConvoMakeActivePass;
+    }|{
+        type:'pass-end';
+        target:ConvoMakePass;
+    }
+)
+export type ConvoMakeBuildEvtType=ConvoMakeBuildEvtParams['type'];
+export type ConvoMakeBuildEvt={
+    type:ConvoMakeBuildEvtType;
+    eventTarget:ConvoMakeCtrl|ConvoMakeTargetCtrl|ConvoMakeStage|ConvoMakePass|ConvoMakeActivePass;
+    ctrl:ConvoMakeCtrl;
+} & ConvoMakeBuildEvtParams;

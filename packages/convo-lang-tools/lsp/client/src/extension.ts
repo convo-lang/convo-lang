@@ -4,13 +4,15 @@ import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } 
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliConfig, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage } from '@iyio/common';
+import { Lock, createJsonRefReplacer, deleteUndefined, getErrorMessage, getFileName } from '@iyio/common';
 import { pathExistsAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { extensionPublisher } from './build-const';
+import { ConvoExt } from './ConvoExt';
 import { ConvoDocumentLinkProvider } from './link-provider';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree';
 
 let client:LanguageClient;
 
@@ -54,15 +56,18 @@ Use the buildVehicle function to build my vehicle
 
 export function activate(context:ExtensionContext){
 
-    registerCommands(context);
+    const ext=new ConvoExt();
+
+    registerCommands(context,ext);
     startLsp(context);
 
-    context.subscriptions.push(
-  languages.registerDocumentLinkProvider(
-    { pattern: '**/*.convo' },
-    new ConvoDocumentLinkProvider()
-  )
-);
+    window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        {pattern: '**/*.convo'},
+        new ConvoDocumentLinkProvider()
+    ));
 }
 
 export function deactivate():Thenable<void>|undefined {
@@ -101,7 +106,7 @@ const startLsp=(context:ExtensionContext)=>{
 
 }
 
-const registerCommands=(context:ExtensionContext)=>{
+const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
     context.subscriptions.push(commands.registerCommand('convo.parse', async () => {
         const document=window.activeTextEditor?.document;
@@ -273,14 +278,16 @@ const registerCommands=(context:ExtensionContext)=>{
         }
 
         const flat=await ctx.convo.flattenAsync();
-        const options=getConvoMakeOptionsFromVars(ctx.cwd,flat.exe.sharedVars);
+        const options=getConvoMakeOptionsFromVars(
+            document.uri.fsPath?getFileName(document.uri.fsPath):undefined,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
         if(!options){
             return;
         }
         const ctrl=new ConvoMakeCtrl({
             ...options,
-            echoMode:false,
-            continueReview:true,
             browserInf:new ConvoBrowserCtrl(),
         });
         try{
@@ -324,16 +331,22 @@ const registerCommands=(context:ExtensionContext)=>{
             const flat=await ctx.convo.flattenAsync();
             if(token.isCancellationRequested){return}
 
-            const options=getConvoMakeOptionsFromVars(ctx.cwd,flat.exe.sharedVars);
+            const options=getConvoMakeOptionsFromVars(
+                document.uri.fsPath?getFileName(document.uri.fsPath):undefined,
+                ctx.cwd,
+                flat.exe.sharedVars
+            );
             if(!options){
                 return;
             }
             const ctrl=new ConvoMakeCtrl({
                 ...options,
+                name:document.uri.fsPath?getFileName(document.uri.fsPath):'(untitled).convo',
                 //echoMode:true,
                 //continueReview:true,
                 browserInf:new ConvoBrowserCtrl(),
             });
+            ext.addMakeCtrl(ctrl);
             token.onCancellationRequested(()=>{
                 ctrl.dispose();
             })

@@ -63,6 +63,18 @@
                 "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts packages/convo-lang-cli/examples/example.convo"
             }
         },
+        "make": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --make make.convo --exe-cwd ../tmp/beach-rescue"
+            }
+        },
+        "makeTargets": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "npx ts-node -r tsconfig-paths/register --project packages/convo-lang-cli/tsconfig.lib.json packages/convo-lang-cli/src/bin/convo.ts --make-targets make.convo --exe-cwd ../tmp/beach-rescue"
+            }
+        },
         "repl": {
             "executor": "nx:run-commands",
             "options": {

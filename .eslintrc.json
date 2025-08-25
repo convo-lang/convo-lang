@@ -20,7 +20,8 @@
                     }
                 ],
                 "@next/next/no-img-element":0,
-                "react-hooks/exhaustive-deps":1
+                "react-hooks/exhaustive-deps":1,
+                "no-fallthrough":0
             }
         },
         {
@@ -31,7 +32,8 @@
                 "@typescript-eslint/no-explicit-any":0,
                 "@typescript-eslint/ban-ts-comment":0,
                 "no-useless-escape":0,
-                "no-unused-vars": ["warn",{ "args": "off" }]
+                "no-unused-vars": ["warn",{ "args": "off" }],
+                "no-fallthrough":0
             }
         },
         {

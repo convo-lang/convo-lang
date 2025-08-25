@@ -1,6 +1,6 @@
 import { convoFunctions } from "../convo-lib";
 import { ConvoModule } from "../convo-types";
-import { convoDefineMakeAppScopeFunction, convoDefineMakeStageScopeFunction, convoMakeScopeFunction } from "./convo-make-scope-functions";
+import { convoDefineMakeAppScopeFunction, convoDefineMakeStageScopeFunction, convoMakeScopeFunction, convoMakeTargetScopeFunction } from "./convo-make-scope-functions";
 
 export const convoMakeExports=(name:string):ConvoModule|undefined=>{
     switch(name){
@@ -10,7 +10,8 @@ export const convoMakeExports=(name:string):ConvoModule|undefined=>{
                 name:name,
                 uri:name,
                 externScopeFunctions:{
-                    [convoFunctions.makeTarget]:convoMakeScopeFunction,
+                    [convoFunctions.makeDefaults]:convoMakeScopeFunction,
+                    [convoFunctions.makeTarget]:convoMakeTargetScopeFunction,
                     [convoFunctions.makeApp]:convoDefineMakeAppScopeFunction,
                     [convoFunctions.makeStage]:convoDefineMakeStageScopeFunction,
                 },
@@ -18,7 +19,13 @@ export const convoMakeExports=(name:string):ConvoModule|undefined=>{
 
 @assumeHandledMessageLocation
 @messageHandler make
-> makeHandler(target:any) -> (
+> makeHandler(defaults:any) -> (
+    makeDefaults(defaults);
+)
+
+@assumeHandledMessageLocation
+@messageHandler target
+> targetHandler(target:any) -> (
     target.instructions=switch(target._.length target._ undefined)
     target._=undefined
     target.stage=or(target.stage __currentMakeStage)

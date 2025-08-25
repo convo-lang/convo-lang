@@ -96,6 +96,16 @@ export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps
      * The direction that paths are relative to
      */
     dir?:string;
+
+    /**
+     * Array of targets that this targets depends on and will be blocked by
+     */
+    deps?:string|string[];
+
+    /**
+     * Array of targets this target blocks
+     */
+    blocks?:string|string[];
 }
 
 export interface ConvoMakeContentTemplate
@@ -225,6 +235,16 @@ export interface ConvoMakeTarget extends ConvoMakeTargetAppProps
      * The LLM to be used for generation
      */
     model?:string;
+
+    /**
+     * Array of targets that this targets depends on and will be blocked by
+     */
+    deps?:string[];
+
+    /**
+     * Array of targets this target blocks
+     */
+    blocks?:string[];
 }
 
 export interface ConvoMakeTargetAppProps

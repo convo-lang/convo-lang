@@ -132,7 +132,7 @@
             "patterns":[{"include":"#lineExpression"}]
         },
         "topLevelStatements":{
-            "begin": "^\\s*(>)\\s*(do|thinkingResult|result|define|debug|end|make|stage|app|\\w+[ \\t]*(!))( |\\t|$)([ \\t]*[^\\n\\r]*)?",
+            "begin": "^\\s*(>)\\s*(do|thinkingResult|result|define|debug|end|target|make|stage|app|\\w+[ \\t]*(!))( |\\t|$)([ \\t]*[^\\n\\r]*)?",
             "end": "(?=\\s*>)",
             "beginCaptures": {
                 "1":{

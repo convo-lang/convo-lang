@@ -19,7 +19,7 @@ import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
 import { convoStdImportHandler } from "./convo-std-imports";
 import { convoScript } from "./convo-template";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoImportService } from "./convo.deps";
 import { isConvoObject } from "./convoAsync";
@@ -247,8 +247,8 @@ export class Conversation
     private readonly _onAppend=new Subject<ConvoAppend>();
     public get onAppend():Observable<ConvoAppend>{return this._onAppend}
 
-    private readonly _onImportSource=new Subject<string>();
-    public get onImportSource():Observable<string>{return this._onImportSource}
+    private readonly _onImportSource=new Subject<ConvoImportSourceEvt>();
+    public get onImportSource():Observable<ConvoImportSourceEvt>{return this._onImportSource}
 
     private readonly _openTasks:BehaviorSubject<ConvoTask[]>=new BehaviorSubject<ConvoTask[]>([]);
     public get openTasksSubject():ReadonlySubject<ConvoTask[]>{return this._openTasks}
@@ -3135,7 +3135,11 @@ export class Conversation
             throw r.error;
         }
 
-        this._onImportSource.next(convo);
+        this._onImportSource.next({
+            module,
+            source:convo,
+            isSystemImport:module.name.startsWith(convoStdImportPrefix),
+        });
 
         const {system,ignoreContent}=importStatement;
 

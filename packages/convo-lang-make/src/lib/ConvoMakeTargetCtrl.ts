@@ -87,8 +87,14 @@ export class ConvoMakeTargetCtrl
         this.buildPromiseSource.resolve();
         this.disposables.dispose();
         if(this.state!=='complete'){
-            this._state.next('cancelled');
+            this.setState('cancelled');
         }
+        this.makeCtrl.triggerBuildEvent({
+            type:'target-dispose',
+            target:this,
+            eventTarget:this,
+            ctrl:this.makeCtrl,
+        })
     }
 
     public async appendAsync(append:Append|Append[]){
@@ -138,19 +144,30 @@ export class ConvoMakeTargetCtrl
         return listIns.map(t=>t.hash??'').join('\n');
     }
 
+    private setState(state:ConvoMakeTargetState){
+        this._state.next(state);
+        this.makeCtrl.triggerBuildEvent({
+            type:'target-state-change',
+            target:this,
+            eventTarget:this,
+            state,
+            ctrl:this.makeCtrl,
+        })
+    }
+
     private async tryBuildAsync(){
 
         if(this.isBuilding || this.isDisposed){
             return;
         }
 
-        if(this.target.in.some(i=>!i.ready || (i.path && !this.makeCtrl.areTargetDepsReady(this.target.stage,i.path)))){
+        if(!this.makeCtrl.isTargetReady(this.target)){
             this.commit('skipped',{addSkipCount:1});
             return;
         }
 
         this.isBuilding=true;
-        this._state.next('building');
+        this.setState('building');
 
         if(this.target.outFromList){
             const children=this.makeCtrl.targets.filter(t=>t.parent===this);
@@ -313,7 +330,7 @@ export class ConvoMakeTargetCtrl
 
     private commit(state:ConvoMakeTargetState,passUpdate:ConvoMakePassUpdate){
 
-        this._state.next(state);
+        this.setState(state);
         this.buildPromiseSource.resolve();
         this.makeCtrl.updatePass(passUpdate);
     }

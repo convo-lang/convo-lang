@@ -1,5 +1,5 @@
 import { ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { asArray, valueIsZodType } from "@iyio/common";
+import { asArray, getObjKeyCount, valueIsZodType } from "@iyio/common";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
 
 
@@ -29,13 +29,13 @@ export const convoMakeTargetHasProps:(keyof ConvoMakeTarget)[]=[
 convoMakeTargetHasProps.sort();
 
 
-export const getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
+export const getConvoMakeOptionsFromVars=(name:string|undefined,dir:string,vars:Record<string,any>):ConvoMakeCtrlOptions|undefined=>
 {
     const targets=vars[convoVars.__makeTargets];
     if(!Array.isArray(targets) || !targets.length){
         return undefined;
     }
-    const options:ConvoMakeCtrlOptions={targets,dir};
+    const options:ConvoMakeCtrlOptions={name:name??'(untitled).convo',targets,dir};
     const apps=vars[convoVars.__makeApps];
     if(Array.isArray(apps)){
         options.apps=apps;
@@ -43,6 +43,10 @@ export const getConvoMakeOptionsFromVars=(dir:string,vars:Record<string,any>):Co
     const stages=vars[convoVars.__makeStages];
     if(Array.isArray(stages)){
         options.stages=stages;
+    }
+    const defaults=vars[convoVars.__makeDefaults];
+    if(defaults && (typeof defaults === 'object')){
+        options.targetDefaults=defaults;
     }
     return options;
 }
@@ -73,14 +77,24 @@ export const convoMakeOutputTypeName='ConvoMakeOutputType';
 /**
  * Applies stage defaults to targets. The targets will not be mutated. Defaults will be applied to copies of target objects.
  */
-export const applyConvoMakeStageDefaults=(targets:ConvoMakeTargetDeclaration[],stages:ConvoMakeStage[]):ConvoMakeTargetDeclaration[]=>{
-    if(!stages.length){
+export const applyConvoMakeTargetSharedProps=(targets:ConvoMakeTargetDeclaration[],stages:ConvoMakeStage[],targetDefaults?:ConvoMakeTargetSharedProps):ConvoMakeTargetDeclaration[]=>{
+
+    if(targetDefaults && !getObjKeyCount(targetDefaults)){
+        targetDefaults=undefined;
+    }
+
+    if(!stages.length && !targetDefaults){
         return targets;
     }
 
     const updated:ConvoMakeTargetDeclaration[]=[];
 
-    for(const target of targets){
+    for(const t of targets){
+        let target=t;
+        if(targetDefaults){
+            target=_applySharedProps(target,targetDefaults);
+        }
+
         const sn=target.stage??defaultConvoMakeStageName;
         const stage=stages.find(s=>s.name===sn);
         if(!stage){
@@ -88,34 +102,37 @@ export const applyConvoMakeStageDefaults=(targets:ConvoMakeTargetDeclaration[],s
             continue;
         }
 
-        let t=target;
-        let copied=false;
-        for(const prop of stageTargetDefaults){
-            const v=stage[prop];
-            if(v===undefined){
-                continue;
-            }
-            if(t[prop]===undefined){
-                if(!copied){
-                    t={...t}
-                    copied=true;
-                }
-                t[prop]=v as any;
-            }else if(stageTargetArrays.includes(prop)){
-                if(!copied){
-                    t={...t}
-                    copied=true;
-                }
-                t[prop]=[
-                    ...(asArray(t[prop]??[])),
-                    ...(asArray(v))
-                ] as any;
-            }
-        }
-        updated.push(t);
+
+        updated.push(_applySharedProps(target,stage));
     }
 
     return updated;
+}
+const _applySharedProps=(target:ConvoMakeTargetDeclaration,stage:ConvoMakeTargetSharedProps)=>{
+    let copied=false;
+    for(const prop of stageTargetDefaults){
+        const v=stage[prop];
+        if(v===undefined){
+            continue;
+        }
+        if(target[prop]===undefined){
+            if(!copied){
+                target={...target}
+                copied=true;
+            }
+            target[prop]=v as any;
+        }else if(stageTargetArrays.includes(prop)){
+            if(!copied){
+                target={...target}
+                copied=true;
+            }
+            target[prop]=[
+                ...(asArray(target[prop]??[])),
+                ...(asArray(v))
+            ] as any;
+        }
+    }
+    return target;
 }
 const stageTargetDefaults:(keyof ConvoMakeTargetSharedProps)[]=[
     'app',

@@ -1,20 +1,22 @@
-import { contentHasConvoRole, Conversation, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs } from "@iyio/common";
+import { contentHasConvoRole, Conversation, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoVars, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
-import { BehaviorSubject } from "rxjs";
-import { applyConvoMakeStageDefaults, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType } from "./convo-make-lib";
-import { ConvoMakeAppTargetRef, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
+import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { applyConvoMakeTargetSharedProps, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType } from "./convo-make-lib";
+import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
 
 export interface ConvoMakeCtrlOptions
 {
+    name:string;
     vfsCtrl?:VfsCtrl;
     shell?:ConvoMakeShell;
     browserInf?:ConvoBrowserInf;
     targets:ConvoMakeTargetDeclaration[];
     apps?:ConvoMakeApp[];
     stages?:ConvoMakeStage[];
+    targetDefaults?:ConvoMakeTargetSharedProps;
     dir:string;
     /**
      * If true input content is echoed in to outputs instead of being generated
@@ -38,8 +40,14 @@ export interface ConvoMakeCtrlOptions
 
 export class ConvoMakeCtrl
 {
+    public readonly name:string;
 
-    public readonly options:InternalOptions<ConvoMakeCtrlOptions,'shell'|'browserInf'>;
+    public readonly id:string;
+
+    public readonly options:InternalOptions<ConvoMakeCtrlOptions,'shell'|'browserInf'|'targetDefaults'>;
+
+    private readonly _onBuildEvent=new Subject<ConvoMakeBuildEvt>();
+    public get onBuildEvent():Observable<ConvoMakeBuildEvt>{return this._onBuildEvent}
 
     private readonly _targets:BehaviorSubject<ConvoMakeTargetCtrl[]>=new BehaviorSubject<ConvoMakeTargetCtrl[]>([]);
     public get targetsSubject():ReadonlySubject<ConvoMakeTargetCtrl[]>{return this._targets}
@@ -59,6 +67,7 @@ export class ConvoMakeCtrl
     public get passes(){return this._passes.value}
 
     public constructor({
+        name,
         vfsCtrl=vfs(),
         targets,
         dir,
@@ -71,10 +80,12 @@ export class ConvoMakeCtrl
         continueReview=false,
         disableInputTrimming=false,
         stages=[],
+        targetDefaults,
     }:ConvoMakeCtrlOptions){
         this.options={
+            name,
             vfsCtrl,
-            targets:applyConvoMakeStageDefaults(targets,stages),
+            targets:applyConvoMakeTargetSharedProps(targets,stages,targetDefaults),
             dir,
             echoMode,
             dryRun,
@@ -85,7 +96,10 @@ export class ConvoMakeCtrl
             continueReview,
             disableInputTrimming,
             stages,
+            targetDefaults,
         }
+        this.id=uuid();
+        this.name=name;
         console.log('hio 👋 👋 👋 make ctrl',this);
     }
 
@@ -104,6 +118,12 @@ export class ConvoMakeCtrl
             a.dispose();
         }
         this.options.browserInf?.dispose();
+        this.triggerBuildEvent({
+            type:'ctrl-dispose',
+            target:this,
+            eventTarget:this,
+            ctrl:this,
+        })
     }
 
     private buildPromise:Promise<void>|undefined;
@@ -119,16 +139,25 @@ export class ConvoMakeCtrl
             const pass=await this.makePassAsync();
             console.log('hio 👋 👋 👋 Pass complete',pass);
             pushBehaviorSubjectAry(this._passes,pass);
+            this.triggerBuildEvent({
+                type:'pass-end',
+                target:pass,
+                eventTarget:pass,
+                ctrl:this,
+            })
             if(pass.genCount<=0 && pass.skipCount<=0){
                 break;
             }
         }
 
         console.log('hio 👋 👋 👋 DONE',);
+        this._activePass.next(null);
+        this.dispose();
     }
 
     private async makePassAsync():Promise<ConvoMakePass>
     {
+
         const pass:ConvoMakeActivePass={
             index:this.passes.length,
             startTime:Date.now(),
@@ -140,6 +169,12 @@ export class ConvoMakeCtrl
         console.log('hio 👋 👋 👋 start pass',pass);
         this.activePassRef=pass;
         this._activePass.next({...pass});
+        this.triggerBuildEvent({
+            type:'pass-start',
+            target:pass,
+            eventTarget:pass,
+            ctrl:this,
+        })
         //this._stages.next(this.options.stages.map(stage=>new ConvoMakeStageCtrl({makeCtrl:this,stage})));
         const targets=await this.getTargetPairsAsync();
         if(this.isDisposed){
@@ -172,24 +207,43 @@ export class ConvoMakeCtrl
             ctrls.splice(i+1,0,...forked);
         }
 
+        this.clearTargets();
         this._targets.next(ctrls);
-
-        console.log('hio 👋 👋 👋 targets',targets);
+        for(const ctrl of ctrls){
+            this.triggerBuildEvent({
+                type:'target-add',
+                target:ctrl,
+                eventTarget:ctrl,
+                ctrl:this,
+            })
+        }
 
         await Promise.all(this.targets.map(t=>t.checkReadyAsync()));
 
         await Promise.all(this.targets.map(t=>t.buildAsync()));
 
-        const clearCtrls=this.targets;
-        this._targets.next([]);
-        for(const c of clearCtrls){
-            c.dispose();
-        }
-
         return {
             ...pass,
             endTime:Date.now(),
         };
+    }
+
+    private clearTargets(){
+        const clearCtrls=this.targets;
+        this._targets.next([]);
+        for(const c of clearCtrls){
+            c.dispose();
+            this.triggerBuildEvent({
+                type:'target-remove',
+                target:c,
+                eventTarget:c,
+                ctrl:this,
+            })
+        }
+    }
+
+    public triggerBuildEvent(evt:ConvoMakeBuildEvt){
+        this._onBuildEvent.next(evt);
     }
 
     public updatePass({
@@ -218,6 +272,12 @@ export class ConvoMakeCtrl
             this.activePassRef.forkedCount=update.forkedCount;
         }
         this._activePass.next(update);
+        this.triggerBuildEvent({
+                type:'pass-update',
+                target:update,
+                eventTarget:update,
+                ctrl:this,
+            })
     }
 
     public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
@@ -336,6 +396,8 @@ export class ConvoMakeCtrl
             outNameProp:dec.outNameProp,
             outFromList:dec.inList?true:undefined,
             model:dec.model,
+            deps:dec.deps?asArray(dec.deps):undefined,
+            blocks:dec.blocks?asArray(dec.blocks):undefined,
         }
 
         if(multiOut && !sharedProps.outFromList){
@@ -445,17 +507,15 @@ export class ConvoMakeCtrl
         this.fileCache[relPath]=Promise.resolve(content);
     }
 
-    public getDependencies(stage:string|undefined,relPath:string):ConvoMakeTargetCtrl[]
+    /**
+     * Returns targets that the path directly depends on.
+     */
+    public getDirectTargetDeps(relPath:string):ConvoMakeTargetCtrl[]
     {
         const deps:ConvoMakeTargetCtrl[]=[];
         for(const ctrl of this.targets){
-            if( (stage?ctrl.target.stage===stage:true) &&
-                (
-                    ctrl.target.dynamicOutReg?
-                        ctrl.target.dynamicOutReg.test(relPath)
-                    :
-                        ctrl.target.out===relPath
-                )
+            if(ctrl.target.dynamicOutReg?
+                ctrl.target.dynamicOutReg.test(relPath):ctrl.target.out===relPath
             ){
                 deps.push(ctrl);
             }
@@ -482,8 +542,11 @@ export class ConvoMakeCtrl
 
     }
 
+    /**
+     * Returns targets that the path depends on and any targets in stages that the path depends on.
+     */
     public getTargetDeps(stage:string|undefined,relPath:string):ConvoMakeTargetCtrl[]{
-        const deps=this.getDependencies(stage,relPath);
+        const deps=this.getDirectTargetDeps(relPath);
         const s=this.options.stages.find(s=>s.name===stage);
         if(s){
             this.getStageDepsRecursive(s,deps,[],true);
@@ -520,10 +583,56 @@ export class ConvoMakeCtrl
 
     }
 
-    public areTargetDepsReady(stage:string|undefined,relPath:string):boolean{
+    public isTargetReady(target:ConvoMakeTarget){
+        return (
+            !target.in.some(i=>!i.ready || (i.path && !this.isTargetDepsPathReady(target.stage,i.path))) &&
+            this.isExplicitTargetDepsReady(target.name,target.deps)
+        )
+    }
+
+    public isTargetDepsPathReady(stage:string|undefined,relPath:string):boolean{
         const deps=this.getTargetDepsRecursive(stage,relPath);
         console.log('hio 👋 👋 👋 \nDEPS ------------------------\n',relPath,'\n----------------\n',deps.map(d=>d.outPath).join('\n'),'-------------------');
         return !deps.length || deps.every(d=>d.contentReady && d.target.in.every(i=>i.ready))
+    }
+
+    /**
+     * Checks if a targets explicit dependencies are ready
+     */
+    public isExplicitTargetDepsReady(targetName:string|undefined,deps:string[]|undefined):boolean{
+        const chain=this.getNamedTargetDepChain(targetName,deps);
+        for(const c of chain){
+            for(const i of c.target.in){
+                if(i.path && !this.isTargetDepsPathReady(c.target.stage,i.path)){
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public getNamedTargetDepChain(targetName:string|undefined,deps:string[]|undefined):ConvoMakeTargetCtrl[]{
+        const targets:ConvoMakeTargetCtrl[]=[];
+        this._getNamedTargetDepChain(targetName,deps,targets,targetName);
+        return targets;
+    }
+
+
+    private _getNamedTargetDepChain(targetName:string|undefined,deps:string[]|undefined,targets:ConvoMakeTargetCtrl[],exclude:string|undefined){
+        if(!targetName && !deps?.length){
+            return;
+        }
+        for(const t of this.targets){
+            if(targets.includes(t) || (exclude && t.target.name===exclude)){
+                continue;
+            }
+
+            if((t.target.name && deps?.includes(t.target.name)) || (targetName && t.target.blocks?.includes(targetName))){
+                targets.push(t);
+
+                this._getNamedTargetDepChain(t.target.name,t.target.deps,targets,exclude);
+            }
+        }
     }
 
     public async contentToConvoAsync(
@@ -600,7 +709,11 @@ export class ConvoMakeCtrl
         if(isConvoFile && relPath && content && importReg.test(content)){
             const conversation=this.createConversation(relPath);
             const imports:string[]=[];
-            const sub=conversation.onImportSource.subscribe(i=>imports.push(i.trim()));
+            const sub=conversation.onImportSource.subscribe(i=>{
+                if(!i.isSystemImport){
+                    imports.push(i.source.trim());
+                }
+            });
             try{
                 conversation.append(content,{filePath:normalizePath(joinPaths(this.options.dir,relPath))});
                 await conversation.flattenAsync(undefined,{importOnly:true});

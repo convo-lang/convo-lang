@@ -179,6 +179,11 @@ export const convoRoles={
      * Used by the convo make build system to define a make target. `std://make.convo` must
      * be imported to function correctly
      */
+    target:'target',
+
+    /**
+     * Used by the convo make build system to define target defaults and configure build options
+     */
     make:'make',
 
     /**
@@ -199,6 +204,7 @@ export const convoRoles={
  */
 export const convoHandlerAllowedRoles=[
     convoRoles.make,
+    convoRoles.target,
     convoRoles.app,
     convoRoles.stage,
 ] as const;
@@ -391,6 +397,11 @@ export const convoFunctions={
      * Removes the first matching item in an array using shallow comparison.
      */
     aryRemoveMatch:'aryRemoveMatch',
+
+    /**
+     * Used by the convo make build system to define target defaults and build options
+     */
+    makeDefaults:'makeDefaults',
 
     /**
      * Used by the convo make build system to define a output to make
@@ -646,6 +657,11 @@ export const convoVars={
      * Object containing additional parameters to pass to the LLM.
      */
     __modelParams:'__modelParams',
+
+    /**
+     * Array of ConvoMakeApp objects
+     */
+    __makeDefaults:'__makeDefaults',
 
     /**
      * Array of ConvoMakeTargetDeclaration objects

@@ -2155,3 +2155,18 @@ export interface ConvoExecuteFunctionOptions
     handlerHeadName?:string;
     locationOverride?:ConvoMessage;
 }
+
+export interface ConvoImportSourceEvt
+{
+    /**
+     * Source convo code.
+     */
+    source:string;
+
+    module:ConvoModule;
+
+    /**
+     * If true the import is a system or standard import
+     */
+    isSystemImport:boolean;
+}

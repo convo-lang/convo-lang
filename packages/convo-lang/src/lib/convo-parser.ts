@@ -7,7 +7,7 @@ import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, Con
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*(\()/gs;
-const topLevelMessageReg=/(>)[ \t]*(do|thinkingResult|result|define|debug|end|make|stage|app|\w+[ \t]*!)([ \t]+[^\n\r]*)?/g;
+const topLevelMessageReg=/(>)[ \t]*(do|thinkingResult|result|define|debug|end|target|make|stage|app|\w+[ \t]*!)([ \t]+[^\n\r]*)?/g;
 const roleReg=/(>)[ \t]*(\w+)([ \t]+[^\n\r]*)?/g;
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;

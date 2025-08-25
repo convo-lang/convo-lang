@@ -288,6 +288,24 @@
                     "order": 8
                 }
             }
+        },
+        "viewsContainers":{
+            "activitybar":[
+                {
+                    "id":"convo-lang-tools",
+                    "title":"Convo-Lang",
+                    "icon":"$(tools)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id":"convoMakeBuild",
+                    "name":"Make Build",
+                    "icon":"$(tools)"
+                }
+            ]
         }
     }
 }

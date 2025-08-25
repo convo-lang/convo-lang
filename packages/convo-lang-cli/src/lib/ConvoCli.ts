@@ -2,7 +2,7 @@ import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, C
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, getFileName, initRootScope, normalizePath, rootScope } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
@@ -445,7 +445,11 @@ The current date and time is: "{{dateTime()}}"
 
         await this.appendCodeAsync(code);
         const flat=await this.convo.flattenAsync();
-        const options=getConvoMakeOptionsFromVars(this.options.exeCwd,flat.exe.sharedVars);
+        const options=getConvoMakeOptionsFromVars(
+            this.options.source?getFileName(this.options.source):undefined,
+            this.options.exeCwd,
+            flat.exe.sharedVars
+        );
         if(!options){
             return;
         }

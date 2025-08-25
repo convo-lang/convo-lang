@@ -1,10 +1,31 @@
 import { aryUnique, getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
 import { convoVars, createConvoScopeFunction } from "../convo-lib";
 import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib";
-import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration } from "./convo-make-common-types";
+import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps } from "./convo-make-common-types";
 
 
 export const convoMakeScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
+
+    const defaults=scope.paramValues?.[0] as ConvoMakeTargetSharedProps|undefined;
+    if(!defaults){
+        return;
+    }
+
+    let currentDefaults=ctx.getVar(convoVars.__makeDefaults) as ConvoMakeTargetSharedProps|undefined;
+    if(!currentDefaults || (typeof currentDefaults !== 'object')){
+        currentDefaults={};
+        ctx.setVar(true,currentDefaults,convoVars.__makeDefaults);
+    }
+
+    for(const e in defaults){
+        (currentDefaults as any)[e]=(defaults as any)[e];
+    }
+
+    return currentDefaults;
+
+});
+
+export const convoMakeTargetScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{
 
     const target=scope.paramValues?.[0] as ConvoMakeTargetDeclaration|undefined;
     if(!target){
