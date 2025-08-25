@@ -66,6 +66,10 @@ export class ConvoMakeCtrl
     public get passesSubject():ReadonlySubject<ConvoMakePass[]>{return this._passes}
     public get passes(){return this._passes.value}
 
+    private readonly _complete:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get completeSubject():ReadonlySubject<boolean>{return this._complete}
+    public get complete(){return this._complete.value}
+
     public constructor({
         name,
         vfsCtrl=vfs(),
@@ -151,6 +155,15 @@ export class ConvoMakeCtrl
         }
 
         console.log('hio 👋 👋 👋 DONE',);
+        if(!this.isDisposed){
+            this._complete.next(true);
+            this.triggerBuildEvent({
+                type:'ctrl-complete',
+                target:this,
+                eventTarget:this,
+                ctrl:this,
+            })
+        }
         this._activePass.next(null);
         this.dispose();
     }

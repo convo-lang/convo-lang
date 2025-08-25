@@ -47,7 +47,7 @@ export class ConvoMakeExtPass extends ConvoMakeExtTreeItem<ConvoMakeActivePass>
             id:`pass::${options.obj.index}::${options.obj.endTime}`,
             name:`pass ${options.obj.index+1}${options.obj.endTime===undefined?'':` (${Math.round((options.obj.endTime-options.obj.startTime)/1000)}s)`}`,
             type:'pass',
-            icon:new ThemeIcon((options.obj.endTime || options.ctrl.isDisposed)?'debug-stop':'debug-start'),
+            icon:new ThemeIcon((options.obj.endTime || options.ctrl.isDisposed)?'check':'debug-start'),
             expand:options.obj.endTime?false:true,
         });
     }

@@ -19,11 +19,11 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
             name:options.ctrl.name,
             type:'build',
             expand:true,
-            icon:new ThemeIcon(options.ctrl.isDisposed?'debug-stop':'debug-start')
+            icon:getIcon(options.ctrl)
         });
         this.ctrl.onBuildEvent.subscribe(()=>{
-            if(this.ctrl.isDisposed){
-                this.iconPath=new ThemeIcon('debug-stop')
+            if(this.ctrl.isDisposed || this.ctrl.complete){
+                this.iconPath=getIcon(this.ctrl);
             }
         })
     }
@@ -49,4 +49,8 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
             })),
         ]
     }
+}
+
+const getIcon=(ctrl:ConvoMakeCtrl)=>{
+    return new ThemeIcon(ctrl.complete?'check':ctrl.isDisposed?'debug-stop':'debug-start')
 }

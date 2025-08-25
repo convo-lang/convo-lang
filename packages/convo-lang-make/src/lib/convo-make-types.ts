@@ -116,7 +116,7 @@ export interface ConvoMakePassUpdate
 
 type ConvoMakeBuildEvtParams=(
     {
-        type:'ctrl-dispose';
+        type:'ctrl-dispose'|'ctrl-complete';
         target:ConvoMakeCtrl;
     }|{
         type:'target-add'|'target-remove'|'target-dispose';
