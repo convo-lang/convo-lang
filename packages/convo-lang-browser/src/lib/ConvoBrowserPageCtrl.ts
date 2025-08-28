@@ -91,7 +91,7 @@ export class ConvoBrowserPageCtrl implements ConvoBrowserPage
         const r=await this.page.screenshot();
         return {
             screenshot:options.screenshot?new Blob([r as any],{type:'image/png'}):undefined,
-            screenshotBase64Url:options.screenshotBase64Url?`data:image/png;base64,${r.toString('base64')}`:undefined,
+            screenshotBase64Url:options.screenshotBase64Url?`data:image/png;base64,${(r as any).toString('base64')}`:undefined,
         }
     }
 
