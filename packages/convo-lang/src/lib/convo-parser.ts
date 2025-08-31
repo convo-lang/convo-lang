@@ -7,8 +7,10 @@ import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, Con
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
 const fnMessageReg=/(>)[ \t]*(\w+)?[ \t]+(\w+)\s*(\()/gs;
-const topLevelMessageReg=/(>)[ \t]*(do|thinkingResult|result|define|debug|end|target|make|stage|app|\w+[ \t]*!)([ \t]+[^\n\r]*)?/g;
+const topLevelMessageReg=/(>)[ \t]*(do|thinkingResult|result|define|debug|end|target|make|stage|app|\w+[ \t]*!)([^\n\r]*)?/g;
 const roleReg=/(>)[ \t]*(\w+)([ \t]+[^\n\r]*)?/g;
+
+const alphaStartReg=/^\w/
 
 const statementReg=/([\s\n\r]*[,;]*[\s\n\r]*)((#|\/\/|@|\)|\}\}|\}|\]|<<|>|$)|((\w+|"[^"]*"|'[^']*')(\??):)?\s*(([\w.]+)\s*=)?\s*('|"|\?{3,}|={3,}|\*{3,}|-{3,}|[\w.]+\s*(\()|[\w.]+|-?[\d.]+|\{|\[))/gs;
 const spaceIndex=1;
@@ -944,7 +946,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
                 topLevelMessageReg.lastIndex=index;
                 match=topLevelMessageReg.exec(code);
-                if(match && match.index===index){
+                if(match && match.index===index && !alphaStartReg.test(match[3]??'')){
                     msgName=match[2]??'topLevelStatements';
                     if(msgName.endsWith('!')){
                         msgName=msgName.substring(0,msgName.length-1).trim();
