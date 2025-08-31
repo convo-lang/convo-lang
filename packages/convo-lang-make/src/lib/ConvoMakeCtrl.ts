@@ -1,5 +1,5 @@
 import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
+import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { applyConvoMakeTargetSharedProps, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType } from "./convo-make-lib";
@@ -165,6 +165,12 @@ export class ConvoMakeCtrl
             await this.loadAsPreviewAsync();
         }else{
             while(!this.isDisposed){
+
+                await delayAsync(1);
+                if(this.isDisposed){
+                    break;
+                }
+
                 const pass=await this.makePassAsync();
                 if(this.isDisposed){
                     pass.cancelled=true;
@@ -176,8 +182,12 @@ export class ConvoMakeCtrl
                     eventTarget:pass,
                     ctrl:this,
                 })
-                if(pass.genCount<=0 && pass.skipCount<=0){
-                    break;
+                if(pass.genCount<=0){
+                    if(pass.skipCount<=0){
+                        break;
+                    }else{
+                        throw new Error('No targets generated')
+                    }
                 }
             }
         }
@@ -531,7 +541,7 @@ export class ConvoMakeCtrl
                     dec,
                     false,
                     true,
-                    contentHasConvoRole(i)?instruction:`> user\n${instruction}`,
+                    contentHasConvoRole(i)?instruction:`> appendUser\n${instruction}`,
                     true
                 ));
             }
@@ -565,8 +575,14 @@ export class ConvoMakeCtrl
         const path=normalizePath(joinPaths(this.options.dir,relPath));
         return this.fileCache[relPath]??(this.fileCache[relPath]=(async ()=>{
             try{
-                const content=await this.options.vfsCtrl.readStringAsync(path);
-                return this.options.disableInputTrimming?content:content?.trim();
+                const contentType=getContentType(path);
+                if(contentType.startsWith('image/')){
+                    const content=await this.options.vfsCtrl.readBufferAsync(path);
+                    return base64EncodeMarkdownImage('file',contentType,content);
+                }else{
+                    const content=await this.options.vfsCtrl.readStringAsync(path);
+                    return this.options.disableInputTrimming?content:content?.trim();
+                }
             }catch(ex){
                 return undefined;
             }
@@ -1023,7 +1039,7 @@ const applyTemplate=(content:string,isContext:boolean,isCommand:boolean,inputTem
         }
     }
 
-    return `> ${isCommand?'user':'system'}\n${escapeConvo(content)}`;
+    return `> appendUser\n${escapeConvo(content)}`;
 }
 
 const mdSplitReg=/(?=\n[ \t]*##[ \t])/

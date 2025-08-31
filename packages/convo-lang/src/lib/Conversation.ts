@@ -5067,13 +5067,56 @@ export class Conversation
         const updated:FlatConvoMessage[]=[];
         let lastContentMessage:FlatConvoMessage|undefined;
         let lastContentMessageI=0;
+        let lastSystemMessage:FlatConvoMessage|undefined;
+        let lastSystemMessageI=0;
+        let lastUserMessage:FlatConvoMessage|undefined;
+        let lastUserMessageI=0;
+        let lastAssistantMessage:FlatConvoMessage|undefined;
+        let lastAssistantMessageI=0;
 
         for(let i=0;i<messages.length;i++){
             let msg=messages[i];
             if(!msg){continue}
 
             if(isConvoMessageModification(msg.role)){
-                if(this.isAssistantMessage(lastContentMessage)){
+
+                if(msg.role===convoRoles.appendUser){
+                    if(lastUserMessage){
+                        lastUserMessage={...lastUserMessage,content:lastUserMessage.content?`${lastUserMessage.content}\n\n${msg.content}`:msg.content};
+                        messages[lastUserMessageI]=lastUserMessage;
+                        messages.splice(i,1);
+                        updated.push(lastUserMessage);
+                        continue;
+                    }else{
+                        msg={...msg,role:convoRoles.user,isUser:true};
+                        messages[i]=msg;
+                        updated.push(msg);
+                    }
+                }else if(msg.role===convoRoles.appendAssistant){
+                    if(lastAssistantMessage){
+                        lastAssistantMessage={...lastAssistantMessage,content:lastAssistantMessage.content?`${lastAssistantMessage.content}\n\n${msg.content}`:msg.content};
+                        messages[lastAssistantMessageI]=lastAssistantMessage;
+                        messages.splice(i,1);
+                        updated.push(lastAssistantMessage);
+                        continue;
+                    }else{
+                        msg={...msg,role:convoRoles.assistant,isAssistant:true};
+                        messages[i]=msg;
+                        updated.push(msg);
+                    }
+                }else if(msg.role===convoRoles.appendSystem){
+                    if(lastSystemMessage){
+                        lastSystemMessage={...lastSystemMessage,content:lastSystemMessage.content?`${lastSystemMessage.content}\n\n${msg.content}`:msg.content};
+                        messages[lastSystemMessageI]=lastSystemMessage;
+                        messages.splice(i,1);
+                        updated.push(lastSystemMessage);
+                        continue;
+                    }else{
+                        msg={...msg,role:convoRoles.assistant,isSystem:true};
+                        messages[i]=msg;
+                        updated.push(msg);
+                    }
+                }else if(this.isAssistantMessage(lastContentMessage)){
                     msg.role=this.userRoles[0]??convoRoles.user;
                     msg.content=getFullFlatConvoMessageContent(msg);
                 }else{
@@ -5113,6 +5156,19 @@ export class Conversation
                     continue;
                 }
 
+            }
+
+            if(msg.isUser){
+                lastUserMessage=msg;
+                lastUserMessageI=i;
+                lastAssistantMessage=undefined;
+            }else if(msg.isAssistant){
+                lastAssistantMessage=msg;
+                lastAssistantMessageI=i;
+                lastUserMessage=undefined;
+            }else if(msg.isSystem){
+                lastSystemMessage=msg;
+                lastSystemMessageI=i;
             }
 
             if(msg.content!==undefined && !(msg.tags && (convoTags.disableModifiers in msg.tags))){

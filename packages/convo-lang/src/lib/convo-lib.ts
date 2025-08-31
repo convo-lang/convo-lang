@@ -72,6 +72,21 @@ export const convoRoles={
     append:'append',
 
     /**
+     * Appends content to the last system message
+     */
+    appendSystem:'appendSystem',
+
+    /**
+     * Appends content to the last user message
+     */
+    appendUser:'appendUser',
+
+    /**
+     * Appends content to the last assistant message
+     */
+    appendAssistant:'appendAssistant',
+
+    /**
      * Prepends content to the previous content message
      */
     prepend:'prepend',

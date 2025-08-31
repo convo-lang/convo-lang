@@ -1961,7 +1961,17 @@ export interface ConvoHttpToInputRequest
     inputType?:string;
 }
 
-export const allConvoMessageModification=['replace','replaceForModel','append','prepend','prefix','suffix'] as const;
+export const allConvoMessageModification=[
+    'replace',
+    'replaceForModel',
+    'append',
+    'prepend',
+    'prefix',
+    'suffix',
+    'appendSystem',
+    'appendUser',
+    'appendAssistant',
+] as const;
 
 export const allConvoMessageModificationAction=[...allConvoMessageModification,'respond'] as const;
 
