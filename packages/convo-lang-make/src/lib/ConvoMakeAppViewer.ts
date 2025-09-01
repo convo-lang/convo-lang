@@ -1,7 +1,7 @@
 import { ConvoBrowserInf, ConvoBrowserPage } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { createPromiseSource, delayAsync, DisposeContainer, PromiseSource } from "@iyio/common";
-import { ConvoMakeOutputReview, ConvoMakeOutputReviewRequest } from "./convo-make-types";
+import { ConvoMakeAppTargetRef, ConvoMakeOutputReview } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { checkIcon, colorPickerIcon, downIcon, drawIcon, eraserIcon, loadingIcon, noteIcon, sendIcon, textIcon, trashIcon, upIcon, xIcon } from "./icons";
 
@@ -11,11 +11,11 @@ export class ConvoMakeAppViewer
 {
     public readonly appCtrl:ConvoMakeAppCtrl;
 
-    public readonly reviewRequest:ConvoMakeOutputReviewRequest;
+    public readonly reviewRequest:ConvoMakeAppTargetRef;
 
     public readonly instName:string;
 
-    public constructor(appCtrl:ConvoMakeAppCtrl,reviewRequest:ConvoMakeOutputReviewRequest){
+    public constructor(appCtrl:ConvoMakeAppCtrl,reviewRequest:ConvoMakeAppTargetRef){
         this.appCtrl=appCtrl;
         this.reviewRequest=reviewRequest;
         this.instName=`CONVO_MAKE_${Date.now()}_${Math.round(Math.random()*100000)}`

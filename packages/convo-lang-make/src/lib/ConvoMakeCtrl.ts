@@ -1,8 +1,8 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakePreviewPort, defaultConvoMakeStageName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { applyConvoMakeTargetSharedProps, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType } from "./convo-make-lib";
+import { applyConvoMakeTargetSharedProps, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib";
 import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
@@ -17,6 +17,9 @@ export interface ConvoMakeCtrlOptions
     apps?:ConvoMakeApp[];
     stages?:ConvoMakeStage[];
     targetDefaults?:ConvoMakeTargetSharedProps;
+    /**
+     * Full path to the working directory
+     */
     dir:string;
     /**
      * Full path to the convo make file the controller is building
@@ -482,6 +485,10 @@ export class ConvoMakeCtrl
             model:dec.model,
             deps:dec.deps?asArray(dec.deps):undefined,
             blocks:dec.blocks?asArray(dec.blocks):undefined,
+            component:dec.component,
+            appHostFile:dec.appHostFile,
+            appHostMode:dec.appHostMode,
+            appImportPath:dec.appImportPath,
         }
 
         if(multiOut && !sharedProps.outFromList){
@@ -882,7 +889,7 @@ export class ConvoMakeCtrl
             }else if(target.review==='source'){
                 reviewType='source';
             }else if(app.httpRoot){
-                if(targetOut.startsWith(app.httpRoot)){
+                if(targetOut.startsWith(app.httpRoot) || target.component){
                     reviewType='http'
                 }else{
                     reviewType='source';
@@ -899,6 +906,32 @@ export class ConvoMakeCtrl
             target.appPath??
             ((app.httpRoot && targetOut.startsWith(app.httpRoot))?targetOut.substring(app.httpRoot.length-1):undefined)
         );
+
+        let hostMode=target.appHostMode??app.componentHostMode??defaultConvoMakeAppContentHostMode;
+        let hostFile=target.appHostFile;
+        let importPath=target.appImportPath;
+
+        if(reviewType && target.component && app.httpRoot){
+            const pageFileName=getEscapeConvoMakePathName(target.out)+'.tsx'
+            if(!hostFile){
+                hostFile=joinPaths(app.tmpPagesDir??defaultConvoMakeTmpPagesDir,pageFileName);
+            }
+            if(!appPath){
+                const ext=getFileExt(hostFile,true);
+                appPath=ext?hostFile.substring(0,hostFile.length-ext.length):hostFile;
+            }
+            if(!importPath){
+                importPath=targetOut.substring(app.dir.length);
+                if(!importPath.startsWith('/')){
+                    importPath='/'+importPath;
+                }
+                importPath='@'+importPath;
+                const ext=getFileExt(importPath,true);
+                if(ext){
+                    importPath=importPath.substring(0,importPath.length-ext.length);
+                }
+            }
+        }
 
 
         if(!target.keepAppPathExt && appPath){
@@ -922,6 +955,9 @@ export class ConvoMakeCtrl
             app,
             reviewType,
             appPath,
+            hostMode,
+            hostFile,
+            importPath,
         }
     }
 

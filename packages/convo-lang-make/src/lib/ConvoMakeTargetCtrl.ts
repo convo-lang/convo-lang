@@ -254,6 +254,9 @@ export class ConvoMakeTargetCtrl
                         this.writeOutputAsync(r.message?.content??''),
                         this.writeConvoOutputAsync(this.conversation.convo),
                     ]);
+                    if(this.appRef?.hostFile){
+                        await this.writeAppHostFileAsync(this.appRef);
+                    }
                 }else{
                     continueConvo=undefined;
                     output=false;
@@ -343,6 +346,69 @@ export class ConvoMakeTargetCtrl
         this.setState(state);
         this.buildPromiseSource.resolve();
         this.makeCtrl.updatePass(passUpdate);
+    }
+
+    private async writeAppHostFileAsync(appRef:ConvoMakeAppTargetRef){
+        const content=this.getAppHostFileContent(appRef);
+        if(!content || !appRef.app.httpRoot || !appRef.hostFile){
+            return;
+        }
+        const appOut=joinPaths(appRef.app.httpRoot,appRef.hostFile);
+        await this.makeCtrl.options.vfsCtrl.writeStringAsync(appOut,content)
+    }
+
+    private getAppHostFileContent(appRef:ConvoMakeAppTargetRef):string|undefined{
+        switch(appRef.hostMode??'react-page'){
+
+            case 'react-page':
+                return `
+import { useEffect, useState } from "react";
+
+export default function ComponentPreview(){
+
+    const [error,setError]=useState('');
+    const [Component,setComponent]=useState<{Comp:((...props:any[])=>any)|null}>({Comp:null});
+
+    useEffect(()=>{
+        setError('');
+        let m=true;
+        (async ()=>{
+            try{
+                const mod:any=await import('${appRef.importPath}');
+                if(!m){
+                    return;
+                }
+                let found=false;
+                for(const e in mod){
+                    const c=mod[e];
+                    if(typeof c === 'function'){
+                        found=true;
+                        setComponent({Comp:c});
+                        break;
+                    }
+                }
+                if(!found){
+                    setError('No component found in import - ${appRef.importPath}')
+                }
+            }catch(ex){
+                if(m){
+                    setError(\`Unable to load component - \${(ex as any)?.message}\`);
+                }
+            }
+        })();
+    },[]);
+
+    return error?error:Component.Comp?<Component.Comp/>:'...Loading Component';
+
+}
+
+`
+
+
+            default:
+                return undefined;
+
+        }
     }
 
     private async writeOutputAsync(output:string){

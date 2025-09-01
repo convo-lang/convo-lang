@@ -177,3 +177,15 @@ export const getConvoMakeInputSortKey=(input:ConvoMakeInput):string=>{
     }
     return `${input.path??''}///[${(input.listIndex??0).toString().padStart(7,'0')}]`
 }
+
+const pathEscape=/[~\/\\.]/g;
+export const getEscapeConvoMakePathName=(path:string)=>{
+    return path.replace(pathEscape,(v)=>(
+        v==='~'?
+            '~~'
+        :(v==='/' || v==='\\')?
+            '~s'
+        :
+            '~d'
+    ))
+}

@@ -4,6 +4,9 @@ import { ZodTypeAny } from "zod";
 export type ConvoMakeExplicitReviewType='http'|'source';
 export type ConvoMakeReviewType='auto'|ConvoMakeExplicitReviewType;
 
+
+export type ConvoMakeAppContentHostMode='react-page';
+
 export interface ConvoMakeApp
 {
     /**
@@ -34,6 +37,14 @@ export interface ConvoMakeApp
     httpRoot?:string;
 
     /**
+     * Relative path from httpRoot where temporary pages can be written to preview generated components
+     * and assets. For example when previewing generated components a new page will be created
+     * to render the component on a path that is accessible from a browser.
+     * @default "convo-make-tmp"
+     */
+    tmpPagesDir?:string;
+
+    /**
      * The working directory of the app
      */
     dir:string;
@@ -42,6 +53,14 @@ export interface ConvoMakeApp
      * If true review screens will be reloaded on changes instead of relying on hot reload
      */
     reloadOnChange?:boolean;
+
+    /**
+     * Determines how hosted content is displayed
+     * @default "react-page"
+     */
+    componentHostMode?:ConvoMakeAppContentHostMode;
+
+
 }
 
 /**
@@ -274,6 +293,27 @@ export interface ConvoMakeTargetAppProps
      * If true the extension of the output path should be keep when determining the appPath
      */
     keepAppPathExt?:boolean;
+
+    /**
+     * Path relative to app.httpRoot of app that contains the target. For NextJS
+     * apps this a tmp page that will render a component
+     */
+    appHostFile?:string;
+
+    /**
+     * Determines how hosted content is displayed
+     */
+    appHostMode?:ConvoMakeAppContentHostMode;
+
+    /**
+     * Path used to import the component
+     */
+    appImportPath?:string
+
+    /**
+     * If true the target is a component
+     */
+    component?:boolean;
 }
 
 /**

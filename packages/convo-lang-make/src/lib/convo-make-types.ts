@@ -1,4 +1,4 @@
-import { ConvoMakeActivePass, ConvoMakeApp, ConvoMakeExplicitReviewType, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
+import { ConvoMakeActivePass, ConvoMakeApp, ConvoMakeAppContentHostMode, ConvoMakeExplicitReviewType, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
 import { Observable } from "rxjs";
 import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
@@ -7,6 +7,8 @@ export interface ConvoMakeTargetPair{
     target:ConvoMakeTarget;
     declaration:ConvoMakeTargetDeclaration;
 }
+
+
 export interface ConvoMakeAppTargetRef
 {
     /**
@@ -23,19 +25,22 @@ export interface ConvoMakeAppTargetRef
      * For http this is the path relative to the web root.
      */
     appPath?:string;
-}
-
-export interface ConvoMakeOutputReviewRequest
-{
-    /**
-     * The requested review type
-     */
-    reviewType:ConvoMakeExplicitReviewType;
 
     /**
-     * For http this is the path relative to the web root.
+     * Path relative to app.httpRoot of app that contains the target. For NextJS
+     * apps this a tmp page that will render a component
      */
-    appPath?:string;
+    hostFile?:string;
+
+    /**
+     * Determines how hosted content is displayed
+     */
+    hostMode?:ConvoMakeAppContentHostMode;
+
+    /**
+     * Path used to import the component
+     */
+    importPath?:string
 }
 
 export interface ConvoMakeOutputReview
