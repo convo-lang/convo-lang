@@ -17,6 +17,8 @@ export class ConvoExt
         if(value==this._makeCtrls.value){
             return;
         }
+        value=[...value];
+        value.sort((a,b)=>a.filePath.localeCompare(b.filePath));
         this._makeCtrls.next(value);
     }
 

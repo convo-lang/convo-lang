@@ -57,6 +57,7 @@ export abstract class ConvoMakeExtTreeItem<T> extends TreeItem
         this.ctrl=ctrl;
         this.ext=ext;
         this.obj=obj;
+        this.contextValue=type;
     }
 
     public getBaseParams():Omit<ConvoMakeExtTreeItemOptionsBase<T>,'obj'>{

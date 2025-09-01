@@ -44,7 +44,19 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
         });
         this.obj.reviewingSubject.subscribe(()=>{
             this.iconPath=getIcon(this.obj);
+            this.updateContextValue();
         })
+        this.updateContextValue();
+    }
+
+    public updateContextValue(){
+        this.contextValue=(
+            'target-'+
+            (this.obj.reviewing?'reviewing':this.obj.state)+
+            (this.obj.outExists?'-exists':'-notFound')+
+            (this.obj.target.review?'-review':'-newReview')+
+            (this.ctrl.preview?'-preview':'-noPreview')
+        );
     }
 
     public getChildren():ProviderResult<any[]>

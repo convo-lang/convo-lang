@@ -1,4 +1,4 @@
-import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
+import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
 import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
@@ -11,6 +11,7 @@ export interface ConvoMakeTargetCtrlOptions
 {
     makeCtrl:ConvoMakeCtrl;
     target:ConvoMakeTarget;
+    outExists:boolean;
     targetDeclaration:ConvoMakeTargetDeclaration;
     parent?:ConvoMakeTargetCtrl;
 }
@@ -34,6 +35,7 @@ export class ConvoMakeTargetCtrl
     public readonly outPath:string;
     public readonly conversation:Conversation;
     public readonly appRef?:ConvoMakeAppTargetRef;
+    public readonly outExists:boolean;
 
     private readonly _output:BehaviorSubject<string|undefined>=new BehaviorSubject<string|undefined>(undefined);
     public get outputSubject():ReadonlySubject<string|undefined>{return this._output}
@@ -56,12 +58,14 @@ export class ConvoMakeTargetCtrl
         target,
         targetDeclaration,
         parent,
+        outExists,
     }:ConvoMakeTargetCtrlOptions){
         this.makeCtrl=makeCtrl;
         this.target=target;
         this.targetDeclaration=targetDeclaration;
         this.parent=parent;
         this.outPath=normalizePath(joinPaths(this.makeCtrl.options.dir,this.target.out));
+        this.outExists=outExists;
         const metaOutBase=normalizePath(joinPaths(
             this.makeCtrl.options.dir,
             convoMakeStateDir,
@@ -161,6 +165,20 @@ export class ConvoMakeTargetCtrl
         })
     }
 
+    public shouldContinueReview():boolean
+    {
+        if(this.makeCtrl._builtOutputs.includes(this.outPath)){
+            return false;
+        }
+        const c=this.makeCtrl.options.continueReview;
+        return c===true || c===this.outPath || (Array.isArray(c) && c.includes(this.outPath));
+    }
+
+    public shouldSkipReview():boolean
+    {
+        return this.makeCtrl.options.continueReview!==false && !this.shouldContinueReview();
+    }
+
     private async tryBuildAsync(){
 
         if(this.isBuilding || this.isDisposed){
@@ -169,6 +187,11 @@ export class ConvoMakeTargetCtrl
 
         if(!this.makeCtrl.isTargetReady(this.target)){
             this.commit('skipped',{addSkipCount:1});
+            return;
+        }
+
+        if(this.shouldSkipReview()){
+            this.commit('complete',{})
             return;
         }
 
@@ -186,7 +209,7 @@ export class ConvoMakeTargetCtrl
         const upToDateContent=await this.isUpToDateAsync();
         let continueConvo:string|undefined;
         if(upToDateContent){
-            if(this.makeCtrl.options.continueReview && this.target.review){
+            if(this.shouldContinueReview() && this.target.review){
                 try{
                     continueConvo=await this.makeCtrl.options.vfsCtrl.readStringAsync(this.convoFile);
                 }catch{}
@@ -209,7 +232,6 @@ export class ConvoMakeTargetCtrl
         }
 
         const initConvo:Append[]=[];
-
         if(this.target.model){
             initConvo.push({content:`> define\n__model=${JSON.stringify(this.target.model)}`.trim()})
         }
@@ -230,10 +252,14 @@ export class ConvoMakeTargetCtrl
             }
             initConvo.push({content:i.convo,options:{filePath:i.path?normalizePath(joinPaths(this.makeCtrl.options.dir,i.path)):undefined}});
         }
+        initConvo.push({content:`> nop\n${convoMakeTargetConvoInputEnd}\n`})
         if(continueConvo){
-            continueConvo=continueConvo.substring(this.conversation.convo.length);
-            if(continueConvo.trim()){
-                initConvo.push({content:continueConvo});
+            const match=convoMakeTargetConvoInputEndReg.exec(continueConvo);
+            if(match){
+                const content=continueConvo.substring(match.index+match[0].length).trim();
+                if(content){
+                    initConvo.push({content});
+                }
             }
         }
 
@@ -243,23 +269,20 @@ export class ConvoMakeTargetCtrl
 
             while(!this.isDisposed){
 
-                let output:string|false|undefined;
                 if(!continueConvo){
                     const r=await this.conversation.completeAsync();
                     if(this.isDisposed){
                         return;
                     }
-                    output=r.message?.content;
                     await Promise.all([
                         this.writeOutputAsync(r.message?.content??''),
                         this.writeConvoOutputAsync(this.conversation.convo),
                     ]);
-                    if(this.appRef?.hostFile){
-                        await this.writeAppHostFileAsync(this.appRef);
-                    }
                 }else{
                     continueConvo=undefined;
-                    output=false;
+                }
+                if(this.appRef?.hostFile){
+                    await this.writeAppHostFileAsync(this.appRef);
                 }
 
                 let feedback:string|undefined;
@@ -309,9 +332,8 @@ export class ConvoMakeTargetCtrl
                 if(feedback){
                     await this.appendAsync({content:`> user\n${escapeConvo(feedback)}`})
                 }else{
-                    if(output!==false){
-                        this.commit('complete',{addGenCount:1});
-                    }
+                    this.makeCtrl._builtOutputs.push(this.outPath);
+                    this.commit('complete',{addGenCount:1});
                     break;
                 }
             }

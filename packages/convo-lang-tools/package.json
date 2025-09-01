@@ -125,11 +125,6 @@
                     "group": "navigation@7"
                 },
                 {
-                    "command": "convo.make",
-                    "when": "resourceLangId == source.convo",
-                    "group": "navigation@8"
-                },
-                {
                     "command": "convo.list-models",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@9"
@@ -142,6 +137,38 @@
                     "group": "navigation"
                 }
 
+            ],
+            "view/item/context":[
+                {
+                    "command":"convo.make",
+                    "when":"view == convoMakeBuild && viewItem == build",
+                    "group":"inline"
+                },
+                {
+                    "command":"convo.make-stop",
+                    "when":"view == convoMakeBuild && viewItem == build-active",
+                    "group":"inline"
+                },
+                {
+                    "command":"convo.make-open",
+                    "when":"view == convoMakeBuild && viewItem =~ /^build/",
+                    "group":"inline"
+                },
+                {
+                    "command":"convo.make-target-open",
+                    "when":"view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group":"inline"
+                },
+                {
+                    "command":"convo.make-target-delete",
+                    "when":"view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group":"inline"
+                },
+                {
+                    "command":"convo.make-target-single",
+                    "when":"view == convoMakeBuild && viewItem =~ /^target-complete.*-preview/",
+                    "group":"inline"
+                }
             ]
         },
         "commands": [
@@ -197,10 +224,36 @@
                 "shortTitle": "Convo: Complete Fork"
             },
             {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon":"$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon":"$(play)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon":"$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon":"$(folder-opened)"
+            },
+            {
                 "command": "convo.make",
                 "title": "Convo: Make - Runs the Convo Make build system",
                 "shortTitle": "Convo: Make",
-                "icon":"$(combine)"
+                "icon":"$(play)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon":"$(debug-stop)"
             },
             {
                 "command": "convo.make-targets",

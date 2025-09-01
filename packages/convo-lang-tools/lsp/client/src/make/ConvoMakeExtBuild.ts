@@ -15,6 +15,7 @@ import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMa
 export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
 {
 
+
     public constructor(options:ConvoMakeExtTreeItemOptionsBase<ConvoMakeCtrl>){
         let name=normalizePath(options.ctrl.filePath);
         let dir=workspace.workspaceFolders?.[0]?.uri.path
@@ -39,7 +40,8 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
             if(this.ctrl.isDisposed || this.ctrl.complete){
                 this.iconPath=getIcon(this.ctrl);
             }
-        })
+        });
+        this.contextValue=options.ctrl.preview?'build':'build-active';
     }
 
     public getChildren():ProviderResult<ConvoMakeExtTreeItem<any>[]>

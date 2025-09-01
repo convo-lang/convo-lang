@@ -33,9 +33,9 @@ export interface ConvoMakeCtrlOptions
     dryRun?:boolean;
 
     /**
-     * If true cached outputs will be reviewed
+     * If true or a path or paths to target outputs cached outputs will be reviewed
      */
-    continueReview?:boolean;
+    continueReview?:boolean|string|string[];
 
     previewPort?:number;
 
@@ -48,6 +48,8 @@ export interface ConvoMakeCtrlOptions
      * If true the controller will be loaded as a preview when the build is tarted
      */
     preview?:boolean;
+
+
 }
 
 export class ConvoMakeCtrl
@@ -88,6 +90,8 @@ export class ConvoMakeCtrl
     private readonly _usage:BehaviorSubject<ConvoTokenUsage>=new BehaviorSubject<ConvoTokenUsage>(createEmptyConvoTokenUsage());
     public get usageSubject():ReadonlySubject<ConvoTokenUsage>{return this._usage}
     public get usage(){return this._usage.value}
+
+    readonly _builtOutputs:string[]=[];
 
     public constructor({
         name,
@@ -266,11 +270,13 @@ export class ConvoMakeCtrl
             return [];
         }
 
-        const ctrls=targets.map(t=>new ConvoMakeTargetCtrl({
+        const ctrls=await Promise.all(targets.map(async t=>new ConvoMakeTargetCtrl({
             target:t.target,
             targetDeclaration:t.declaration,
             makeCtrl:this,
-        }));
+            outExists:(await this.options.vfsCtrl.getItemAsync(joinPaths(this.options.dir,t.target.out)))?true:false,
+
+        })));
 
         for(let i=0;i<ctrls.length;i++){
             const ctrl=ctrls[i];
@@ -407,6 +413,7 @@ export class ConvoMakeCtrl
             targetDeclaration:parent.targetDeclaration,
             makeCtrl:this,
             parent,
+            outExists:parent.outExists,
         });
         return targetCtrl;
     }

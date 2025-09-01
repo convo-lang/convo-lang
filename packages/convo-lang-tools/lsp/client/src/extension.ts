@@ -3,14 +3,16 @@ import { Conversation, convoResultErrorName, flatConvoMessagesToTextView, getSer
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { Lock, createJsonRefReplacer, getErrorMessage } from '@iyio/common';
-import { pathExistsAsync } from '@iyio/node-common';
+import { CancelToken, Lock, createJsonRefReplacer, getErrorMessage } from '@iyio/common';
+import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { extensionPublisher } from './build-const';
 import { ConvoExt } from './ConvoExt';
 import { ConvoDocumentLinkProvider } from './link-provider';
+import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild';
+import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree';
 
 let client:LanguageClient;
@@ -157,20 +159,29 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         editor.selection=new Selection(pos,pos);
     }));
 
-    const getConvoEditorContextAsync=async (cliOptions:ConvoCliOptions={}):Promise<{cli:ConvoCli,src:string,convo:Conversation,document:TextDocument,cwd:string|undefined}|undefined>=>{
+    const getConvoEditorContextAsync=async (cliOptions:ConvoCliOptions={},docPath?:string):Promise<{cli:ConvoCli,src:string,convo:Conversation,document?:TextDocument,cwd:string|undefined}|undefined>=>{
         const document=window.activeTextEditor?.document;
-        if(!document){
+        if(!document && !docPath){
+            return;
+        }
+
+        if(!docPath && document){
+            docPath=document.uri.scheme==='file'?document.uri.fsPath:undefined;
+        }
+        if(!docPath){
             return;
         }
 
         let src:string|undefined=undefined;
 
-        if(document.languageId==='source.convo'){
+        if(docPath){
+            src=await readFileAsStringAsync(docPath);
+        }else if(document?.languageId==='source.convo'){
             src=document?.getText();
         }else{
             const selection=window.activeTextEditor?.selection
             if(selection){
-                src=document.getText(new Range(selection.start,selection.end));
+                src=document?.getText(new Range(selection.start,selection.end));
             }
         }
 
@@ -178,17 +189,17 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        const cwd=document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined;
+        const cwd=docPath?path.dirname(docPath):undefined;
         const cli=await createConvoCliAsync({
             config:ext.getCliConfig(),
             bufferOutput:true,
             exeCwd:cwd,
-            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+            sourcePath:docPath,
             ...cliOptions
         });
 
         const convo=cli.convo;
-        convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
+        convo.append(src,{disableAutoFlatten:true,filePath:docPath});
 
         return {
             cli,
@@ -307,59 +318,120 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.make', async () => {
-        await window.withProgress({
-            location: ProgressLocation.Notification,
-            title: "Building targets",
-            cancellable: true
-        }, async (progress,token)=>{
-            const document=window.activeTextEditor?.document;
-            if(!document){
-                return;
-            }
-            await initConvoCliAsync({
-                config:ext.getCliConfig(),
-                sourcePath:document.isUntitled?undefined:document.uri.fsPath,
-                bufferOutput:true,
-                exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
-            })
-            if(token.isCancellationRequested){return}
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
 
-            const ctx=await getConvoEditorContextAsync();
-            if(token.isCancellationRequested){return}
+        await makeAsync(ctrl.filePath,targetPath);
 
-            if(!ctx?.cwd){
-                return;
-            }
-
-            const flat=await ctx.convo.flattenAsync();
-            if(token.isCancellationRequested){return}
-
-            const options=getConvoMakeOptionsFromVars(
-                document.uri.fsPath,
-                ctx.cwd,
-                flat.exe.sharedVars
-            );
-            if(!options){
-                return;
-            }
-            const ctrl=new ConvoMakeCtrl({
-                ...options,
-                //echoMode:true,
-                //continueReview:true,
-                browserInf:new ConvoBrowserCtrl(),
-            });
-            ext.addMakeCtrl(ctrl);
-            token.onCancellationRequested(()=>{
-                ctrl.dispose();
-            })
-            try{
-                await ctrl.buildAsync();
-            }finally{
-                ctrl.dispose();
-            }
-        });
     }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-delete', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete "${targetPath}"?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm === 'Delete'){
+                await workspace.fs.delete(Uri.file(targetPath),{useTrash:true});
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-open', async (build?:ConvoMakeExtBuild|string) => {
+        const targetPath=(typeof build === 'string')?build:build?.ctrl.filePath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-stop', async (build?:ConvoMakeExtBuild|string) => {
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        const ctrls=[...ext.makeCtrls];
+        for(const ctrl of ctrls){
+            if(!ctrl.preview){
+                ctrl.dispose();
+            }
+        }
+    }));
+
+    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string) => {
+
+        const token=new CancelToken();
+
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:sourcePath,
+            bufferOutput:true,
+            exeCwd:path.dirname(sourcePath),
+        })
+        if(token.isCanceled){return}
+
+        const ctx=await getConvoEditorContextAsync(undefined,sourcePath);
+        if(token.isCanceled){return}
+
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        if(token.isCanceled){return}
+
+        const options=getConvoMakeOptionsFromVars(
+            sourcePath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            ...options,
+            //echoMode:true,
+            continueReview:singleFile,
+            browserInf:new ConvoBrowserCtrl(),
+        });
+        ext.addMakeCtrl(ctrl);
+        token.onCancel(()=>{
+            ctrl.dispose();
+        })
+        commands.executeCommand('convoMakeBuild.focus');
+        try{
+            await ctrl.buildAsync();
+        }finally{
+            ctrl.dispose();
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync(v)));
 
     context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
         const document=window.activeTextEditor?.document;
