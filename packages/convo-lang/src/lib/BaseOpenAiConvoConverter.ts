@@ -154,10 +154,17 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 outputTokens:output.usage?.completion_tokens,
             })];
         }else{
+            let content=msg.message.content;
+            if(msg.message.images?.length){
+                const urls=msg.message.images.filter(i=>i?.image_url?.url && i?.type==='image_url').map(i=>`![image](${i.image_url.url})`);
+                if(urls.length){
+                    content+='\n\n'+urls.join('\n\n');
+                }
+            }
             return [createTextConvoCompletionMessage({
                 flat,
                 role:msg.message.role,
-                content:msg.message.content,
+                content,
                 model:output.model,
                 models:this.models,
                 inputTokens:output.usage?.prompt_tokens,
