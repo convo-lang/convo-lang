@@ -2606,6 +2606,7 @@ export const createTextConvoCompletionMessage=({
     outputTokens,
     tokenPrice,
     defaults,
+    tags,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     const lastContentMessage=getLastConvoContentMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
@@ -2619,6 +2620,7 @@ export const createTextConvoCompletionMessage=({
         assignTo:lastContentMessage?.responseAssignTo,
         endpoint:flat.responseEndpoint,
         model,
+        tags,
         ...((models && tokenPrice===undefined)?calculateConvoTokenUsage(
             model,
             models,
@@ -2727,6 +2729,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         responseEndpoint:flat.responseEndpoint,
         userId:flat.userId,
         apiKey:flat.apiKey,
+        model:flat.model,
     }
 }
 
