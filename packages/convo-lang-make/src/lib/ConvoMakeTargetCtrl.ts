@@ -1,5 +1,5 @@
 import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
-import { createPromiseSource, DisposeContainer, getDirectoryName, joinPaths, normalizePath, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
+import { createPromiseSource, DisposeContainer, getContentType, getDirectoryName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
 import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts";
@@ -36,6 +36,7 @@ export class ConvoMakeTargetCtrl
     public readonly conversation:Conversation;
     public readonly appRef?:ConvoMakeAppTargetRef;
     public readonly outExists:boolean;
+    public readonly isMedia:boolean;
 
     private readonly _output:BehaviorSubject<string|undefined>=new BehaviorSubject<string|undefined>(undefined);
     public get outputSubject():ReadonlySubject<string|undefined>{return this._output}
@@ -79,6 +80,8 @@ export class ConvoMakeTargetCtrl
         this.conversation=new Conversation(makeCtrl.getDefaultConversationOptions());
         this.conversation.unregisteredVars[convoVars.__cwd]=getDirectoryName(this.outPath);
         this.conversation.unregisteredVars[convoVars.__mainFile]=this.outPath;
+        const contentType=getContentType(this.outPath);
+        this.isMedia=contentType.startsWith('image/') || contentType.startsWith('video/');
         this.appRef=makeCtrl.getAppRef(target);
 
     }
@@ -434,6 +437,11 @@ export default function ComponentPreview(){
     }
 
     private async writeOutputAsync(output:string){
+        let mediaBase64:string|undefined;
+        if(this.isMedia){
+            const md=parseMarkdownImages(output);
+            mediaBase64=md.find(m=>m.image)?.image?.url;
+        }
         if(this.makeCtrl.options.dryRun){
             console.log(`mock write ${this.outPath}`);
             if(!this.target.outFromList){
@@ -444,7 +452,13 @@ export default function ComponentPreview(){
                 this.makeCtrl.insertIntoCache(this.target.out,output);
             }
             await Promise.all([
-                this.target.outFromList?null:this.makeCtrl.options.vfsCtrl.writeStringAsync(this.outPath,output),
+                this.target.outFromList?
+                    null
+                :mediaBase64?
+                    this.makeCtrl.options.vfsCtrl.writeBase64Async(this.outPath,mediaBase64)
+                :
+                    this.makeCtrl.options.vfsCtrl.writeStringAsync(this.outPath,output)
+                ,
                 this.makeCtrl.options.vfsCtrl.writeStringAsync(
                     this.cacheFile,
                     this.getHash(output)
