@@ -27,6 +27,7 @@ export const createOpenRouterConvoServiceFromScope=(scope:Scope):BaseOpenAiConvo
 }
 export const createOpenRouterConvoConverterFromScope=(scope:Scope):BaseOpenAiConvoConverter=>{
     return new BaseOpenAiConvoConverter({
+        includeModalities:true,
         chatModel:scope.to(openRouterChatModelParam).get()??scope.to(openAiChatModelParam).get()??defaultOpenRouterModel,
         visionModel:scope.to(openRouterVisionModelParam).get()??scope.to(openAiVisionModelParam).get(),
         supportedInputTypes:[convoOpenRouterInputType],

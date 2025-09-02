@@ -7,13 +7,13 @@ import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoRoom } from "./ConvoRoom";
 import { HttpConvoCompletionService } from "./HttpConvoCompletionService";
 import { requireParseConvoCached } from "./convo-cached-parsing";
-import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, getConvoCompletionServicesForModelAsync, requireConvertConvoOutput } from "./convo-completion-lib";
+import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, requireConvertConvoOutput } from "./convo-completion-lib";
 import { getConvoMessageComponent } from "./convo-component-lib";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval";
 import { ConvoForm } from "./convo-forms-types";
 import { getGlobalConversationLock } from "./convo-lang-lock";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoAnyModelName, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib";
 import { parseConvoCode } from "./convo-parser";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types";
@@ -1440,8 +1440,25 @@ export class Conversation
 
 
     public async getCompletionServiceAsync(flat:FlatConvoConversation):Promise<ConvoCompletionServiceAndModel|undefined>{
-        const services=await getConvoCompletionServicesForModelAsync(flat.responseModel??convoAnyModelName,this.completionService?asArray(this.completionService):[],this.modelServiceMap);
-        return services[0];
+
+        const convoEndpoint=flat.exe.getVar(convoVars.__convoEndpoint);
+
+        const serviceAndModel=await getConvoCompletionServiceAsync(
+            flat,
+            (convoEndpoint?
+                [this.getHttpService(convoEndpoint)]
+            :this.completionService?
+                asArray(this.completionService)
+            :
+                []
+            ),
+            false,
+            convoEndpoint?
+                (this.endpointModelServiceMap[convoEndpoint]??(this.endpointModelServiceMap[convoEndpoint]={})):
+                this.modelServiceMap
+        )
+
+        return serviceAndModel;
 
     }
     private setFlat(flat:FlatConvoConversation,dup=true){
@@ -4863,6 +4880,7 @@ export class Conversation
             return undefined;
         }
         if(service.model){
+            flat.model=service.model;
             await applyConvoModelConfigurationToInputAsync(service.model,flat,this);
         }
         if(service.service.relayConvertConvoToInputAsync){
