@@ -1,1 +1,1 @@
-from .convoLib import *
+from .conversation import Conversation
