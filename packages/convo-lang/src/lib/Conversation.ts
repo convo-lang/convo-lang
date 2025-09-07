@@ -5101,6 +5101,9 @@ export class Conversation
                 if(msg.role===convoRoles.appendUser){
                     if(lastUserMessage){
                         lastUserMessage={...lastUserMessage,content:lastUserMessage.content?`${lastUserMessage.content}\n\n${msg.content}`:msg.content};
+                        if(msg.tags){
+                            lastUserMessage.tags={...lastUserMessage.tags,...msg.tags}
+                        }
                         messages[lastUserMessageI]=lastUserMessage;
                         messages.splice(i,1);
                         updated.push(lastUserMessage);
@@ -5113,6 +5116,9 @@ export class Conversation
                 }else if(msg.role===convoRoles.appendAssistant){
                     if(lastAssistantMessage){
                         lastAssistantMessage={...lastAssistantMessage,content:lastAssistantMessage.content?`${lastAssistantMessage.content}\n\n${msg.content}`:msg.content};
+                        if(msg.tags){
+                            lastAssistantMessage.tags={...lastAssistantMessage.tags,...msg.tags}
+                        }
                         messages[lastAssistantMessageI]=lastAssistantMessage;
                         messages.splice(i,1);
                         updated.push(lastAssistantMessage);
@@ -5125,6 +5131,9 @@ export class Conversation
                 }else if(msg.role===convoRoles.appendSystem){
                     if(lastSystemMessage){
                         lastSystemMessage={...lastSystemMessage,content:lastSystemMessage.content?`${lastSystemMessage.content}\n\n${msg.content}`:msg.content};
+                        if(msg.tags){
+                            lastSystemMessage.tags={...lastSystemMessage.tags,...msg.tags}
+                        }
                         messages[lastSystemMessageI]=lastSystemMessage;
                         messages.splice(i,1);
                         updated.push(lastSystemMessage);

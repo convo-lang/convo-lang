@@ -1,4 +1,4 @@
-import { ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { ConvoMakeContextTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
 import { asArray, getDirectoryName, getFileName, getObjKeyCount, normalizePath, valueIsZodType } from "@iyio/common";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
 
@@ -188,4 +188,20 @@ export const getEscapeConvoMakePathName=(path:string)=>{
         :
             '~d'
     ))
+}
+
+export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContextTemplate):string=>{
+    if(tmpl.tag){
+        content=`<${tmpl.tag}>\n${content}\n</${tmpl.tag}>`;
+    }
+    if(tmpl.template){
+        content=insertConvoContentIntoSlot(content,tmpl.template);
+    }
+    if(tmpl.prefix){
+        content=tmpl.prefix+'\n\n'+content;
+    }
+    if(tmpl.suffix){
+        content+='\n\n'+tmpl.suffix;
+    }
+    return content;
 }

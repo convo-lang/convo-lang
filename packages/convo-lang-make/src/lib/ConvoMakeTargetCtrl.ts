@@ -1,5 +1,5 @@
 import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
-import { createPromiseSource, DisposeContainer, getContentType, getDirectoryName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
+import { createPromiseSource, delayAsync, DisposeContainer, getContentType, getDirectoryName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
 import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts";
@@ -291,6 +291,7 @@ export class ConvoMakeTargetCtrl
                 let feedback:string|undefined;
 
                 if(this.target.review && this.appRef){
+                    await delayAsync(1000);
                     const appCtrl=this.makeCtrl.getAppCtrl(this.appRef.app.name);
                     if(appCtrl){
                         if(this.appRef.app.reloadOnChange && viewer){

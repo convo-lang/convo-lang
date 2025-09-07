@@ -1,6 +1,6 @@
 import { ConvoBrowserInf, ConvoBrowserPage } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
-import { createPromiseSource, delayAsync, DisposeContainer, PromiseSource } from "@iyio/common";
+import { createPromiseSource, delayAsync, DisposeContainer, getUriProtocol, PromiseSource } from "@iyio/common";
 import { ConvoMakeAppTargetRef, ConvoMakeOutputReview } from "./convo-make-types";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
 import { checkIcon, colorPickerIcon, downIcon, drawIcon, eraserIcon, loadingIcon, noteIcon, sendIcon, textIcon, trashIcon, upIcon, xIcon } from "./icons";
@@ -36,14 +36,24 @@ export class ConvoMakeAppViewer
 
     private pagePromise?:Promise<ConvoBrowserPage>|undefined;
 
+    private async openPageAsync(page:ConvoBrowserPage){
+        if(this.reviewRequest.reviewType==='http'){
+            const url=((this.reviewRequest.appPath && getUriProtocol(this.reviewRequest.appPath))?
+                this.reviewRequest.appPath
+            :
+                `http://${this.appCtrl.app.host??'localhost'}:${this.appCtrl.app.port}/${this.reviewRequest.appPath}`
+            );
+            await page.openUrlAsync(url);
+        }else{
+            await page.openSourceAsync('')// todo
+        }
+    }
+
     private async getPageAsync(browser:ConvoBrowserInf){
         const page=await browser.createPageAsync();
         try{
-            if(this.reviewRequest.reviewType==='http'){
-                await page.openUrlAsync(`http://${this.appCtrl.app.host??'localhost'}:${this.appCtrl.app.port}/${this.reviewRequest.appPath}`);
-            }else{
-                await page.openSourceAsync('')// todo
-            }
+            await this.openPageAsync(page);
+
             if(this.isDisposed){
                 page.dispose();
                 return page;
@@ -65,7 +75,7 @@ export class ConvoMakeAppViewer
     private reviewSource?:PromiseSource<ConvoMakeOutputReview>;
     public async reviewAsync():Promise<ConvoMakeOutputReview>{
         const browser=this.appCtrl.parent.options.browserInf;
-        if(!browser || !this.appCtrl.app.port){
+        if(!browser || (!this.appCtrl.app.port && !(this.reviewRequest.appPath && getUriProtocol(this.reviewRequest.appPath)))){
             return {approved:true};
         }
 
@@ -77,6 +87,8 @@ export class ConvoMakeAppViewer
 
             if(this.firstView){
                 this.firstView=false;
+            }else{
+                await this.openPageAsync(page);
             }
 
             while(true){

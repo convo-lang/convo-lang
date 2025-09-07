@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ConvoError } from "./ConvoError";
 import { ConvoExecutionContext } from "./ConvoExecutionContext";
 import { ConvoForm } from "./convo-forms-types";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, makeAnyConvoType } from "./convo-lib";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib";
 import { convoPipeScopeFunction } from "./convo-pipe";
 import { createConvoSceneDescription } from "./convo-scene-lib";
 import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
@@ -919,13 +919,17 @@ export const defaultConvoVarsBase={
             }else if(value===null){
                 out.push('null');
             }else if((typeof value === 'object') && !isPrimitiveArray(value) && !(value instanceof Date)){
-                try{
-                    out.push(JSON.stringify(value,null,4));
-                }catch{
+                if(value[convoMetadataKey] || isConvoTypeArray(value)){
+                    out.push(JSON.stringify(convoTypeToJsonScheme(value)));
+                }else{
                     try{
-                        out.push(JSON.stringify(value,createJsonRefReplacer(),4));
+                        out.push(JSON.stringify(value,null,4));
                     }catch{
-                        out.push('[[object with excessive recursive references]]')
+                        try{
+                            out.push(JSON.stringify(value,createJsonRefReplacer(),4));
+                        }catch{
+                            out.push('[[object with excessive recursive references]]')
+                        }
                     }
                 }
             }else{

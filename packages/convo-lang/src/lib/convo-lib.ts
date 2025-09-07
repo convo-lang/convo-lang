@@ -3135,3 +3135,11 @@ export const contentHasConvoRole=(content:string):boolean=>{
 }
 
 export const defaultConvoImportServicePriority=0;
+
+export const isConvoTypeArray=(value:any):boolean=>{
+    return (
+        Array.isArray(value) &&
+        value.length &&
+        value.every(v=>v?.[convoMetadataKey])
+    )?true:false;
+}

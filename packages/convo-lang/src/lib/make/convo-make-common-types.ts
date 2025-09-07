@@ -280,6 +280,12 @@ export interface ConvoMakeTargetAppProps
     review?:boolean|ConvoMakeReviewType;
 
     /**
+     * An explicit URL to preview the target using. Review URLs can be inferred using the `app`
+     * and `appPath` when using apps. `reviewUrl` will override app and appPath.
+     */
+    reviewUrl?:string;
+
+    /**
      * Name of the app the target is a part of
      */
     app?:string;
@@ -337,14 +343,27 @@ export interface ConvoMakeStage extends ConvoMakeTargetSharedProps
     blocks?:string[];
 
     /**
-     * Context passed to all targets of the stage
-     */
-    context?:string|string[];
-
-    /**
      * Instructions passed to all targets of the state
      */
     instructions?:string|string[];
+}
+
+export interface ConvoMakeContextTemplate
+{
+    /**
+     * Path to context file
+     */
+    path:string;
+
+    template?:string;
+
+    prefix?:string;
+
+    suffix?:string;
+
+    tag?:string;
+
+    tags?:Record<string,string|boolean>;
 }
 
 /**
@@ -356,7 +375,7 @@ export interface ConvoMakeTargetSharedProps extends ConvoMakeContentTemplate, Co
     /**
      * Path or paths to files that will serve as additional context to all inputs.
      */
-    context?:string|string[];
+    context?:string|string[]|ConvoMakeContextTemplate|ConvoMakeContextTemplate[];
 
     /**
      * Instructions that will be inserted in the context of all inputs.

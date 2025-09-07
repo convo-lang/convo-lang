@@ -166,7 +166,7 @@
                 },
                 {
                     "command":"convo.make-target-single",
-                    "when":"view == convoMakeBuild && viewItem =~ /^target-complete.*-preview/",
+                    "when":"view == convoMakeBuild && viewItem =~ /^target.*-preview/",
                     "group":"inline"
                 }
             ]

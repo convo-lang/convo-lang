@@ -42,7 +42,7 @@ const _convoValueToZodType=(value:any,metadata:ConvoMetadata|undefined,maxDepth=
         if(value.length===0){
             zType=z.any();
         }else{
-            zType=_convoValueToZodType(value[0],undefined,maxDepth);
+            zType=_convoValueToZodType(value[0],value[0]?.[convoMetadataKey],maxDepth);
         }
     }else if(isConvoType(value)){
         if(isConvoBaseType(value.type)){

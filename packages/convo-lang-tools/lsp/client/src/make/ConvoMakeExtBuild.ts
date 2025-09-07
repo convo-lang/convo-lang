@@ -33,7 +33,7 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
             id:options.ctrl.id,
             name,
             type:'build',
-            expand:true,
+            expand:false,
             icon:getIcon(options.ctrl)
         });
         this.ctrl.onBuildEvent.subscribe(()=>{
