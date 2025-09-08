@@ -1,0 +1,5 @@
+# Test dependencies
+pytest==8.4.1
+
+# Include runtime dependencies
+# -r ../functions/requirements.txt 

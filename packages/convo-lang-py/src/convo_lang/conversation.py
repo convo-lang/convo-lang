@@ -31,13 +31,13 @@ class Conversation:
         role = role.strip()
         self.convo_text += f"> {role}\n{content.rstrip()}\n\n"
 
-    def add_user(self, content: str) -> None:
+    def add_user_message(self, content: str) -> None:
         self.add_message("user", content)
 
-    def add_assistant(self, content: str) -> None:
+    def add_assistant_message(self, content: str) -> None:
         self.add_message("assistant", content)
 
-    def add_system(self, content: str) -> None:
+    def add_system_message(self, content: str) -> None:
         self.add_message("system", content)
 
     def complete(
