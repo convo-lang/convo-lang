@@ -7,6 +7,7 @@ import tempfile
 from typing import Dict, List, Optional
 
 from .convo_cli_path import discover_convo_bin
+from .errors import ConvoNotFound, ExecFailed, Timeout
 
 
 @dataclass
@@ -17,7 +18,10 @@ class ConvoCLIRunner:
 
     def __post_init__(self) -> None:
         if not self.convo_bin:
-            self.convo_bin = discover_convo_bin()
+            try:
+                self.convo_bin = discover_convo_bin()
+            except Exception as e:
+                raise ConvoNotFound(f"Convo CLI binary not found: {e}") from e
 
     def _build_cmd(
         self,
@@ -51,22 +55,27 @@ class ConvoCLIRunner:
     ) -> str:
         """
         Run a .convo file via CLI and return (full_transcript, last_assistant_text).
-        Raises RuntimeError on non-zero exit; includes stderr/stdout in message.
+        Raises ConvoNotFound, ExecFailed, or Timeout on errors.
         """
         path = Path(script_path).resolve()
         if not path.exists():
-            raise FileNotFoundError(f".convo script not found: {path}")
+            raise ConvoNotFound(f".convo script not found: {path}")
         cmd = self._build_cmd(path, variables=variables, extra_args=extra_args,
                               use_prefix_output=True)
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=working_dir or None,
-            timeout=timeout,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=working_dir or None,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise Timeout(
+                f"Convo CLI timed out after {timeout} seconds"
+            ) from e
         if proc.returncode != 0:
-            raise RuntimeError(
+            raise ExecFailed(
                 f"Convo exited with code {proc.returncode}\n"
                 f"STDERR:\n{proc.stderr}\n"
                 f"STDOUT:\n{proc.stdout}"
@@ -88,10 +97,9 @@ class ConvoCLIRunner:
         """
         Materialize `convo_text` to a temp file and run it via CLI.
         If keep_temp=True, the temp file is preserved (useful for debugging).
-        Returns (full_transcript, last_assistant_text).
         """
         if not convo_text.strip():
-            raise RuntimeError("Empty .convo text submitted to runner.")
+            raise ExecFailed("Empty .convo text submitted to runner.")
         tmp = tempfile.NamedTemporaryFile(
             prefix="convo_",
             suffix=".convo",

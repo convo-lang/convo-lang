@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable, Dict, List, Optional
 
 from .convo_cli_runner import ConvoCLIRunner
+from .errors import ParseError
 
 
 @dataclass
@@ -60,6 +61,7 @@ class Conversation:
         self._parse_prefixed(transcript)
         return self.messages[-1]["content"]
 
+
     def _parse_prefixed(self, transcript: str) -> None:
         state_lines = [l[2:] for l in transcript.splitlines()
                        if l.startswith("s:")]
@@ -69,11 +71,18 @@ class Conversation:
                        if l.startswith("f:")]
         result_lines  = [l[2:] if l.startswith(": ") else l[1:]
                          for l in transcript.splitlines() if l.startswith(":")]
-
-        self.state = json.loads("".join(state_lines)) if state_lines else {}
-        self.syntax_messages = (json.loads("".join(syntax_lines))
-                                if syntax_lines else [])
-        self.messages = json.loads("".join(flat_lines)) if flat_lines else []
+        try:
+            self.state = (json.loads("".join(state_lines))
+                          if state_lines else {})
+            self.syntax_messages = (json.loads("".join(syntax_lines))
+                                    if syntax_lines else [])
+            self.messages = (json.loads("".join(flat_lines))
+                             if flat_lines else [])
+        except json.JSONDecodeError as e:
+            raise ParseError(
+                f"Failed to parse CLI output JSON: {e}\n"
+                f"Transcript:\n{transcript}"
+            ) from e
         self.convo_text = "\n\n".join(result_lines).strip()
 
     def clear(self) -> None:
