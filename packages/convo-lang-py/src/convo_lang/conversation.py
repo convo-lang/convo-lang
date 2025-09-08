@@ -18,6 +18,7 @@ class Conversation:
     messages: List[Dict[str, Any]] = field(default_factory=list)
     syntax_messages: List[Dict[str, Any]] = field(default_factory=list)
     state: Dict[str, Any] = field(default_factory=dict)
+    convo_cli_runner: Optional[ConvoCLIRunner] = None
 
     def add_convo_text(self, content: str) -> None:
         """Append raw text into the .convo source (accepts content that may start with '*convo*')."""
@@ -50,8 +51,9 @@ class Conversation:
         Run the current in-memory .convo via the injected ConvoCLIRunner.
         Returns (full_transcript, last_assistant_text).
         """
-        convo_cli_runner = ConvoCLIRunner(config=self.config)
-        transcript = convo_cli_runner.run_text(
+        if not self.convo_cli_runner:
+            self.convo_cli_runner = ConvoCLIRunner(config=self.config)
+        transcript = self.convo_cli_runner.run_text(
             self.convo_text,
             variables=variables,
             timeout=timeout,
@@ -60,7 +62,6 @@ class Conversation:
         )
         self._parse_prefixed(transcript)
         return self.messages[-1]["content"]
-
 
     def _parse_prefixed(self, transcript: str) -> None:
         state_lines = [l[2:] for l in transcript.splitlines()
