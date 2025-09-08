@@ -81,7 +81,6 @@ class ConvoCLIRunner:
                 f"STDOUT:\n{proc.stdout}"
             )
         transcript = proc.stdout
-        print(transcript)
         return transcript
 
     def run_text(

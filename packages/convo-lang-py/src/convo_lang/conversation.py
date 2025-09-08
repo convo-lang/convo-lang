@@ -61,7 +61,13 @@ class Conversation:
             extra_args=["--print-state", "--print-messages", "--print-flat"],
         )
         self._parse_prefixed(transcript)
-        return self.messages[-1]["content"]
+        return self._last_assistant_content()
+
+    def _last_assistant_content(self) -> str:
+        last_message = self.messages[-1]
+        if last_message.get("role") == "assistant":
+            return last_message.get("content", "")
+        raise ParseError("No assistant message found in transcript.")
 
     def _parse_prefixed(self, transcript: str) -> None:
         state_lines = [l[2:] for l in transcript.splitlines()
