@@ -1,11 +1,11 @@
 import { Scope, ScopeRegistration, secretManager } from "@iyio/common";
-import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService";
-import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter";
-import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps";
-import { convoOpenRouterInputType, convoOpenRouterOutputType, defaultOpenRouterModel, openRouterAutoSelectModel, openRouterModel, openRouterModelPrefix } from "./open-router-lib";
-import { getOpenRouterModelsAsync } from "./open-router-models";
-import { openRouterApiKeyParam, openRouterBaseUrlParam, openRouterChatModelParam, openRouterSecretsParam, openRouterVisionModelParam } from "./open-router-params";
-import { openAiChatModelParam, openAiVisionModelParam } from "./openai-params";
+import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService.js";
+import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter.js";
+import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps.js";
+import { convoOpenRouterInputType, convoOpenRouterOutputType, defaultOpenRouterModel, openRouterAutoSelectModel, openRouterModel, openRouterModelPrefix } from "./open-router-lib.js";
+import { getOpenRouterModelsAsync } from "./open-router-models.js";
+import { openRouterApiKeyParam, openRouterBaseUrlParam, openRouterChatModelParam, openRouterSecretsParam, openRouterVisionModelParam } from "./open-router-params.js";
+import { openAiChatModelParam, openAiVisionModelParam } from "./openai-params.js";
 
 export const convoOpenRouterModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,createOpenRouterConvoServiceFromScope);

@@ -1,6 +1,6 @@
-import { convoFunctions } from "../convo-lib";
-import { ConvoModule } from "../convo-types";
-import { convoDefineMakeAppScopeFunction, convoDefineMakeStageScopeFunction, convoMakeScopeFunction, convoMakeTargetScopeFunction } from "./convo-make-scope-functions";
+import { convoFunctions } from "../convo-lib.js";
+import { ConvoModule } from "../convo-types.js";
+import { convoDefineMakeAppScopeFunction, convoDefineMakeStageScopeFunction, convoMakeScopeFunction, convoMakeTargetScopeFunction } from "./convo-make-scope-functions.js";
 
 export const convoMakeExports=(name:string):ConvoModule|undefined=>{
     switch(name){

@@ -1,7 +1,7 @@
 import { shortUuid, wAryPush, wArySplice } from "@iyio/common";
 import { Observable, Subject } from "rxjs";
-import { convoTraverserStateStoreSuffix, getConvoTraverserForSaving } from "./convo-graph-lib";
-import { ConvoEdge, ConvoEdgeSide, ConvoGraphDb, ConvoGraphStore, ConvoGraphStoreEvt, ConvoNode, ConvoSourceNode, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types";
+import { convoTraverserStateStoreSuffix, getConvoTraverserForSaving } from "./convo-graph-lib.js";
+import { ConvoEdge, ConvoEdgeSide, ConvoGraphDb, ConvoGraphStore, ConvoGraphStoreEvt, ConvoNode, ConvoSourceNode, ConvoTraverser, IHasConvoGraphDb } from "./convo-graph-types.js";
 
 
 export interface ConvoMemoryGraphStoreOptions

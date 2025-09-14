@@ -1,13 +1,13 @@
 import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
-import { Conversation, ConversationOptions } from "./Conversation";
-import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore";
-import { ConvoComponentRenderer } from "./convo-component-types";
-import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib";
-import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types";
-import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types";
+import { Conversation, ConversationOptions } from "./Conversation.js";
+import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
+import { ConvoComponentRenderer } from "./convo-component-types.js";
+import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
+import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
+import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 

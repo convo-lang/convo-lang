@@ -1,8 +1,8 @@
 import { ConvoMakeCtrl, ConvoMakeTargetCtrl } from "@convo-lang/convo-lang-make";
 import { ProviderResult } from "vscode";
-import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
-import { createConvoExtIcon } from "./convo-make-ext-lib";
+import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
+import { createConvoExtIcon } from "./convo-make-ext-lib.js";
 
 
 

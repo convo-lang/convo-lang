@@ -1,4 +1,4 @@
-import { ConvoModelInfo } from "../convo-types";
+import { ConvoModelInfo } from "../convo-types.js";
 
 const m=(num:number)=>num/1000000;
 let chatModel:ConvoModelInfo;

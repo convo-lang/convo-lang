@@ -1,9 +1,9 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as CompletionsAPI from '../completions';
-import * as Shared from '../shared';
-import * as ChatAPI from './chat';
-import * as ChatCompletionsAPI from './completions';
+import * as CompletionsAPI from '../completions.js';
+import * as Shared from '../shared.js';
+import * as ChatAPI from './chat.js';
+import * as ChatCompletionsAPI from './completions.js';
 
 /**
  * Represents a chat completion response returned by model, based on the provided

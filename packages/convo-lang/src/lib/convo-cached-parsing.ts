@@ -1,7 +1,7 @@
 import { CodeParsingResult, strHashBase64 } from "@iyio/common";
-import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { parseConvoCode } from "./convo-parser";
-import { ConvoMessage } from "./convo-types";
+import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
+import { parseConvoCode } from "./convo-parser.js";
+import { ConvoMessage } from "./convo-types.js";
 
 const parsingCache:Record<string,CodeParsingResult<ConvoMessage[]>>={}
 

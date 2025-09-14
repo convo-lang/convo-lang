@@ -1,3 +1,3 @@
-export * from './lib/ConvoBrowserCtrl';
+export * from './lib/ConvoBrowserCtrl.js';
 
 

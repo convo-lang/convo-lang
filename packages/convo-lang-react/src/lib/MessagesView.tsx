@@ -3,10 +3,10 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
 import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
-import { ConversationStatusIndicator } from "./ConversationStatusIndicator";
-import { MarkdownViewer } from "./MarkdownViewer";
-import { MessageComponentRenderer } from "./MessageComponentRenderer";
-import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
+import { ConversationStatusIndicator } from "./ConversationStatusIndicator.js";
+import { MarkdownViewer } from "./MarkdownViewer.js";
+import { MessageComponentRenderer } from "./MessageComponentRenderer.js";
+import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
 
 export type ConvoMessageIconRenderer=(msg:FlatConvoMessage)=>string|any;
 

@@ -1,5 +1,5 @@
-import { ConversationUiCtrl } from "./ConversationUiCtrl";
-import { ConvoCompletionOptions, ConvoMessagePrefixOptions, FlatConvoMessage } from "./convo-types";
+import { ConversationUiCtrl } from "./ConversationUiCtrl.js";
+import { ConvoCompletionOptions, ConvoMessagePrefixOptions, FlatConvoMessage } from "./convo-types.js";
 
 export const convoPromptImagePropKey=Symbol('convoPromptImagePropKey');
 

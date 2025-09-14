@@ -1,6 +1,6 @@
 import { parseXml } from "@iyio/common";
-import { ConvoComponent } from "./convo-component-types";
-import { ConvoComponentMode, FlatConvoMessage, isConvoComponentMode } from "./convo-types";
+import { ConvoComponent } from "./convo-component-types.js";
+import { ConvoComponentMode, FlatConvoMessage, isConvoComponentMode } from "./convo-types.js";
 
 /**
  * Finds the component type of a message.

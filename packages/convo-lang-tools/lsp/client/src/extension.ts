@@ -8,12 +8,12 @@ import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
-import { extensionPublisher } from './build-const';
-import { ConvoExt } from './ConvoExt';
-import { ConvoDocumentLinkProvider } from './link-provider';
-import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild';
-import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget';
-import { ConvoMakeExtTree } from './make/ConvoMakeExtTree';
+import { extensionPublisher } from './build-const.js';
+import { ConvoExt } from './ConvoExt.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
+import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
 
 let client:LanguageClient;
 

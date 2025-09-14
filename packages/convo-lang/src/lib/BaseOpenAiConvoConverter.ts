@@ -1,8 +1,8 @@
 import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
-import { convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib";
-import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types";
-import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat';
+import { convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib.js";
+import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types.js";
+import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat/index.js';
 
 export interface BaseOpenAiConvoConverterOptions
 {

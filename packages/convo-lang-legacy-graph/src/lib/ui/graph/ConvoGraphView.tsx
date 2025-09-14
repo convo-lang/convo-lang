@@ -2,15 +2,15 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { Point, asArray, escapeHtml, wAryPush, wSetProp } from "@iyio/common";
 import { DragTarget, PanZoomCtrl, PanZoomState, PanZoomView, SlimButton, View, useDeepCompareItem, useElementSize, useWatchDeep } from "@iyio/react-common";
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConvoGraphCtrl } from "../../ConvoGraphCtrl";
-import { getConvoGraphEventString } from "../../convo-graph-lib";
-import { ConvoNode } from "../../convo-graph-types";
-import { convoGraphChatRenderer } from "../graph-chat/graph-chat-renderer";
-import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas";
-import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl";
-import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl";
-import { ConvoGraphReactCtx, convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
-import { ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
+import { ConvoGraphCtrl } from "../../ConvoGraphCtrl.js";
+import { getConvoGraphEventString } from "../../convo-graph-lib.js";
+import { ConvoNode } from "../../convo-graph-types.js";
+import { convoGraphChatRenderer } from "../graph-chat/graph-chat-renderer.js";
+import { ConvoGraphCanvas, convoGraphCanvasStyle } from "./ConvoGraphCanvas.js";
+import { ConvoGraphViewCtrl, ConvoGraphViewCtrlOptions } from "./ConvoGraphViewCtrl.js";
+import { convoElemLineRef, convoLineCtrlStyle } from "./ConvoLineCtrl.js";
+import { ConvoGraphReactCtx, convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib.js";
+import { ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type.js";
 
 export interface ConvoGraphViewProps
 {

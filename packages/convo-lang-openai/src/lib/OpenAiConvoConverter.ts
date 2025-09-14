@@ -2,10 +2,10 @@ import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversati
 import { Scope, asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from 'openai/resources/chat';
-import { openAiConvoInputType, openAiConvoOutputType, openAiMessageRoles } from "./openai-lib";
-import { getOpenAiModelsFromScope } from "./openai-model-helper";
-import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models";
-import { OpenAiModels } from "./openai-types";
+import { openAiConvoInputType, openAiConvoOutputType, openAiMessageRoles } from "./openai-lib.js";
+import { getOpenAiModelsFromScope } from "./openai-model-helper.js";
+import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models.js";
+import { OpenAiModels } from "./openai-types.js";
 
 /**
  * @deprecated

@@ -1,9 +1,9 @@
 import { ConvoBrowserInf, ConvoBrowserPage } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { createPromiseSource, delayAsync, DisposeContainer, getUriProtocol, PromiseSource } from "@iyio/common";
-import { ConvoMakeAppTargetRef, ConvoMakeOutputReview } from "./convo-make-types";
-import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
-import { checkIcon, colorPickerIcon, downIcon, drawIcon, eraserIcon, loadingIcon, noteIcon, sendIcon, textIcon, trashIcon, upIcon, xIcon } from "./icons";
+import { ConvoMakeAppTargetRef, ConvoMakeOutputReview } from "./convo-make-types.js";
+import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl.js";
+import { checkIcon, colorPickerIcon, downIcon, drawIcon, eraserIcon, loadingIcon, noteIcon, sendIcon, textIcon, trashIcon, upIcon, xIcon } from "./icons.js";
 
 const defaultColor='#0a84ff'
 

@@ -4,7 +4,7 @@ import { pathExistsAsync, readDirAsync, readFileAsStringAsync } from "@iyio/node
 import { mkdir, realpath, watch, writeFile } from "fs/promises";
 import { relative } from "path";
 import { ExportGetableNode, JSDocTagInfo, Node, Project, SourceFile, Symbol, SyntaxKind, Type, VariableDeclaration } from "ts-morph";
-import { ConvoCliOptions } from "./convo-cli-types";
+import { ConvoCliOptions } from "./convo-cli-types.js";
 
 const ignoreTypes=['ConvoComponentRendererContext'];
 const arrayTypeMap:Record<string,string>={

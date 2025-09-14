@@ -1,9 +1,9 @@
 import { ConvoMakeApp } from "@convo-lang/convo-lang";
 import { createPromiseSource, delayAsync, DisposeContainer, ReadonlySubject } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { ConvoMakeAppTargetRef, ConvoMakeShellProc } from "./convo-make-types";
-import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer";
-import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
+import { ConvoMakeAppTargetRef, ConvoMakeShellProc } from "./convo-make-types.js";
+import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer.js";
+import { ConvoMakeCtrl } from "./ConvoMakeCtrl.js";
 
 export interface ConvoMakeAppCtrlOptions
 {

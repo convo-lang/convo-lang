@@ -1,5 +1,5 @@
 import { getSortedObjectHash } from "@iyio/common";
-import { ConvoCompletionMessage, ConvoConversationCache, FlatConvoConversation } from "./convo-types";
+import { ConvoCompletionMessage, ConvoConversationCache, FlatConvoConversation } from "./convo-types.js";
 
 /**
  * Base conversation cache that uses the sorted object hash of the messages of a conversation as

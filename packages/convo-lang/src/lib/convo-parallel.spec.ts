@@ -1,7 +1,7 @@
 import { delayAsync } from "@iyio/common";
-import { CallbackConvoCompletionService } from "./CallbackConvoCompletionService";
-import { Conversation } from "./Conversation";
-import { ConvoCompletionMessage } from "./convo-types";
+import { CallbackConvoCompletionService } from "./CallbackConvoCompletionService.js";
+import { Conversation } from "./Conversation.js";
+import { ConvoCompletionMessage } from "./convo-types.js";
 
 describe('convo-parallel',()=>{
 

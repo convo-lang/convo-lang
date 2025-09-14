@@ -1,4 +1,4 @@
-import { ConvoDataStore } from "./convo-lang-ui-types";
+import { ConvoDataStore } from "./convo-lang-ui-types.js";
 
 export interface LocalStorageConvoDataStoreOptions
 {

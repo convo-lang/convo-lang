@@ -1,8 +1,8 @@
 import { convoUsageTokensToString } from "@convo-lang/convo-lang";
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
 import { ProviderResult } from "vscode";
-import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
+import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
 
 
 

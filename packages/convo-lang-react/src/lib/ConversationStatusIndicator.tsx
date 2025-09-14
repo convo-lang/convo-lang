@@ -1,6 +1,6 @@
 import { Conversation, ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { LoadingDots, useSubject } from "@iyio/react-common";
-import { ConvoTaskView } from "./ConvoTaskView";
+import { ConvoTaskView } from "./ConvoTaskView.js";
 
 export interface ConversationStatusIndicatorProps
 {

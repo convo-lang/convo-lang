@@ -1,9 +1,9 @@
 import { currentBaseUser } from "@iyio/common";
-import { ConvoHashCacheBase } from "./ConvoHashCacheBase";
-import { ConvoLocalStorageCache, ConvoLocalStorageCacheOptions } from "./ConvoLocalStorageCache";
-import { ConvoVfsCache, ConvoVfsCacheOptions } from "./ConvoVfsCache";
-import { commonConvoCacheTypes } from "./convo-lib";
-import { ConvoCompletionMessage } from "./convo-types";
+import { ConvoHashCacheBase } from "./ConvoHashCacheBase.js";
+import { ConvoLocalStorageCache, ConvoLocalStorageCacheOptions } from "./ConvoLocalStorageCache.js";
+import { ConvoVfsCache, ConvoVfsCacheOptions } from "./ConvoVfsCache.js";
+import { commonConvoCacheTypes } from "./convo-lib.js";
+import { ConvoCompletionMessage } from "./convo-types.js";
 
 export interface ConvoUserVfsCacheOptions
 {

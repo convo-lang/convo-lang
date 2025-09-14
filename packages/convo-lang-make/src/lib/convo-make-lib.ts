@@ -1,6 +1,6 @@
 import { ConvoMakeContextTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
 import { asArray, getDirectoryName, getFileName, getObjKeyCount, normalizePath, valueIsZodType } from "@iyio/common";
-import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
+import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl.js";
 
 
 

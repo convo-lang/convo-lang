@@ -1,9 +1,9 @@
 import { atDotCss } from "@iyio/at-dot-css";
 import { useWatchPath } from "@iyio/react-common";
 import { useEffect, useState } from "react";
-import { ConvoNode } from "../../convo-graph-types";
-import { ConvoGraphEntityView } from "./ConvoGraphEntityView";
-import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
+import { ConvoNode } from "../../convo-graph-types.js";
+import { ConvoGraphEntityView } from "./ConvoGraphEntityView.js";
+import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl.js";
 const svgSpan=6000;
 
 export interface ConvoGraphCanvasProps

@@ -1,27 +1,37 @@
 {
-    "compileOnSave": false,
     "compilerOptions": {
         "rootDir": ".",
         "sourceMap": true,
-        "declaration": false,
-        "moduleResolution": "node",
+        "declaration": true,
+        "moduleResolution": "nodenext",
+        "jsx": "react-jsx",
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
+        "forceConsistentCasingInFileNames": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "noImplicitReturns": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "preserveSymlinks": true,
+        "strict": true,
         "importHelpers": true,
         "target": "es2020",
-        "module": "esnext",
-        "strict": true,
+        "module": "nodenext",
         "lib": [
             "es2020",
             "dom"
         ],
+        "types": [
+            "node"
+        ],
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
+        "esModuleInterop": true,
         "baseUrl": ".",
+        "outDir": "./dist",
+        "composite": true,
         "paths": {
-            "@convo-lang/convo-lang-browser": [
-                "packages/convo-lang-browser/src/index.ts"
-            ],
             "@convo-lang/convo-crawler": [
                 "packages/convo-crawler/src/index.ts"
             ],
@@ -31,8 +41,14 @@
             "@convo-lang/convo-lang-api-routes": [
                 "packages/convo-lang-api-routes/src/index.ts"
             ],
+            "@convo-lang/convo-lang-aws-cdk": [
+                "packages/convo-lang-aws-cdk/src/index.ts"
+            ],
             "@convo-lang/convo-lang-bedrock": [
                 "packages/convo-lang-bedrock/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-browser": [
+                "packages/convo-lang-browser/src/index.ts"
             ],
             "@convo-lang/convo-lang-cli": [
                 "packages/convo-lang-cli/src/index.ts"
@@ -49,14 +65,44 @@
             "@convo-lang/convo-lang-pdf": [
                 "packages/convo-lang-pdf/src/index.ts"
             ],
-            "@convo-lang/convo-lang-react": [
-                "packages/convo-lang-react/src/index.ts"
-            ],
             "@convo-lang/convo-lang-pinecone": [
                 "packages/convo-lang-pinecone/src/index.ts"
             ],
-            "@convo-lang/convo-lang-aws-cdk": [
-                "packages/convo-lang-aws-cdk/src/index.ts"
+            "@convo-lang/convo-lang-react": [
+                "packages/convo-lang-react/src/index.ts"
+            ],
+            "@iyio/at-dot-css": [
+                "packages/at-dot-css/src/index.ts"
+            ],
+            "@iyio/common": [
+                "packages/iyio-common/src/index.ts"
+            ],
+            "@iyio/json5": [
+                "packages/json5/src/index.ts"
+            ],
+            "@iyio/media-common": [
+                "packages/media-common/src/index.ts"
+            ],
+            "@iyio/node-common": [
+                "packages/node-common/src/index.ts"
+            ],
+            "@iyio/nx-common": [
+                "packages/nx-common/src/index.ts"
+            ],
+            "@iyio/pdf-viewer": [
+                "packages/pdf-viewer/src/index.ts"
+            ],
+            "@iyio/react-common": [
+                "packages/react-common/src/index.ts"
+            ],
+            "@iyio/rtxt": [
+                "packages/rtxt/src/index.ts"
+            ],
+            "@iyio/syn-taxi": [
+                "packages/syn-taxi/src/index.ts"
+            ],
+            "@iyio/vfs": [
+                "packages/vfs/src/index.ts"
             ]
         }
     },

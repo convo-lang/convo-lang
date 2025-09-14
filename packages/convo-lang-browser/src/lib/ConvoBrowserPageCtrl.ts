@@ -1,7 +1,7 @@
 import { ConvoBrowserInjectOptions, ConvoBrowserPage, ConvoBrowserScreenshot, ConvoBrowserScreenshotOptions } from "@convo-lang/convo-lang";
 import { asArray } from "@iyio/common";
 import { Page } from 'puppeteer';
-import { ConvoBrowserCtrl } from "./ConvoBrowserCtrl";
+import { ConvoBrowserCtrl } from "./ConvoBrowserCtrl.js";
 
 export class ConvoBrowserPageCtrl implements ConvoBrowserPage
 {

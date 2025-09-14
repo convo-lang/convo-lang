@@ -1,10 +1,10 @@
 import { uuid, zodTypeToJsonScheme } from "@iyio/common"
 import { parseJson5 } from "@iyio/json5"
-import { Conversation } from "./Conversation"
-import { ConvoError } from "./ConvoError"
-import { appendFlatConvoMessageSuffix, convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib"
-import { ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types"
-import { convoTypeToJsonScheme } from "./convo-zod"
+import { Conversation } from "./Conversation.js"
+import { ConvoError } from "./ConvoError.js"
+import { appendFlatConvoMessageSuffix, convoAnyModelName, convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getConvoCompletionServiceModelsAsync, getLastConvoMessageWithRole, insertSystemMessageIntoFlatConvo, isConvoModelAliasMatch, parseConvoJsonMessage } from "./convo-lib.js"
+import { ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types.js"
+import { convoTypeToJsonScheme } from "./convo-zod.js"
 
 export const convertConvoInput=(
     flat:FlatConvoConversationBase,

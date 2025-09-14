@@ -2,12 +2,12 @@ import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValue
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
-import type { ConversationOptions } from "./Conversation";
-import { ConvoError } from "./ConvoError";
-import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { ConvoDocumentReference } from "./convo-rag-types";
-import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types";
+import type { ConversationOptions } from "./Conversation.js";
+import { ConvoError } from "./ConvoError.js";
+import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
+import { ConvoDocumentReference } from "./convo-rag-types.js";
+import { convoSystemMessages } from "./convo-system-messages.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';

@@ -1,10 +1,10 @@
 import { Scope, ScopeRegistration, secretManager } from "@iyio/common";
-import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService";
-import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter";
-import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps";
-import { convoOpenAiInputType, convoOpenAiOutputType } from "./openai-lib";
-import { defaultOpenAiChatModel, openAiModels } from "./openai-models";
-import { openAiApiKeyParam, openAiBaseUrlParam, openAiChatModelParam, openAiSecretsParam, openAiVisionModelParam } from "./openai-params";
+import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService.js";
+import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter.js";
+import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps.js";
+import { convoOpenAiInputType, convoOpenAiOutputType } from "./openai-lib.js";
+import { defaultOpenAiChatModel, openAiModels } from "./openai-models.js";
+import { openAiApiKeyParam, openAiBaseUrlParam, openAiChatModelParam, openAiSecretsParam, openAiVisionModelParam } from "./openai-params.js";
 
 export const convoOpenAiModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,createOpenAiConvoServiceFromScope);

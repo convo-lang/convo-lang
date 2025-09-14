@@ -1,9 +1,9 @@
 import { AnyFunction, getZodTypeName } from "@iyio/common";
 import { ZodType, z } from "zod";
-import { Conversation, ConversationOptions } from "./Conversation";
-import { getAssumedConvoCompletionValue } from "./convo-lib";
-import { convoScript } from "./convo-template";
-import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, LockedConvoObject, convoScopeFnDefKey } from "./convo-types";
+import { Conversation, ConversationOptions } from "./Conversation.js";
+import { getAssumedConvoCompletionValue } from "./convo-lib.js";
+import { convoScript } from "./convo-template.js";
+import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, LockedConvoObject, convoScopeFnDefKey } from "./convo-types.js";
 
 const jsonEndReg=/@json[ \t]*$/;
 

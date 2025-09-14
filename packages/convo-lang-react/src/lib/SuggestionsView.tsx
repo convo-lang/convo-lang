@@ -2,7 +2,7 @@ import { ConversationSuggestions, getLastConvoSuggestions } from "@convo-lang/co
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps } from "@iyio/common";
 import { SlimButton, useSubject } from "@iyio/react-common";
-import { useConversationUiCtrl } from "./convo-lang-react";
+import { useConversationUiCtrl } from "./convo-lang-react.js";
 
 export interface SuggestionsViewProps
 {

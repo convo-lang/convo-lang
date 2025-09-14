@@ -1,10 +1,10 @@
 import { asType } from '@iyio/common';
 import { ZodObject } from 'zod';
-import { ConvoError } from './ConvoError';
-import { ConvoExecutionContext, executeConvoFunction } from './ConvoExecutionContext';
-import { escapeConvoMessageContent } from './convo-lib';
-import { parseConvoCode } from './convo-parser';
-import { ConvoErrorType, ConvoParsingResult } from './convo-types';
+import { ConvoError } from './ConvoError.js';
+import { ConvoExecutionContext, executeConvoFunction } from './ConvoExecutionContext.js';
+import { escapeConvoMessageContent } from './convo-lib.js';
+import { parseConvoCode } from './convo-parser.js';
+import { ConvoErrorType, ConvoParsingResult } from './convo-types.js';
 
 const varShouldBe=(convo:ConvoParsingResult,varName:string,value:string)=>{
     const statement=convo.result?.[1]?.fn?.body?.find(s=>s.set===varName);

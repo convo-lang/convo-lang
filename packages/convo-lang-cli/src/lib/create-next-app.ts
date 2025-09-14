@@ -1,7 +1,7 @@
 import { CancelToken } from "@iyio/common";
 import { pathExistsAsync, readStdInLineAsync, spawnAsync } from "@iyio/node-common";
 import { mkdir } from "fs/promises";
-import { ConvoCliOptions } from "./convo-cli-types";
+import { ConvoCliOptions } from "./convo-cli-types.js";
 
 export const createNextAppAsync=async (options:ConvoCliOptions,cancel:CancelToken)=>{
 

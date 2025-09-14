@@ -1,14 +1,14 @@
 import { getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
-import { Conversation, ConversationOptions } from './Conversation';
-import { ConvoError } from './ConvoError';
-import { parseConvoType } from './convo-cached-parsing';
-import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
-import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
-import { convoValueToZodType } from './convo-zod';
+import { Conversation, ConversationOptions } from './Conversation.js';
+import { ConvoError } from './ConvoError.js';
+import { parseConvoType } from './convo-cached-parsing.js';
+import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars.js";
+import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
+import { doesConvoContentHaveMessage } from './convo-parser.js';
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
+import { convoValueToZodType } from './convo-zod.js';
 
 
 const argsCacheKey=Symbol('argsCacheKey');

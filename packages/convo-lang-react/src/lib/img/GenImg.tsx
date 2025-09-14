@@ -3,7 +3,7 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps, currentBaseUser, getErrorMessage, httpClient } from "@iyio/common";
 import { LoadingDots, Text, View } from "@iyio/react-common";
 import { useEffect, useState } from "react";
-import { getGenImgUrl } from "./gen-img-lib";
+import { getGenImgUrl } from "./gen-img-lib.js";
 
 export interface GenImgProps
 {

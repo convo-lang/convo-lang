@@ -1,10 +1,10 @@
 import type { AnyFunction, CodeParsingOptions, CodeParsingResult, JsonScheme, MarkdownLine, Progress } from '@iyio/common';
 import type { ZodObject, ZodType } from 'zod';
-import type { Conversation, ConversationOptions } from "./Conversation";
-import type { ConvoExecutionContext } from './ConvoExecutionContext';
-import type { ConvoComponentDef } from './convo-component-types';
-import type { convoReservedRoles } from './convo-lib';
-import type { convoSystemMessages } from './convo-system-messages';
+import type { Conversation, ConversationOptions } from "./Conversation.js";
+import type { ConvoExecutionContext } from './ConvoExecutionContext.js';
+import type { ConvoComponentDef } from './convo-component-types.js';
+import type { convoReservedRoles } from './convo-lib.js';
+import type { convoSystemMessages } from './convo-system-messages.js';
 
 export type ConvoMessageType='text'|'function';
 

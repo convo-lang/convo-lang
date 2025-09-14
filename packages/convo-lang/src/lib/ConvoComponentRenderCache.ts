@@ -1,6 +1,6 @@
-import { parseConvoComponent } from "./convo-component-lib";
-import { ConvoComponent } from "./convo-component-types";
-import { FlatConvoMessage } from "./convo-types";
+import { parseConvoComponent } from "./convo-component-lib.js";
+import { ConvoComponent } from "./convo-component-types.js";
+import { FlatConvoMessage } from "./convo-types.js";
 
 
 export class ConvoComponentRenderCache

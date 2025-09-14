@@ -1,6 +1,6 @@
 import { ProviderResult } from "vscode";
-import { ConvoMakeExtLabel } from "./ConvoMakeExtLabel";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptions, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
+import { ConvoMakeExtLabel } from "./ConvoMakeExtLabel.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptions, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
 
 
 

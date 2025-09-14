@@ -1,15 +1,15 @@
 import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
-import { ConvoError } from "./ConvoError";
-import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { ConvoForm } from "./convo-forms-types";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib";
-import { convoPipeScopeFunction } from "./convo-pipe";
-import { createConvoSceneDescription } from "./convo-scene-lib";
-import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types";
-import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod";
-import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc";
+import { ConvoError } from "./ConvoError.js";
+import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
+import { ConvoForm } from "./convo-forms-types.js";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
+import { convoPipeScopeFunction } from "./convo-pipe.js";
+import { createConvoSceneDescription } from "./convo-scene-lib.js";
+import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
+import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod.js";
+import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc.js";
 
 const ifFalse=Symbol();
 const ifTrue=Symbol();

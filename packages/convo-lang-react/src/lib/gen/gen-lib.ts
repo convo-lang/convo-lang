@@ -1,7 +1,7 @@
 import { ConversationOptions, ConvoCompletion, ConvoDocQueryResult } from "@convo-lang/convo-lang";
 import { addSpacesToCamelCase } from "@iyio/common";
 import { createContext, useContext } from "react";
-import { GenNode } from "./GenNode";
+import { GenNode } from "./GenNode.js";
 
 export const GenNodeReactContext=createContext<GenNode|null>(null);
 

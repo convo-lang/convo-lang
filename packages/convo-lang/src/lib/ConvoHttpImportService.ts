@@ -1,5 +1,5 @@
 import { httpClient, isHttp } from "@iyio/common";
-import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types";
+import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types.js";
 
 export class ConvoHttpImportService implements ConvoImportService
 {

@@ -1,9 +1,9 @@
 import { DisposeContainer } from "@iyio/common";
 import { EventEmitter, ProviderResult, TreeDataProvider, TreeItem } from "vscode";
-import { ConvoExt } from "../ConvoExt";
-import { ConvoMakeExtBuild } from "./ConvoMakeExtBuild";
-import { ConvoMakeExtTreeItem } from "./ConvoMakeExtTreeItem";
-import { getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib";
+import { ConvoExt } from "../ConvoExt.js";
+import { ConvoMakeExtBuild } from "./ConvoMakeExtBuild.js";
+import { ConvoMakeExtTreeItem } from "./ConvoMakeExtTreeItem.js";
+import { getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib.js";
 
 
 export interface ConvoMakeExtTreeOptions

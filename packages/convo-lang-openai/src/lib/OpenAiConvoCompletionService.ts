@@ -2,11 +2,11 @@ import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase }
 import { Scope, SecretManager, secretManager } from "@iyio/common";
 import OpenAIApi from 'openai';
 import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat';
-import { openAiApiKeyParam, openAiBaseUrlParam, openAiSecretsParam } from "./convo-lang-openai-params";
-import { openAiConvoInputType, openAiConvoOutputType } from "./openai-lib";
-import { getOpenAiModelsFromScope } from "./openai-model-helper";
-import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models";
-import { OpenAiModels, OpenAiSecrets } from "./openai-types";
+import { openAiApiKeyParam, openAiBaseUrlParam, openAiSecretsParam } from "./convo-lang-openai-params.js";
+import { openAiConvoInputType, openAiConvoOutputType } from "./openai-lib.js";
+import { getOpenAiModelsFromScope } from "./openai-model-helper.js";
+import { defaultOpenAiChantModel, defaultOpenAiImageModel, defaultOpenAiSpeechToTextModel, defaultOpenAiVisionModel, openAiModels } from "./openai-models.js";
+import { OpenAiModels, OpenAiSecrets } from "./openai-types.js";
 
 
 /**

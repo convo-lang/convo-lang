@@ -2,10 +2,10 @@ import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOpt
 import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib";
-import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
-import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
-import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
+import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib.js";
+import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types.js";
+import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl.js";
+import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl.js";
 
 export interface ConvoMakeCtrlOptions
 {

@@ -1,6 +1,6 @@
 import { httpClient } from "@iyio/common";
-import { allConvoModelCapability, ConvoModelCapability, ConvoModelInfo } from "../convo-types";
-import { openRouterAutoSelectModel, openRouterModel, openRouterModelPrefix } from "./open-router-lib";
+import { allConvoModelCapability, ConvoModelCapability, ConvoModelInfo } from "../convo-types.js";
+import { openRouterAutoSelectModel, openRouterModel, openRouterModelPrefix } from "./open-router-lib.js";
 
 export interface Architecture {
     input_modalities:string[];

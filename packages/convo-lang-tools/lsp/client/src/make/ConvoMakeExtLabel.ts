@@ -1,5 +1,5 @@
 import { ProviderResult } from "vscode";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptions } from "./ConvoMakeExtTreeItem";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptions } from "./ConvoMakeExtTreeItem.js";
 
 
 

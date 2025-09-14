@@ -1,6 +1,6 @@
 import { escapeConvoMessageContent, escapeConvoTagValue } from "@convo-lang/convo-lang";
 import { createJsonRefReplacer, setIndentation } from "@iyio/common";
-import { ConvoEdge, ConvoGraphDb, ConvoInputTemplate, ConvoNode, ConvoNodeStep } from "./convo-graph-types";
+import { ConvoEdge, ConvoGraphDb, ConvoInputTemplate, ConvoNode, ConvoNodeStep } from "./convo-graph-types.js";
 
 export const convoGraphToConvo=(db:Partial<ConvoGraphDb>):string=>{
 

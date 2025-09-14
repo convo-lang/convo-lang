@@ -1,10 +1,10 @@
 import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
-import { createConvoCliAsync } from "../lib/ConvoCli";
-import { ConvoCliOptions } from "../lib/convo-cli-types";
-import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter";
-import { createNextAppAsync } from "../lib/create-next-app";
+import { createConvoCliAsync } from "../lib/ConvoCli.js";
+import { ConvoCliOptions } from "../lib/convo-cli-types.js";
+import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
+import { createNextAppAsync } from "../lib/create-next-app.js";
 
 
 

@@ -1,4 +1,4 @@
-import { ConvoStatement, ConvoTag } from "./convo-types";
+import { ConvoStatement, ConvoTag } from "./convo-types.js";
 
 export type ConvoMdStatementType=(
     'h1'|

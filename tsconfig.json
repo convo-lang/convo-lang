@@ -1,0 +1,47 @@
+{
+    "files": [],
+    "references": [
+        {
+            "path": "./packages/convo-lang"
+        },
+        {
+            "path": "./packages/convo-lang-alias"
+        },
+        {
+            "path": "./packages/convo-lang-api-routes"
+        },
+        {
+            "path": "./packages/convo-lang-aws-cdk"
+        },
+        {
+            "path": "./packages/convo-lang-bedrock"
+        },
+        {
+            "path": "./packages/convo-lang-browser"
+        },
+        {
+            "path": "./packages/convo-lang-cli"
+        },
+        {
+            "path": "./packages/convo-lang-legacy-graph"
+        },
+        {
+            "path": "./packages/convo-lang-make"
+        },
+        {
+            "path": "./packages/convo-lang-model-testing"
+        },
+        {
+            "path": "./packages/convo-lang-openai"
+        },
+        {
+            "path": "./packages/convo-lang-pdf"
+        },
+        {
+            "path": "./packages/convo-lang-pinecone"
+        },
+        {
+            "path": "./packages/convo-lang-react"
+        }
+    ]
+}

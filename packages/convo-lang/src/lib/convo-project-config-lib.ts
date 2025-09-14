@@ -1,6 +1,6 @@
 import { joinPaths, normalizePath } from "@iyio/common";
 import { vfs, VfsCtrl } from "@iyio/vfs";
-import { ConvoProjectConfig } from "./convo-types";
+import { ConvoProjectConfig } from "./convo-types.js";
 
 export interface LoadConfigProjectConfigOptions
 {

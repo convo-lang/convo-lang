@@ -1,4 +1,4 @@
-import { ConvoMarkdownEnableState, ConvoPromptMedia, ConvoPromptMediaPurpose, convoPromptImagePropKey } from "./convo-lang-ui-types";
+import { ConvoMarkdownEnableState, ConvoPromptMedia, ConvoPromptMediaPurpose, convoPromptImagePropKey } from "./convo-lang-ui-types.js";
 
 export const getConvoPromptMediaUrl=(img:string|ConvoPromptMedia|null|undefined,purpose:ConvoPromptMediaPurpose):string|undefined=>{
     if(typeof img === 'string'){

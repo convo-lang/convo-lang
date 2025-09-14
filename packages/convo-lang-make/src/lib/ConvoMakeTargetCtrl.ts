@@ -1,11 +1,11 @@
 import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, convoVars, defaultConvoMakeStageName, escapeConvo } from "@convo-lang/convo-lang";
 import { createPromiseSource, delayAsync, DisposeContainer, getContentType, getDirectoryName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib";
-import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts";
-import { ConvoMakeAppTargetRef, ConvoMakeOutputReview, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types";
-import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer";
-import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
+import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash } from "./convo-make-lib.js";
+import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts.js";
+import { ConvoMakeAppTargetRef, ConvoMakeOutputReview, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types.js";
+import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer.js";
+import { ConvoMakeCtrl } from "./ConvoMakeCtrl.js";
 
 export interface ConvoMakeTargetCtrlOptions
 {
