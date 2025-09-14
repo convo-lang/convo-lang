@@ -9,6 +9,13 @@
         {"dir":"../iyio-common/packages/vfs"},
         {"dir":"../iyio-common/packages/rtxt"},
         {"dir":"../iyio-common/packages/json5"},
-        {"dir":"../iyio-common/packages/pdf-viewer"}
+        {"dir":"../iyio-common/packages/pdf-viewer"},
+        {"dir":"../iyio-common/packages/aws-credential-providers"},
+        {"dir":"../iyio-common/packages/aws-secrets"},
+        {"dir":"../iyio-common/packages/aws-dynamo"},
+        {"dir":"../iyio-common/packages/vfs-node"},
+        {"dir":"../iyio-common/packages/aws"},
+        {"dir":"../iyio-common/packages/cdk-common"},
+        {"dir":"../iyio-common/packages/aws-rds"}
     ]
 }
