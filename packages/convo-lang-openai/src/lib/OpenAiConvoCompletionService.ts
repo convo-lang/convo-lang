@@ -1,7 +1,7 @@
 import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase } from "@convo-lang/convo-lang";
 import { Scope, SecretManager, secretManager } from "@iyio/common";
 import OpenAIApi from 'openai';
-import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat';
+import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/index.js';
 import { openAiApiKeyParam, openAiBaseUrlParam, openAiSecretsParam } from "./convo-lang-openai-params.js";
 import { openAiConvoInputType, openAiConvoOutputType } from "./openai-lib.js";
 import { getOpenAiModelsFromScope } from "./openai-model-helper.js";

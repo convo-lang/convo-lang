@@ -1,6 +1,6 @@
 import { NotFoundError, SecretManager, httpClient, joinPaths } from "@iyio/common";
 import { ConvoCompletionCtx, ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
-import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from './open-ai/resources/chat.js';
+import { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from './open-ai/resources/chat/index.js';
 
 export interface BaseOpenAiConvoCompletionServiceOptions
 {

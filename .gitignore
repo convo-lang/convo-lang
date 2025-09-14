@@ -2,6 +2,7 @@
 /dist
 /tmp
 /out-tsc
+/.pkij
 
 # dependencies
 node_modules
