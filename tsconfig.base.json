@@ -70,39 +70,6 @@
             ],
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
-            ],
-            "@iyio/at-dot-css": [
-                "packages/at-dot-css/src/index.ts"
-            ],
-            "@iyio/common": [
-                "packages/iyio-common/src/index.ts"
-            ],
-            "@iyio/json5": [
-                "packages/json5/src/index.ts"
-            ],
-            "@iyio/media-common": [
-                "packages/media-common/src/index.ts"
-            ],
-            "@iyio/node-common": [
-                "packages/node-common/src/index.ts"
-            ],
-            "@iyio/nx-common": [
-                "packages/nx-common/src/index.ts"
-            ],
-            "@iyio/pdf-viewer": [
-                "packages/pdf-viewer/src/index.ts"
-            ],
-            "@iyio/react-common": [
-                "packages/react-common/src/index.ts"
-            ],
-            "@iyio/rtxt": [
-                "packages/rtxt/src/index.ts"
-            ],
-            "@iyio/syn-taxi": [
-                "packages/syn-taxi/src/index.ts"
-            ],
-            "@iyio/vfs": [
-                "packages/vfs/src/index.ts"
             ]
         }
     },
