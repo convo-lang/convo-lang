@@ -1,7 +1,7 @@
 import { ConvoDocReader } from "@convo-lang/convo-lang";
 import { PdfReader, pdfReaderPool } from "@iyio/pdf-viewer";
 import { VfsItem, getVfsItemUrl } from "@iyio/vfs";
-import { TextItem } from "pdfjs-dist/types/src/display/api";
+import { TextItem } from "pdfjs-dist/types/src/display/api.js";
 
 export class ConvoPdfDocReader implements ConvoDocReader
 {

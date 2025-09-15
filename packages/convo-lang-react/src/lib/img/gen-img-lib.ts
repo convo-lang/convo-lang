@@ -1,5 +1,5 @@
 import { joinPaths } from "@iyio/common";
-import { genMetadataToString } from "../gen/gen-lib";
+import { genMetadataToString } from "../gen/gen-lib.js";
 
 export interface GenImgUrlOptions
 {
