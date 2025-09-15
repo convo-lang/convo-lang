@@ -58,6 +58,7 @@ cdk.out
 
 /.nx
 
+.npmrc
 
 /tmp-*
 /data
