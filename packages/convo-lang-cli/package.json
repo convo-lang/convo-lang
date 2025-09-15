@@ -1,11 +1,8 @@
 {
     "name": "@convo-lang/convo-lang-cli",
     "version": "0.7.50",
-    "type": "commonjs",
+    "type": "module",
     "sideEffects": false,
-    "bin": {
-        "convo": "bin/convo.js"
-    },
     "keywords": [
         "prompt",
         "prompt-engineering",
