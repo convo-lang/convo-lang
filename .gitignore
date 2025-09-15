@@ -85,3 +85,10 @@ venv
 /packages/tmpl-gen
 /packages/pdf-viewer
 /packages/json5
+/packages/aws-credential-providers
+/packages/aws-secrets
+/packages/aws-dynamo
+/packages/vfs-node
+/packages/aws
+/packages/cdk-common
+/packages/aws-rds
