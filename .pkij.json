@@ -1,5 +1,11 @@
 {
-    "packages":[
+    "type":"repo",
+    "namespace":"@convo-lang",
+    "additionalNamespaces":[
+        "convo-lang-tools",
+        "convo-lang"
+    ],
+    "inject":[
         {"dir":"../iyio-common/packages/at-dot-css"},
         {"dir":"../iyio-common/packages/iyio-common"},
         {"dir":"../iyio-common/packages/media-common"},
