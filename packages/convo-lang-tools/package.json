@@ -2,7 +2,7 @@
     "name": "convo-lang-tools",
     "displayName": "convo-lang",
     "description": "A conversational language 🤓",
-    "version": "0.7.50",
+    "version": "0.8.0",
     "type": "commonjs",
     "sideEffects": false,
     "publisher": "IYIO",
@@ -87,8 +87,8 @@
                 }
             }
         ],
-        "menus":{
-            "editor/title":[
+        "menus": {
+            "editor/title": [
                 {
                     "command": "convo.complete",
                     "when": "resourceLangId == source.convo",
@@ -130,44 +130,43 @@
                     "group": "navigation@9"
                 }
             ],
-            "view/title":[
+            "view/title": [
                 {
                     "command": "convo.refresh-make-targets",
                     "when": "view == convoMakeBuild",
                     "group": "navigation"
                 }
-
             ],
-            "view/item/context":[
+            "view/item/context": [
                 {
-                    "command":"convo.make",
-                    "when":"view == convoMakeBuild && viewItem == build",
-                    "group":"inline"
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
                 },
                 {
-                    "command":"convo.make-stop",
-                    "when":"view == convoMakeBuild && viewItem == build-active",
-                    "group":"inline"
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
                 },
                 {
-                    "command":"convo.make-open",
-                    "when":"view == convoMakeBuild && viewItem =~ /^build/",
-                    "group":"inline"
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
                 },
                 {
-                    "command":"convo.make-target-open",
-                    "when":"view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
-                    "group":"inline"
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
                 },
                 {
-                    "command":"convo.make-target-delete",
-                    "when":"view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
-                    "group":"inline"
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
                 },
                 {
-                    "command":"convo.make-target-single",
-                    "when":"view == convoMakeBuild && viewItem =~ /^target.*-preview/",
-                    "group":"inline"
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
                 }
             ]
         },
@@ -192,19 +191,19 @@
                 "command": "convo.text",
                 "title": "Convo: Flatten - View of conversation with all expressions evaluated",
                 "shortTitle": "Convo: Flatten",
-                "icon":"$(chrome-restore)"
+                "icon": "$(chrome-restore)"
             },
             {
                 "command": "convo.flat",
                 "title": "Convo: Message Objects - View of conversation as JSON message object. Useful for UI bindings.",
                 "shortTitle": "Convo: Message Objects",
-                "icon":"$(code-review)"
+                "icon": "$(code-review)"
             },
             {
                 "command": "convo.vars",
                 "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
                 "shortTitle": "Convo: Vars",
-                "icon":"$(symbol-misc)"
+                "icon": "$(symbol-misc)"
             },
             {
                 "command": "convo.convert",
@@ -226,51 +225,51 @@
             {
                 "command": "convo.make-target-open",
                 "title": "Convo: Open Make Target",
-                "icon":"$(folder-opened)"
+                "icon": "$(folder-opened)"
             },
             {
                 "command": "convo.make-target-single",
                 "title": "Convo: Make Single File",
-                "icon":"$(play)"
+                "icon": "$(play)"
             },
             {
                 "command": "convo.make-target-delete",
                 "title": "Convo: Delete Make Target",
-                "icon":"$(trash)"
+                "icon": "$(trash)"
             },
             {
                 "command": "convo.make-open",
                 "title": "Convo: Make Open",
-                "icon":"$(folder-opened)"
+                "icon": "$(folder-opened)"
             },
             {
                 "command": "convo.make",
                 "title": "Convo: Make - Runs the Convo Make build system",
                 "shortTitle": "Convo: Make",
-                "icon":"$(play)"
+                "icon": "$(play)"
             },
             {
                 "command": "convo.make-stop",
                 "title": "Convo: Make Stop - Stop active make",
                 "shortTitle": "Convo: Make Stop",
-                "icon":"$(debug-stop)"
+                "icon": "$(debug-stop)"
             },
             {
                 "command": "convo.make-targets",
                 "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
                 "shortTitle": "Convo: Make Targets",
-                "icon":"$(combine)"
+                "icon": "$(combine)"
             },
             {
                 "command": "convo.list-models",
                 "title": "Convo: List Models - Lists registered LLM models",
                 "shortTitle": "Convo: List Models",
-                "icon":"$(list-unordered)"
+                "icon": "$(list-unordered)"
             },
             {
                 "command": "convo.open-settings",
                 "title": "Convo: Open Settings",
-                "icon":"$(tools)"
+                "icon": "$(tools)"
             },
             {
                 "command": "convo.new",
@@ -279,7 +278,7 @@
             {
                 "command": "convo.modules",
                 "title": "Convo: Modules",
-                "icon":"$(extensions)"
+                "icon": "$(extensions)"
             }
         ],
         "keybindings": [
@@ -355,21 +354,21 @@
                 }
             }
         },
-        "viewsContainers":{
-            "activitybar":[
+        "viewsContainers": {
+            "activitybar": [
                 {
-                    "id":"convo-lang-tools",
-                    "title":"Convo-Lang",
-                    "icon":"$(github-action)"
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
                 }
             ]
         },
         "views": {
             "convo-lang-tools": [
                 {
-                    "id":"convoMakeBuild",
-                    "name":"Make Build",
-                    "icon":"$(github-action)"
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
                 }
             ]
         }
