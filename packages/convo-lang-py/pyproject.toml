@@ -1,23 +1,33 @@
 [project]
 name = "convo_lang"
-version = "0.5.11"
-authors = [
-  { name="Scott Vance", email="scott@iyio.io" },
-]
-repository = "https://github.com/iyioio/common"
+version = "0.6.0"
 description = "A conversational prompting and programming language"
-keywords = ["prompt", "prompt-engineering", "open-ai", "ai", "convo-lang"]
 readme = "README.md"
 requires-python = ">=3.8"
+authors = [{ name = "Scott Vance", email = "scott@iyio.io" }]
+maintainers = [{ name = "Sergey Inozemtsev", email = "inozemtsevserge@gmail.com" }]
+license = { file = "LICENSE" }
+keywords = ["prompt", "prompt-engineering", "open-ai", "ai", "convo-lang"]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
 
-[tool.hatch.build]
-ignore-vcs = true
+[project.urls]
+Repository = "https://github.com/convo-lang/convo-lang/blob/main/packages/convo-lang-py"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/convo_lang"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/convo_lang",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
+]
