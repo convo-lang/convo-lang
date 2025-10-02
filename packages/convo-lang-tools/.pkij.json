@@ -3,6 +3,6 @@
         "test-make":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../convo-lang-make-example",
         "test-mindark":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../mindark-exit",
         "publish-ext":"./publish.sh",
-        "publish-ext-ovsx":"./publish-ovsx.sh"
+        "publish-ext-open":"./publish-ovsx.sh"
     }
 }
