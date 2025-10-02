@@ -7,7 +7,7 @@ import { ConvoForm } from "./convo-forms-types.js";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
 import { convoPipeScopeFunction } from "./convo-pipe.js";
 import { createConvoSceneDescription } from "./convo-scene-lib.js";
-import { ConvoIterator, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
+import { ConvoIterator, ConvoMultiReadOptions, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod.js";
 import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc.js";
 
@@ -1480,6 +1480,31 @@ export const extendedConvoVars={
         }catch{
             return undefined;
         }
+    }),
+
+    [convoFunctions.fsMultiRead]:createConvoScopeFunction(async (scope,ctx)=>{
+        const options:ConvoMultiReadOptions=scope.paramValues?.[0];
+        if(!options || (typeof options !== 'object') || (!Array.isArray(options.names))){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsMultiRead expects first argument an object of type ConvoMultiReadOptions');
+        }
+
+        const all=await Promise.all(options.names.map(async name=>{
+            const path=ctx.getFullPath(options.pattern?options.pattern.replace('*',name):name);
+            let value=await vfs().readStringAsync(path);
+            if(options.tagItemsWithName){
+                value=`<${name}>\n${value}\n</${name}>`;
+            }
+            if(options.itemTag){
+                value=`<${options.itemTag}>\n${value}\n</${options.itemTag}>`;
+            }
+            return value;
+        }));
+
+        let value=all.join('\n\n');
+        if(options.tag){
+            value=`<${options.tag}>\n${value}\n</${options.tag}>`;
+        }
+        return value;
     }),
 
     [convoFunctions.fsReadBase64]:createConvoScopeFunction(async (scope,ctx)=>{

@@ -344,6 +344,12 @@ export const convoFunctions={
     fsRead:'fsRead',
 
     /**
+     * Reads multiple files as a single string using a list of names and an optional pattern that
+     * the each name is inserted into.
+     */
+    fsMultiRead:'fsMultiRead',
+
+    /**
      * Writes a string value to the virtual file system and returns the written value.
      */
     fsWrite:'fsWrite',
@@ -3130,7 +3136,7 @@ export const insertConvoContentIntoSlot=(content:string,template:string,slotName
         if(slotName){
             return slot===slotName?escapeConvo(content):_;
         }else{
-            return escapeConvo(content);
+            return slot?_:escapeConvo(content);
         }
     })
 }

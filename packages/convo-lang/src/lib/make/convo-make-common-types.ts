@@ -63,6 +63,23 @@ export interface ConvoMakeApp
 
 }
 
+export interface ConvoMakeTargetAttachment extends ConvoMakeContentTemplate
+{
+    /**
+     * A path relative to the input that will be used to load an additional file. Any stars in the
+     * value of attach will be replaced with the filename of the input without its extension.
+     */
+    path:string;
+
+    /**
+     * If the attachment is a JSON array the string value of each item will be used a file pointed
+     * to by the path. Any stars in the path will be replaced by the value of the item in the array.
+     */
+    listLoadPath?:string;
+
+    item?:ConvoMakeContentTemplate;
+}
+
 /**
  * A declaration of a make target. The declaration is not yet expanded into a concrete make target
  */
@@ -81,6 +98,11 @@ export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps
      * to map multiple inputs to matching outputs.
      */
     in?:string|string[];
+
+    /**
+     * Addition files to attach with the input of the target
+     */
+    attach?:string|ConvoMakeTargetAttachment|(string|ConvoMakeTargetAttachment)[];
 
     /**
      * Path to a file containing a json array. The items in the array will be used as input
@@ -127,7 +149,7 @@ export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps
     blocks?:string|string[];
 }
 
-export interface ConvoMakeContentTemplate
+export interface ConvoMakeTargetContentTemplate
 {
     /**
      * A template that context contents will be inserted into. The string "$$CONTENT$$" will be
@@ -152,7 +174,7 @@ export interface ConvoMakeContentTemplate
     inputTag?:string;
 }
 
-export interface ConvoMakeInput extends ConvoMakeContentTemplate
+export interface ConvoMakeInput extends ConvoMakeTargetContentTemplate
 {
     /**
      * Relative file path of the input. Inputs not source from a file such as inline instructions
@@ -347,13 +369,9 @@ export interface ConvoMakeStage extends ConvoMakeTargetSharedProps
      */
     instructions?:string|string[];
 }
-
-export interface ConvoMakeContextTemplate
+export interface ConvoMakeContentTemplate
 {
-    /**
-     * Path to context file
-     */
-    path:string;
+    path?:string;
 
     template?:string;
 
@@ -363,6 +381,40 @@ export interface ConvoMakeContextTemplate
 
     tag?:string;
 
+    /**
+     * If true and the content has a name the content will be wrapped in an xml tag that matches
+     * its name.
+     */
+    tagWithName?:boolean;
+
+    /**
+     * Used to override content type of file extension of path
+     */
+    contentType?:string;
+
+    /**
+     * Select a markdown section or JSON property. If the context is a markdown file `select`
+     * should be the name of a section to select. If the context is a json file `select` should
+     * be a dot path.
+     */
+    select?:string|string[];
+
+    /**
+     * Max number of characters to use. Extra characters will be removed.
+     */
+    maxLength?:number;
+}
+
+export interface ConvoMakeContextTemplate extends ConvoMakeContentTemplate
+{
+    /**
+     * Path to context file
+     */
+    path:string;
+
+    /**
+     * Tags to apply to the appended convo created by the context item
+     */
     tags?:Record<string,string|boolean>;
 }
 
@@ -370,7 +422,7 @@ export interface ConvoMakeContextTemplate
  * Properties shared between targets and stages. When defined in a stage the values act as defaults
  * for the targets of the stage.
  */
-export interface ConvoMakeTargetSharedProps extends ConvoMakeContentTemplate, ConvoMakeTargetAppProps
+export interface ConvoMakeTargetSharedProps extends ConvoMakeTargetContentTemplate, ConvoMakeTargetAppProps
 {
     /**
      * Path or paths to files that will serve as additional context to all inputs.

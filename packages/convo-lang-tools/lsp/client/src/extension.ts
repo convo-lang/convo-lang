@@ -318,6 +318,17 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }));
 
+    context.subscriptions.push(commands.registerCommand('convo.make-target-sync', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync(ctrl.filePath,undefined,targetPath);
+
+    }));
+
     context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
         const targetPath=target?.obj.outPath;
         const ctrl=target?.ctrl;
@@ -376,7 +387,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }));
 
-    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string) => {
+    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string,sync?:string) => {
 
         const token=new CancelToken();
 
@@ -425,9 +436,16 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         })
         commands.executeCommand('convoMakeBuild.focus');
         try{
-            await ctrl.buildAsync();
+            if(sync){
+                await ctrl.syncTargetCacheWithOutput(sync);
+            }else{
+                await ctrl.buildAsync();
+            }
         }finally{
             ctrl.dispose();
+        }
+        if(sync){
+            await ext.scanMakeCtrlsAsync();
         }
     }
 

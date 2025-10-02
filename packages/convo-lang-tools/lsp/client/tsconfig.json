@@ -9,6 +9,6 @@
 		"strict": true,
 		"outDir": "out"
 	},
-	"include": ["src"],
+	"include": ["src","lsp"],
 	"exclude": ["node_modules", ".vscode-test"]
 }

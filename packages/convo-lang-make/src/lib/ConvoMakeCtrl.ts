@@ -1,6 +1,7 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
-import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
+import { parseJson5 } from "@iyio/json5";
+import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib.js";
 import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types.js";
@@ -158,6 +159,15 @@ export class ConvoMakeCtrl
             eventTarget:this,
             ctrl:this,
         })
+    }
+
+    public async syncTargetCacheWithOutput(outPath:string){
+        const ctrls=await this.getBuildTargetsAsync();
+        this.clearTargets();
+        this._targets.next(ctrls);
+
+        const syncTargets=ctrls.filter(t=>t.outPath===outPath);
+        await Promise.all(syncTargets.map(t=>t.syncCacheAsync()));
     }
 
     private buildPromise:Promise<void>|undefined;
@@ -452,16 +462,13 @@ export class ConvoMakeCtrl
         const inGroups=await Promise.all(decInputs.map<Promise<PathAndStarPath[]>>(async ({input,isList})=>{
             input=normalizePath(joinPaths(dir,input));
             if(input.includes('*')){
-                const star=parseStarPath(input);
-                const items=await (star?.recursiveBase?
-                    this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
-                    this.options.vfsCtrl.readDirAsync({path:input})
-                );
+                const items=await this.readStarPathAsync(input);
                 if(this.isDisposed){
                     return []
                 }
+                const star=parseStarPath(input);
                 const inputs:PathAndStarPath[]=[];
-                for(const item of items.items){
+                for(const item of items){
                     if(item.type==='file'){
                         inputs.push({path:item.path,star});
                     }
@@ -543,6 +550,15 @@ export class ConvoMakeCtrl
         }
     }
 
+    private async readStarPathAsync(path:string):Promise<VfsItem[]>{
+        const star=parseStarPath(path);
+        const items=await (star?.recursiveBase?
+            this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
+            this.options.vfsCtrl.readDirAsync({path})
+        );
+        return items.items;
+    }
+
     private async createInputAryAsync(inputFile:PathAndStarPath|PathAndStarPath[]|undefined,dir:string,cwd:string,dec:ConvoMakeTargetDeclaration):Promise<ConvoMakeInput[]>{
         const inputAry:ConvoMakeInput[]=[];
 
@@ -551,19 +567,43 @@ export class ConvoMakeCtrl
             for(const c of ary){
                 const context:ConvoMakeContextTemplate=(typeof c === 'string')?{path:c}:c;
                 const path=removeDir(normalizePath(joinPaths(dir,context.path)),cwd);
-                let content=await this.loadFileAsync(path);
-                if(content!==undefined){
-                    content=applyConvoMakeContextTemplate(content,context);
+                if(path.includes('*')){
+                    const items=await this.readStarPathAsync(normalizePath(joinPaths(dir,context.path)));
+                    if(this.isDisposed){
+                        return [];
+                    }
+                    const contentList=await Promise.all(items.map(async item=>{
+                        let content=await this.loadFileAsync(removeDir(item.path,cwd));
+                        if(content!==undefined){
+                            content=applyConvoMakeContextTemplate(content,context);
+                        }
+                        return {item,content}
+                    }))
+                    contentList.sort((a,b)=>a.item.path.localeCompare(b.item.path));
+                    inputAry.push(...await this.contentToConvoAsync(path,undefined,{},true,false,contentList.filter(c=>c.content).map(c=>c.content).join('\n\n'),undefined,context.tags));
+                }else{
+                    let content=await this.loadFileAsync(path);
+                    if(content!==undefined){
+                        content=applyConvoMakeContextTemplate(content,context);
+                    }
+                    inputAry.push(...await this.contentToConvoAsync(path,undefined,{},true,false,content,undefined,context.tags));
                 }
-                inputAry.push(...await this.contentToConvoAsync(path,undefined,dec,true,false,content,undefined,context.tags))
             }
         }
+
+        const attachments=dec.attach?asArray(dec.attach).map(a=>(typeof a === 'string')?{path:a}:a):undefined;
 
         if(inputFile){
             const ary=asArray(inputFile);
             for(const f of ary){
                 const content=await this.loadFileAsync(f.path);
-                inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content))
+                inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content));
+
+                if(attachments){
+                    for(const attachment of attachments){
+                        await this.loadAttachmentAsync(f.path,attachment,inputAry);
+                    }
+                }
             }
         }
 
@@ -574,7 +614,7 @@ export class ConvoMakeCtrl
                 inputAry.push(...await this.contentToConvoAsync(
                     undefined,
                     undefined,
-                    dec,
+                    {},
                     false,
                     true,
                     contentHasConvoRole(i)?instruction:`> appendUser\n${instruction}`,
@@ -588,24 +628,61 @@ export class ConvoMakeCtrl
         return inputAry;
     }
 
+    private async loadAttachmentAsync(inputPath:string,attachment:ConvoMakeTargetAttachment,inputAry:ConvoMakeInput[]){
+        const name=getFileNameNoExt(inputPath);
+        const srcPath=joinPaths(
+            getDirectoryName(inputPath),
+            attachment.path.includes('*')?attachment.path.replace(/\*/g,name):attachment.path
+        );
+        let content=await this.loadFileAsync(srcPath);
+        if(content!==undefined){
+
+            if(attachment.listLoadPath){
+                const list=parseJson5(content);
+                if(Array.isArray(list)){
+                    const all=await Promise.all(list.map(async item=>{
+                        const name=item+'';
+                        const loadPath=attachment.listLoadPath?.replace(/\*/g,name)??'';
+                        let value=await this.loadFileAsync(loadPath);
+                        // todo - if no file loaded log error
+                        if(value===undefined){
+                            throw new Error(`No attachment list load file found at - ${loadPath}`)
+                        }
+                        if(attachment.item){
+                            value=applyConvoMakeContextTemplate(value,attachment.item,{name});
+                        }escapeConvo
+                        return value;
+                    }));
+                    content=all.join('\n\n');
+                }
+            }
+
+            content=applyConvoMakeContextTemplate(content,attachment);
+        }
+        inputAry.push(...await this.contentToConvoAsync(srcPath,false,{},true,false,content,false));
+
+    }
+
     private fileCache:Record<string,Promise<string|undefined>>={};
     private loadFileAsync(relPath:string):Promise<string|undefined>
     {
         const path=normalizePath(joinPaths(this.options.dir,relPath));
-        return this.fileCache[relPath]??(this.fileCache[relPath]=(async ()=>{
-            try{
-                const contentType=getContentType(path);
-                if(contentType.startsWith('image/')){
-                    const content=await this.options.vfsCtrl.readBufferAsync(path);
-                    return base64EncodeMarkdownImage('file',contentType,content);
-                }else{
-                    const content=await this.options.vfsCtrl.readStringAsync(path);
-                    return this.options.disableInputTrimming?content:content?.trim();
-                }
-            }catch(ex){
-                return undefined;
+        return this.fileCache[relPath]??(this.fileCache[relPath]=this.readFileAsync(path));
+    }
+
+    public async readFileAsync(path:string):Promise<string|undefined>{
+        try{
+            const contentType=getContentType(path);
+            if(contentType.startsWith('image/')){
+                const content=await this.options.vfsCtrl.readBufferAsync(path);
+                return base64EncodeMarkdownImage('file',contentType,content);
+            }else{
+                const content=await this.options.vfsCtrl.readStringAsync(path);
+                return this.options.disableInputTrimming?content:content?.trim();
             }
-        })())
+        }catch(ex){
+            return undefined;
+        }
     }
 
     public removeFromCache(relPath:string){
@@ -746,7 +823,7 @@ export class ConvoMakeCtrl
     public async contentToConvoAsync(
         relPath:string|undefined,
         isList:boolean|undefined,
-        tmpl:ConvoMakeContentTemplate,
+        tmpl:ConvoMakeTargetContentTemplate,
         isContext:boolean,
         isCommand:boolean|undefined,
         content:string|null|undefined,
@@ -797,7 +874,7 @@ export class ConvoMakeCtrl
         relPath:string|undefined,
         isList:boolean|undefined,
         listIndex:number|undefined,
-        tmpl:ConvoMakeContentTemplate,
+        tmpl:ConvoMakeTargetContentTemplate,
         isContext:boolean,
         isCommand:boolean|undefined,
         content:string|null|undefined,
@@ -845,7 +922,7 @@ export class ConvoMakeCtrl
             inputTemplate:tmpl.inputTemplate,
             isContext,
             isCommand,
-            convo:content?isConvoFile?content:applyTemplate(content,isContext,isCommand,tmpl,tags):undefined,
+            convo:content?isConvoFile?content:applyTemplate(content,isContext,tmpl,tags):undefined,
             ready,
             hash,
             isConvoFile,
@@ -1021,6 +1098,7 @@ export class ConvoMakeCtrl
 
 interface StarPath
 {
+    path:string;
     start:string;
     end:string;
     recursiveBase?:string;
@@ -1061,6 +1139,7 @@ const parseStarPath=(path:string):StarPath|undefined=>{
         recursiveFilter={match:starStringToRegex(name)}
     }
     return {
+        path,
         start:parts[0] as string,
         end:parts[1] as string,
         recursiveBase,
@@ -1084,8 +1163,7 @@ const importReg=/(^|\n)[ \t]*@import\s/
 const applyTemplate=(
     content:string,
     isContext:boolean,
-    isCommand:boolean,
-    inputTemplate:ConvoMakeContentTemplate,
+    inputTemplate:ConvoMakeTargetContentTemplate,
     tags?:Record<string,string|boolean>
 ):string=>{
     if(isContext && content!==undefined && content!==null){

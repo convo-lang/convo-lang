@@ -2180,3 +2180,12 @@ export interface ConvoImportSourceEvt
      */
     isSystemImport:boolean;
 }
+
+export interface ConvoMultiReadOptions
+{
+    names:string[];
+    pattern?:string;
+    tagItemsWithName?:string;
+    itemTag?:string;
+    tag?:string;
+}

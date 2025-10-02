@@ -437,7 +437,24 @@ export default function ComponentPreview(){
         }
     }
 
-    private async writeOutputAsync(output:string){
+    public async syncCacheAsync():Promise<boolean>
+    {
+        if(!await this.makeCtrl.options.vfsCtrl.getItemAsync(this.outPath)){
+            return false;
+        }
+
+        const content=await this.makeCtrl.readFileAsync(this.outPath);
+
+        if(!content){
+            return false;
+        }
+
+        await this.writeOutputAsync(content,true);
+
+        return true;
+    }
+
+    private async writeOutputAsync(output:string,writeCacheOnly=false){
         let mediaBase64:string|undefined;
         if(this.isMedia){
             const md=parseMarkdownImages(output);
@@ -453,7 +470,7 @@ export default function ComponentPreview(){
                 this.makeCtrl.insertIntoCache(this.target.out,output);
             }
             await Promise.all([
-                this.target.outFromList?
+                (this.target.outFromList || writeCacheOnly)?
                     null
                 :mediaBase64?
                     this.makeCtrl.options.vfsCtrl.writeBase64Async(this.outPath,mediaBase64)

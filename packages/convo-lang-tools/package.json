@@ -167,6 +167,11 @@
                     "command": "convo.make-target-single",
                     "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
                     "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
                 }
             ]
         },
@@ -231,6 +236,11 @@
                 "command": "convo.make-target-single",
                 "title": "Convo: Make Single File",
                 "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(sync)"
             },
             {
                 "command": "convo.make-target-delete",
