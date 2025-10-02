@@ -2,6 +2,8 @@
 
 ### v0.8.0
 - **Build System**: Replaced NX build system with pkij
+- **Compatibility**: Removed CJS build format
+- **Node Version**: Removed support for NodeJS v18. v20 and above supported.
 
 ### v0.7.50
 - **Convo-Make**: Added comprehensive Convo-Make system for build automation and code generation
