@@ -1964,7 +1964,13 @@ export const escapeConvo=(content:string|null|undefined,isStartOfMessage=true,op
     }
 
     if(content.includes('{{')){
-        content=content.replace(/\{\{/g,'\\{{');
+        content=content.replace(/(\\*)\{\{/g,(_,slashes:string)=>{
+            if(!(slashes.length%2)){
+                return slashes+'\\{{';
+            }else{
+                return _;
+            }
+        });
     }
     if(content.includes('>')){
         content=content.replace(

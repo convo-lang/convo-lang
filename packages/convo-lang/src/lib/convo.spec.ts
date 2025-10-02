@@ -2,7 +2,7 @@ import { asType } from '@iyio/common';
 import { ZodObject } from 'zod';
 import { ConvoError } from './ConvoError.js';
 import { ConvoExecutionContext, executeConvoFunction } from './ConvoExecutionContext.js';
-import { escapeConvoMessageContent } from './convo-lib.js';
+import { escapeConvo, escapeConvoMessageContent } from './convo-lib.js';
 import { parseConvoCode } from './convo-parser.js';
 import { ConvoErrorType, ConvoParsingResult } from './convo-types.js';
 
@@ -187,7 +187,14 @@ describe('convo',()=>{
         parse(8,defaultPrompt);
     })
 
+    it('should double escape',()=>{
+        const src='<div style={{backgroundColor:"green"}}/>';
+        const expectedEscape='<div style=\\{{backgroundColor:"green"}}/>';
+        const escaped=escapeConvo(src);
 
+        expect(escaped).toBe(expectedEscape);
+        expect(escapeConvo(escaped)).toBe(expectedEscape);
+    });
 
     it('should generate function scheme',async ()=>{
 
