@@ -170,7 +170,7 @@
                 },
                 {
                     "command": "convo.make-target-sync",
-                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
                     "group": "inline"
                 }
             ]

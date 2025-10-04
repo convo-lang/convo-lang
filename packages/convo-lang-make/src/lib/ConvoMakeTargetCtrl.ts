@@ -439,17 +439,18 @@ export default function ComponentPreview(){
 
     public async syncCacheAsync():Promise<boolean>
     {
-        if(!await this.makeCtrl.options.vfsCtrl.getItemAsync(this.outPath)){
+        const isList=this.target.outFromList??false;
+        if(!await this.makeCtrl.options.vfsCtrl.getItemAsync(this.outPath) && !isList){
             return false;
         }
 
-        const content=await this.makeCtrl.readFileAsync(this.outPath);
+        const content=isList?undefined:await this.makeCtrl.readFileAsync(this.outPath);
 
-        if(!content){
+        if(!content && !isList){
             return false;
         }
 
-        await this.writeOutputAsync(content,true);
+        await this.writeOutputAsync(content??'',true);
 
         return true;
     }

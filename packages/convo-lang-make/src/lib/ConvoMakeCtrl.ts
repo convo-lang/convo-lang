@@ -294,9 +294,15 @@ export class ConvoMakeCtrl
                 continue;
             }
 
-            const forked=ctrl.target.in.filter(i=>i.listIndex!==undefined).map((input,index)=>{
-                return this.forkTargetList(ctrl,input,index);
-            });
+            const forked:ConvoMakeTargetCtrl[]=[];
+            const filtered=ctrl.target.in.filter(i=>i.listIndex!==undefined);
+            for(let index=0;index<filtered.length;index++){
+                const input=filtered[index];
+                if(!input){
+                    continue;
+                }
+                forked.push(await this.forkTargetListAsync(ctrl,input,index))
+            }
 
             ctrls.splice(i+1,0,...forked);
         }
@@ -386,7 +392,7 @@ export class ConvoMakeCtrl
             })
     }
 
-    public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
+    public async forkTargetListAsync(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):Promise<ConvoMakeTargetCtrl>
     {
         if(!parent.target.outFromList){
             throw new Error('Only targets that outFromList is true should be forked')
@@ -418,12 +424,13 @@ export class ConvoMakeCtrl
             name=normalizePath(name);
             target.out=`${starPath.start}${name}${starPath.end}`;
         }
+        const outPath=normalizePath(joinPaths(this.options.dir,target.out));
         const targetCtrl=new ConvoMakeTargetCtrl({
             target:target,
             targetDeclaration:parent.targetDeclaration,
             makeCtrl:this,
             parent,
-            outExists:parent.outExists,
+            outExists:(await this.options.vfsCtrl.getItemAsync(outPath))?true:false,
         });
         return targetCtrl;
     }

@@ -54,6 +54,7 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
             'target-'+
             (this.obj.reviewing?'reviewing':this.obj.state)+
             (this.obj.outExists?'-exists':'-notFound')+
+            (this.obj.target.outFromList?'-list':'-notList')+
             (this.obj.target.review?'-review':'-newReview')+
             (this.ctrl.preview?'-preview':'-noPreview')
         );
