@@ -5,7 +5,7 @@ import { ConvoMakeAppTargetRef, ConvoMakeOutputReview } from "./convo-make-types
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl.js";
 import { checkIcon, colorPickerIcon, downIcon, drawIcon, eraserIcon, loadingIcon, noteIcon, sendIcon, textIcon, trashIcon, upIcon, xIcon } from "./icons.js";
 
-const defaultColor='#0a84ff'
+const defaultColor='#ff0000'
 
 export class ConvoMakeAppViewer
 {
