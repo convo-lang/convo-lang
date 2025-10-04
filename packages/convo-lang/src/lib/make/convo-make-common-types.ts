@@ -37,6 +37,12 @@ export interface ConvoMakeApp
     httpRoot?:string;
 
     /**
+     * Usually https or http. Localhost and 127 addresses will default to http while all other
+     * hosts will default to https.
+     */
+    protocol?:string;
+
+    /**
      * Relative path from httpRoot where temporary pages can be written to preview generated components
      * and assets. For example when previewing generated components a new page will be created
      * to render the component on a path that is accessible from a browser.
@@ -248,6 +254,12 @@ export interface ConvoMakeTarget extends ConvoMakeTargetAppProps
      * Expanded path to target output.
      */
     out:string;
+
+    /**
+     * The part of the output path that is mapped from the input path of the target when the target
+     * uses a wildcard.
+     */
+    outMappedPart?:string;
 
     /**
      * Is true if the target's output is based on a list

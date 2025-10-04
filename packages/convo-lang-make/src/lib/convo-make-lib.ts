@@ -1,4 +1,4 @@
-import { ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
 import { asArray, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, normalizePath, valueIsZodType } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl.js";
@@ -286,3 +286,32 @@ export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContent
     }
     return content;
 }
+
+export const getConvoMakeAppProtocol=(app:ConvoMakeApp):string=>{
+    if(app.protocol){
+        return app.protocol;
+    }
+    const host=app.host??'localhost';
+    return host==='localhost' || host.endsWith('.localhost') || host.startsWith('127.')?'http':'https';
+}
+
+
+
+export const getConvoMakeAppBaseUrl=(app:ConvoMakeApp):string=>{
+    return `${
+        getConvoMakeAppProtocol(app)
+    }://${
+        app.host??'localhost'
+    }${
+        app.port?`:${app.port}`:''
+    }`;
+}
+
+export const getConvoMakeAppUrl=(app:ConvoMakeApp,path:string):string=>{
+    return `${
+        getConvoMakeAppBaseUrl(app)
+    }${
+        path.startsWith('/')?'':'/'}${path
+    }`
+}
+

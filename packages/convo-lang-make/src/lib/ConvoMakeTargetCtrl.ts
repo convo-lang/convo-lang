@@ -324,7 +324,7 @@ export class ConvoMakeTargetCtrl
                                     feedback?feedback+'\n\n':''
                                 }${review.message?.trim()?
                                     'Use the following screenshot for additional context:':
-                                    'Follow the instructions in the following screenshot:'
+                                    'Follow the instructions in the following screenshot. The instructions can include markup drawn by the user.:'
                                 }\n![screenshot](${
                                     review.screenshotBase64Url
                                 })`

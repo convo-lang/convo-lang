@@ -1,9 +1,9 @@
 import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
+import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib.js";
+import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeAppUrl, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib.js";
 import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types.js";
 import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl.js";
 import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl.js";
@@ -489,7 +489,7 @@ export class ConvoMakeCtrl
         }
 
         const sharedProps:Partial<ConvoMakeTarget>={
-            review:dec.review,
+            review:((dec.review===true || dec.review===undefined) && dec.reviewUrl)?'http':dec.review,
             reviewUrl:dec.reviewUrl,
             app:dec.app,
             appPath:dec.appPath,
@@ -514,18 +514,22 @@ export class ConvoMakeCtrl
                     continue;
                 }
                 const outStar=isDynamic?undefined:parseStarPath(output);
+                let outMappedPart:string|undefined;
                 if(outStar){
                     if(input.star){
-                        output=`${outStar.start}${input.path.substring(
+                        outMappedPart=input.path.substring(
                             input.star.start.length,
                             input.path.length-input.star.end.length
-                        )}${outStar.end}`
+                        );
+                        output=`${outStar.start}${outMappedPart}${outStar.end}`
                     }else{
                         output=`${outStar.start}${getFileNameNoExt(input.path)}${outStar.end}`
                     }
                 }
                 const target:ConvoMakeTarget={
                     ...sharedProps,
+                    reviewUrl:(outMappedPart && sharedProps.reviewUrl?.includes('*'))?sharedProps.reviewUrl.replace(/\*/g,outMappedPart):sharedProps.reviewUrl,
+                    outMappedPart,
                     stage:dec.stage??defaultConvoMakeStageName,
                     in:await this.createInputAryAsync({...input,path:removeDir(input.path,cwd)},dir,cwd,dec),
                     out:removeDir(output,cwd),
@@ -960,9 +964,16 @@ export class ConvoMakeCtrl
     public getAppRef(target:ConvoMakeTarget):ConvoMakeAppTargetRef|undefined{
 
         if(target.reviewUrl){
+            let appPath=target.reviewUrl;
+            if(!getUriProtocol(appPath)){
+                const firstApp=this.options.apps?.[0];
+                if(firstApp){
+                    appPath=getConvoMakeAppUrl(firstApp,appPath);
+                }
+            }
             return {
                 reviewType:'http',
-                appPath:target.reviewUrl,
+                appPath,
                 app:{name:directUrlConvoMakeAppName,dir:'./'}
             }
         }
