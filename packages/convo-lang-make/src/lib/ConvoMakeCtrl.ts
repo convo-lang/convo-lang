@@ -161,6 +161,16 @@ export class ConvoMakeCtrl
         })
     }
 
+    public async syncAllTargetCachesWithOutput()
+    {
+        const ctrls=await this.getBuildTargetsAsync();
+        this.clearTargets();
+        this._targets.next(ctrls);
+
+        ctrls.sort((a,b)=>(a.target.outFromList?1:0)-(b.target.outFromList?1:0));
+        await Promise.all(ctrls.map(t=>t.syncCacheAsync()));
+    }
+
     public async syncTargetCacheWithOutput(outPath:string){
         const ctrls=await this.getBuildTargetsAsync();
         this.clearTargets();

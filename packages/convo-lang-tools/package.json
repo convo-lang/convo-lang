@@ -154,6 +154,11 @@
                     "group": "inline"
                 },
                 {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
                     "command": "convo.make-target-open",
                     "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
                     "group": "inline"
@@ -240,7 +245,7 @@
             {
                 "command": "convo.make-target-sync",
                 "title": "Convo: Sync target with output",
-                "icon": "$(sync)"
+                "icon": "$(check)"
             },
             {
                 "command": "convo.make-target-delete",
@@ -251,6 +256,11 @@
                 "command": "convo.make-open",
                 "title": "Convo: Make Open",
                 "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
             },
             {
                 "command": "convo.make",

@@ -329,6 +329,16 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
     }));
 
+    context.subscriptions.push(commands.registerCommand('convo.make-sync', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        await makeAsync(ctrl.filePath,undefined,true);
+
+    }));
+
     context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
         const targetPath=target?.obj.outPath;
         const ctrl=target?.ctrl;
@@ -387,7 +397,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }));
 
-    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string,sync?:string) => {
+    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string,sync?:string|boolean) => {
 
         const token=new CancelToken();
 
@@ -436,7 +446,9 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         })
         commands.executeCommand('convoMakeBuild.focus');
         try{
-            if(sync){
+            if(sync===true){
+                await ctrl.syncAllTargetCachesWithOutput();
+            }else if(sync){
                 await ctrl.syncTargetCacheWithOutput(sync);
             }else{
                 await ctrl.buildAsync();
