@@ -108,7 +108,7 @@ export class ConvoExt
                 ...options,
                 ...ctrlOptions,
                 //echoMode:true,
-                //continueReview:true,
+                //rebuild:true,
                 browserInf:new ConvoBrowserCtrl(),
             });
             if(autoAdd){

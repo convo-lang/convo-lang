@@ -34,9 +34,9 @@ export interface ConvoMakeCtrlOptions
     dryRun?:boolean;
 
     /**
-     * If true or a path or paths to target outputs cached outputs will be reviewed
+     * If true, a path or paths to target outputs cached outputs will be rebuilt
      */
-    continueReview?:boolean|string|string[];
+    rebuild?:boolean|string|string[];
 
     previewPort?:number;
 
@@ -49,6 +49,11 @@ export interface ConvoMakeCtrlOptions
      * If true the controller will be loaded as a preview when the build is tarted
      */
     preview?:boolean;
+
+    /**
+     * If true all targets will be forced to be reviewed
+     */
+    forceReview?:boolean;
 
 
 }
@@ -106,11 +111,12 @@ export class ConvoMakeCtrl
         browserInf,
         apps=[],
         previewPort=defaultConvoMakePreviewPort,
-        continueReview=false,
+        rebuild=false,
         disableInputTrimming=false,
         stages=[],
         targetDefaults,
         preview=false,
+        forceReview=false,
     }:ConvoMakeCtrlOptions){
         this.options={
             name,
@@ -124,11 +130,12 @@ export class ConvoMakeCtrl
             shell,
             browserInf,
             previewPort,
-            continueReview,
+            rebuild,
             disableInputTrimming,
             stages,
             targetDefaults,
             preview,
+            forceReview,
         }
         this.id=uuid();
         this.name=name;
@@ -506,7 +513,7 @@ export class ConvoMakeCtrl
         }
 
         const sharedProps:Partial<ConvoMakeTarget>={
-            review:((dec.review===true || dec.review===undefined) && dec.reviewUrl)?'http':dec.review,
+            review:(((dec.review===true || dec.review===undefined) && dec.reviewUrl)?'http':dec.review)||(this.options.forceReview||undefined),
             reviewUrl:dec.reviewUrl,
             app:dec.app,
             appPath:dec.appPath,

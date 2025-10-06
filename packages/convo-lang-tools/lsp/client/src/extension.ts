@@ -325,7 +325,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        await makeAsync(ctrl.filePath,undefined,targetPath);
+        await makeAsync({build:ctrl.filePath,sync:targetPath});
 
     }));
 
@@ -335,7 +335,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        await makeAsync(ctrl.filePath,undefined,true);
+        await makeAsync({build:ctrl.filePath,sync:true});
 
     }));
 
@@ -346,7 +346,18 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        await makeAsync(ctrl.filePath,targetPath);
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single-review', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath,forceReview:true});
 
     }));
 
@@ -397,7 +408,19 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }));
 
-    const makeAsync=async (build?:ConvoMakeExtBuild|string,singleFile?:string,sync?:string|boolean) => {
+    interface MakeOptions
+    {
+        build?:ConvoMakeExtBuild|string;
+        rebuild?:string;
+        sync?:string|boolean;
+        forceReview?:boolean;
+    }
+    const makeAsync=async ({
+        build,
+        rebuild,
+        sync,
+        forceReview
+    }:MakeOptions) => {
 
         const token=new CancelToken();
 
@@ -437,7 +460,8 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         const ctrl=new ConvoMakeCtrl({
             ...options,
             //echoMode:true,
-            continueReview:singleFile,
+            forceReview,
+            rebuild,
             browserInf:new ConvoBrowserCtrl(),
         });
         ext.addMakeCtrl(ctrl);

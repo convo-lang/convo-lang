@@ -69,7 +69,7 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
 const getIcon=(target:ConvoMakeTargetCtrl)=>{
     return createConvoExtIcon(
         target.reviewing?
-            'open-preview'
+            'debug-line-by-line'
         :target.state==='complete'?
             'check'
         :target.isDisposed?

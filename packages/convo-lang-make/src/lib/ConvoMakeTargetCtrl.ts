@@ -173,13 +173,13 @@ export class ConvoMakeTargetCtrl
         if(this.makeCtrl._builtOutputs.includes(this.outPath)){
             return false;
         }
-        const c=this.makeCtrl.options.continueReview;
+        const c=this.makeCtrl.options.rebuild;
         return c===true || c===this.outPath || (Array.isArray(c) && c.includes(this.outPath));
     }
 
-    public shouldSkipReview():boolean
+    public shouldSkipBuild():boolean
     {
-        return this.makeCtrl.options.continueReview!==false && !this.shouldContinueReview();
+        return this.makeCtrl.options.rebuild!==false && !this.shouldContinueReview();
     }
 
     private async tryBuildAsync(){
@@ -193,7 +193,7 @@ export class ConvoMakeTargetCtrl
             return;
         }
 
-        if(this.shouldSkipReview()){
+        if(this.shouldSkipBuild()){
             this.commit('complete',{})
             return;
         }
