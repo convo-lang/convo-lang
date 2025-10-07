@@ -485,7 +485,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     }
 
-    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync(v)));
+    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync({build:v})));
 
     context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
         const document=window.activeTextEditor?.document;
