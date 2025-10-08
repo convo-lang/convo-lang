@@ -1,4 +1,4 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
@@ -36,7 +36,7 @@ export interface ConvoMakeCtrlOptions
     /**
      * If true, a path or paths to target outputs cached outputs will be rebuilt
      */
-    rebuild?:boolean|string|string[];
+    rebuild?:boolean|ConvoMakeTargetRebuild|string|(string|ConvoMakeTargetRebuild)[];
 
     previewPort?:number;
 
@@ -703,7 +703,7 @@ export class ConvoMakeCtrl
             const contentType=getContentType(path);
             if(contentType.startsWith('image/')){
                 const content=await this.options.vfsCtrl.readBufferAsync(path);
-                return base64EncodeMarkdownImage('file',contentType,content);
+                return base64EncodeMarkdownImage('image',contentType,content);
             }else{
                 const content=await this.options.vfsCtrl.readStringAsync(path);
                 return this.options.disableInputTrimming?content:content?.trim();
@@ -1128,6 +1128,30 @@ export class ConvoMakeCtrl
             targets,
             sourceTargets:this.options.targets
         }
+    }
+
+    public getTargetRebuildInfo(outPath:string):ConvoMakeTargetRebuild|undefined{
+        if(!this.options.rebuild){
+            return undefined;
+        }else if(this.options.rebuild===true){
+            return {
+                path:outPath,
+            }
+        }
+        const ary=asArray(this.options.rebuild);
+        for(const r of ary){
+            if(typeof r === 'string'){
+                if(r===outPath){
+                    return {
+                        path:outPath
+                    }
+                }
+            }else if(r.path===outPath){
+                return r;
+            }
+        }
+
+        return undefined;
     }
 }
 

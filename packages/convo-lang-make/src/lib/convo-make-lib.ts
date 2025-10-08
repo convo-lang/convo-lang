@@ -15,7 +15,13 @@ export const getConvoMakeTargetInHash=(value:string)=>{
 
 }
 
-
+export const getConvoMakeTargetOutHash=(value:string)=>{
+    const match=outReg.exec(value);
+    if(!match){
+        return '';
+    }
+    return value.substring(match.index+match[0].length).replace(/^\r?\n/,'');
+}
 
 /**
  * Props that should effect the target's hash

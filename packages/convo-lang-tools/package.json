@@ -35,7 +35,9 @@
                     "convo"
                 ],
                 "extensions": [
-                    ".convo"
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
                 ],
                 "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
                 "configuration": "./convo-language-configuration.json",
@@ -182,6 +184,11 @@
                     "command": "convo.make-target-sync",
                     "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
                     "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
                 }
             ]
         },
@@ -256,6 +263,11 @@
                 "command": "convo.make-target-sync",
                 "title": "Convo: Sync target with output",
                 "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
             },
             {
                 "command": "convo.make-target-delete",

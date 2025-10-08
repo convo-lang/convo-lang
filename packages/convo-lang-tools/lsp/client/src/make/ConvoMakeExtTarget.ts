@@ -56,7 +56,8 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
             (this.obj.outExists?'-exists':'-notFound')+
             (this.obj.target.outFromList?'-list':'-notList')+
             (this.obj.target.review?'-review':'-newReview')+
-            (this.ctrl.preview?'-preview':'-noPreview')
+            (this.ctrl.preview?'-preview':'-noPreview')+
+            (this.obj.convoExists?'-convoExists':'-convoNotExists')
         );
     }
 
@@ -70,6 +71,8 @@ const getIcon=(target:ConvoMakeTargetCtrl)=>{
     return createConvoExtIcon(
         target.reviewing?
             'debug-line-by-line'
+        :target.outputInSync===false?
+            'diff-modified'
         :target.state==='complete'?
             'check'
         :target.isDisposed?

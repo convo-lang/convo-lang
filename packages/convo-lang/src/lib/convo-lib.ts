@@ -700,6 +700,15 @@ export const convoVars={
     __makeStages:'__makeStages',
 
     /**
+     * Relative path to the make directory the current convo file was created in
+     */
+    __makeRoot:'__makeRoot',
+
+    __makeFile:'__makeFile',
+
+    __makeOut:'__makeOut',
+
+    /**
      * Maps custom messages to handler functions
      */
     __messageHandlers:'__messageHandlers',
@@ -707,7 +716,7 @@ export const convoVars={
     /**
      * Name of a type to be used as the default json response type
      */
-    __defaultResponseType:'__defaultResponseType'
+    __defaultResponseType:'__defaultResponseType',
 
 } as const;
 

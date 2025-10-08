@@ -480,3 +480,16 @@ export interface ConvoMakeActivePass
 export type ConvoMakePass=Required<ConvoMakeActivePass> & {
     cancelled?:boolean;
 }
+
+export interface ConvoMakeTargetRebuild
+{
+    /**
+     * Full path to output
+     */
+    path:string;
+
+    /**
+     * If true the existing conversation should be continued
+     */
+    continueConversation?:boolean;
+}
