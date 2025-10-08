@@ -1,4 +1,4 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, convoMakeStatsDir, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
@@ -63,6 +63,7 @@ export class ConvoMakeCtrl
     public readonly name:string;
     public readonly dir:string;
     public readonly filePath:string;
+    public readonly statsPath:string;
     public readonly preview:boolean;
 
     public readonly id:string;
@@ -140,6 +141,12 @@ export class ConvoMakeCtrl
         this.id=uuid();
         this.name=name;
         this.dir=dir;
+        this.statsPath=normalizePath(joinPaths(
+                dir,
+                convoMakeStateDir,
+                convoMakeStatsDir,
+                `${new Date().toISOString()}.json`
+        ));
         this.filePath=filePath;
         this.preview=preview;
         console.log('ConvoMakeCtrl',this);
@@ -215,7 +222,8 @@ export class ConvoMakeCtrl
                     target:pass,
                     eventTarget:pass,
                     ctrl:this,
-                })
+                });
+                await this.options.vfsCtrl.writeStringAsync(this.statsPath,JSON.stringify(this.getStats(),null,4));
                 if(pass.genCount<=0){
                     if(pass.skipCount<=0){
                         break;
@@ -240,6 +248,13 @@ export class ConvoMakeCtrl
         this.dispose();
 
         console.log('ConvoMakeCtrl done',this.filePath);
+    }
+
+    public getStats():ConvoMakeStats{
+        return {
+            usage:{...this.usage},
+            passes:[...this.passes],
+        }
     }
 
     private async makePassAsync():Promise<ConvoMakePass>

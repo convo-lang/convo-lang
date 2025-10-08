@@ -1,4 +1,5 @@
 import { ZodTypeAny } from "zod";
+import { ConvoTokenUsage } from "../convo-types.js";
 
 
 export type ConvoMakeExplicitReviewType='http'|'source';
@@ -492,4 +493,10 @@ export interface ConvoMakeTargetRebuild
      * If true the existing conversation should be continued
      */
     continueConversation?:boolean;
+}
+
+export interface ConvoMakeStats
+{
+    passes:ConvoMakePass[];
+    usage:ConvoTokenUsage;
 }
