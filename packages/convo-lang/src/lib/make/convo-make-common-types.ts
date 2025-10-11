@@ -90,7 +90,7 @@ export interface ConvoMakeTargetAttachment extends ConvoMakeContentTemplate
 /**
  * A declaration of a make target. The declaration is not yet expanded into a concrete make target
  */
-export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps
+export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps, ConvoMakeTargetShellProps
 {
     name?:string;
 
@@ -236,7 +236,7 @@ export interface ConvoMakeInput extends ConvoMakeTargetContentTemplate
     jsonValue?:any;
 }
 
-export interface ConvoMakeTarget extends ConvoMakeTargetAppProps
+export interface ConvoMakeTarget extends ConvoMakeTargetAppProps, ConvoMakeTargetShellProps
 {
     name?:string;
 
@@ -429,6 +429,43 @@ export interface ConvoMakeContextTemplate extends ConvoMakeContentTemplate
      * Tags to apply to the appended convo created by the context item
      */
     tags?:Record<string,string|boolean>;
+}
+
+export interface ConvoMakeTargetShellProps
+{
+    /**
+     * A shell command that will be ran and to produce the output of the target. If `pipeShell` is
+     * true then the std output of the shell command will written as the output of the target
+     * otherwise it is expected that the shell command will write the output of the target to the
+     * path or paths pointed to by the out property of the target.
+     * If `shell` is an array the shell commands will be ran in sequence.
+     *
+     * The full paths to the inputs of the target can be accessed using the `targetInput` function.
+     * @example shell: 'echo "{{targetInput()}}"'
+     * @example shell: 'echo "input 0: {{targetInput(0)}}, input 1: {{targetInput(1)}}"'
+     */
+    shell?:string|string[];
+
+    /**
+     * If true shell output will be piped to the output of the target
+     */
+    pipeShell?:boolean;
+
+
+    /**
+     * If true piped shell output will not be trimmed.
+     */
+    disableShellPipeTrimming?:boolean;
+
+    /**
+     * Current working directory to use will shell and inShell
+     */
+    shellCwd?:string;
+
+    /**
+     * If true the exit code of shell command will be ignored
+     */
+    ignoreShellExitCode?:boolean;
 }
 
 /**

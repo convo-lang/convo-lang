@@ -442,7 +442,12 @@ export const convoFunctions={
     /**
      * Similar to the map function except unlabeled values are place the the `_` property
      */
-    mapWithCapture:'mapWithCapture'
+    mapWithCapture:'mapWithCapture',
+
+    /**
+     * Used to access properties of a make target by path
+     */
+    mkt:'mkt',
 
 
 } as const;

@@ -1,7 +1,7 @@
 import { AppendConvoOptions, Conversation, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMessage, convoRoles, convoVars, escapeConvo, parseConvoCode } from "@convo-lang/convo-lang";
-import { createPromiseSource, delayAsync, DisposeContainer, getContentType, getDirectoryName, getFileName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
+import { asArray, createPromiseSource, delayAsync, DisposeContainer, getContentType, getDirectoryName, getFileName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash, getConvoMakeTargetOutHash } from "./convo-make-lib.js";
+import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash, getConvoMakeTargetOutHash, insertConvoMakeTargetShellInputs } from "./convo-make-lib.js";
 import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts.js";
 import { ConvoMakeAppTargetRef, ConvoMakeOutputReview, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types.js";
 import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer.js";
@@ -289,12 +289,12 @@ export class ConvoMakeTargetCtrl
             while(!this.isDisposed){
 
                 if(!continueConvo){
-                    const r=await this.conversation.completeAsync();
+                    const r=this.target.shell?await this.runShellCommandAsync():(await this.conversation.completeAsync()).message?.content;
                     if(this.isDisposed){
                         return;
                     }
                     await Promise.all([
-                        this.writeOutputAsync(r.message?.content??''),
+                        this.writeOutputAsync(r??'',(this.target.shell && !this.target.pipeShell)?true:false),
                         this.writeConvoOutputAsync(this.conversation.convo),
                     ]);
                 }else{
@@ -360,6 +360,37 @@ export class ConvoMakeTargetCtrl
             }
         }finally{
             viewer?.dispose();
+        }
+    }
+
+    private async runShellCommandAsync():Promise<string|undefined>
+    {
+        if(!this.target.shell || !this.makeCtrl.options.shell){
+            return undefined;
+        }
+        const output:string[]=[];
+
+        const shell=asArray(this.target.shell);
+        for(const s of shell){
+            const proc=this.makeCtrl.options.shell.exec(insertConvoMakeTargetShellInputs(s,this.target,this.makeCtrl.dir),{cwd:this.target.shellCwd});
+            const sub=proc.onOutput.subscribe(v=>{
+                output.push(v);
+            });
+            try{
+                const code=await proc.exitPromise;
+                if(code!==0 && !this.target.ignoreShellExitCode){
+                    throw new Error(`shell command existed with code ${code}`);
+                }
+            }finally{
+                sub.unsubscribe();
+            }
+        }
+
+        if(this.target.pipeShell){
+            const out=output.join('');
+            return this.target.disableShellPipeTrimming?out:out.trim();
+        }else{
+            return await this.makeCtrl.options.vfsCtrl.readStringAsync(this.outPath);
         }
     }
 

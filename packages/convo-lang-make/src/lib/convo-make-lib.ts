@@ -1,5 +1,5 @@
-import { ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { asArray, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, normalizePath, valueIsZodType } from "@iyio/common";
+import { ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoMakeTargetShellInputPlaceholder, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { asArray, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, joinPaths, normalizePath, valueIsZodType } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl.js";
 
@@ -31,7 +31,12 @@ export const convoMakeTargetHasProps:(keyof ConvoMakeTarget)[]=[
     'app',
     'appPath',
     'keepAppPathExt',
-    'outType'
+    'outType',
+    'shell',
+    'shellCwd',
+    'pipeShell',
+    'ignoreShellExitCode',
+    'disableShellPipeTrimming',
 ];
 convoMakeTargetHasProps.sort();
 
@@ -321,3 +326,36 @@ export const getConvoMakeAppUrl=(app:ConvoMakeApp,path:string):string=>{
     }`
 }
 
+export const insertConvoMakeTargetShellInputs=(shellCommand:string,target:ConvoMakeTarget,makeDir:string):string=>{
+    const [start,end]=convoMakeTargetShellInputPlaceholder.split('_');
+    if(!start || !end){
+        return shellCommand;
+    }
+
+    let i=shellCommand.indexOf(start);
+    while(i!==-1){
+        i=shellCommand.indexOf(start);
+        const e=shellCommand.indexOf(end);
+        if(e===-1){
+            break;
+        }
+
+        const objPath=shellCommand.substring(i+start.length,e);
+        let path=getValueByPath(target,objPath);
+        if(path && (typeof path === 'object')){
+            path=path.path;
+        }
+
+        shellCommand=`${
+            shellCommand.substring(0,i)
+        }${
+            (typeof path === 'string')?joinPaths(makeDir,path):''
+        }${
+            shellCommand.substring(e+end.length)
+        }`;
+
+    }
+
+    return shellCommand;
+
+}

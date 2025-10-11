@@ -1,6 +1,6 @@
 import { aryUnique, getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
 import { convoVars, createConvoScopeFunction } from "../convo-lib.js";
-import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib.js";
+import { convoMakeTargetShellInputPlaceholder, defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib.js";
 import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps } from "./convo-make-common-types.js";
 
 
@@ -136,3 +136,7 @@ export const convoDefineMakeStageScopeFunction=createConvoScopeFunction({usesLab
     return stage;
 
 });
+
+export const convoMakeTargetPlaceholderValueFunction=createConvoScopeFunction((scope)=>{
+    return convoMakeTargetShellInputPlaceholder.replace('_',scope.paramValues?.[0]??'in.0')
+})

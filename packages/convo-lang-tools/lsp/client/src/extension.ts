@@ -10,6 +10,7 @@ import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { extensionPublisher } from './build-const.js';
+import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
@@ -473,6 +474,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             forceReview,
             rebuild,
             browserInf:new ConvoBrowserCtrl(),
+            shell:new ConvoCliShell(),
         });
         ext.addMakeCtrl(ctrl);
         token.onCancel(()=>{

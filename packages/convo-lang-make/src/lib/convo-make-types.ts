@@ -71,12 +71,17 @@ export interface ConvoMakeOutputReview
     screenshotBase64Url?:string;
 }
 
+export interface ConvoMakeShellExecOptions
+{
+    cwd?:string;
+}
+
 export interface ConvoMakeShell
 {
     /**
      * Starts the execution of a shell command and returns a process object to interact with the process
      */
-    execAsync(shellCommand:string):ConvoMakeShellProc;
+    exec(shellCommand:string,options?:ConvoMakeShellExecOptions):ConvoMakeShellProc;
 
     /**
      * Checks if a specific port is open

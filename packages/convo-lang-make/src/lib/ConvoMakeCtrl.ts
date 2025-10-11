@@ -543,6 +543,11 @@ export class ConvoMakeCtrl
             appHostFile:dec.appHostFile,
             appHostMode:dec.appHostMode,
             appImportPath:dec.appImportPath,
+            shell:dec.shell,
+            shellCwd:dec.shellCwd,
+            pipeShell:dec.pipeShell,
+            disableShellPipeTrimming:dec.disableShellPipeTrimming,
+            ignoreShellExitCode:dec.ignoreShellExitCode,
         }
 
         if(multiOut && !sharedProps.outFromList){
