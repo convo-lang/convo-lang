@@ -26,6 +26,9 @@
         "type": "git",
         "url": "https://github.com/convo-lang/convo-lang.git"
     },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
     "contributes": {
         "languages": [
             {
