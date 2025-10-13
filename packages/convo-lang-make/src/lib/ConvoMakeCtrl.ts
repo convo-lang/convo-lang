@@ -1,5 +1,5 @@
 import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, convoMakeStatsDir, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
+import { asArray, base64EncodeMarkdownImage, CancelToken, delayAsync, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getFileNameNoExt, getTimestampString, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -64,6 +64,7 @@ export class ConvoMakeCtrl
     public readonly dir:string;
     public readonly filePath:string;
     public readonly statsPath:string;
+    public readonly logPath:string;
     public readonly preview:boolean;
 
     public readonly id:string;
@@ -97,6 +98,8 @@ export class ConvoMakeCtrl
     private readonly _usage:BehaviorSubject<ConvoTokenUsage>=new BehaviorSubject<ConvoTokenUsage>(createEmptyConvoTokenUsage());
     public get usageSubject():ReadonlySubject<ConvoTokenUsage>{return this._usage}
     public get usage(){return this._usage.value}
+
+    private messageLog:string[]=[];
 
     readonly _builtOutputs:string[]=[];
 
@@ -141,15 +144,17 @@ export class ConvoMakeCtrl
         this.id=uuid();
         this.name=name;
         this.dir=dir;
-        this.statsPath=normalizePath(joinPaths(
+        const logBaseName=normalizePath(joinPaths(
                 dir,
                 convoMakeStateDir,
                 convoMakeStatsDir,
-                `${new Date().toISOString()}.json`
+                `${getTimestampString()}-ID-${this.id}`
         ));
+        this.statsPath=logBaseName+'.json';
+        this.logPath=logBaseName+'.log';
         this.filePath=filePath;
         this.preview=preview;
-        console.log('ConvoMakeCtrl',this);
+        console.log(`ConvoMakeCtrl - ${filePath}`,this);
     }
 
     private _isDisposed=false;
@@ -175,6 +180,58 @@ export class ConvoMakeCtrl
         })
     }
 
+    public log(...args:any[]){
+        if(this.preview){
+            return;
+        }
+        const msg=args.map(a=>{
+            if(typeof a === 'string'){
+                return a;
+            }
+            if(a instanceof Error){
+                const msg=getErrorMessage(a);
+                const stack=a.stack;
+                return stack?msg+'\n'+stack:msg;
+            }
+            try{
+                return JSON.stringify(a);
+            }catch{
+                return a+'';
+            }
+        }).join(' ');
+
+        this.messageLog.push(msg);
+        this.flushLog();
+    }
+
+    private flushingLog=false;
+    private flushLogRequested=false;
+    private flushLog()
+    {
+        if(!this.messageLog.length){
+            return;
+        }
+        if(this.flushingLog){
+            this.flushLogRequested=true;
+            return;
+        }
+        this.flushingLog=true;
+        setTimeout(async ()=>{
+            const log=this.messageLog.join('\n');
+            this.messageLog.splice(0,this.messageLog.length);
+            try{
+                await this.options.vfsCtrl.appendStringAsync(this.logPath,log);
+            }catch(ex){
+                console.error('Unable to append log messages');
+                console.error('Unwritten log messages:',log);
+            }
+            if(this.flushLogRequested){
+                this.flushLogRequested=false;
+                this.flushLog();
+            }
+        },250);
+    }
+
     public async syncAllTargetCachesWithOutput()
     {
         const ctrls=await this.getBuildTargetsAsync();
@@ -194,43 +251,59 @@ export class ConvoMakeCtrl
         await Promise.all(syncTargets.map(t=>t.syncCacheAsync()));
     }
 
-    private buildPromise:Promise<void>|undefined;
-    public buildAsync()
+    private buildPromise:Promise<boolean>|undefined;
+    public buildAsync():Promise<boolean>
     {
         return this.buildPromise??(this.buildPromise=this._buildAsync());
     }
 
-    private async _buildAsync()
+    private async _buildAsync():Promise<boolean>
     {
         if(this.preview){
             await this.loadAsPreviewAsync();
         }else{
-            while(!this.isDisposed){
+            this.log('Start build');
+            const buildCancel=new CancelToken();
 
-                await delayAsync(1);
-                if(this.isDisposed){
-                    break;
-                }
+            try{
+                while(!this.isDisposed && !buildCancel.isCanceled){
 
-                const pass=await this.makePassAsync();
-                if(this.isDisposed){
-                    pass.cancelled=true;
-                }
-                pushBehaviorSubjectAry(this._passes,pass);
-                this.triggerBuildEvent({
-                    type:'pass-end',
-                    target:pass,
-                    eventTarget:pass,
-                    ctrl:this,
-                });
-                await this.options.vfsCtrl.writeStringAsync(this.statsPath,JSON.stringify(this.getStats(),null,4));
-                if(pass.genCount<=0){
-                    if(pass.skipCount<=0){
+                    await delayAsync(1);
+                    if(this.isDisposed){
                         break;
-                    }else{
-                        throw new Error('No targets generated')
+                    }
+
+                    this.log(`---------------------- Pass ${this.passes.length} ----------------------`);
+                    await this.writeStatsAsync();
+                    const pass=await this.makePassAsync();
+                    if(this.isDisposed){
+                        pass.cancelled=true;
+                    }
+                    pushBehaviorSubjectAry(this._passes,pass);
+                    this.triggerBuildEvent({
+                        type:'pass-end',
+                        target:pass,
+                        eventTarget:pass,
+                        ctrl:this,
+                    });
+                    await this.writeStatsAsync();
+                    if(pass.genCount<=0){
+                        if(pass.skipCount<=0){
+                            break;
+                        }else{
+                            throw new Error('No targets generated')
+                        }
                     }
                 }
+                this.log('End build');
+            }catch(ex){
+                console.error('Convo-Make build failed',ex);
+                this.log('Build error',ex);
+                await this.writeStatsAsync();
+                this.dispose();
+                return false;
+            }finally{
+                buildCancel.cancelNow();
             }
         }
 
@@ -248,6 +321,16 @@ export class ConvoMakeCtrl
         this.dispose();
 
         console.log('ConvoMakeCtrl done',this.filePath);
+        return true;
+    }
+    public async writeStatsAsync()
+    {
+        try{
+            const stats=JSON.stringify(this.getStats(),null,4);
+            await this.options.vfsCtrl.writeStringAsync(this.statsPath,stats);
+        }catch(ex){
+            console.error(`Failed to write stats to ${this.statsPath}`,ex);
+        }
     }
 
     public getStats():ConvoMakeStats{
@@ -267,6 +350,7 @@ export class ConvoMakeCtrl
             skipCount:0,
             cachedCount:0,
             forkedCount:0,
+            generated:[],
         }
         this.activePassRef=pass;
         this._activePass.next({...pass});
@@ -277,7 +361,7 @@ export class ConvoMakeCtrl
             ctrl:this,
         })
 
-        const ctrls=await this.getBuildTargetsAsync();
+        const ctrls=await this.getBuildTargetsAsync(pass);
         if(this.isDisposed){
             return {
                 ...pass,
@@ -300,13 +384,17 @@ export class ConvoMakeCtrl
 
         await Promise.all(this.targets.map(t=>t.buildAsync()));
 
+        for(const c of ctrls){
+            c.dispose();
+        }
+
         return {
             ...pass,
             endTime:Date.now(),
         };
     }
 
-    private async getBuildTargetsAsync(){
+    private async getBuildTargetsAsync(pass?:ConvoMakeActivePass){
         const targets=await this.getTargetPairsAsync();
         if(this.isDisposed){
             return [];
@@ -316,6 +404,7 @@ export class ConvoMakeCtrl
             target:t.target,
             targetDeclaration:t.declaration,
             makeCtrl:this,
+            pass,
             outExists:(await this.options.vfsCtrl.getItemAsync(joinPaths(this.options.dir,t.target.out)))?true:false,
 
         })));
@@ -403,6 +492,7 @@ export class ConvoMakeCtrl
             skipCount:0,
             cachedCount:0,
             forkedCount:0,
+            generated:[],
             ...this.activePassRef,
         }
         update.genCount+=addGenCount;
@@ -462,6 +552,7 @@ export class ConvoMakeCtrl
             targetDeclaration:parent.targetDeclaration,
             makeCtrl:this,
             parent,
+            pass:parent.pass,
             outExists:(await this.options.vfsCtrl.getItemAsync(outPath))?true:false,
         });
         return targetCtrl;
@@ -720,13 +811,28 @@ export class ConvoMakeCtrl
 
     public async readFileAsync(path:string):Promise<string|undefined>{
         try{
-            const contentType=getContentType(path);
-            if(contentType.startsWith('image/')){
-                const content=await this.options.vfsCtrl.readBufferAsync(path);
-                return base64EncodeMarkdownImage('image',contentType,content);
+            const item=await this.options.vfsCtrl.getItemAsync(path);
+            if(item?.type==='dir'){
+                const items=await this.options.vfsCtrl.readDirAsync({path:path});
+                const files=await Promise.all(items.items.map(async item=>{
+                    const content=await this.readFileAsync(item.path);
+                    return {
+                        path:item.path,
+                        name:item.name,
+                        hash:strHashBase64Fs(item.name+'::'+content),
+                    }
+                }));
+                files.sort((a,b)=>a.path.localeCompare(b.path));
+                return files.map(f=>`${f.name}:${f.hash}`).join('\n');
             }else{
-                const content=await this.options.vfsCtrl.readStringAsync(path);
-                return this.options.disableInputTrimming?content:content?.trim();
+                const contentType=getContentType(path);
+                if(contentType.startsWith('image/')){
+                    const content=await this.options.vfsCtrl.readBufferAsync(path);
+                    return base64EncodeMarkdownImage('image',contentType,content);
+                }else{
+                    const content=await this.options.vfsCtrl.readStringAsync(path);
+                    return this.options.disableInputTrimming?content:content?.trim();
+                }
             }
         }catch(ex){
             return undefined;
@@ -739,6 +845,15 @@ export class ConvoMakeCtrl
 
     public insertIntoCache(relPath:string,content:string){
         this.fileCache[relPath]=Promise.resolve(content);
+        this.triggerFileChange(relPath);
+    }
+
+    public triggerFileChange(relPath:string){
+        for(const ctrl of this.targets){
+            if(ctrl.target.in.some(i=>i.path===relPath)){
+                ctrl.onInputChange(relPath);
+            }
+        }
     }
 
     /**

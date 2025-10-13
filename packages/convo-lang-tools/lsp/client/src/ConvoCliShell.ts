@@ -10,6 +10,7 @@ export class ConvoCliShell implements ConvoMakeShell
     {
         const exitProcess=createPromiseSource<number>();
         const onOutput=new Subject<string>();
+        const onErr=new Subject<string>();
 
         spawnAsync({
             cmd:shellCommand,
@@ -17,6 +18,8 @@ export class ConvoCliShell implements ConvoMakeShell
             onOutput:(type,value)=>{
                 if(type==='out'){
                     onOutput.next(value);
+                }else{
+                    onErr.next(value);
                 }
             },
             onExit(code){
@@ -31,6 +34,7 @@ export class ConvoCliShell implements ConvoMakeShell
 
             },
             onOutput,
+            onErr,
             exitPromise:exitProcess.promise,
         }
 

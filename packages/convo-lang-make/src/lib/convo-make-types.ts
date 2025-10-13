@@ -102,6 +102,11 @@ export interface ConvoMakeShellProc
     get onOutput():Observable<string>;
 
     /**
+     * Occurs with the process writes text to stdout
+     */
+    get onErr():Observable<string>;
+
+    /**
      * A promise that is completed when the process exits
      */
     exitPromise:Promise<number>;

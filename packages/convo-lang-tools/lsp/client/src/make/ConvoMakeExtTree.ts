@@ -66,7 +66,7 @@ export class ConvoMakeExtTree implements TreeDataProvider<ConvoMakeExtTreeItem<a
                     ext:this.ext,
                     tree:this,
                 })
-            }))
+            })).sort((a,b)=>a.name.localeCompare(b.name))
         }
     }
 
