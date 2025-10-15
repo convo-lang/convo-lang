@@ -36,6 +36,8 @@ export const convoMetadataKey=Symbol('convoMetadataKey');
 export const convoCaptureMetadataTag='captureMetadata';
 export const defaultConversationName='default';
 
+export const convoLogDir='.convo-lang-logs';
+
 export const convoMsgModifiers={
     /**
      * When applied to the function the function is used as the default function of an agent

@@ -1,4 +1,4 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, convoMakeStatsDir, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, convoLogDir, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
 import { asArray, base64EncodeMarkdownImage, CancelToken, delayAsync, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getFileNameNoExt, getTimestampString, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
@@ -147,7 +147,7 @@ export class ConvoMakeCtrl
         const logBaseName=normalizePath(joinPaths(
                 dir,
                 convoMakeStateDir,
-                convoMakeStatsDir,
+                convoLogDir,
                 `${getTimestampString()}-ID-${this.id}`
         ));
         this.statsPath=logBaseName+'.json';
