@@ -1,4 +1,4 @@
-import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
+import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, getFileNameNoExt, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
 import { ConvoError } from "./ConvoError.js";
@@ -16,7 +16,11 @@ const ifTrue=Symbol();
 const breakIteration=Symbol();
 
 const mdImg=createConvoScopeFunction(async (scope,ctx)=>{
-    const [url,description='image',contentType=getContentType(url)]=scope.paramValues??[];
+    const [
+        url,
+        description=getFileNameNoExt(url)?.trim().replace(/[^\w-. ]/g,'_')||'image',
+        contentType=getContentType(url)
+    ]=scope.paramValues??[];
     try{
         if(typeof url !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects first argument to be a string');

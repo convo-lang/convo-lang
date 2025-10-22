@@ -1,7 +1,6 @@
 import { ConvoMakeAppContentHostMode } from "./convo-make-common-types.js";
 
 export const convoMakeStateDir='.convo-make';
-export const convoMakeStatsDir='.convo-make-stats';
 export const defaultConvoMakeAppName='default';
 export const directUrlConvoMakeAppName='_direct_url';
 export const defaultConvoMakeStageName='default';

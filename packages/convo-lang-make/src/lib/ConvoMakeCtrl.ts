@@ -1085,7 +1085,7 @@ export class ConvoMakeCtrl
             inputTemplate:tmpl.inputTemplate,
             isContext,
             isCommand,
-            convo:content?isConvoFile?content:applyTemplate(content,isContext,tmpl,tags):undefined,
+            convo:content?isConvoFile?content:applyTemplate(content,relPath,isContext,tmpl,tags):undefined,
             ready,
             hash,
             isConvoFile,
@@ -1356,6 +1356,7 @@ const importReg=/(^|\n)[ \t]*@import\s/
 
 const applyTemplate=(
     content:string,
+    path:string|undefined,
     isContext:boolean,
     inputTemplate:ConvoMakeTargetContentTemplate,
     tags?:Record<string,string|boolean>
@@ -1373,8 +1374,12 @@ const applyTemplate=(
 
     if(!isContext && content!==undefined && content!==null){
 
-        if(inputTemplate.inputTag){
-            content=`<${inputTemplate.inputTag}>\n${content}\n</${inputTemplate.inputTag}>`;
+        const tag=inputTemplate.inputTag??(!inputTemplate.inputTemplate && path?
+            (getFileName(path).replace(/[^\w-]/g,'_'))
+        :undefined);
+
+        if(tag){
+            content=`<${tag}>\n${content}\n</${tag}>`;
         }
 
         if(inputTemplate.inputTemplate){
