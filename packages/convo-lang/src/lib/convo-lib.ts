@@ -336,6 +336,13 @@ export const convoFunctions={
     fsReadBase64Image:'fsReadBase64Image',
 
     /**
+     * Creates a markdown image from the given path and description. mdImg is an alias of `fsReadBase64Image`
+     *
+     * @signature (path:string description?:string contentType?:string) -> string
+     */
+    mdImg:'mdImg',
+
+    /**
      * Writes a JSON value to the virtual file system and returns the written value.
      */
     fsWriteJson:'fsWriteJson',

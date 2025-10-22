@@ -15,6 +15,28 @@ const ifFalse=Symbol();
 const ifTrue=Symbol();
 const breakIteration=Symbol();
 
+const mdImg=createConvoScopeFunction(async (scope,ctx)=>{
+    const [url,description='image',contentType=getContentType(url)]=scope.paramValues??[];
+    try{
+        if(typeof url !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects first argument to be a string');
+        }
+        if(typeof description !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects second argument to be a string');
+        }
+        if(typeof contentType !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects third argument to be a string');
+        }
+        const path=ctx.getFullPath(url,scope);
+
+        const data=await vfs().readBufferAsync(path);
+        return base64EncodeMarkdownImage(description,contentType,data);
+    }catch(ex){
+        console.error('ERROR',ex);
+        return ''
+    }
+})
+
 
 const mapFn=makeAnyConvoType('map',createConvoScopeFunction({
     usesLabels:true,
@@ -1290,7 +1312,7 @@ export const defaultConvoVarsBase={
     }),
 
     [convoFunctions.fsFullPath]:createConvoScopeFunction(async (scope,ctx)=>{
-        return ctx.getFullPath(scope.paramValues?.[0]);
+        return ctx.getFullPath(scope.paramValues?.[0],scope);
     }),
 
     [convoFunctions.joinPaths]:createConvoScopeFunction(async (scope)=>{
@@ -1462,7 +1484,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsWriteJson expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues[0]);
+        const path=ctx.getFullPath(scope.paramValues[0],scope);
         const value=scope.paramValues[1];
 
         await vfs().writeObjectAsync(path,value);
@@ -1473,7 +1495,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsReadJson expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         try{
             return await vfs().readObjectAsync(path);
@@ -1489,7 +1511,7 @@ export const extendedConvoVars={
         }
 
         const all=await Promise.all(options.names.map(async name=>{
-            const path=ctx.getFullPath(options.pattern?options.pattern.replace('*',name):name);
+            const path=ctx.getFullPath(options.pattern?options.pattern.replace('*',name):name,scope);
             let value=await vfs().readStringAsync(path);
             if(options.tagItemsWithName){
                 value=`<${name}>\n${value}\n</${name}>`;
@@ -1512,7 +1534,7 @@ export const extendedConvoVars={
         if(typeof url !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64 expects first argument to be a string');
         }
-        const path=ctx.getFullPath(url);
+        const path=ctx.getFullPath(url,scope);
 
         const data=await vfs().readStringAsync(path);
         return base64Encode(data??'');
@@ -1530,39 +1552,20 @@ export const extendedConvoVars={
         if(typeof contentType !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects second argument to be a string');
         }
-        const path=ctx.getFullPath(url);
+        const path=ctx.getFullPath(url,scope);
 
         const data=await vfs().readBufferAsync(path);
         return base64EncodeUrl(contentType,data);
     }),
 
-    [convoFunctions.fsReadBase64Image]:createConvoScopeFunction(async (scope,ctx)=>{
-        const [url,description='image',contentType=getContentType(url)]=scope.paramValues??[];
-        try{
-            if(typeof url !== 'string'){
-                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects first argument to be a string');
-            }
-            if(typeof description !== 'string'){
-                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects second argument to be a string');
-            }
-            if(typeof contentType !== 'string'){
-                throw new ConvoError('invalid-args',{statement:scope.s},'fsReadBase64Url expects third argument to be a string');
-            }
-            const path=ctx.getFullPath(url);
-
-            const data=await vfs().readBufferAsync(path);
-            return base64EncodeMarkdownImage(description,contentType,data);
-        }catch(ex){
-            console.error('ERROR',ex);
-            return ''
-        }
-    }),
+    [convoFunctions.fsReadBase64Image]:mdImg,
+    [convoFunctions.mdImg]:mdImg,
 
     [convoFunctions.fsWrite]:createConvoScopeFunction(async (scope,ctx)=>{
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsWrite expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues[0]);
+        const path=ctx.getFullPath(scope.paramValues[0],scope);
         const value=scope.paramValues[1];
 
         await vfs().writeStringAsync(path,(typeof value === 'string')?value:(value+''));
@@ -1573,7 +1576,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsRead expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         try{
             return await vfs().readStringAsync(path);
@@ -1586,7 +1589,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsRemove expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         return await vfs().removeAsync(path);
     }),
@@ -1595,7 +1598,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsMkDir expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         return await vfs().mkDirAsync(path);
     }),
@@ -1604,7 +1607,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsExists expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         return (await vfs().getItemAsync(path))?true:false
     }),
@@ -1613,7 +1616,7 @@ export const extendedConvoVars={
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsExists expects first argument to be a string');
         }
-        const path=ctx.getFullPath(scope.paramValues?.[0]);
+        const path=ctx.getFullPath(scope.paramValues?.[0],scope);
 
         try{
             return (await vfs().readDirAsync(path)).items.map(v=>v.path);
@@ -1705,3 +1708,4 @@ const isPrimitiveArray=(value:any)=>{
     }
     return true;
 }
+
