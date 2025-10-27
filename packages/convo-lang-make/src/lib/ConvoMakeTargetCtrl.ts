@@ -1,7 +1,7 @@
 import { AppendConvoOptions, Conversation, ConvoMakeActivePass, convoMakeStateDir, ConvoMakeTarget, convoMakeTargetConvoInputEnd, convoMakeTargetConvoInputEndReg, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMessage, convoRoles, convoVars, escapeConvo, parseConvoCode } from "@convo-lang/convo-lang";
 import { asArray, createPromiseSource, delayAsync, DisposeContainer, getContentType, getDirectoryName, getFileName, joinPaths, normalizePath, parseMarkdownImages, ReadonlySubject, strHashBase64Fs } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { convoMakeOutputTypeName, convoMakeTargetHasProps, getConvoMakeInputSortKey, getConvoMakeTargetInHash, getConvoMakeTargetOutHash, insertConvoMakeTargetShellInputs } from "./convo-make-lib.js";
+import { convoMakeOutputTypeName, convoMakeTargetHasProps, formatConvoMakeJsonOutput, getConvoMakeInputSortKey, getConvoMakeTargetInHash, getConvoMakeTargetOutHash, insertConvoMakeTargetShellInputs } from "./convo-make-lib.js";
 import { getDefaultConvoMakeTargetSystemMessage } from "./convo-make-prmopts.js";
 import { ConvoMakeAppTargetRef, ConvoMakeOutputReview, ConvoMakePassUpdate, ConvoMakeTargetState } from "./convo-make-types.js";
 import { ConvoMakeAppViewer } from "./ConvoMakeAppViewer.js";
@@ -317,9 +317,12 @@ export class ConvoMakeTargetCtrl
             while(!this.isDisposed){
 
                 if(!continueConvo){
-                    const r=this.target.shell?await this.runShellCommandAsync():(await this.conversation.completeAsync()).message?.content;
+                    let r=this.target.shell?await this.runShellCommandAsync():(await this.conversation.completeAsync()).message?.content;
                     if(this.isDisposed){
                         return;
+                    }
+                    if(r && this.target.outType){
+                        r=formatConvoMakeJsonOutput(r,this.target.outType);
                     }
                     this.log('result:',r===undefined?'undefined':(r.length>200?r.substring(0,200)+'...':r));
                     await Promise.all([

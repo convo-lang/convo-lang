@@ -359,3 +359,17 @@ export const insertConvoMakeTargetShellInputs=(shellCommand:string,target:ConvoM
     return shellCommand;
 
 }
+
+export const formatConvoMakeJsonOutput=(content:string,outType:string):string=>{
+    const isArray=outType.startsWith('array(');
+    const value=parseJson5(content);
+    if(isArray && !Array.isArray(value) && value && (typeof value === 'object')){
+        for(const e in value){
+            const v=value[e];
+            if(Array.isArray(v)){
+                return JSON.stringify(v,null,4);
+            }
+        }
+    }
+    return JSON.stringify(value,null,4);
+}
