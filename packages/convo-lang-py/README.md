@@ -1,11 +1,9 @@
-# Convo-Lang Python Wrapper (v0.6.0)
+# Convo-Lang Python Wrapper (v0.6.1)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/convo-lang?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/convo-lang)
 
 A Python wrapper around the **Convo-Lang CLI** that lets you build conversations in Python and execute them via the official Convo-Lang engine.
 
-> **Status:** 0.6.0 – basic conversation building + single-shot completion via the CLI.
-
-\
-
+> **Status:** 0.6.1 – basic conversation building + single-shot completion via the CLI.
 
 ---
 
