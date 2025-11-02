@@ -1,6 +1,6 @@
 import { isPromise } from "@iyio/common";
-import { createConvoScopeFunction } from "./convo-lib";
-import { isConvoPipeTarget } from "./convo-types";
+import { createConvoScopeFunction } from "./convo-lib.js";
+import { isConvoPipeTarget } from "./convo-types.js";
 
 const pipeValues=(values:any[]):any=>{
     if(values.length<2){

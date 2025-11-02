@@ -1,6 +1,6 @@
-import { ConvoHashCacheBase } from "./ConvoHashCacheBase";
-import { commonConvoCacheTypes } from "./convo-lib";
-import { ConvoCompletionMessage } from "./convo-types";
+import { ConvoHashCacheBase } from "./ConvoHashCacheBase.js";
+import { commonConvoCacheTypes } from "./convo-lib.js";
+import { ConvoCompletionMessage } from "./convo-types.js";
 
 /**
  * Caches conversation responses in memory

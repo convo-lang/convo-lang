@@ -1,8 +1,8 @@
 import { ConvoDocumentReference, ConvoRagSearch, ConvoRagSearchResult, ConvoRagSearchResultItem, ConvoRagService, createEmptyConvoTokenUsage, defaultConvoRagSearchLimit, mergeConvoRagResults } from "@convo-lang/convo-lang";
 import { InternalOptions, Scope } from "@iyio/common";
 import { Index, IntegratedRecord, Pinecone, RecordMetadata } from '@pinecone-database/pinecone';
-import { pineconeAllowedReadIndexesParam, pineconeAllowedWriteIndexesParam, pineconeApiKeyParam, pineconeAutoCreateIndexParam, pineconeCloudParam, pineconeIndexKeyParam, pineconeIndexMountsParam, pineconeIndexParam, pineconeModelParam, pineconeRegionParam } from "./convo-pinecone-deps";
-import { defaultPineconeAutoCreateIndex, defaultPineconeCloud, defaultPineconeIndex, defaultPineconeIndexKey, defaultPineconeModel, defaultPineconeRegion } from "./pinecone-const";
+import { pineconeAllowedReadIndexesParam, pineconeAllowedWriteIndexesParam, pineconeApiKeyParam, pineconeAutoCreateIndexParam, pineconeCloudParam, pineconeIndexKeyParam, pineconeIndexMountsParam, pineconeIndexParam, pineconeModelParam, pineconeRegionParam } from "./convo-pinecone-deps.js";
+import { defaultPineconeAutoCreateIndex, defaultPineconeCloud, defaultPineconeIndex, defaultPineconeIndexKey, defaultPineconeModel, defaultPineconeRegion } from "./pinecone-const.js";
 
 export interface ConvoPineconeIndexMount
 {

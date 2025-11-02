@@ -6,7 +6,7 @@ import { atDotCss } from "@iyio/at-dot-css";
 import { createJsonRefReplacer } from "@iyio/common";
 import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConversationInputChange, useConversation, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
+import { ConversationInputChange, useConversation, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
 
 export interface MessagesSourceViewProps
 {

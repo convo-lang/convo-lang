@@ -1,9 +1,10 @@
-import { Conversation, ConversationOptions, convoAnyModelName } from '@convo-lang/convo-lang';
 import { InternalOptions, ReadonlySubject, createJsonRefReplacer, getErrorMessage, pushBehaviorSubjectAry } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { BehaviorSubject } from 'rxjs';
-import { ConvoModelTestManager } from './ConvoModelTestManager';
-import { ConvoModelTestResult } from './convo-testing-types';
+import { Conversation, ConversationOptions } from '../Conversation.js';
+import { convoAnyModelName } from '../convo-lib.js';
+import { ConvoModelTestManager } from './ConvoModelTestManager.js';
+import { ConvoModelTestResult } from './convo-testing-types.js';
 
 export interface ConvoModelTesterOptions
 {

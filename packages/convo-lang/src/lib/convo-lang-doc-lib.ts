@@ -1,8 +1,8 @@
 import { asArray, continueFunction, getContentType } from "@iyio/common";
 import { VfsItem, getVfsItemUrl } from "@iyio/vfs";
-import { ConvoDocOutput, ConvoDocPageResult, ConvoDocQueryResult, ConvoDocRangeOptions, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement } from "./convo-lang-doc-types";
-import { convoDocReaderFactory } from "./convo-lang-doc.deps";
-import { escapeConvo } from "./convo-lib";
+import { ConvoDocOutput, ConvoDocPageResult, ConvoDocQueryResult, ConvoDocRangeOptions, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement } from "./convo-lang-doc-types.js";
+import { convoDocReaderFactory } from "./convo-lang-doc.deps.js";
+import { escapeConvo } from "./convo-lib.js";
 
 export const convoDocOutputsToDocument=(outputs:ConvoDocOutput[]):ConvoDocQueryResult=>{
 

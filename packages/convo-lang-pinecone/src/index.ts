@@ -1,6 +1,6 @@
-export * from './lib/ConvoPineconeRagService';
-export * from './lib/convo-pinecone-deps';
-export * from './lib/convo-pinecone-module';
-export * from './lib/pinecone-const';
+export * from './lib/ConvoPineconeRagService.js';
+export * from './lib/convo-pinecone-deps.js';
+export * from './lib/convo-pinecone-module.js';
+export * from './lib/pinecone-const.js';
 
 

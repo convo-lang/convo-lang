@@ -1,5 +1,5 @@
-import { flatConvoConversationToBase, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
-import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase } from "./convo-types";
+import { flatConvoConversationToBase, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
+import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase } from "./convo-types.js";
 
 export class PassthroughConvoConversationConverter implements ConvoConversationConverter<FlatConvoConversationBase,ConvoCompletionMessage[]>
 {

@@ -2,12 +2,12 @@ import { DisposeContainer, Point, ReadonlySubject, Size, removeBehaviorSubjectAr
 import { PanZoomCtrl } from "@iyio/react-common";
 import { DragEvent } from "react";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { ConvoGraphCtrl } from "../../ConvoGraphCtrl";
-import { compareConvoGraphSelections, createConvoGraphEntity, hasConvoGraphDb } from "../../convo-graph-lib";
-import { ConvoEdge, ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityAny, ConvoGraphEntityRef, ConvoGraphSelection, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types";
-import { ConvoLineCtrl } from "./ConvoLineCtrl";
-import { getDarkConvoGraphStyle } from "./convo-graph-react-lib";
-import { ConvoEntityLayoutCtrl, ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoInputSource } from "./convo-graph-react-type";
+import { ConvoGraphCtrl } from "../../ConvoGraphCtrl.js";
+import { compareConvoGraphSelections, createConvoGraphEntity, hasConvoGraphDb } from "../../convo-graph-lib.js";
+import { ConvoEdge, ConvoGraphDb, ConvoGraphEntities, ConvoGraphEntityAny, ConvoGraphEntityRef, ConvoGraphSelection, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types.js";
+import { ConvoLineCtrl } from "./ConvoLineCtrl.js";
+import { getDarkConvoGraphStyle } from "./convo-graph-react-lib.js";
+import { ConvoEntityLayoutCtrl, ConvoGraphEntityRenderResult, ConvoGraphEntityRenderer, ConvoGraphStyle, ConvoInputSource } from "./convo-graph-react-type.js";
 
 export interface ConvoGraphViewCtrlOptions
 {

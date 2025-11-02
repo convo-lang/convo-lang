@@ -1,7 +1,7 @@
 
 import { ScopeModule, initRootScope, rootScope } from '@iyio/common';
-import { openAiApiKeyParam } from './openai-params';
-import { convoOpenAiModule } from './openai-service';
+import { openAiApiKeyParam } from './openai-params.js';
+import { convoOpenAiModule } from './openai-service.js';
 
 let inited=false;
 export const initOpenAiBackend=(apiKey?:string,module?:ScopeModule)=>{

@@ -1,9 +1,9 @@
 import { NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
-import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib";
-import { convoRagService } from "./convo-rag-lib";
-import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types";
-import { ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types";
-import { convoCompletionService } from "./convo.deps";
+import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
+import { convoRagService } from "./convo-rag-lib.js";
+import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
+import { ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
+import { convoCompletionService } from "./convo.deps.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;

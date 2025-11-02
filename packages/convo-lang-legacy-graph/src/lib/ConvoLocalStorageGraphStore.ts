@@ -1,4 +1,4 @@
-import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions } from "./ConvoMemoryGraphStore";
+import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions } from "./ConvoMemoryGraphStore.js";
 
 const defaultStoreKey='convo-graph-store';
 

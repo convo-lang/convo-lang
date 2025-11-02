@@ -2,7 +2,7 @@ import { Conversation, ConversationOptions, ConvoMessage } from "@convo-lang/con
 import { CancelToken, CodeParsingResult, Point } from "@iyio/common";
 import { BehaviorSubject, Observable } from "rxjs";
 import { ZodType } from "zod";
-import type { ConvoGraphCtrl } from "./ConvoGraphCtrl";
+import type { ConvoGraphCtrl } from "./ConvoGraphCtrl.js";
 
 export const allConvoGraphEntityTypeAry=['node','edge','input','source','traverser'] as const;
 export type ConvoGraphEntityType=typeof allConvoGraphEntityTypeAry[number];

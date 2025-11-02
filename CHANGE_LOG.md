@@ -1,5 +1,27 @@
 ## Change Log
 
+### v0.8.0
+- **Build System**: Replaced NX build system with pkij
+- **Compatibility**: Removed CJS build format
+- **Node Version**: Removed support for NodeJS v18. v20 and above supported.
+
+### v0.7.50
+- **Convo-Make**: Added comprehensive Convo-Make system for build automation and code generation
+  - Added support for make targets with dynamic inputs and outputs
+  - Added multi-pass generation system with stage-based builds
+  - Added sandbox mode for secure script execution
+  - Added token usage tracking and observability improvements
+  - Added VS Code Build side panel integration
+  - Added support for previewing components and generating images
+  - Added recursive input searching and working directory improvements
+
+### v0.7.49
+- **Image Support**: Added support for image message responses in OpenAI API providers
+- **Message Handling**: Enhanced message processing with custom handlers and role-specific append functions
+- **Standard Library**: Added filesystem base64 functions and std:// protocol imports
+- **VS Code Extension**: Added buttons for make file operations, process indicators, and parsed target viewing
+- **Legacy Code**: Moved legacy ConvoGraph code to separate package and removed deprecated VFS package
+
 ### v0.7.48
 - **Bug Fixes**: Fixed inline prompting bugs
 - **JSON Mode**: JSON response request message is now only appended if the message is the last message in the conversation

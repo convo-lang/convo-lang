@@ -1,10 +1,10 @@
 import { Scope, ScopeRegistration, secretManager } from "@iyio/common";
-import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService";
-import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter";
-import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps";
-import { convoAnthropicInputType, convoAnthropicOutputType } from "./anthropic-lib";
-import { defaultAnthropicChatModel, knownConvoAnthropicModels } from "./anthropic-models";
-import { anthropicApiKeyParam, anthropicBaseUrlParam, anthropicChatModelParam, anthropicSecretsParam, anthropicVisionModelParam } from "./anthropic-params";
+import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService.js";
+import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter.js";
+import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps.js";
+import { convoAnthropicInputType, convoAnthropicOutputType } from "./anthropic-lib.js";
+import { defaultAnthropicChatModel, knownConvoAnthropicModels } from "./anthropic-models.js";
+import { anthropicApiKeyParam, anthropicBaseUrlParam, anthropicChatModelParam, anthropicSecretsParam, anthropicVisionModelParam } from "./anthropic-params.js";
 
 export const convoAnthropicModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,createAnthropicConvoServiceFromScope);

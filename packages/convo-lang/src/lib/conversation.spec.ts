@@ -1,11 +1,11 @@
 import { asType, valueIsZodObject } from '@iyio/common';
 import { ZodEnum, ZodObject, z } from 'zod';
-import { CallbackConvoCompletionService } from './CallbackConvoCompletionService';
-import { Conversation } from "./Conversation";
-import { ConvoError } from './ConvoError';
-import { ConvoComponent } from './convo-component-types';
-import { getConvoMetadata } from './convo-lib';
-import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
+import { CallbackConvoCompletionService } from './CallbackConvoCompletionService.js';
+import { Conversation } from "./Conversation.js";
+import { ConvoError } from './ConvoError.js';
+import { ConvoComponent } from './convo-component-types.js';
+import { getConvoMetadata } from './convo-lib.js';
+import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types.js";
 
 describe('conversation',()=>{
 

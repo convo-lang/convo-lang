@@ -1,7 +1,7 @@
 import { ConvoMakeActivePass, ConvoMakeApp, ConvoMakeAppContentHostMode, ConvoMakeExplicitReviewType, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
 import { Observable } from "rxjs";
-import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
-import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
+import { ConvoMakeCtrl } from "./ConvoMakeCtrl.js";
+import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl.js";
 
 export interface ConvoMakeTargetPair{
     target:ConvoMakeTarget;

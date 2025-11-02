@@ -1,9 +1,9 @@
 import { BedrockRuntimeClient, ConverseCommand, ConverseCommandInput, ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
 import { ConvoCompletionCtx, ConvoCompletionService, FlatConvoConversationBase, isConvoModelAliasMatch } from "@convo-lang/convo-lang";
 import { deleteUndefined, Scope } from "@iyio/common";
-import { bedrockModelPrefix, convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib";
-import { bedrockModels } from "./bedrock-models";
-import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam, awsProfileParam, awsRegionParam } from "./bedrock-params";
+import { bedrockModelPrefix, convoBedrockInputType, convoBedrockOutputType } from "./bedrock-lib.js";
+import { bedrockModels } from "./bedrock-models.js";
+import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam, awsProfileParam, awsRegionParam } from "./bedrock-params.js";
 
 export interface BedrockConvoCompletionServiceOptions
 {

@@ -1,5 +1,5 @@
-import { genMetadataToString } from "@convo-lang/convo-lang-react";
 import { joinPaths } from "@iyio/common";
+import { genMetadataToString } from "../gen/gen-lib.js";
 
 export interface GenImgUrlOptions
 {

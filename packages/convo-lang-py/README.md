@@ -27,6 +27,7 @@ Download and install the latest **LTS** version of Node.js (includes `npm`):
 
 Verify installation:
 
+
 ```bash
 node -v
 npm -v
@@ -39,6 +40,7 @@ npm i -g @convo-lang/convo-lang-cli
 ```
 
 This makes the `convo` binary available in your `PATH`.
+
 
 ### 3. Install the Python wrapper
 

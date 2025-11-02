@@ -1,9 +1,9 @@
 import { XmlNode } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { ZodType } from "zod";
-import { Conversation } from "./Conversation";
-import type { ConversationUiCtrl } from "./ConversationUiCtrl";
-import { ConvoCompletionMessage, FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import { Conversation } from "./Conversation.js";
+import type { ConversationUiCtrl } from "./ConversationUiCtrl.js";
+import { ConvoCompletionMessage, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export interface ConvoComponentDef
 {

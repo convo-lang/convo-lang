@@ -1,7 +1,7 @@
 import { isVfsFilePath, vfs } from "@iyio/vfs";
-import { convoTraverserProxyVar, getConvoTraverserForSaving, getConvoTraverserStoreId, getConvoTraverserStoreIdById } from "./convo-graph-lib";
-import { ConvoStateVarProxyMap, ConvoTraverser } from "./convo-graph-types";
-import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions } from "./ConvoMemoryGraphStore";
+import { convoTraverserProxyVar, getConvoTraverserForSaving, getConvoTraverserStoreId, getConvoTraverserStoreIdById } from "./convo-graph-lib.js";
+import { ConvoStateVarProxyMap, ConvoTraverser } from "./convo-graph-types.js";
+import { ConvoMemoryGraphStore, ConvoMemoryGraphStoreOptions } from "./ConvoMemoryGraphStore.js";
 
 export type ConvoVfsProxyType='all'|'none'|'traverser'|'node'|'edge';
 

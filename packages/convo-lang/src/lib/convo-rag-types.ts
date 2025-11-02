@@ -1,5 +1,5 @@
-import type { Conversation } from "./Conversation";
-import type { ConvoTokenUsage, FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import type { Conversation } from "./Conversation.js";
+import type { ConvoTokenUsage, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export type ConvoVectorValue=string|number[]|Uint8Array;
 

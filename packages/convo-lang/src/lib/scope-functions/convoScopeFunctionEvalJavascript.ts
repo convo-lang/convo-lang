@@ -1,5 +1,5 @@
-import { ConvoError } from "../ConvoError";
-import { createConvoScopeFunction } from "../convo-lib";
+import { ConvoError } from "../ConvoError.js";
+import { createConvoScopeFunction } from "../convo-lib.js";
 
 export const convoScopeFunctionEvalJavascript=createConvoScopeFunction(async (scope,ctx)=>{
 

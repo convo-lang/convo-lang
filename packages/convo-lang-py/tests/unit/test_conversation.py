@@ -23,7 +23,6 @@ def test_add_message_variants_and_to_convo():
     )
     assert c.to_convo() == expected
 
-
 def test_complete_parsing_with_mock_runner():
     transcript = (
         's:{"foo":["bar"]}\n'
@@ -61,3 +60,4 @@ def test_complete_raises_on_invalid_json_with_mock_runner():
     c.convo_cli_runner = MockConvoRunner(response=bad_transcript)
     with pytest.raises(ParseError):
         c.complete()
+

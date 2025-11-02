@@ -1,6 +1,6 @@
 import { ConvoImageGenerator, ConvoImageResponse } from "@convo-lang/convo-lang";
 import { httpClient, joinPaths } from "@iyio/common";
-import { openAiApiKeyParam, openAiBaseUrlParam, openAiImageModelParam } from "./convo-lang-openai-params";
+import { openAiApiKeyParam, openAiBaseUrlParam, openAiImageModelParam } from "./convo-lang-openai-params.js";
 
 interface ImagesResponse
 {

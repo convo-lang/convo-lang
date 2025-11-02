@@ -4,7 +4,7 @@ import { wAryMove, wAryRemove, wSetProp, wSetPropOrDeleteFalsy } from "@iyio/com
 import { SlimButton, View, useWProp } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback } from "react";
-import { ConvoNode, ConvoNodeStep } from "../../convo-graph-types";
+import { ConvoNode, ConvoNodeStep } from "../../convo-graph-types.js";
 
 export interface ConvoNodeStepViewProps
 {

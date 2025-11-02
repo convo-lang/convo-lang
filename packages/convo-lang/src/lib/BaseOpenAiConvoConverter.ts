@@ -1,8 +1,8 @@
 import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
-import { createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib";
-import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types";
-import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat';
+import { convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib.js";
+import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types.js";
+import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat/index.js';
 
 export interface BaseOpenAiConvoConverterOptions
 {
@@ -24,6 +24,8 @@ export interface BaseOpenAiConvoConverterOptions
      * Roles that will map to the system role
      */
     systemRoles?:string[];
+
+    includeModalities?:boolean;
 
     /**
      * Roles that will map to the function role
@@ -55,6 +57,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public readonly chatModel?:string;
     public readonly visionModel?:string;
     public readonly models?:ConvoModelInfo[];
+    public readonly includeModalities?:boolean;
     public readonly hasVision?:(modelName:string)=>boolean;
 
     public readonly transformInput?:(input:ChatCompletionCreateParamsNonStreaming)=>ChatCompletionCreateParamsNonStreaming;
@@ -75,6 +78,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         hasVision,
         transformInput,
         transformOutput,
+        includeModalities,
     }:BaseOpenAiConvoConverterOptions){
         this.chatModel=chatModel;
         this.visionModel=visionModel;
@@ -95,6 +99,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         this.hasVision=hasVision;
         this.transformInput=transformInput;
         this.transformOutput=transformOutput;
+        this.includeModalities=includeModalities;
 
 
     }
@@ -154,14 +159,24 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 outputTokens:output.usage?.completion_tokens,
             })];
         }else{
+            let content=msg.message.content;
+            let vision=false;
+            if(msg.message.images?.length){
+                const urls=msg.message.images.filter(i=>i?.image_url?.url && i?.type==='image_url').map(i=>`![image](${i.image_url.url})`);
+                if(urls.length){
+                    content+='\n\n'+urls.join('\n\n');
+                    vision=true;
+                }
+            }
             return [createTextConvoCompletionMessage({
                 flat,
                 role:msg.message.role,
-                content:msg.message.content,
+                content,
                 model:output.model,
                 models:this.models,
                 inputTokens:output.usage?.prompt_tokens,
                 outputTokens:output.usage?.completion_tokens,
+                tags:vision?{[convoTags.vision]:''}:undefined
             })];
         }
     }
@@ -254,6 +269,10 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 flat.toolChoice:{type:"function","function":flat.toolChoice}
             ):undefined
         };
+
+        if(this.includeModalities && flat.model?.outputCapabilities?.length){
+            cParams.modalities=flat.model.outputCapabilities as any;
+        }
 
         if(flat.temperature!==undefined){
             cParams.temperature=flat.temperature;

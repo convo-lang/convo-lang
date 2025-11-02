@@ -1,4 +1,4 @@
-import { getRawConvoValueAsString } from "./convo-template-types";
+import { getRawConvoValueAsString } from "./convo-template-types.js";
 
 
 export const convoScript=(strings:TemplateStringsArray,...values:any[]):string=>{

@@ -2,12 +2,12 @@ import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValue
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
-import type { ConversationOptions } from "./Conversation";
-import { ConvoError } from "./ConvoError";
-import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { ConvoDocumentReference } from "./convo-rag-types";
-import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types";
+import type { ConversationOptions } from "./Conversation.js";
+import { ConvoError } from "./ConvoError.js";
+import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
+import { ConvoDocumentReference } from "./convo-rag-types.js";
+import { convoSystemMessages } from "./convo-system-messages.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -342,6 +342,12 @@ export const convoFunctions={
      * Reads a string value from the virtual file system
      */
     fsRead:'fsRead',
+
+    /**
+     * Reads multiple files as a single string using a list of names and an optional pattern that
+     * the each name is inserted into.
+     */
+    fsMultiRead:'fsMultiRead',
 
     /**
      * Writes a string value to the virtual file system and returns the written value.
@@ -694,6 +700,15 @@ export const convoVars={
     __makeStages:'__makeStages',
 
     /**
+     * Relative path to the make directory the current convo file was created in
+     */
+    __makeRoot:'__makeRoot',
+
+    __makeFile:'__makeFile',
+
+    __makeOut:'__makeOut',
+
+    /**
      * Maps custom messages to handler functions
      */
     __messageHandlers:'__messageHandlers',
@@ -701,7 +716,7 @@ export const convoVars={
     /**
      * Name of a type to be used as the default json response type
      */
-    __defaultResponseType:'__defaultResponseType'
+    __defaultResponseType:'__defaultResponseType',
 
 } as const;
 
@@ -1964,7 +1979,13 @@ export const escapeConvo=(content:string|null|undefined,isStartOfMessage=true,op
     }
 
     if(content.includes('{{')){
-        content=content.replace(/\{\{/g,'\\{{');
+        content=content.replace(/(\\*)\{\{/g,(_,slashes:string)=>{
+            if(!(slashes.length%2)){
+                return slashes+'\\{{';
+            }else{
+                return _;
+            }
+        });
     }
     if(content.includes('>')){
         content=content.replace(
@@ -2606,6 +2627,7 @@ export const createTextConvoCompletionMessage=({
     outputTokens,
     tokenPrice,
     defaults,
+    tags,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     const lastContentMessage=getLastConvoContentMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
@@ -2619,6 +2641,7 @@ export const createTextConvoCompletionMessage=({
         assignTo:lastContentMessage?.responseAssignTo,
         endpoint:flat.responseEndpoint,
         model,
+        tags,
         ...((models && tokenPrice===undefined)?calculateConvoTokenUsage(
             model,
             models,
@@ -2727,6 +2750,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         responseEndpoint:flat.responseEndpoint,
         userId:flat.userId,
         apiKey:flat.apiKey,
+        model:flat.model,
     }
 }
 
@@ -3121,7 +3145,7 @@ export const insertConvoContentIntoSlot=(content:string,template:string,slotName
         if(slotName){
             return slot===slotName?escapeConvo(content):_;
         }else{
-            return escapeConvo(content);
+            return slot?_:escapeConvo(content);
         }
     })
 }
@@ -3132,3 +3156,11 @@ export const contentHasConvoRole=(content:string):boolean=>{
 }
 
 export const defaultConvoImportServicePriority=0;
+
+export const isConvoTypeArray=(value:any):boolean=>{
+    return (
+        Array.isArray(value) &&
+        value.length &&
+        value.every(v=>v?.[convoMetadataKey])
+    )?true:false;
+}

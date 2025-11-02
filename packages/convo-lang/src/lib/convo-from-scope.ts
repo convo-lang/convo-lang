@@ -1,7 +1,7 @@
 import { Scope, rootScope } from "@iyio/common"
-import { Conversation, ConversationOptions } from "./Conversation"
-import { ConvoCapability, allConvoCapabilityAry } from "./convo-types"
-import { convoCapabilitiesParams } from "./convo.deps"
+import { Conversation, ConversationOptions } from "./Conversation.js"
+import { ConvoCapability, allConvoCapabilityAry } from "./convo-types.js"
+import { convoCapabilitiesParams } from "./convo.deps.js"
 
 /**
  * Creates a new Conversation configured using values defined in the given scope or the root scope.

@@ -1,8 +1,8 @@
 import { Lock, getFileName, joinPaths, strHashBase64Fs } from "@iyio/common";
 import { ErrorBoundary, JsonView } from "@iyio/react-common";
 import { vfs } from "@iyio/vfs";
-import { GenNode } from "./GenNode";
-import { GenItemRenderer, GenNodeSuccessState } from "./gen-lib";
+import { GenNode } from "./GenNode.js";
+import { GenItemRenderer, GenNodeSuccessState } from "./gen-lib.js";
 
 export interface ConvoGenFile
 {

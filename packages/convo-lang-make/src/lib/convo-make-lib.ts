@@ -1,6 +1,7 @@
-import { ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { asArray, getDirectoryName, getFileName, getObjKeyCount, normalizePath, valueIsZodType } from "@iyio/common";
-import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl";
+import { ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
+import { asArray, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, normalizePath, valueIsZodType } from "@iyio/common";
+import { parseJson5 } from "@iyio/json5";
+import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl.js";
 
 
 
@@ -14,7 +15,13 @@ export const getConvoMakeTargetInHash=(value:string)=>{
 
 }
 
-
+export const getConvoMakeTargetOutHash=(value:string)=>{
+    const match=outReg.exec(value);
+    if(!match){
+        return '';
+    }
+    return value.substring(match.index+match[0].length).replace(/^\r?\n/,'');
+}
 
 /**
  * Props that should effect the target's hash
@@ -189,3 +196,128 @@ export const getEscapeConvoMakePathName=(path:string)=>{
             '~d'
     ))
 }
+
+export const getConvoMakeContextTemplateType=(tmpl:ConvoMakeContentTemplate,content?:string):'json'|'markdown'=>{
+    const contentType=tmpl.contentType||getContentType(tmpl.path);
+    const ext=getFileExt(tmpl.path,false,true);
+    if(contentType.includes('markdown') || ext==='mdx'){
+        return 'markdown';
+    }
+    if(contentType.includes('json')){
+        return 'json';
+    }
+    if(!content){
+        return 'markdown';
+    }
+    content=content.trim();
+    return (content.startsWith('{') || content.startsWith('['))?'json':'markdown';
+}
+
+const mdSectionReg=/(\n|^)[ \t]*(#+)(.*)/g;
+
+const selectMarkdownSection=(section:string,content:string):string=>{
+    section=section.trim().toLowerCase();
+    mdSectionReg.lastIndex=0;
+    let startIndex:number|undefined;
+    let headerSize=0;
+    while(true){
+        const match=mdSectionReg.exec(content);
+        if(!match){
+            break;
+        }
+        if(startIndex===undefined){
+            if(match[3]?.trim().toLowerCase()===section){
+                startIndex=match.index;
+                headerSize=match[2]?.length??0;
+            }
+        }else{
+            if((match[2]?.length??0)>=headerSize){
+                return content.substring(startIndex,match.index-1).trim();
+            }
+        }
+
+    }
+    return startIndex===undefined?'':content.substring(startIndex).trim();
+}
+
+const selectContextContent=(content:string,tmpl:ConvoMakeContentTemplate,select:string):string=>{
+    const type=getConvoMakeContextTemplateType(tmpl,content);
+    if(type==='json'){
+        try{
+            const value=parseJson5(content);
+            return getValueByPath(value,select,undefined)+'';
+        }catch(ex){
+            return getErrorMessage(ex);
+        }
+    }else{
+        return selectMarkdownSection(select,content);
+    }
+}
+export interface ApplyConvoMakeContentTemplateOptions{
+    name?:string;
+    templateVars?:Record<string,string>;
+}
+export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContentTemplate,options?:ApplyConvoMakeContentTemplateOptions):string=>{
+
+    if(tmpl.select){
+        content=asArray(tmpl.select).map(s=>selectContextContent(content,tmpl,s)).join('\n\n');
+    }
+
+    if(tmpl.maxLength!==undefined){
+        content=content.substring(0,tmpl.maxLength);
+    }
+
+    if(tmpl.tag){
+        content=`<${tmpl.tag}>\n${content}\n</${tmpl.tag}>`;
+    }
+    if(options?.name && tmpl.tagWithName){
+        content=`<${options.name}>\n${content}\n</${options.name}>`;
+    }
+    if(tmpl.template){
+        content=insertConvoContentIntoSlot(content,tmpl.template);
+        if(options?.name){
+            content=insertConvoContentIntoSlot(options.name,content,'NAME');
+        }
+        if(options?.templateVars){
+            for(const e in options.templateVars){
+                content=insertConvoContentIntoSlot(options.templateVars[e]??'',content,e);
+            }
+        }
+    }
+    if(tmpl.prefix){
+        content=tmpl.prefix+'\n\n'+content;
+    }
+    if(tmpl.suffix){
+        content+='\n\n'+tmpl.suffix;
+    }
+    return content;
+}
+
+export const getConvoMakeAppProtocol=(app:ConvoMakeApp):string=>{
+    if(app.protocol){
+        return app.protocol;
+    }
+    const host=app.host??'localhost';
+    return host==='localhost' || host.endsWith('.localhost') || host.startsWith('127.')?'http':'https';
+}
+
+
+
+export const getConvoMakeAppBaseUrl=(app:ConvoMakeApp):string=>{
+    return `${
+        getConvoMakeAppProtocol(app)
+    }://${
+        app.host??'localhost'
+    }${
+        app.port?`:${app.port}`:''
+    }`;
+}
+
+export const getConvoMakeAppUrl=(app:ConvoMakeApp,path:string):string=>{
+    return `${
+        getConvoMakeAppBaseUrl(app)
+    }${
+        path.startsWith('/')?'':'/'}${path
+    }`
+}
+

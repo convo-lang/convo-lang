@@ -1,8 +1,8 @@
 import { JsonScheme, valueIsZodType, wordToSingular, zodTypeToJsonScheme } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
-import { ConvoError } from "./ConvoError";
-import { convoDescriptionToCommentOut, convoMetadataKey } from "./convo-lib";
-import { ConvoBaseType, ConvoMetadata, OptionalConvoValue, isConvoBaseType, isConvoType, isOptionalConvoValue } from "./convo-types";
+import { ConvoError } from "./ConvoError.js";
+import { convoDescriptionToCommentOut, convoMetadataKey } from "./convo-lib.js";
+import { ConvoBaseType, ConvoMetadata, OptionalConvoValue, isConvoBaseType, isConvoType, isOptionalConvoValue } from "./convo-types.js";
 
 const typeCacheKey=Symbol('typeCacheKey');
 
@@ -42,7 +42,7 @@ const _convoValueToZodType=(value:any,metadata:ConvoMetadata|undefined,maxDepth=
         if(value.length===0){
             zType=z.any();
         }else{
-            zType=_convoValueToZodType(value[0],undefined,maxDepth);
+            zType=_convoValueToZodType(value[0],value[0]?.[convoMetadataKey],maxDepth);
         }
     }else if(isConvoType(value)){
         if(isConvoBaseType(value.type)){

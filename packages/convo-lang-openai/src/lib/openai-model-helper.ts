@@ -1,6 +1,6 @@
 import { Scope } from "@iyio/common";
-import { openAiAudioModelParam, openAiChatModelParam, openAiImageModelParam, openAiVisionModelParam } from "./convo-lang-openai-params";
-import { OpenAiModels } from "./openai-types";
+import { openAiAudioModelParam, openAiChatModelParam, openAiImageModelParam, openAiVisionModelParam } from "./convo-lang-openai-params.js";
+import { OpenAiModels } from "./openai-types.js";
 
 /**
  * @deprecated

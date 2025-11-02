@@ -1,9 +1,9 @@
 import { atDotCss } from "@iyio/at-dot-css";
 import { Point, ReadonlySubject, Rect, getDistanceBetweenPoints, wAryRemoveAt, wArySplice, wSetProp } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { ConvoEdge } from "../../convo-graph-types";
-import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
-import { ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type";
+import { ConvoEdge } from "../../convo-graph-types.js";
+import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl.js";
+import { ConvoGraphStyle, ConvoUiLine } from "./convo-graph-react-type.js";
 
 const plusSize=22;
 const plusSizeHalf=plusSize/2;

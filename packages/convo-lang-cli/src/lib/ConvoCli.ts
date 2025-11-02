@@ -10,8 +10,8 @@ import { VfsDiskMntCtrl } from "@iyio/vfs-node";
 import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import { z } from 'zod';
-import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types";
-import { createConvoExec } from './convo-exec';
+import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
+import { createConvoExec } from './convo-exec.js';
 
 let configPromise:Promise<ConvoCliConfig>|null=null;
 export const getConvoCliConfigAsync=(options:ConvoCliOptions):Promise<ConvoCliConfig>=>

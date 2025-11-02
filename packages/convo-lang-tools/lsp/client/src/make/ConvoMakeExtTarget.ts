@@ -1,8 +1,8 @@
 import { ConvoMakeCtrl, ConvoMakeTargetCtrl } from "@convo-lang/convo-lang-make";
 import { ProviderResult } from "vscode";
-import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
-import { createConvoExtIcon } from "./convo-make-ext-lib";
+import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
+import { createConvoExtIcon } from "./convo-make-ext-lib.js";
 
 
 
@@ -54,8 +54,10 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
             'target-'+
             (this.obj.reviewing?'reviewing':this.obj.state)+
             (this.obj.outExists?'-exists':'-notFound')+
+            (this.obj.target.outFromList?'-list':'-notList')+
             (this.obj.target.review?'-review':'-newReview')+
-            (this.ctrl.preview?'-preview':'-noPreview')
+            (this.ctrl.preview?'-preview':'-noPreview')+
+            (this.obj.convoExists?'-convoExists':'-convoNotExists')
         );
     }
 
@@ -68,7 +70,9 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
 const getIcon=(target:ConvoMakeTargetCtrl)=>{
     return createConvoExtIcon(
         target.reviewing?
-            'open-preview'
+            'debug-line-by-line'
+        :target.outputInSync===false?
+            'diff-modified'
         :target.state==='complete'?
             'check'
         :target.isDisposed?

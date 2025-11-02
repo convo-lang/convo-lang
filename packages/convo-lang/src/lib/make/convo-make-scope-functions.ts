@@ -1,7 +1,7 @@
 import { aryUnique, getDirectoryName, joinPaths, normalizePath } from "@iyio/common";
-import { convoVars, createConvoScopeFunction } from "../convo-lib";
-import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib";
-import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps } from "./convo-make-common-types";
+import { convoVars, createConvoScopeFunction } from "../convo-lib.js";
+import { defaultConvoMakeAppName, defaultConvoMakeStageName } from "./convo-make-common-lib.js";
+import { ConvoMakeApp, ConvoMakeStage, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps } from "./convo-make-common-types.js";
 
 
 export const convoMakeScopeFunction=createConvoScopeFunction({usesLabels:true},(scope,ctx)=>{

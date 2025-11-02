@@ -2,7 +2,7 @@ import { ConvoComponent, ConvoComponentMessageState, ConvoComponentRenderCache }
 import { atDotCss } from "@iyio/at-dot-css";
 import { JsonView, LoadingDots, View, useSubject } from "@iyio/react-common";
 import { useMemo } from "react";
-import { MarkdownViewer } from "./MarkdownViewer";
+import { MarkdownViewer } from "./MarkdownViewer.js";
 
 export interface ConvoComponentRendererProps
 {

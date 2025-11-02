@@ -2,8 +2,8 @@ import { ConvoCompletionMessage, convoRoles, convoTags, unknownConvoTokenPrice }
 import { createConvoLangApiRoutes } from "@convo-lang/convo-lang-api-routes";
 import { FnEvent, NotFoundError, asArrayItem, createFnHandler, queryParamsToObject } from '@iyio/common';
 import { HttpRoute, getHttpRoute } from '@iyio/node-common';
-import { initBackend } from "../convo-lang-aws-cdk-lib";
-import { checkTokenQuotaAsync, getTokenQuotaAsync, storeTokenUsageAsync } from '../price-capping';
+import { initBackend } from "../convo-lang-aws-cdk-lib.js";
+import { checkTokenQuotaAsync, getTokenQuotaAsync, storeTokenUsageAsync } from '../price-capping.js';
 
 
 initBackend();

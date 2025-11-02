@@ -1,7 +1,7 @@
 import { ReadonlySubject, aryDuplicateRemoveItem } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { Conversation } from "./Conversation";
-import { ConvoRoomState } from "./convo-types";
+import { Conversation } from "./Conversation.js";
+import { ConvoRoomState } from "./convo-types.js";
 
 /**
  * A ConvoRoom contains 1 or more conversations and allows conversations to interact with each

@@ -1,4 +1,4 @@
-export * from './lib/ConvoLangConstruct';
-export * from './lib/convo-lang-aws-cdk-lib';
-export * from './lib/convo-lang-aws-cdk.deps';
+export * from './lib/ConvoLangConstruct.js';
+export * from './lib/convo-lang-aws-cdk-lib.js';
+export * from './lib/convo-lang-aws-cdk.deps.js';
 

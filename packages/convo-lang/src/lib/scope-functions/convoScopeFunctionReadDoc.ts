@@ -1,8 +1,8 @@
 import { Lock, deleteUndefined, getFileName } from "@iyio/common";
-import { ConvoDocQueryRunner } from "../ConvoDocQueryRunner";
-import { ConvoError } from "../ConvoError";
-import { convoDoQueryOutputToMessageContent } from "../convo-lang-doc-lib";
-import { convoParamsToObj, createConvoScopeFunction } from "../convo-lib";
+import { ConvoDocQueryRunner } from "../ConvoDocQueryRunner.js";
+import { ConvoError } from "../ConvoError.js";
+import { convoDoQueryOutputToMessageContent } from "../convo-lang-doc-lib.js";
+import { convoParamsToObj, createConvoScopeFunction } from "../convo-lib.js";
 
 const lock=new Lock(1);
 

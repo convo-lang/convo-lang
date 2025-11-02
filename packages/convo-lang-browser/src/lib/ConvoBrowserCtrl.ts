@@ -2,7 +2,7 @@ import { ConvoBrowserInf, ConvoBrowserPage } from "@convo-lang/convo-lang";
 import { DisposeContainer, pushBehaviorSubjectAry, ReadonlySubject, removeBehaviorSubjectAryValue } from "@iyio/common";
 import puppeteer, { Browser } from 'puppeteer';
 import { BehaviorSubject } from "rxjs";
-import { ConvoBrowserPageCtrl } from "./ConvoBrowserPageCtrl";
+import { ConvoBrowserPageCtrl } from "./ConvoBrowserPageCtrl.js";
 
 export class ConvoBrowserCtrl implements ConvoBrowserInf
 {

@@ -1,12 +1,12 @@
-import { convoStdImportPrefix } from "./convo-lib";
-import { ConvoImport, ConvoModule } from "./convo-types";
+import { convoStdImportPrefix } from "./convo-lib.js";
+import { ConvoImport, ConvoModule } from "./convo-types.js";
 
 export const getStdConvoImportAsync=async (name:string):Promise<ConvoModule|undefined>=>{
     if(name.startsWith(convoStdImportPrefix)){
         name=name.substring(convoStdImportPrefix.length);
     }
     return (
-        (await import('./make/convo-make-convo-exports')).convoMakeExports(name)
+        (await import('./make/convo-make-convo-exports.js')).convoMakeExports(name)
     )
 }
 

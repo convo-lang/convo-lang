@@ -1,7 +1,7 @@
 import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { BaseLayoutProps, bcn } from "@iyio/common";
 import { useSubject } from "@iyio/react-common";
-import { MessageComponentRenderer } from "./MessageComponentRenderer";
+import { MessageComponentRenderer } from "./MessageComponentRenderer.js";
 
 export interface ComponentRenderTargetProps
 {

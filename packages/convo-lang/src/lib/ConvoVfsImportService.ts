@@ -1,6 +1,6 @@
 import { getUriProtocol } from "@iyio/common";
 import { VfsDirReadRecursiveOptions, vfs } from "@iyio/vfs";
-import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types";
+import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types.js";
 
 export class ConvoVfsImportService implements ConvoImportService
 {

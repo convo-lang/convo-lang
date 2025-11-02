@@ -1,9 +1,9 @@
 import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
 import { BadRequestError, InternalOptions, NotFoundError, dupDeleteUndefined, escapeRegex, getErrorMessage, safeParseNumber } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
-import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib';
-import { createImageGenRoute } from './createImageGenRoute';
-import { getMockConvoRoutes } from './mock-routes';
+import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib.js';
+import { createImageGenRoute } from './createImageGenRoute.js';
+import { getMockConvoRoutes } from './mock-routes.js';
 
 const modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={}
 
