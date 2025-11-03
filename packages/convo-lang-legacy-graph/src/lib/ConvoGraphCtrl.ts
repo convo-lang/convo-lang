@@ -639,7 +639,7 @@ export class ConvoGraphCtrl
                 const conversation=new Conversation(
                     await this.getConvoOptionsAsync(undefined,
                         `\n> edgeConditionEvalFunction() -> ( ${edge.conditionConvo} )\n`+
-                         `> do`+
+                         `> do\n`+
                          `edgeConditionResult=edgeConditionEvalFunction()`,
                          {input,workflow}
                     )
