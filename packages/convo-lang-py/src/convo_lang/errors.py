@@ -16,3 +16,15 @@ class Timeout(ConvoError):
 
 class ParseError(ConvoError):
     """Raised when parsing the CLI output fails."""
+
+
+class ConvoValidationError(ExecFailed):
+    """Raised when the CLI reports validation/syntax/missing-vars problems."""
+
+
+class ConvoRuntimeError(ExecFailed):
+    """Raised when the CLI ran the convo but failed during execution."""
+
+
+class ConvoCLIError(ExecFailed):
+    """Raised when CLI failed for an unknown or unexpected reason."""
