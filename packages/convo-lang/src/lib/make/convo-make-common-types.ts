@@ -116,6 +116,13 @@ export interface ConvoMakeTargetDeclaration extends ConvoMakeTargetSharedProps, 
      */
     inList?:string|string[];
 
+
+    /**
+     * An object that is used filter items from an `inList`. If all key value paris in `listFilter`
+     * match an item in the inList the item will not be filtered out.
+     */
+    inListFilter?:Record<string,any>;
+
     /**
      * Path or paths to target outputs. Output paths can use a wildcard (*) character that is used
      * to map multiple inputs to matching outputs.

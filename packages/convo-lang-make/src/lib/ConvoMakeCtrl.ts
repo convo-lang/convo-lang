@@ -986,7 +986,7 @@ export class ConvoMakeCtrl
     public async contentToConvoAsync(
         relPath:string|undefined,
         isList:boolean|undefined,
-        tmpl:ConvoMakeTargetContentTemplate,
+        tmpl:Partial<ConvoMakeTargetDeclaration>,
         isContext:boolean,
         isCommand:boolean|undefined,
         content:string|null|undefined,
@@ -1005,6 +1005,24 @@ export class ConvoMakeCtrl
                 :
                     (asArray(JSON.parse(content))??[])
             ):[];
+
+            // filter items here
+            if(tmpl.inListFilter){
+                itemLoop: for(let i=0;i<items.length;i++){
+                    const item=items[i];
+                    if(!item){
+                        continue;
+                    }
+                    for(const e in tmpl.inListFilter){
+                        if(tmpl.inListFilter[e]!==item[e]){
+                            items.splice(i,1);
+                            i--;
+                            continue itemLoop;
+                        }
+                    }
+                }
+            }
+
             return await Promise.all(items.map((value,index)=>this._contentToConvoAsync(
                 relPath,
                 false,
