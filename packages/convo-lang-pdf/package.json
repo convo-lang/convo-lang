@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-pdf",
-    "version": "0.8.11",
+    "version": "0.8.12",
     "type": "module",
     "sideEffects": false
 }
