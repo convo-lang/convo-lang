@@ -7,6 +7,7 @@ import tempfile
 from typing import Dict, List, Optional
 
 from .convo_cli_path import discover_convo_bin
+from .error_utils import raise_for_cli_failure
 from .errors import ConvoNotFound, ExecFailed, Timeout
 
 
@@ -75,10 +76,10 @@ class ConvoCLIRunner:
                 f"Convo CLI timed out after {timeout} seconds"
             ) from e
         if proc.returncode != 0:
-            raise ExecFailed(
-                f"Convo exited with code {proc.returncode}\n"
-                f"STDERR:\n{proc.stderr}\n"
-                f"STDOUT:\n{proc.stdout}"
+            raise_for_cli_failure(
+                returncode=proc.returncode,
+                stdout=proc.stdout or "",
+                stderr=proc.stderr or "",
             )
         transcript = proc.stdout
         return transcript

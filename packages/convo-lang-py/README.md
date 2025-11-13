@@ -1,11 +1,9 @@
-# Convo-Lang Python Wrapper (v0.6.0)
+# Convo-Lang Python Wrapper (v0.6.1)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/convo-lang?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/convo-lang)
 
 A Python wrapper around the **Convo-Lang CLI** that lets you build conversations in Python and execute them via the official Convo-Lang engine.
 
-> **Status:** 0.6.0 – basic conversation building + single-shot completion via the CLI.
-
-\
-
+> **Status:** 0.6.1 – basic conversation building + single-shot completion via the CLI.
 
 ---
 
@@ -29,6 +27,7 @@ Download and install the latest **LTS** version of Node.js (includes `npm`):
 
 Verify installation:
 
+
 ```bash
 node -v
 npm -v
@@ -41,6 +40,7 @@ npm i -g @convo-lang/convo-lang-cli
 ```
 
 This makes the `convo` binary available in your `PATH`.
+
 
 ### 3. Install the Python wrapper
 
