@@ -7,21 +7,6 @@ import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js
 import { createNextAppAsync } from "../lib/create-next-app.js";
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-const flags=['make'] as const;
-
 type Args=ConvoCliOptions;
 const args=parseCliArgsT<Args>({
     args:process.argv,
@@ -77,6 +62,9 @@ const args=parseCliArgsT<Args>({
         listModels:args=>args.length?true:false,
         make:args=>args.length?true:false,
         makeTargets:args=>args.length?true:false,
+        var:args=>args,
+        vars:args=>args,
+        varsPath:args=>args,
     }
 }).parsed as Args;
 

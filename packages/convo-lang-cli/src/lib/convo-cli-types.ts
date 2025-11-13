@@ -26,6 +26,7 @@ export interface ConvoCliConfig
     visionModel?:string;
     secrets?:string;
     defaultModel?:string;
+    defaultVars?:Record<string,any>;
 }
 
 export interface ConvoCliOptions
@@ -180,6 +181,44 @@ export interface ConvoCliOptions
      * If true all known models will be listed as JSON
      */
     listModels?:boolean;
+
+    /**
+     * Adds a named variable that can be used by executed convo-lang. To use spaces and other special
+     * characters enclose the variable name and value in double or single quotes.
+     *
+     * By default variables are strings but can use a colon followed by a type to set the type of the variable.
+     *
+     * Variables with dots in their name can be used to override deeply nested values in objects
+     * loaded using the `vars` or `varsPath` options.
+     *
+     * Vars that don't assign a value will be give a value of boolean true.
+     *
+     * Variables are assigned in the following order: --vars-path, --vars, --var
+     *
+     * @example --var winner=Ricky_Bobby
+     * @example --var 'second=Cal Naughton, Jr.'
+     * @example --var age:number=38
+     * @example --var userData.lastSignIn=2025-11-13
+     * @example --var 'data:object={"accountId":"3PRF1vx4niGfQJ9qbMhm","userType":"admin"}'
+     * @example --var 'data:object=[5,1,3]'
+     * @example --var isWinner
+     */
+    var?:string[];
+
+    /**
+     * A JSON object containing variables that can be used by executed convo-lang.
+     * @example --vars '{"name":"Tom",age:55}'
+     */
+    vars?:string[];
+
+    /**
+     * Path to a JSON or .env file that defines variables that can be used by executed convo-lang.
+     * Variables in .env files follow the same rules as vars define the by `--var` argument, allowing
+     * them to use types and nested value assign name.
+     * @example --vars-path ./customer-info.json
+     * @example --vars-path ./.env.local
+     */
+    varsPath?:string[];
 
     /**
      * If true make targets should be built
