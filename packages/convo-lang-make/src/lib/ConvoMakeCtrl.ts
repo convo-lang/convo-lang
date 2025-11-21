@@ -1,5 +1,5 @@
 import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, convoLogDir, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, base64EncodeMarkdownImage, CancelToken, delayAsync, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getFileNameNoExt, getTimestampString, getUriProtocol, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
+import { addConsoleListener, asArray, base64EncodeMarkdownImage, CancelToken, ConsoleEntry, delayAsync, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getFileNameNoExt, getTimestampString, getUriProtocol, InternalOptions, joinPaths, LogLevel, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, removeConsoleListener, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
@@ -54,6 +54,13 @@ export interface ConvoMakeCtrlOptions
      * If true all targets will be forced to be reviewed
      */
     forceReview?:boolean;
+
+    /**
+     * If not falsy console logs will be captured that match the defined log level and written to the log file
+     */
+    captureConsoleLogLevel?:LogLevel;
+
+
 
 
 }
@@ -121,6 +128,7 @@ export class ConvoMakeCtrl
         targetDefaults,
         preview=false,
         forceReview=false,
+        captureConsoleLogLevel=LogLevel.none,
     }:ConvoMakeCtrlOptions){
         this.options={
             name,
@@ -140,6 +148,7 @@ export class ConvoMakeCtrl
             targetDefaults,
             preview,
             forceReview,
+            captureConsoleLogLevel,
         }
         this.id=uuid();
         this.name=name;
@@ -154,7 +163,17 @@ export class ConvoMakeCtrl
         this.logPath=logBaseName+'.log';
         this.filePath=filePath;
         this.preview=preview;
+        if(captureConsoleLogLevel){
+            const _log=console.log;
+            const added=addConsoleListener(this.consoleLogListener);
+        }
         console.log(`ConvoMakeCtrl - ${filePath}`,this);
+    }
+
+    private readonly consoleLogListener=(entry:ConsoleEntry)=>{
+        //if(entry.level&this.options.captureConsoleLogLevel){
+            this.log(...entry.args);
+        //}
     }
 
     private _isDisposed=false;
@@ -177,7 +196,12 @@ export class ConvoMakeCtrl
             target:this,
             eventTarget:this,
             ctrl:this,
-        })
+        });
+        if(this.options.captureConsoleLogLevel){
+            setTimeout(()=>{
+                removeConsoleListener(this.consoleLogListener);
+            },500);
+        };
     }
 
     public log(...args:any[]){
@@ -222,8 +246,11 @@ export class ConvoMakeCtrl
             try{
                 await this.options.vfsCtrl.appendStringAsync(this.logPath,log);
             }catch(ex){
-                console.error('Unable to append log messages');
-                console.error('Unwritten log messages:',log);
+                // Do not write to console if capturing or an infinite loop may occur
+                if(!this.options.captureConsoleLogLevel){
+                    console.error('Unable to append log messages');
+                    console.error('Unwritten log messages:',log);
+                }
             }
             if(this.flushLogRequested){
                 this.flushLogRequested=false;
