@@ -9,6 +9,10 @@ export interface ConvoDocumentReference
     sourceId?:string;
     sourceName?:string;
     sourceUrl?:string;
+    sourcePageIndex?:number;
+    sourcePageEndIndex?:number;
+    sourceCharIndex?:number;
+    sourceCharEndIndex?:number;
     contentType?:string;
     vector?:string|number[]|Uint8Array;
     path?:string;
