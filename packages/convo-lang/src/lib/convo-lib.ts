@@ -130,7 +130,7 @@ export const convoRoles={
     ragSuffix:'ragSuffix',
 
     /**
-     * A message used as a template to insert RAG content into. The value __RAG__ will be used replaced with the actual rag content
+     * A message used as a template to insert RAG content into. The value $$RAG$$ will be used replaced with the actual rag content
      */
     ragTemplate:'ragTemplate',
 
