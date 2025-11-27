@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -1140,19 +1140,9 @@ export const convoTags={
     disabled:'disabled',
 
     /**
-     * A URL to the source of the message. Typically used with RAG.
+     * Reference to a document related to a message. Typically used with RAG.
      */
-    sourceUrl:'sourceUrl',
-
-    /**
-     * The ID of the source content of the message. Typically used with RAG.
-     */
-    sourceId:'sourceId',
-
-    /**
-     * The name of the source content of the message. Typically used with RAG.
-     */
-    sourceName:'sourceName',
+    docRef:'docRef',
 
     /**
      * When applied to a message the message becomes a clickable suggestion that when clicked will
@@ -2418,19 +2408,47 @@ export const shouldDisableConvoAutoScroll=(messages:FlatConvoMessage[]):boolean=
     return false;
 }
 
+const sortDocProps=(doc:ConvoDocumentReference)=>{
+    const keys=Object.keys(doc);
+    keys.sort();
+    let i=keys.indexOf('id');
+    if(i!==-1){
+        keys.splice(i,1);
+        keys.unshift('id');
+    }
+    i=keys.indexOf('content');
+    if(i!==-1){
+        keys.splice(i,1);
+        keys.push('content');
+    }
+    const sorted:Record<string,any>={};
+    for(const key of keys){
+        if(key==='vector'){
+            continue;
+        }
+        sorted[key]=(doc as any)[key];
+    }
+    return sorted as ConvoDocumentReference;
+}
+
+export const convoDocRefToTagValue=(doc:ConvoDocumentReference)=>{
+    return JSON.stringify(sortDocProps(doc));
+}
+
 export const convoRagDocRefToMessage=(
     flat:FlatConvoConversation,
     docs:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[],
     role:string
 ):ConvoMessage|undefined=>{
-    const ary=asArray(docs);
-    if(!ary){
+    const ary=asArray(docs)?.filter(d=>d) as ConvoDocumentReference[]|null|undefined;
+    if(!ary?.length){
         return undefined;
     }
     const msg:ConvoMessage={
         role,
         content:ary.map(d=>d?.content??'').join('\n\n'),
-        tags:[]
+        tags:[],
+        docRefs:deepClone(ary),
     }
 
     if(!msg.content){
@@ -2438,30 +2456,12 @@ export const convoRagDocRefToMessage=(
     }
 
     for(const doc of ary){
-        if(!doc){
-            continue;
-        }
-        if(doc.sourceId){
-            if(!msg.sourceId){
-                msg.sourceId=doc.sourceId;
-            }
-            msg.tags?.push({name:convoTags.sourceId,value:doc.sourceId})
-        }
-
-        if(doc.sourceName){
-            if(!msg.sourceName){
-                msg.sourceName=doc.sourceName;
-            }
-            msg.tags?.push({name:convoTags.sourceName,value:doc.sourceName})
-        }
-
-        if(doc.sourceUrl){
-            if(!msg.sourceUrl){
-                msg.sourceUrl=doc.sourceUrl;
-            }
-            msg.tags?.push({name:convoTags.sourceUrl,value:doc.sourceUrl})
-        }
+        msg.tags?.push({
+            name:convoTags.docRef,
+            value:convoDocRefToTagValue(doc),
+        });
     }
+
 
     let template=flat.ragTemplate;
     if(!template && (flat.ragPrefix || flat.ragSuffix)){

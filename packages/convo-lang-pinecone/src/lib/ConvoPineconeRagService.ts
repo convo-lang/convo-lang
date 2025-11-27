@@ -235,7 +235,7 @@ export class ConvoPineconeRagService implements ConvoRagService
                     id:h._id,
                     distance:h._score,
                     document:{
-                        sourceId:h._id,
+                        id:h._id,
                         content,
                     }
                 }
@@ -267,11 +267,13 @@ export class ConvoPineconeRagService implements ConvoRagService
             await idx.upsertRecords(docs.map<IntegratedRecord>(d=>{
                 const doc={...d.doc};
                 delete doc.vector;
-                if(doc.sourceId){
-                    (doc as any)._id=doc.sourceId;
-                    delete doc.sourceId;
+                if(doc.id){
+                    (doc as any)._id=doc.id;
+                    delete doc.id;
                 }
-                return doc as IntegratedRecord;
+                delete doc.vector;
+                delete doc.metadata;
+                return doc as Omit<ConvoDocumentReference,'id'|'vector'|'metadata'> as IntegratedRecord;
             }))
         }))
     }

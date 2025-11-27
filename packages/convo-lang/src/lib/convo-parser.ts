@@ -1315,6 +1315,16 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         break;
                     }
 
+                    case convoTags.docRef:
+                        if(tag.value){
+                            if(!msg.docRefs){
+                                msg.docRefs=[];
+                            }
+                            const docRef=parseJson5(tag.value);
+                            msg.docRefs.push(docRef);
+                        }
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;
@@ -1349,9 +1359,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
  */
 const copyTagValues:Record<string,boolean>={
     [convoTags.renderTarget]:true,
-    [convoTags.sourceId]:true,
-    [convoTags.sourceUrl]:true,
-    [convoTags.sourceName]:true,
 
 }
 

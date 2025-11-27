@@ -6,16 +6,19 @@ export type ConvoVectorValue=string|number[]|Uint8Array;
 export interface ConvoDocumentReference
 {
     content:string;
-    sourceId?:string;
-    sourceName?:string;
-    sourceUrl?:string;
-    sourcePageIndex?:number;
-    sourcePageEndIndex?:number;
-    sourceCharIndex?:number;
-    sourceCharEndIndex?:number;
+    id?:string;
+    name?:string;
+    url?:string;
+    pageIndex?:number;
+    pageEndIndex?:number;
+    lineIndex?:number;
+    lineEndIndex?:number;
+    charIndex?:number;
+    charEndIndex?:number;
     contentType?:string;
     vector?:string|number[]|Uint8Array;
     path?:string;
+    metadata?:Record<string,any>;
 }
 
 export interface ConvoRagContext

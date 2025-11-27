@@ -1,4 +1,4 @@
-import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, getValueByPath, isClassInstanceObject, isRooted, joinPaths, log, normalizePath, parseBoolean, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, safeParseNumberOrUndefined, shortUuid, starStringToRegex } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, ReadonlySubject, aryRemoveItem, asArray, asArrayItem, createJsonRefReplacer, deepClone, delayAsync, deleteUndefined, getDirectoryName, getErrorMessage, getObjKeyCount, getValueByPath, isClassInstanceObject, isRooted, joinPaths, log, normalizePath, parseBoolean, parseMarkdown, pushBehaviorSubjectAry, pushBehaviorSubjectAryMany, removeBehaviorSubjectAryValue, removeBehaviorSubjectAryValueMany, safeParseNumber, safeParseNumberOrUndefined, shortUuid, starStringToRegex } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { BehaviorSubject, Observable, Subject, Subscription } from "rxjs";
 import { ZodType, ZodTypeAny, z } from "zod";
@@ -2855,14 +2855,8 @@ export class Conversation
         if(msg.component!==undefined){
             flat.component=msg.component;
         }
-        if(msg.sourceId!==undefined){
-            flat.sourceId=msg.sourceId;
-        }
-        if(msg.sourceUrl!==undefined){
-            flat.sourceUrl=msg.sourceUrl;
-        }
-        if(msg.sourceName!==undefined){
-            flat.sourceName=msg.sourceName;
+        if(msg.docRefs){
+            flat.docRefs=deepClone(msg.docRefs);
         }
         if(msg.isSuggestion!==undefined){
             flat.isSuggestion=msg.isSuggestion;
