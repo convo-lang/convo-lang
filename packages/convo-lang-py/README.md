@@ -1,16 +1,16 @@
-# Convo-Lang Python Wrapper (v0.6.1)
+# Convo-Lang Python Wrapper (v0.6.2)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/convo-lang?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/convo-lang)
 
 A Python wrapper around the **Convo-Lang CLI** that lets you build conversations in Python and execute them via the official Convo-Lang engine.
 
-> **Status:** 0.6.1 – basic conversation building + single-shot completion via the CLI.
+> **Status:** 0.6.2 – basic conversation building, runtime variables support, and single-shot completion via the CLI.
 
 ---
 
 ## Features
 
 - Minimal, Pythonic API to build conversations (`system`, `user`, `assistant`)
-- One-line `complete()` to run via Convo-Lang CLI
+- One-line `complete()` to run via Convo-Lang CLI, with optional runtime variables via `complete(variables={...})`
 - Simple config with `env` passthrough (e.g., `OPENAI_API_KEY`) and `defaultModel`
 - Zero server code required — uses the official Convo-Lang CLI under the hood
 
@@ -66,8 +66,30 @@ convo = Conversation(
 convo.add_system_message("You are a home automation assistant.")
 convo.add_user_message("It's time for bed, can you turn off the lights")
 answer = convo.complete()
-print("\n--- LAST ASSISTANT ---\n", answer)
+print(answer)
 ```
+
+### Passing Variables to `.convo`
+
+You can pass variables to the Convo-Lang runtime using the `variables` argument of `complete()`. These variables can be referenced inside your `.convo` script.
+
+```python
+from convo_lang import Conversation
+
+convo = Conversation(
+    config={
+        "env": {"OPENAI_API_KEY": OPENAI_API_KEY},
+        "defaultModel": defaultModel,
+    }
+)
+
+convo.add_convo_text(convo_text)
+
+answer = convo.complete(variables={"isNewVisitor": True})
+print(answer)
+```
+
+Variables are forwarded to the Convo-Lang CLI via `--vars` and support booleans, numbers, and strings.
 
 ---
 
