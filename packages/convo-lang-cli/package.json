@@ -1,7 +1,7 @@
 {
     "name": "@convo-lang/convo-lang-cli",
-    "version": "0.8.3",
-    "type": "module",
+    "version": "0.8.16",
+    "type": "commonjs",
     "sideEffects": false,
     "keywords": [
         "prompt",

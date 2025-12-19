@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-react",
-    "version": "0.8.3",
+    "version": "0.8.16",
     "type": "module",
     "sideEffects": false,
     "repository": {

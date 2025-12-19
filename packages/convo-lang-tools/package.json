@@ -2,7 +2,7 @@
     "name": "convo-lang-tools",
     "displayName": "convo-lang",
     "description": "A conversational language 🤓",
-    "version": "0.8.3",
+    "version": "0.8.16",
     "type": "commonjs",
     "sideEffects": false,
     "publisher": "IYIO",
@@ -26,6 +26,9 @@
         "type": "git",
         "url": "https://github.com/convo-lang/convo-lang.git"
     },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
     "contributes": {
         "languages": [
             {

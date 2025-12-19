@@ -58,7 +58,7 @@ export class ConvoMakeAppCtrl
             return;
         }
 
-        this._proc=shell.execAsync(this.app.startCommand);
+        this._proc=shell.exec(this.app.startCommand);
 
         if(this.app.port){
 

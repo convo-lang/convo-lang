@@ -7,6 +7,7 @@ import { deleteUndefined, getDirectoryName, normalizePath, ReadonlySubject } fro
 import { vfs } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { RelativePattern, workspace } from "vscode";
+import { isIgnoredAsync } from "./git-helper.js";
 
 export class ConvoExt
 {
@@ -75,6 +76,11 @@ export class ConvoExt
             ...ctrlOptions
         }=opts;
         try{
+
+            if(await isIgnoredAsync(_filePath)){
+                return undefined;
+            }
+
             const filePath=normalizePath(_filePath);
 
             if(skipActiveBuild){

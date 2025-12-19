@@ -3,18 +3,21 @@ import { Conversation, ConvoMakeTargetRebuild, convoResultErrorName, convoVars, 
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { CancelToken, Lock, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, joinPaths, normalizePath } from '@iyio/common';
+import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, joinPaths, normalizePath } from '@iyio/common';
 import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
 import { realpath } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { extensionPublisher } from './build-const.js';
+import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
 
 let client:LanguageClient;
 
@@ -303,6 +306,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
         const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
             ...options,
             browserInf:new ConvoBrowserCtrl(),
         });
@@ -469,10 +473,12 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
         const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
             ...options,
             forceReview,
             rebuild,
             browserInf:new ConvoBrowserCtrl(),
+            shell:new ConvoCliShell(),
         });
         ext.addMakeCtrl(ctrl);
         token.onCancel(()=>{

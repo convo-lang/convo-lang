@@ -4,6 +4,7 @@ import type { Conversation, ConversationOptions } from "./Conversation.js";
 import type { ConvoExecutionContext } from './ConvoExecutionContext.js';
 import type { ConvoComponentDef } from './convo-component-types.js';
 import type { convoReservedRoles } from './convo-lib.js';
+import { ConvoDocumentReference } from './convo-rag-types.js';
 import type { convoSystemMessages } from './convo-system-messages.js';
 
 export type ConvoMessageType='text'|'function';
@@ -153,11 +154,10 @@ export interface ConvoMessage
      */
     renderOnly?:boolean;
 
-    sourceUrl?:string;
-
-    sourceId?:string;
-
-    sourceName?:string;
+    /**
+     * References to documents related to the message.
+     */
+    docRefs?:ConvoDocumentReference[];
 
     /**
      * If true the message should be clickable and when clicked the content of the message should be
@@ -1017,11 +1017,10 @@ export interface FlatConvoMessage
 
     markdown?:MarkdownLine[];
 
-    sourceUrl?:string;
-
-    sourceId?:string;
-
-    sourceName?:string;
+    /**
+     * References to documents related to the message.
+     */
+    docRefs?:ConvoDocumentReference[];
 
     /**
      * If true the message should be clickable and when clicked the content of the message should be

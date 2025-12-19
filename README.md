@@ -303,37 +303,42 @@ convo talky-time.convo --out .
 
 ### CLI Arguments
 
-| argument                 | description                                                                    |
-|--------------------------|--------------------------------------------------------------------------------|
-| --config                 | ConvoCliConfig object or path to a ConvoCliConfig file                         |
-| --inline-config          | Inline configuration as JSON                                                   |
-| --source                 | Path to a source convo file                                                    |
-| --stdin                  | If present, the source will be read from stdin                                 |
-| --inline                 | Inline convo code                                                              |
-| --source-path            | Used to set or overwrite the source path of executed files                     |
-| --cmd-mode               | If present, CLI operates in command mode for function calling via stdin/stdout |
-| --repl                   | If present, CLI enters REPL mode for chat                                      |
-| --prefix-output          | If present, each output line is prefixed to indicate its relation              |
-| --print-state            | If present, prints the shared variable state                                   |
-| --print-flat             | If present, prints the flattened messages                                      |
-| --print-messages         | If present, prints the messages                                                |
-| --parse                  | If present, parses convo code and outputs as JSON instead of executing         |
-| --parse-format           | JSON formatting used if parse option is present                                |
-| --convert                | If present, converts input to target LLM format and writes as output           |
-| --out                    | Function or path for output; if ".", writes to source path                     |
-| --buffer-output          | If present, buffers executor output for later use                              |
-| --allow-exec             | Controls shell command execution permissions                                   |
-| --prepend                | Conversation content to prepend to source                                      |
-| --exe-cwd                | Current working directory for context execution                                |
-| --sync-ts-config         | Path(s) to tsconfig for TypeScript project synchronization                     |
-| --sync-watch             | If present, updates TypeScript projects in real time during scan               |
-| --sync-out               | Directory for generated sync output files                                      |
-| --spawn                  | Command line to run in parallel with actions like sync watching                |
-| --spawn-dir              | Directory where spawn command runs                                             |
-| --create-next-app        | If present, creates a new Next.js app using the template                       |
-| --create-app-dir         | Directory where apps will be created                                           |
-| --create-app-working-dir | Directory where the create app command will be run                             |
-| --list-models            | If present, lists all known models as JSON                                     |
+| argument                 | multi | description                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+|--------------------------|-------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --config                 | N     | ConvoCliConfig object or path to a ConvoCliConfig file                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --inline-config          | N     | Inline configuration as JSON                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --source                 | N     | Path to a source convo file                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --stdin                  | N     | If present, the source will be read from stdin                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --inline                 | N     | Inline convo code                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --source-path            | N     | Used to set or overwrite the source path of executed files                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --cmd-mode               | N     | If present, CLI operates in command mode for function calling via stdin/stdout                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --repl                   | N     | If present, CLI enters REPL mode for chat                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --prefix-output          | N     | If present, each output line is prefixed to indicate its relation                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --print-state            | N     | If present, prints the shared variable state                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --print-flat             | N     | If present, prints the flattened messages                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --print-messages         | N     | If present, prints the messages                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --parse                  | N     | If present, parses convo code and outputs as JSON instead of executing                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --parse-format           | N     | JSON formatting used if parse option is present                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --convert                | N     | If present, converts input to target LLM format and writes as output                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --out                    | N     | Function or path for output; if ".", writes to source path                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --buffer-output          | N     | If present, buffers executor output for later use                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --allow-exec             | N     | Controls shell command execution permissions                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --prepend                | N     | Conversation content to prepend to source                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --exe-cwd                | N     | Current working directory for context execution                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --sync-ts-config         | Y     | Path(s) to tsconfig for TypeScript project synchronization                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --sync-watch             | N     | If present, updates TypeScript projects in real time during scan                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --sync-out               | N     | Directory for generated sync output files                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --spawn                  | N     | Command line to run in parallel with actions like sync watching                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --spawn-dir              | N     | Directory where spawn command runs                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --create-next-app        | N     | If present, creates a new Next.js app using the template                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --create-app-dir         | N     | Directory where apps will be created                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --create-app-working-dir | N     | Directory where the create app command will be run                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --list-models            | N     | If present, lists all known models as JSON                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --var                    | Y     | Adds a named variable that can be used by executed convo-lang. To use spaces and other special characters enclose the variable name and value in double or single quotes. By default variables are strings but can use a colon followed by a type to set the type of the variable. Variables with dots in their name can be used to override deeply nested values in objects loaded using the `vars` or `varsPath` options. Vars that don't assign a value will be give a value of boolean true. Variables are assigned in the following order: --vars-path, --vars, --var |
+| --vars                   | Y     | A JSON object containing variables that can be used by executed convo-lang                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --vars-path              | Y     | Path to a JSON or .env file that defines variables that can be used by executed convo-lang. Variables in .env files follow the same rules as vars define the by `--var` argument, allowing them to use types and nested value assign name                                                                                                                                                                                                                                                 |
+| --make                   | N     | If present, make targets should be built                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --make-targets           | N     | If present, make targets will be printed as JSON                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## CLI configuration
 To allow the Convo-Lang CLI to access OpenAI and other model providers, create a JSON file called ~/.config/convo/convo.json and add the
@@ -371,10 +376,54 @@ X - https://x.com/ConvoLang
 
 ## Change Log
 
+## Change Log
+
+### v0.8.12
+- **Convo-Make**: Added support for filtering items out of a make input list
+
+### v0.8.11
+- **Bug Fixes**: Fixed condition expression in graph ctrl
+- **Functions**: Added a fallback for arrays returned as an object
+
+### v0.8.10
+- **Functions**: Added mdImg function for reading files and markdown images
+- **Context**: Added ctx.getFullPath for getting full paths
+- **Markdown**: Updated markdown image regex
+
+### v0.8.4
+- **Convo-Make**: Added better logging system - writes logs to a log file
+- **Convo-Make**: Make stages now track which files they generate
+- **Convo-Make**: Changed log directory name
+- **Convo-Make**: Now ignores git-ignored convo-make files
+
+### v0.8.3
+- **Convo-Make**: Added support for targets to run shell commands instead of using AI
+- **Convo-Make**: Now tracks stats in the .convo-make/.convo-make-stats folder
+- **Convo-Make**: Target convo files can now be added to, to regenerate outputs
+
+### v0.8.2
+- **VSCode Extension**: Added support for syncing an entire make file with one click
+- **VSCode Extension**: Added support for forcing review when rebuilding individual targets
+- **VSCode Extension**: Fixed list syncing and main make command
+- **VSCode Extension**: Running make items are auto-expanded now
+- **VSCode Extension**: Added support for selecting markdown sections and JSON properties of input context files
+- **VSCode Extension**: Added support for syncing cache file with current version of output
+- **Convo-Make**: Review paths can now use wildcards
+- **Convo-Make**: Added protocol property to ConvoMakeApp interface
+- **Convo-Make**: Updated default system prompt to include instructions for full contents responses
+- **Convo-Make**: Changed default markup color
+- **Bug Fixes**: Fixed double escaping var insertion
+- **Build System**: Updated pkij configuration and publish scripts
+
+### v0.8.1
+- **Build System**: Installed pkij
+
 ### v0.8.0
 - **Build System**: Replaced NX build system with pkij
 - **Compatibility**: Removed CJS build format
 - **Node Version**: Removed support for NodeJS v18. v20 and above supported.
+- **Package Management**: Changed package type to module for all package.json files
+- **Infrastructure**: Ejected iyio and removed all NX dependencies
 
 ### v0.7.50
 - **Convo-Make**: Added comprehensive Convo-Make system for build automation and code generation

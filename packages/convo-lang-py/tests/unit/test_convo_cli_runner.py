@@ -262,3 +262,4 @@ def test_run_subprocess_maps_oserror_to_execfailed(monkeypatch):
     runner = ConvoCLIRunner(convo_bin="convo")
     with pytest.raises(ExecFailed):
         runner._run_subprocess(["convo", "x.convo"], timeout=1.0, working_dir=None)
+

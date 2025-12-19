@@ -1,9 +1,51 @@
 ## Change Log
 
+### v0.8.12
+- **Convo-Make**: Added support for filtering items out of a make input list
+
+### v0.8.11
+- **Bug Fixes**: Fixed condition expression in graph ctrl
+- **Functions**: Added a fallback for arrays returned as an object
+
+### v0.8.10
+- **Functions**: Added mdImg function for reading files and markdown images
+- **Context**: Added ctx.getFullPath for getting full paths
+- **Markdown**: Updated markdown image regex
+
+### v0.8.4
+- **Convo-Make**: Added better logging system - writes logs to a log file
+- **Convo-Make**: Make stages now track which files they generate
+- **Convo-Make**: Changed log directory name
+- **Convo-Make**: Now ignores git-ignored convo-make files
+
+### v0.8.3
+- **Convo-Make**: Added support for targets to run shell commands instead of using AI
+- **Convo-Make**: Now tracks stats in the .convo-make/.convo-make-stats folder
+- **Convo-Make**: Target convo files can now be added to, to regenerate outputs
+
+### v0.8.2
+- **VSCode Extension**: Added support for syncing an entire make file with one click
+- **VSCode Extension**: Added support for forcing review when rebuilding individual targets
+- **VSCode Extension**: Fixed list syncing and main make command
+- **VSCode Extension**: Running make items are auto-expanded now
+- **VSCode Extension**: Added support for selecting markdown sections and JSON properties of input context files
+- **VSCode Extension**: Added support for syncing cache file with current version of output
+- **Convo-Make**: Review paths can now use wildcards
+- **Convo-Make**: Added protocol property to ConvoMakeApp interface
+- **Convo-Make**: Updated default system prompt to include instructions for full contents responses
+- **Convo-Make**: Changed default markup color
+- **Bug Fixes**: Fixed double escaping var insertion
+- **Build System**: Updated pkij configuration and publish scripts
+
+### v0.8.1
+- **Build System**: Installed pkij
+
 ### v0.8.0
 - **Build System**: Replaced NX build system with pkij
 - **Compatibility**: Removed CJS build format
 - **Node Version**: Removed support for NodeJS v18. v20 and above supported.
+- **Package Management**: Changed package type to module for all package.json files
+- **Infrastructure**: Ejected iyio and removed all NX dependencies
 
 ### v0.7.50
 - **Convo-Make**: Added comprehensive Convo-Make system for build automation and code generation

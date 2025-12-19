@@ -1,4 +1,4 @@
-import { getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
+import { getDirectoryName, getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation.js';
@@ -1225,15 +1225,41 @@ export class ConvoExecutionContext
      * Returns the full path of the give path if the path is relative. The __cwd variable is used to
      * determine the current working directory.
      */
-    public getFullPath(path:string|undefined|null){
+    public getFullPath(path:string|undefined|null,scope?:ConvoScope){
         if(!path || (typeof path !=='string')){
             return '.';
         }
         if(isRooted(path)){
             return normalizePath(path);
         }
-        const cwd=this.sharedVars[convoVars.__cwd];
+        const cwd=this.getCwdOrUndefined(scope);
         return normalizePath(cwd?joinPaths(cwd,path):path);
+    }
+
+    /**
+     * Gets the current working directory based on scope
+     */
+    public getCwd(scope?:ConvoScope){
+        const cwd=this.sharedVars[convoVars.__cwd];
+        if(typeof cwd === 'string'){
+            return normalizePath(cwd);
+        }
+        const file=this.getVarAlias(convoVars.__file,scope);
+        if(typeof file === 'string'){
+            const r=normalizePath(getDirectoryName(file));
+            return r;
+        }else{
+            return '.';
+        }
+    }
+
+    /**
+     * Gets the current working directory based on scope or undefined if the current working directory
+     * equals '.'
+     */
+    public getCwdOrUndefined(scope?:ConvoScope){
+        const cwd=this.getCwd(scope);
+        return cwd==='.'?undefined:cwd;
     }
 
     /**
