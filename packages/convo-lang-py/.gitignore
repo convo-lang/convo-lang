@@ -1,2 +1,11 @@
 convo.js
 /dist
+
+__pycache__
+venv
+
+logs
+/.pytest_cache
+
+*.convo
+convo-test.py
