@@ -16,7 +16,27 @@ class ConvoVarsSerializer:
             return self._encode_object(value)
         if isinstance(value, (list, tuple)):
             return self._encode_array(list(value))
+        if isinstance(value, str):
+            parsed = self._try_parse_json_string(value)
+            if parsed is not None:
+                return self._encode_value(parsed)
+            return json.dumps(value, ensure_ascii=False)
         return json.dumps(str(value), ensure_ascii=False)
+
+    def _try_parse_json_string(self, value: str) -> Any | None:
+        """
+        Try to parse a string as JSON.
+        Returns parsed object on success, otherwise None.
+        """
+        value = value.strip()
+        if not value:
+            return None
+        if value[0] not in "{[":
+            return None
+        try:
+            return json.loads(value)
+        except Exception:
+            return None
 
     def _encode_object(self, obj: Dict[str, Any]) -> str:
         parts: List[str] = []
