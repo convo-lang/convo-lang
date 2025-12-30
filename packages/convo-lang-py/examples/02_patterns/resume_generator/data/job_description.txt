@@ -1,0 +1,52 @@
+About Biobeat
+
+Biobeat is revolutionizing hypertension diagnosis and management with its pioneering, FDA-cleared, cuff-less 24-hour blood pressure monitoring system. We are committed to empowering healthcare providers and patients with accurate, actionable blood pressure data, enabling precise diagnosis and personalized management programs for hypertension.
+
+
+At the core of Biobeat's innovation is a proprietary, patented PPG (Photoplethysmography) sensor integrated into a comfortable, non-invasive chest patch. This medical-grade device is the first of its kind to receive FDA clearance for cuff-less 24-hour blood pressure monitoring. It captures vital sign data throughout a full day and night, offering a comprehensive view of blood pressure patterns, including during sleep, without the discomfort or disruption of traditional cuff-based methods.
+
+
+About the Position
+
+We are looking for an experienced Senior Backend Developer to join our development team and help build scalable, high-performance backend services. The ideal candidate is passionate about designing clean, efficient architectures, working with modern cloud technologies, and delivering production-grade solutions.
+
+
+Responsibilities
+
+● Design, develop, and maintain backend services using Python
+● Architect and optimize cloud-based systems on AWS
+● Work with SQL and NoSQL databases to design efficient schemas, queries, and data pipelines
+● Implement RESTful and serverless APIs, integrations, and microservices
+● Implement best practices for performance, reliability, security, and scalability
+● Collaborate closely with frontend, QA, and product teams
+● Troubleshoot production issues and improve system stability
+● Participate in code reviews and contribute to technical decisions
+● Write clean, maintainable, and well-tested code
+
+
+Requirements
+
+● 3+ years of hands-on backend development experience using Python
+2+ years of experience working with AWS services, including:
+Lambda, EC2, ECS, Batch, IOT, RDS, DynamoDB, Cognito, S3, CloudFront, API Gateway, SQS, SNS…
+● Strong experience with API development, REST Services
+● Solid knowledge of SQL and NoSQL databases, performance optimization, transactions, indexing, and schema design
+● Experience working with CI/CD, containerization (Docker), and distributed systems
+● Strong understanding of software design principles, clean architecture, and testing
+● B.Sc. in Computer Science, Software Engineering, or equivalent practical experience
+● Fluent English (spoken and written)
+
+
+Advantage
+
+● Experience with frontend development (preferably React)
+● Experience with event-driven and serverless architectures
+● Knowledge of authentication/authorization standards (OAuth2, JWT, Cognito)
+
+
+Personal Skills
+
+● Strong problem-solving abilities and an analytical mindset
+● Ownership mentality with the ability to learn quickly, investigate issues, and drive tasks end-to-end
+● Ability to work independently as well as collaboratively within a team
+● Excellent communication, documentation, and cross-functional collaboration skills

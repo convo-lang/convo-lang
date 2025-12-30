@@ -9,3 +9,5 @@ logs
 
 *.convo
 convo-test.py
+
+.env
