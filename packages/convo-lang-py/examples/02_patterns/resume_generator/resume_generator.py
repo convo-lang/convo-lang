@@ -40,30 +40,21 @@ print("Running ProfileJobMatcher agent...")
 convo_profile_job_matcher = Conversation(agent_configs)
 convo_profile_job_matcher.add_convo_file("agents/profileJobMatcher.convo")
 match_data = convo_profile_job_matcher.complete(
-    variables={
-        "job_data": json.loads(job_data),
-        "profile_data": json.loads(profile_data)
-    }
+    variables={"job_data": job_data, "profile_data": profile_data}
 )
 
 print("Running ResumeWriter agent...")
 convo_resume_writer = Conversation(agent_configs)
 convo_resume_writer.add_convo_file("agents/resumeWriter.convo")
 resume_data = convo_resume_writer.complete(
-    variables={
-        "job_data": json.loads(job_data),
-        "match_data": json.loads(match_data)
-    }
+    variables={"job_data": job_data, "match_data": match_data}
 )
 
 print("Running FitEvaluator agent...")
 convo_fit_evaluator = Conversation(agent_configs)
 convo_fit_evaluator.add_convo_file("agents/fitEvaluator.convo")
 job_apply_decision = convo_fit_evaluator.complete(
-    variables={
-        "job_data": json.loads(job_data),
-        "match_data": json.loads(match_data)
-    }
+    variables={"job_data": job_data, "match_data": match_data}
 )
 
 print("Creating resume...")
