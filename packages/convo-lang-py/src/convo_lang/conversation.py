@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 import json
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from .convo_cli_runner import ConvoCLIRunner
@@ -25,6 +26,16 @@ class Conversation:
         if content.startswith("*convo*"):
             content = content[7:].lstrip()
         self.convo_text += content.rstrip() + "\n\n"
+
+    def add_convo_file(self, file_path: str) -> None:
+        """Load .convo file and append its content to the conversation."""
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Convo file not found: {path}")
+        if path.suffix != ".convo":
+            raise ValueError("Only .convo files are supported")
+        content = path.read_text(encoding="utf-8")
+        self.add_convo_text(content)
 
     def add_message(self, role: str, content: str) -> None:
         """Append a role block into the .convo source."""
