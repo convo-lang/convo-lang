@@ -22,7 +22,7 @@ convo_job_description_analyzer.add_convo_file(
     "agents/jobDescriptionAnalyzer.convo"
 )
 job_data = convo_job_description_analyzer.complete(
-    variables={"job_description": job_description.replace("\n", " ")}
+    variables={"job_description": job_description}
 )
 
 print("Running CandidateProfileAnalyzer agent...")
@@ -33,7 +33,7 @@ convo_candidate_profile_analyzer.add_convo_file(
     "agents/candidateProfileAnalyzer.convo"
 )
 profile_data = convo_candidate_profile_analyzer.complete(
-    variables={"candidate_profile": candidate_profile.replace("\n", " ")}
+    variables={"candidate_profile": candidate_profile}
 )
 
 print("Running ProfileJobMatcher agent...")

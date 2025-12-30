@@ -21,7 +21,8 @@ class ConvoVarsSerializer:
             if parsed is not None:
                 return self._encode_value(parsed)
             return json.dumps(value, ensure_ascii=False)
-        return json.dumps(str(value), ensure_ascii=False)
+        normalized = value.replace("\r\n", " ").replace("\n", " ").strip()
+        return json.dumps(normalized, ensure_ascii=False)
 
     def _try_parse_json_string(self, value: str) -> Any | None:
         """
