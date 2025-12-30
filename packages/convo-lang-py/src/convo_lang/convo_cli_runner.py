@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterator, List, Optional
 from .convo_cli_path import discover_convo_bin
 from .error_utils import raise_for_cli_failure
 from .errors import ConvoNotFound, ExecFailed, Timeout
+from .convo_vars_serializer import ConvoVarsSerializer
 
 
 @dataclass
@@ -25,21 +26,6 @@ class ConvoCLIRunner:
             except Exception as e:
                 raise ConvoNotFound(f"Convo CLI binary not found: {e}") from e
     
-    def to_convo_vars(self, vars_dict: Dict[str, Any]) -> str:
-        parts: List[str] = []
-        for key, value in vars_dict.items():
-            if isinstance(value, bool):
-                v = "true" if value else "false"
-            elif isinstance(value, (int, float)):
-                v = str(value)
-            elif value is None:
-                v = "null"
-            else:
-                escaped = str(value).replace('"', '\\"')
-                v = f'"{escaped}"'
-            parts.append(f"{key}:{v}")
-        return "{" + ", ".join(parts) + "}"
-
     def _build_cmd(
         self,
         path: Path,
@@ -51,7 +37,8 @@ class ConvoCLIRunner:
         """Compose the CLI command arguments (no I/O, no shell quoting)."""
         cmd: List[str] = [self.convo_bin, str(path)]
         if variables:
-            cmd += ["--vars", self.to_convo_vars(variables)]
+            serializer = ConvoVarsSerializer()
+            cmd += ["--vars", serializer.to_convo_vars(vars_dict=variables)]
         if use_prefix_output:
             cmd += ["--prefixOutput"]
         if extra_args:
