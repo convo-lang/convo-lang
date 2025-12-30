@@ -7,7 +7,4 @@ venv
 logs
 /.pytest_cache
 
-*.convo
-convo-test.py
-
 .env
