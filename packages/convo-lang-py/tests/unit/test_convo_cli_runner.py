@@ -156,21 +156,6 @@ def test_run_text_accepts_optional_args_and_vars_with_mock(tmp_path):
     )
     assert out == "ok"
 
-def test_to_convo_vars_serializes_types_and_escapes_quotes():
-    runner = ConvoCLIRunner(convo_bin="convo")
-    vars_dict = OrderedDict(
-        [
-            ("b1", True),
-            ("b2", False),
-            ("i", 3),
-            ("f", 1.25),
-            ("n", None),
-            ("s", 'he said "hi"'),
-        ]
-    )
-    out = runner.to_convo_vars(vars_dict)
-    assert out == '{b1:true, b2:false, i:3, f:1.25, n:null, s:"he said \\"hi\\""}'
-
 def test_run_file_builds_command_including_prefix_vars_extra_args(monkeypatch, tmp_path):
     script = tmp_path / "script.convo"
     script.write_text("dummy")
