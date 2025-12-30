@@ -1,11 +1,12 @@
-import { asType, valueIsZodObject } from '@iyio/common';
+import { asType, deepClone, valueIsZodObject } from '@iyio/common';
 import { ZodEnum, ZodObject, z } from 'zod';
-import { CallbackConvoCompletionService } from './CallbackConvoCompletionService';
-import { Conversation } from "./Conversation";
-import { ConvoError } from './ConvoError';
-import { ConvoComponent } from './convo-component-types';
-import { getConvoMetadata } from './convo-lib';
-import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types";
+import { CallbackConvoCompletionService } from './CallbackConvoCompletionService.js';
+import { Conversation } from "./Conversation.js";
+import { ConvoError } from './ConvoError.js';
+import { ConvoComponent } from './convo-component-types.js';
+import { convoDocRefToTagValue, convoTags, getConvoMetadata } from './convo-lib.js';
+import { ConvoDocumentReference } from './convo-rag-types.js';
+import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types.js";
 
 describe('conversation',()=>{
 
@@ -648,15 +649,17 @@ describe('conversation',()=>{
 
         let ragParams:any;
 
+        const docRef:ConvoDocumentReference={
+            content:'Polar bears like coke ;)',
+            id:'ice123',
+            name:'Bears on Ice',
+            url:'https://example.com/polarbears'
+        }
+
         const convo=new Conversation({
             ragCallback:({params})=>{
                 ragParams=params;
-                return {
-                    content:'Polar bears like coke ;)',
-                    sourceId:'ice123',
-                    sourceName:'Bears on Ice',
-                    sourceUrl:'https://example.com/polarbears'
-                }
+                return docRef;
             },
             completionService:new CallbackConvoCompletionService(async ()=>{
                 return [{
@@ -684,21 +687,11 @@ describe('conversation',()=>{
             "content": "Polar bears like coke ;)",
             "tags": [
                 {
-                    "name": "sourceId",
-                    "value": "ice123"
+                    "name": convoTags.docRef,
+                    "value": convoDocRefToTagValue(docRef)
                 },
-                {
-                    "name": "sourceName",
-                    "value": "Bears on Ice"
-                },
-                {
-                    "name": "sourceUrl",
-                    "value": "https://example.com/polarbears"
-                }
             ],
-            "sourceId": "ice123",
-            "sourceName": "Bears on Ice",
-            "sourceUrl": "https://example.com/polarbears"
+            "docRefs":[deepClone(docRef)]
         })
         expect(ragParams).toEqual({go:'fast'})
     })
@@ -709,9 +702,9 @@ describe('conversation',()=>{
         const convo=new Conversation({
             ragCallback:()=>({
                 content:'Polar bears like coke ;)',
-                sourceId:'ice123',
-                sourceName:'Bears on Ice',
-                sourceUrl:'https://example.com/polarbears'
+                id:'ice123',
+                name:'Bears on Ice',
+                url:'https://example.com/polarbears'
             }),
             completionService:new CallbackConvoCompletionService(async ()=>{
                 return [{

@@ -1,7 +1,7 @@
-export * from './lib/BedrockConvoCompletionService';
-export * from './lib/BedrockConvoConverter';
-export * from './lib/bedrock-lib';
-export * from './lib/bedrock-models';
-export * from './lib/bedrock-params';
-export * from './lib/bedrock-service';
+export * from './lib/BedrockConvoCompletionService.js';
+export * from './lib/BedrockConvoConverter.js';
+export * from './lib/bedrock-lib.js';
+export * from './lib/bedrock-models.js';
+export * from './lib/bedrock-params.js';
+export * from './lib/bedrock-service.js';
 

@@ -1,3 +1,3 @@
-export * from './lib/ConvoPdfDocReader';
-export * from './lib/convoPdfDocReaderFactory';
+export * from './lib/ConvoPdfDocReader.js';
+export * from './lib/convoPdfDocReaderFactory.js';
 

@@ -1,7 +1,7 @@
-export * from './lib/convo-make-lib';
-export * from './lib/convo-make-types';
-export * from './lib/ConvoMakeAppCtrl';
-export * from './lib/ConvoMakeAppViewer';
-export * from './lib/ConvoMakeCtrl';
-export * from './lib/ConvoMakeTargetCtrl';
+export * from './lib/convo-make-lib.js';
+export * from './lib/convo-make-types.js';
+export * from './lib/ConvoMakeAppCtrl.js';
+export * from './lib/ConvoMakeAppViewer.js';
+export * from './lib/ConvoMakeCtrl.js';
+export * from './lib/ConvoMakeTargetCtrl.js';
 

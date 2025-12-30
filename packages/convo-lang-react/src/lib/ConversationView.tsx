@@ -4,12 +4,12 @@ import { BaseLayoutProps, deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo, useRef } from "react";
 import { Subscription } from 'rxjs';
-import { ConversationInput, ConversationInputProps } from "./ConversationInput";
-import { MessagesSourceView } from "./MessagesSourceView";
-import { MessagesView, MessagesViewProps } from "./MessagesView";
-import { SuggestionsView, SuggestionsViewProps } from './SuggestionsView';
-import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react";
-import { ConvoLangTheme, defaultDarkConvoLangTheme, defaultLightConvoLangTheme } from "./convo-lang-theme";
+import { ConversationInput, ConversationInputProps } from "./ConversationInput.js";
+import { MessagesSourceView } from "./MessagesSourceView.js";
+import { MessagesView, MessagesViewProps } from "./MessagesView.js";
+import { SuggestionsView, SuggestionsViewProps } from './SuggestionsView.js';
+import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react.js";
+import { ConvoLangTheme, defaultDarkConvoLangTheme, defaultLightConvoLangTheme } from "./convo-lang-theme.js";
 
 export interface ConversationViewProps
 {

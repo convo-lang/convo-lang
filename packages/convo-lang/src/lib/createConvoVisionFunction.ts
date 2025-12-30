@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { convoFunctions, convoLabeledScopeParamsToObj, convoVars, defaultConvoVisionResponse, escapeConvoMessageContent } from "./convo-lib";
-import { ConvoFunctionDef } from "./convo-types";
+import { convoFunctions, convoLabeledScopeParamsToObj, convoVars, defaultConvoVisionResponse, escapeConvoMessageContent } from "./convo-lib.js";
+import { ConvoFunctionDef } from "./convo-types.js";
 
 const paramsType=z.object({
     query:z.string().describe('The question or request made by the user.'),

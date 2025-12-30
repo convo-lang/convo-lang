@@ -2,9 +2,9 @@ import { Conversation, ConversationOptions, ConvoFnCallInfo, ConvoTokenUsage, ad
 import { CancelToken, DisposeContainer, Lock, ReadonlySubject, aryRemoveItem, createPromiseSource, deepClone, getErrorMessage, getValueByPath, pushBehaviorSubjectAry, shortUuid, zodCoerceObject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { ZodType } from "zod";
-import { convoGraphStore } from "./convo-graph-deps";
-import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, defaultConvoGraphUserDataVarName, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib";
-import { ConvoEdge, ConvoEdgePattern, ConvoGraphBeforeNextCallback, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types";
+import { convoGraphStore } from "./convo-graph-deps.js";
+import { applyConvoTraverserControlPath, convoTraverserProxyVar, convoTraverserStateStoreSuffix, createConvoNodeExecCtxAsync, createConvoNodeExecCtxConvo, defaultConvoGraphUserDataVarName, getConvoGraphEventString, getConvoNodeMetadataAsync, maxConvoGraphConcurrentStepExe, resetConvoNodeExecCtxConvo } from "./convo-graph-lib.js";
+import { ConvoEdge, ConvoEdgePattern, ConvoGraphBeforeNextCallback, ConvoGraphMonitorEvent, ConvoGraphStore, ConvoNode, ConvoNodeExeState, ConvoNodeExecCtx, ConvoNodeExecCtxStep, ConvoNodeStep, ConvoStateVarProxyMap, ConvoTraverser, ConvoTraverserGroup, CreateConvoTraverserOptions, StartConvoTraversalOptions } from "./convo-graph-types.js";
 
 export interface ConvoGraphCtrlOptions
 {
@@ -639,7 +639,7 @@ export class ConvoGraphCtrl
                 const conversation=new Conversation(
                     await this.getConvoOptionsAsync(undefined,
                         `\n> edgeConditionEvalFunction() -> ( ${edge.conditionConvo} )\n`+
-                         `> do`+
+                         `> do\n`+
                          `edgeConditionResult=edgeConditionEvalFunction()`,
                          {input,workflow}
                     )

@@ -2,7 +2,7 @@ import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, C
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, rootScope } from "@iyio/common";
+import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
@@ -10,8 +10,8 @@ import { VfsDiskMntCtrl } from "@iyio/vfs-node";
 import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import { z } from 'zod';
-import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types";
-import { createConvoExec } from './convo-exec';
+import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
+import { createConvoExec } from './convo-exec.js';
 
 let configPromise:Promise<ConvoCliConfig>|null=null;
 export const getConvoCliConfigAsync=(options:ConvoCliOptions):Promise<ConvoCliConfig>=>
@@ -52,16 +52,94 @@ const _getConfigAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         }
     }
 
+    if(options.varsPath){
+        const defaultVars=c.defaultVars??(c.defaultVars={});
+        for(const path of options.varsPath){
+            const value=(await readFileAsStringAsync(path)).trim();
+            if(value.startsWith('{')){
+                const obj=parseJson5(value);
+                if(obj && (typeof obj === 'object')){
+                    for(const e in obj){
+                        defaultVars[e]=obj[e];
+                    }
+                }
+            }else{
+                const lines=value.split('\n');
+                for(const l of lines){
+                    const line=l.trim();
+                    if(!line || line.startsWith('#')){
+                        continue;
+                    }
+                    parseCliValue(line,defaultVars);
+                }
+            }
+        }
+    }
+
+    if(options.vars){
+        const defaultVars=c.defaultVars??(c.defaultVars={});
+        for(const v of options.vars){
+            const obj=parseJson5(v);
+            if(obj && (typeof obj === 'object')){
+                for(const e in obj){
+                    defaultVars[e]=obj[e];
+                }
+            }
+        }
+    }
+
+    if(options.var){
+        const defaultVars=c.defaultVars??(c.defaultVars={});
+        for(const v of options.var){
+            parseCliValue(v,defaultVars);
+        }
+    }
+
     return c;
 }
 
-let initPromise:Promise<ConvoCliOptions>|null=null;
-export const initConvoCliAsync=(options:ConvoCliOptions):Promise<ConvoCliOptions>=>
+const parseCliValue=(value:string,assignTo:Record<string,any>)=>{
+    const i=value.indexOf('=');
+    if(i==-1){
+        setValueByPath(assignTo,value,true);
+        return;
+    }
+    const [name='',type='string']=value.substring(0,i).split(':');
+    let v:any=value.substring(i+1);
+
+    switch(type){
+
+        case 'number':
+            setValueByPath(assignTo,name,Number(v)||0);
+            break;
+
+        case 'bigint':
+            setValueByPath(assignTo,name,BigInt(v)||0);
+            break;
+
+        case 'boolean':
+            setValueByPath(assignTo,name,parseConfigBool(v));
+            break;
+
+        case 'object':
+            setValueByPath(assignTo,name,parseJson5(v));
+            break;
+
+        default:
+            setValueByPath(assignTo,name,v);
+            break;
+    }
+
+
+}
+
+let initPromise:Promise<ConvoCliConfig>|null=null;
+export const initConvoCliAsync=(options:ConvoCliOptions):Promise<ConvoCliConfig>=>
 {
     return initPromise??(initPromise=_initAsync(options));
 }
 
-const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliOptions>=>
+const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
 {
 
     const config=await getConvoCliConfigAsync(options);
@@ -168,6 +246,7 @@ export class ConvoCli
         this.allowExec=options.allowExec;
         this.options=options;
         this.convo=createConversationFromScope(rootScope);
+        if(options.config)
         if(options.cmdMode){
             this.convo.dynamicFunctionCallback=this.dynamicFunctionCallback;
             startReadingStdIn();
@@ -335,6 +414,11 @@ The current date and time is: "{{dateTime()}}"
     public async executeAsync(cancel?:CancelToken):Promise<void>
     {
         const config=await initConvoCliAsync(this.options);
+        if(config.defaultVars){
+            for(const e in config.defaultVars){
+                this.convo.defaultVars[e]=config.defaultVars[e];
+            }
+        }
         if(!this.allowExec){
             this.allowExec=config.allowExec??'ask';
         }

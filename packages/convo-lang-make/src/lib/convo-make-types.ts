@@ -1,7 +1,7 @@
 import { ConvoMakeActivePass, ConvoMakeApp, ConvoMakeAppContentHostMode, ConvoMakeExplicitReviewType, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration } from "@convo-lang/convo-lang";
 import { Observable } from "rxjs";
-import { ConvoMakeCtrl } from "./ConvoMakeCtrl";
-import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
+import { ConvoMakeCtrl } from "./ConvoMakeCtrl.js";
+import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl.js";
 
 export interface ConvoMakeTargetPair{
     target:ConvoMakeTarget;
@@ -71,12 +71,17 @@ export interface ConvoMakeOutputReview
     screenshotBase64Url?:string;
 }
 
+export interface ConvoMakeShellExecOptions
+{
+    cwd?:string;
+}
+
 export interface ConvoMakeShell
 {
     /**
      * Starts the execution of a shell command and returns a process object to interact with the process
      */
-    execAsync(shellCommand:string):ConvoMakeShellProc;
+    exec(shellCommand:string,options?:ConvoMakeShellExecOptions):ConvoMakeShellProc;
 
     /**
      * Checks if a specific port is open
@@ -95,6 +100,11 @@ export interface ConvoMakeShellProc
      * Occurs with the process writes text to stdout
      */
     get onOutput():Observable<string>;
+
+    /**
+     * Occurs with the process writes text to stdout
+     */
+    get onErr():Observable<string>;
 
     /**
      * A promise that is completed when the process exits

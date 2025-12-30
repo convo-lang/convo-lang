@@ -1,6 +1,6 @@
 import { createJsonRefReplacer, getErrorMessage, valueIsZodType } from "@iyio/common";
-import { escapeConvoMessageContent } from "./convo-lib";
-import { zodSchemeToConvoTypeString } from "./convo-zod";
+import { escapeConvoMessageContent } from "./convo-lib.js";
+import { zodSchemeToConvoTypeString } from "./convo-zod.js";
 
 export interface RawConvoValue
 {

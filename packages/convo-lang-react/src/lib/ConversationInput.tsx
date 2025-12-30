@@ -2,8 +2,8 @@ import { ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { Form, Image, SlimButton } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
-import { ConversationInputChange, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react";
-import { Icon } from "./icon/Icon";
+import { ConversationInputChange, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
+import { Icon } from "./icon/Icon.js";
 
 export interface ConversationInputProps
 {

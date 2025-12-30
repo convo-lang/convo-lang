@@ -1,8 +1,8 @@
 import { defineProvider, defineService, defineStringParam } from "@iyio/common";
-import { ConvoLocalStorageCache } from "./ConvoLocalStorageCache";
-import { ConvoVfsCache } from "./ConvoVfsCache";
-import { PassthroughConvoConversationConverter } from "./PassthroughConvoConversationConverter";
-import { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoImportService, ConvoProjectConfig } from "./convo-types";
+import { ConvoLocalStorageCache } from "./ConvoLocalStorageCache.js";
+import { ConvoVfsCache } from "./ConvoVfsCache.js";
+import { PassthroughConvoConversationConverter } from "./PassthroughConvoConversationConverter.js";
+import { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoImportService, ConvoProjectConfig } from "./convo-types.js";
 
 export const convoCompletionService=defineService<ConvoCompletionService<any,any>>('ConvoCompletionService');
 

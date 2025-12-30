@@ -1,17 +1,27 @@
 {
-    "packages":[
+    "type":"repo",
+    "namespace":"@convo-lang",
+    "additionalNamespaces":[
+        "convo-lang-tools",
+        "convo-lang"
+    ],
+    "inject":[
         {"dir":"../iyio-common/packages/at-dot-css"},
         {"dir":"../iyio-common/packages/iyio-common"},
-        {"dir":"../iyio-common/packages/iyio-common-py"},
         {"dir":"../iyio-common/packages/media-common"},
         {"dir":"../iyio-common/packages/node-common"},
         {"dir":"../iyio-common/packages/react-common"},
-        {"dir":"../iyio-common/packages/nx-common"},
         {"dir":"../iyio-common/packages/syn-taxi"},
         {"dir":"../iyio-common/packages/vfs"},
         {"dir":"../iyio-common/packages/rtxt"},
         {"dir":"../iyio-common/packages/json5"},
         {"dir":"../iyio-common/packages/pdf-viewer"},
-        {"dir":"../iyio-common/packages/tmpl-gen","disableTsConfigPath":true}
+        {"dir":"../iyio-common/packages/aws-credential-providers"},
+        {"dir":"../iyio-common/packages/aws-secrets"},
+        {"dir":"../iyio-common/packages/aws-dynamo"},
+        {"dir":"../iyio-common/packages/vfs-node"},
+        {"dir":"../iyio-common/packages/aws"},
+        {"dir":"../iyio-common/packages/cdk-common"},
+        {"dir":"../iyio-common/packages/aws-rds"}
     ]
 }

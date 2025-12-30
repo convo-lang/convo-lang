@@ -2,8 +2,8 @@ import { ContentBlock, ConversationRole, ConverseCommandInput, ConverseCommandOu
 import { ConvoCompletionMessage, ConvoConversationConverter, FlatConvoConversation, FlatConvoConversationBase, convoAnyModelName, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "@convo-lang/convo-lang";
 import { deleteUndefined, log, parseMarkdownImages, uuid, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
-import { convoBedrockInputType, convoBedrockOutputType, defaultBedrockModel } from "./bedrock-lib";
-import { bedrockModels } from "./bedrock-models";
+import { convoBedrockInputType, convoBedrockOutputType, defaultBedrockModel } from "./bedrock-lib.js";
+import { bedrockModels } from "./bedrock-models.js";
 
 
 interface FormatOptions

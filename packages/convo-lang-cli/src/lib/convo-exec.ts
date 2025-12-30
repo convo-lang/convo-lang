@@ -1,6 +1,6 @@
 import { convoVars, createConvoScopeFunction } from "@convo-lang/convo-lang";
 import { execAsync } from "@iyio/node-common";
-import { ConvoExecConfirmCallback } from "./convo-cli-types";
+import { ConvoExecConfirmCallback } from "./convo-cli-types.js";
 
 
 export const createConvoExec=(confirm:ConvoExecConfirmCallback)=>{

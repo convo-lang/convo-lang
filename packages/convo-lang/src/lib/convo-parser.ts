@@ -1,8 +1,8 @@
 import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getErrorMessage, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, starStringToRegex, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
-import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib";
-import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types";
+import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
+import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
@@ -1315,6 +1315,16 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         break;
                     }
 
+                    case convoTags.docRef:
+                        if(tag.value){
+                            if(!msg.docRefs){
+                                msg.docRefs=[];
+                            }
+                            const docRef=parseJson5(tag.value);
+                            msg.docRefs.push(docRef);
+                        }
+                        break;
+
                     default:
                         if(copyTagValues[tag.name] && tag.value){
                             (msg as any)[tag.name]=tag.value;
@@ -1349,9 +1359,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
  */
 const copyTagValues:Record<string,boolean>={
     [convoTags.renderTarget]:true,
-    [convoTags.sourceId]:true,
-    [convoTags.sourceUrl]:true,
-    [convoTags.sourceName]:true,
 
 }
 

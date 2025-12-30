@@ -1,5 +1,5 @@
 import { ThemeColor, ThemeIcon } from "vscode";
-import { ConvoMakeExtItemMetadata } from "./convo-make-ext-types";
+import { ConvoMakeExtItemMetadata } from "./convo-make-ext-types.js";
 
 const metadataKey=Symbol('ConvoExtMetadata');
 

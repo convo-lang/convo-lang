@@ -1,6 +1,6 @@
 import { defineService, safeParseNumber } from "@iyio/common";
-import { addConvoUsageTokens, createEmptyConvoTokenUsage } from "./convo-lib";
-import { ConvoDocumentReference, ConvoRagContext, ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types";
+import { addConvoUsageTokens, createEmptyConvoTokenUsage } from "./convo-lib.js";
+import { ConvoDocumentReference, ConvoRagContext, ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 
 export const convoRagService=defineService<ConvoRagService>('ConvoRagService');
 

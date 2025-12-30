@@ -1,9 +1,9 @@
 import { ConvoMakeActivePass, ConvoMakePass } from "@convo-lang/convo-lang";
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
 import { ProviderResult } from "vscode";
-import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib";
-import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
+import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from "./convo-make-ext-lib.js";
+import { getConvoMakeExtJsonChildren } from "./ConvoMakeExtJson.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
 
 
 

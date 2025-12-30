@@ -1,10 +1,10 @@
 import { ConvoModule, convoDescriptionToComment, convoJsDocTags, escapeConvo, escapeConvoTagValue } from "@convo-lang/convo-lang";
-import { CancelToken, getDirectoryName, getObjKeyCount, joinPaths, normalizePath, strHashBase64 } from "@iyio/common";
-import { pathExistsAsync, readDirAsync, readFileAsStringAsync } from "@iyio/node-common";
+import { CancelToken, getDirectoryName, getObjKeyCount, joinPaths, strHashBase64 } from "@iyio/common";
+import { execAsync, pathExistsAsync, readDirAsync, readFileAsStringAsync } from "@iyio/node-common";
 import { mkdir, realpath, watch, writeFile } from "fs/promises";
 import { relative } from "path";
 import { ExportGetableNode, JSDocTagInfo, Node, Project, SourceFile, Symbol, SyntaxKind, Type, VariableDeclaration } from "ts-morph";
-import { ConvoCliOptions } from "./convo-cli-types";
+import { ConvoCliOptions } from "./convo-cli-types.js";
 
 const ignoreTypes=['ConvoComponentRendererContext'];
 const arrayTypeMap:Record<string,string>={
@@ -84,6 +84,7 @@ interface ProjectCtx{
     mods:Mod[];
     log:(...msgs:any[])=>void;
     reloadPaths:string[];
+    includeGitIgnored?:boolean;
 }
 
 export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:CancelToken)=>{
@@ -105,13 +106,13 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
     }
 
     const outFullPath=await realpath(syncOut);
-    const projects=await Promise.all(syncTsConfig.map(p=>normalizePath(p)).map<Promise<ProjectCtx>>(async p=>({
+    const projects=await Promise.all(syncTsConfig.map<Promise<ProjectCtx>>(async p=>({
         path:p,
         fullPath:await realpath(getDirectoryName(p),{encoding:'utf-8'}),
         project:new Project({
             tsConfigFilePath:p,
         }),
-        out:normalizePath(syncOut),
+        out:syncOut,
         outFullPath,
         options,
         zodOut:[],
@@ -194,12 +195,14 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
             }
         }
 
-        const convoFiles=await readDirAsync({
+        const convoFilesSrc=await readDirAsync({
             path:project.fullPath,
             recursive:true,
             include:'file',
             filter:/\.convo$/
         });
+        const ignored=await getIgnoredPathsAsync(project.fullPath,convoFilesSrc);
+        const convoFiles=convoFilesSrc.filter(f=>!ignored.includes(f));
         await Promise.all(convoFiles.map(file=>scanConvoFileAsync(file,project)));
 
         project.mods.sort((a,b)=>modSortKey(a).localeCompare(modSortKey(b)))
@@ -1009,5 +1012,18 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
         if(!project.cancel.isCanceled){
             console.error(`watchProjectAsync error`,project.outFullPath,ex);
         }
+    }
+}
+
+const getIgnoredPathsAsync=async (dir:string,paths:string[]):Promise<string[]>=>{
+    try{
+        const r=await execAsync({
+            cwd:dir,
+            cmd:`echo -e "\\n${paths.join('\\n')}" | git check-ignore --stdin`,
+        });
+        return r.split('\n').map(v=>v.trim());
+    }catch(ex){
+        console.error('Unable to check git ignored files',ex);
+        return [];
     }
 }

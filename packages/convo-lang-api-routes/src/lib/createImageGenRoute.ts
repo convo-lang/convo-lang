@@ -2,7 +2,7 @@ import { BadRequestError, NotFoundError, fsBase64Chars, getFileName, httpClient,
 import { HttpRoute, createHttpHandlerResult, pathExistsAsync } from "@iyio/node-common";
 import { vfs } from "@iyio/vfs";
 import { writeFile } from "fs/promises";
-import { ImageGenRouteOptions, defaultConvoLangFsRoot } from "./convo-lang-api-routes-lib";
+import { ImageGenRouteOptions, defaultConvoLangFsRoot } from "./convo-lang-api-routes-lib.js";
 
 
 

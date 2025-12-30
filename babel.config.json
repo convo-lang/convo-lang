@@ -1,4 +1,0 @@
-{
-    "babelrcRoots": ["*"],
-    "plugins": ["@iyio/babel-plugin-macros"]
-}

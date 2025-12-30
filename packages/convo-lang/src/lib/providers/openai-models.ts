@@ -1,4 +1,4 @@
-import { ConvoModelInfo } from "../convo-types";
+import { ConvoModelInfo } from "../convo-types.js";
 
 let _chat:ConvoModelInfo;
 let _vision:ConvoModelInfo;

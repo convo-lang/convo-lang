@@ -1,8 +1,8 @@
 import { getErrorMessage } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
-import { Conversation, ConversationOptions } from "./Conversation";
-import { escapeConvoMessageContent } from "./convo-lib";
-import { ConvoCompletion, ConvoCompletionOptions, ConvoParsingResult, FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import { Conversation, ConversationOptions } from "./Conversation.js";
+import { escapeConvoMessageContent } from "./convo-lib.js";
+import { ConvoCompletion, ConvoCompletionOptions, ConvoParsingResult, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export const getConvoCompletionAsync=(
     messagesOrOptions:string|ConvoCompletionOptions,

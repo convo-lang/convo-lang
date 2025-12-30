@@ -1,5 +1,5 @@
-import { defaultConvoVars } from "./convo-default-vars";
-import { FlatConvoConversation, FlatConvoMessage } from "./convo-types";
+import { defaultConvoVars } from "./convo-default-vars.js";
+import { FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export const evalConvoMessageAsCodeAsync=async (msg:FlatConvoMessage,flat:FlatConvoConversation):Promise<any>=>
 {

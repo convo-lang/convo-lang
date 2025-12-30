@@ -1,9 +1,9 @@
-import { useGenMetadata } from "@convo-lang/convo-lang-react";
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutProps, currentBaseUser, getErrorMessage, httpClient } from "@iyio/common";
 import { LoadingDots, Text, View } from "@iyio/react-common";
 import { useEffect, useState } from "react";
-import { getGenImgUrl } from "./gen-img-lib";
+import { useGenMetadata } from "../gen/gen-lib.js";
+import { getGenImgUrl } from "./gen-img-lib.js";
 
 export interface GenImgProps
 {

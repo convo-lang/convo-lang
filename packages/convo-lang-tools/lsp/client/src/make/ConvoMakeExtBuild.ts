@@ -1,14 +1,14 @@
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
 import { normalizePath } from "@iyio/common";
 import { ProviderResult, workspace } from "vscode";
-import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib';
-import { ConvoMakeExtAppList } from "./ConvoMakeExtApp";
-import { ConvoMakeExtPassList } from "./ConvoMakeExtPass";
-import { ConvoMakeExtStageList } from "./ConvoMakeExtStage";
-import { ConvoMakeExtTargetList } from "./ConvoMakeExtTarget";
-import { ConvoMakeExtTargetDecList } from "./ConvoMakeExtTargetDec";
-import { ConvoMakeExtTokenUsage } from "./ConvoMakeExtTokenUsage";
-import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem";
+import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib.js';
+import { ConvoMakeExtAppList } from "./ConvoMakeExtApp.js";
+import { ConvoMakeExtPassList } from "./ConvoMakeExtPass.js";
+import { ConvoMakeExtStageList } from "./ConvoMakeExtStage.js";
+import { ConvoMakeExtTargetList } from "./ConvoMakeExtTarget.js";
+import { ConvoMakeExtTargetDecList } from "./ConvoMakeExtTargetDec.js";
+import { ConvoMakeExtTokenUsage } from "./ConvoMakeExtTokenUsage.js";
+import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
 
 
 
@@ -33,7 +33,7 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
             id:options.ctrl.id,
             name,
             type:'build',
-            expand:true,
+            expand:options.ctrl.preview?false:true,
             icon:getIcon(options.ctrl)
         });
         this.ctrl.onBuildEvent.subscribe(()=>{

@@ -8,8 +8,8 @@
             "executor": "nx:run-commands",
             "options": {
                 "_command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions ../mindark-knowledge",
-                "__command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions ../tmp/beach-rescue",
-                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ --disable-extensions ../guardians-collective"
+                "command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ ../convo-lang-make-example",
+                "__command": "./packages/convo-lang-tools/lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd)/packages/convo-lang-tools/ ../guardians-collective"
             }
         },
         "publish-ext": {

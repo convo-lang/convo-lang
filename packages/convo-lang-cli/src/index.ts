@@ -1,4 +1,4 @@
-export * from './lib/ConvoCli';
-export * from './lib/convo-cli-types';
-export * from './lib/convo-exec';
+export * from './lib/ConvoCli.js';
+export * from './lib/convo-cli-types.js';
+export * from './lib/convo-exec.js';
 

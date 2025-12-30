@@ -1,7 +1,7 @@
 import { atDotCss } from "@iyio/at-dot-css";
 import { BaseLayoutOuterProps } from "@iyio/common";
 import { useWObjProp } from "@iyio/react-common";
-import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
+import { useConvoGraphViewCtrl } from "./convo-graph-react-lib.js";
 
 export interface ConvoNodeSelectorProps
 {

@@ -2,7 +2,7 @@ import { Conversation, ConversationOptions, ConversationUiCtrl, ConvoObject, Con
 import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, zodTypeToJsonScheme } from "@iyio/common";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ConvoLangTheme } from "./convo-lang-theme";
+import { ConvoLangTheme } from "./convo-lang-theme.js";
 
 export type ConversationInputChangeType='chat'|'source'
 export interface ConversationInputChange

@@ -1,11 +1,12 @@
-import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
-import { asArray, base64EncodeMarkdownImage, delayAsync, getContentType, getDirectoryName, getFileExt, getFileName, getFileNameNoExt, InternalOptions, joinPaths, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
-import { vfs, VfsCtrl, VfsFilter } from "@iyio/vfs";
+import { addConvoUsageTokens, contentHasConvoRole, Conversation, ConversationOptions, ConvoBrowserInf, convoLogDir, ConvoMakeActivePass, ConvoMakeApp, ConvoMakeContextTemplate, ConvoMakeExplicitReviewType, ConvoMakeInput, ConvoMakePass, ConvoMakeStage, convoMakeStateDir, ConvoMakeStats, ConvoMakeTarget, ConvoMakeTargetAttachment, ConvoMakeTargetContentTemplate, ConvoMakeTargetDeclaration, ConvoMakeTargetRebuild, ConvoMakeTargetSharedProps, ConvoTokenUsage, convoVars, createEmptyConvoTokenUsage, defaultConvoMakeAppContentHostMode, defaultConvoMakePreviewPort, defaultConvoMakeStageName, defaultConvoMakeTmpPagesDir, directUrlConvoMakeAppName, escapeConvo, insertConvoContentIntoSlot } from "@convo-lang/convo-lang";
+import { addConsoleListener, asArray, base64EncodeMarkdownImage, CancelToken, ConsoleEntry, delayAsync, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getFileNameNoExt, getTimestampString, getUriProtocol, InternalOptions, joinPaths, LogLevel, normalizePath, parseCsvRows, pushBehaviorSubjectAry, ReadonlySubject, removeConsoleListener, starStringToRegex, strHashBase64Fs, uuid } from "@iyio/common";
+import { parseJson5 } from "@iyio/json5";
+import { vfs, VfsCtrl, VfsFilter, VfsItem } from "@iyio/vfs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { applyConvoMakeTargetSharedProps, getConvoMakeInputSortKey, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib";
-import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types";
-import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl";
-import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl";
+import { applyConvoMakeContextTemplate, applyConvoMakeTargetSharedProps, getConvoMakeAppUrl, getConvoMakeStageDeps, getConvoMakeTargetOutType, getEscapeConvoMakePathName } from "./convo-make-lib.js";
+import { ConvoMakeAppTargetRef, ConvoMakeBuildEvt, ConvoMakePassUpdate, ConvoMakeShell, ConvoMakeTargetPair } from "./convo-make-types.js";
+import { ConvoMakeAppCtrl } from "./ConvoMakeAppCtrl.js";
+import { ConvoMakeTargetCtrl } from "./ConvoMakeTargetCtrl.js";
 
 export interface ConvoMakeCtrlOptions
 {
@@ -33,9 +34,9 @@ export interface ConvoMakeCtrlOptions
     dryRun?:boolean;
 
     /**
-     * If true or a path or paths to target outputs cached outputs will be reviewed
+     * If true, a path or paths to target outputs cached outputs will be rebuilt
      */
-    continueReview?:boolean|string|string[];
+    rebuild?:boolean|ConvoMakeTargetRebuild|string|(string|ConvoMakeTargetRebuild)[];
 
     previewPort?:number;
 
@@ -49,6 +50,18 @@ export interface ConvoMakeCtrlOptions
      */
     preview?:boolean;
 
+    /**
+     * If true all targets will be forced to be reviewed
+     */
+    forceReview?:boolean;
+
+    /**
+     * If not falsy console logs will be captured that match the defined log level and written to the log file
+     */
+    captureConsoleLogLevel?:LogLevel;
+
+
+
 
 }
 
@@ -57,6 +70,8 @@ export class ConvoMakeCtrl
     public readonly name:string;
     public readonly dir:string;
     public readonly filePath:string;
+    public readonly statsPath:string;
+    public readonly logPath:string;
     public readonly preview:boolean;
 
     public readonly id:string;
@@ -91,6 +106,8 @@ export class ConvoMakeCtrl
     public get usageSubject():ReadonlySubject<ConvoTokenUsage>{return this._usage}
     public get usage(){return this._usage.value}
 
+    private messageLog:string[]=[];
+
     readonly _builtOutputs:string[]=[];
 
     public constructor({
@@ -105,11 +122,13 @@ export class ConvoMakeCtrl
         browserInf,
         apps=[],
         previewPort=defaultConvoMakePreviewPort,
-        continueReview=false,
+        rebuild=false,
         disableInputTrimming=false,
         stages=[],
         targetDefaults,
         preview=false,
+        forceReview=false,
+        captureConsoleLogLevel=LogLevel.none,
     }:ConvoMakeCtrlOptions){
         this.options={
             name,
@@ -123,18 +142,38 @@ export class ConvoMakeCtrl
             shell,
             browserInf,
             previewPort,
-            continueReview,
+            rebuild,
             disableInputTrimming,
             stages,
             targetDefaults,
             preview,
+            forceReview,
+            captureConsoleLogLevel,
         }
         this.id=uuid();
         this.name=name;
         this.dir=dir;
+        const logBaseName=normalizePath(joinPaths(
+                dir,
+                convoMakeStateDir,
+                convoLogDir,
+                `${getTimestampString()}-ID-${this.id}`
+        ));
+        this.statsPath=logBaseName+'.json';
+        this.logPath=logBaseName+'.log';
         this.filePath=filePath;
         this.preview=preview;
-        console.log('ConvoMakeCtrl',this);
+        if(captureConsoleLogLevel){
+            const _log=console.log;
+            const added=addConsoleListener(this.consoleLogListener);
+        }
+        console.log(`ConvoMakeCtrl - ${filePath}`,this);
+    }
+
+    private readonly consoleLogListener=(entry:ConsoleEntry)=>{
+        //if(entry.level&this.options.captureConsoleLogLevel){
+            this.log(...entry.args);
+        //}
     }
 
     private _isDisposed=false;
@@ -157,45 +196,141 @@ export class ConvoMakeCtrl
             target:this,
             eventTarget:this,
             ctrl:this,
-        })
+        });
+        if(this.options.captureConsoleLogLevel){
+            setTimeout(()=>{
+                removeConsoleListener(this.consoleLogListener);
+            },500);
+        };
     }
 
-    private buildPromise:Promise<void>|undefined;
-    public buildAsync()
+    public log(...args:any[]){
+        if(this.preview){
+            return;
+        }
+        const msg=args.map(a=>{
+            if(typeof a === 'string'){
+                return a;
+            }
+            if(a instanceof Error){
+                const msg=getErrorMessage(a);
+                const stack=a.stack;
+                return stack?msg+'\n'+stack:msg;
+            }
+            try{
+                return JSON.stringify(a);
+            }catch{
+                return a+'';
+            }
+        }).join(' ');
+
+        this.messageLog.push(msg);
+        this.flushLog();
+    }
+
+    private flushingLog=false;
+    private flushLogRequested=false;
+    private flushLog()
+    {
+        if(!this.messageLog.length){
+            return;
+        }
+        if(this.flushingLog){
+            this.flushLogRequested=true;
+            return;
+        }
+        this.flushingLog=true;
+        setTimeout(async ()=>{
+            const log=this.messageLog.join('\n');
+            this.messageLog.splice(0,this.messageLog.length);
+            try{
+                await this.options.vfsCtrl.appendStringAsync(this.logPath,log);
+            }catch(ex){
+                // Do not write to console if capturing or an infinite loop may occur
+                if(!this.options.captureConsoleLogLevel){
+                    console.error('Unable to append log messages');
+                    console.error('Unwritten log messages:',log);
+                }
+            }
+            if(this.flushLogRequested){
+                this.flushLogRequested=false;
+                this.flushLog();
+            }
+        },250);
+    }
+
+    public async syncAllTargetCachesWithOutput()
+    {
+        const ctrls=await this.getBuildTargetsAsync();
+        this.clearTargets();
+        this._targets.next(ctrls);
+
+        ctrls.sort((a,b)=>(a.target.outFromList?1:0)-(b.target.outFromList?1:0));
+        await Promise.all(ctrls.map(t=>t.syncCacheAsync()));
+    }
+
+    public async syncTargetCacheWithOutput(outPath:string){
+        const ctrls=await this.getBuildTargetsAsync();
+        this.clearTargets();
+        this._targets.next(ctrls);
+
+        const syncTargets=ctrls.filter(t=>t.outPath===outPath);
+        await Promise.all(syncTargets.map(t=>t.syncCacheAsync()));
+    }
+
+    private buildPromise:Promise<boolean>|undefined;
+    public buildAsync():Promise<boolean>
     {
         return this.buildPromise??(this.buildPromise=this._buildAsync());
     }
 
-    private async _buildAsync()
+    private async _buildAsync():Promise<boolean>
     {
         if(this.preview){
             await this.loadAsPreviewAsync();
         }else{
-            while(!this.isDisposed){
+            this.log('Start build');
+            const buildCancel=new CancelToken();
 
-                await delayAsync(1);
-                if(this.isDisposed){
-                    break;
-                }
+            try{
+                while(!this.isDisposed && !buildCancel.isCanceled){
 
-                const pass=await this.makePassAsync();
-                if(this.isDisposed){
-                    pass.cancelled=true;
-                }
-                pushBehaviorSubjectAry(this._passes,pass);
-                this.triggerBuildEvent({
-                    type:'pass-end',
-                    target:pass,
-                    eventTarget:pass,
-                    ctrl:this,
-                })
-                if(pass.genCount<=0){
-                    if(pass.skipCount<=0){
+                    await delayAsync(1);
+                    if(this.isDisposed){
                         break;
-                    }else{
-                        throw new Error('No targets generated')
+                    }
+
+                    this.log(`---------------------- Pass ${this.passes.length} ----------------------`);
+                    await this.writeStatsAsync();
+                    const pass=await this.makePassAsync();
+                    if(this.isDisposed){
+                        pass.cancelled=true;
+                    }
+                    pushBehaviorSubjectAry(this._passes,pass);
+                    this.triggerBuildEvent({
+                        type:'pass-end',
+                        target:pass,
+                        eventTarget:pass,
+                        ctrl:this,
+                    });
+                    await this.writeStatsAsync();
+                    if(pass.genCount<=0){
+                        if(pass.skipCount<=0){
+                            break;
+                        }else{
+                            throw new Error('No targets generated')
+                        }
                     }
                 }
+                this.log('End build');
+            }catch(ex){
+                console.error('Convo-Make build failed',ex);
+                this.log('Build error',ex);
+                await this.writeStatsAsync();
+                this.dispose();
+                return false;
+            }finally{
+                buildCancel.cancelNow();
             }
         }
 
@@ -213,6 +348,23 @@ export class ConvoMakeCtrl
         this.dispose();
 
         console.log('ConvoMakeCtrl done',this.filePath);
+        return true;
+    }
+    public async writeStatsAsync()
+    {
+        try{
+            const stats=JSON.stringify(this.getStats(),null,4);
+            await this.options.vfsCtrl.writeStringAsync(this.statsPath,stats);
+        }catch(ex){
+            console.error(`Failed to write stats to ${this.statsPath}`,ex);
+        }
+    }
+
+    public getStats():ConvoMakeStats{
+        return {
+            usage:{...this.usage},
+            passes:[...this.passes],
+        }
     }
 
     private async makePassAsync():Promise<ConvoMakePass>
@@ -225,6 +377,7 @@ export class ConvoMakeCtrl
             skipCount:0,
             cachedCount:0,
             forkedCount:0,
+            generated:[],
         }
         this.activePassRef=pass;
         this._activePass.next({...pass});
@@ -235,7 +388,7 @@ export class ConvoMakeCtrl
             ctrl:this,
         })
 
-        const ctrls=await this.getBuildTargetsAsync();
+        const ctrls=await this.getBuildTargetsAsync(pass);
         if(this.isDisposed){
             return {
                 ...pass,
@@ -258,13 +411,17 @@ export class ConvoMakeCtrl
 
         await Promise.all(this.targets.map(t=>t.buildAsync()));
 
+        for(const c of ctrls){
+            c.dispose();
+        }
+
         return {
             ...pass,
             endTime:Date.now(),
         };
     }
 
-    private async getBuildTargetsAsync(){
+    private async getBuildTargetsAsync(pass?:ConvoMakeActivePass){
         const targets=await this.getTargetPairsAsync();
         if(this.isDisposed){
             return [];
@@ -274,6 +431,7 @@ export class ConvoMakeCtrl
             target:t.target,
             targetDeclaration:t.declaration,
             makeCtrl:this,
+            pass,
             outExists:(await this.options.vfsCtrl.getItemAsync(joinPaths(this.options.dir,t.target.out)))?true:false,
 
         })));
@@ -284,9 +442,15 @@ export class ConvoMakeCtrl
                 continue;
             }
 
-            const forked=ctrl.target.in.filter(i=>i.listIndex!==undefined).map((input,index)=>{
-                return this.forkTargetList(ctrl,input,index);
-            });
+            const forked:ConvoMakeTargetCtrl[]=[];
+            const filtered=ctrl.target.in.filter(i=>i.listIndex!==undefined);
+            for(let index=0;index<filtered.length;index++){
+                const input=filtered[index];
+                if(!input){
+                    continue;
+                }
+                forked.push(await this.forkTargetListAsync(ctrl,input,index))
+            }
 
             ctrls.splice(i+1,0,...forked);
         }
@@ -355,6 +519,7 @@ export class ConvoMakeCtrl
             skipCount:0,
             cachedCount:0,
             forkedCount:0,
+            generated:[],
             ...this.activePassRef,
         }
         update.genCount+=addGenCount;
@@ -376,7 +541,7 @@ export class ConvoMakeCtrl
             })
     }
 
-    public forkTargetList(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):ConvoMakeTargetCtrl
+    public async forkTargetListAsync(parent:ConvoMakeTargetCtrl,listInput:ConvoMakeInput,index:number):Promise<ConvoMakeTargetCtrl>
     {
         if(!parent.target.outFromList){
             throw new Error('Only targets that outFromList is true should be forked')
@@ -408,12 +573,14 @@ export class ConvoMakeCtrl
             name=normalizePath(name);
             target.out=`${starPath.start}${name}${starPath.end}`;
         }
+        const outPath=normalizePath(joinPaths(this.options.dir,target.out));
         const targetCtrl=new ConvoMakeTargetCtrl({
             target:target,
             targetDeclaration:parent.targetDeclaration,
             makeCtrl:this,
             parent,
-            outExists:parent.outExists,
+            pass:parent.pass,
+            outExists:(await this.options.vfsCtrl.getItemAsync(outPath))?true:false,
         });
         return targetCtrl;
     }
@@ -452,16 +619,13 @@ export class ConvoMakeCtrl
         const inGroups=await Promise.all(decInputs.map<Promise<PathAndStarPath[]>>(async ({input,isList})=>{
             input=normalizePath(joinPaths(dir,input));
             if(input.includes('*')){
-                const star=parseStarPath(input);
-                const items=await (star?.recursiveBase?
-                    this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
-                    this.options.vfsCtrl.readDirAsync({path:input})
-                );
+                const items=await this.readStarPathAsync(input);
                 if(this.isDisposed){
                     return []
                 }
+                const star=parseStarPath(input);
                 const inputs:PathAndStarPath[]=[];
-                for(const item of items.items){
+                for(const item of items){
                     if(item.type==='file'){
                         inputs.push({path:item.path,star});
                     }
@@ -482,7 +646,8 @@ export class ConvoMakeCtrl
         }
 
         const sharedProps:Partial<ConvoMakeTarget>={
-            review:dec.review,
+            review:(((dec.review===true || dec.review===undefined) && dec.reviewUrl)?'http':dec.review)||(this.options.forceReview||undefined),
+            reviewUrl:dec.reviewUrl,
             app:dec.app,
             appPath:dec.appPath,
             keepAppPathExt:dec.keepAppPathExt,
@@ -496,6 +661,11 @@ export class ConvoMakeCtrl
             appHostFile:dec.appHostFile,
             appHostMode:dec.appHostMode,
             appImportPath:dec.appImportPath,
+            shell:dec.shell,
+            shellCwd:dec.shellCwd,
+            pipeShell:dec.pipeShell,
+            disableShellPipeTrimming:dec.disableShellPipeTrimming,
+            ignoreShellExitCode:dec.ignoreShellExitCode,
         }
 
         if(multiOut && !sharedProps.outFromList){
@@ -506,18 +676,22 @@ export class ConvoMakeCtrl
                     continue;
                 }
                 const outStar=isDynamic?undefined:parseStarPath(output);
+                let outMappedPart:string|undefined;
                 if(outStar){
                     if(input.star){
-                        output=`${outStar.start}${input.path.substring(
+                        outMappedPart=input.path.substring(
                             input.star.start.length,
                             input.path.length-input.star.end.length
-                        )}${outStar.end}`
+                        );
+                        output=`${outStar.start}${outMappedPart}${outStar.end}`
                     }else{
                         output=`${outStar.start}${getFileNameNoExt(input.path)}${outStar.end}`
                     }
                 }
                 const target:ConvoMakeTarget={
                     ...sharedProps,
+                    reviewUrl:(outMappedPart && sharedProps.reviewUrl?.includes('*'))?sharedProps.reviewUrl.replace(/\*/g,outMappedPart):sharedProps.reviewUrl,
+                    outMappedPart,
                     stage:dec.stage??defaultConvoMakeStageName,
                     in:await this.createInputAryAsync({...input,path:removeDir(input.path,cwd)},dir,cwd,dec),
                     out:removeDir(output,cwd),
@@ -542,8 +716,62 @@ export class ConvoMakeCtrl
         }
     }
 
+    private async readStarPathAsync(path:string):Promise<VfsItem[]>{
+        const star=parseStarPath(path);
+        const items=await (star?.recursiveBase?
+            this.options.vfsCtrl.readDirRecursiveAsync({path:star.recursiveBase,filter:star.recursiveFilter}):
+            this.options.vfsCtrl.readDirAsync({path})
+        );
+        return items.items;
+    }
+
     private async createInputAryAsync(inputFile:PathAndStarPath|PathAndStarPath[]|undefined,dir:string,cwd:string,dec:ConvoMakeTargetDeclaration):Promise<ConvoMakeInput[]>{
         const inputAry:ConvoMakeInput[]=[];
+
+        if(dec.context){
+            const ary=asArray(dec.context);
+            for(const c of ary){
+                const context:ConvoMakeContextTemplate=(typeof c === 'string')?{path:c}:c;
+                const path=removeDir(normalizePath(joinPaths(dir,context.path)),cwd);
+                if(path.includes('*')){
+                    const items=await this.readStarPathAsync(normalizePath(joinPaths(dir,context.path)));
+                    if(this.isDisposed){
+                        return [];
+                    }
+                    const contentList=await Promise.all(items.map(async item=>{
+                        let content=await this.loadFileAsync(removeDir(item.path,cwd));
+                        if(content!==undefined){
+                            content=applyConvoMakeContextTemplate(content,context);
+                        }
+                        return {item,content}
+                    }))
+                    contentList.sort((a,b)=>a.item.path.localeCompare(b.item.path));
+                    inputAry.push(...await this.contentToConvoAsync(path,undefined,{},true,false,contentList.filter(c=>c.content).map(c=>c.content).join('\n\n'),undefined,context.tags));
+                }else{
+                    let content=await this.loadFileAsync(path);
+                    if(content!==undefined){
+                        content=applyConvoMakeContextTemplate(content,context);
+                    }
+                    inputAry.push(...await this.contentToConvoAsync(path,undefined,{},true,false,content,undefined,context.tags));
+                }
+            }
+        }
+
+        const attachments=dec.attach?asArray(dec.attach).map(a=>(typeof a === 'string')?{path:a}:a):undefined;
+
+        if(inputFile){
+            const ary=asArray(inputFile);
+            for(const f of ary){
+                const content=await this.loadFileAsync(f.path);
+                inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content));
+
+                if(attachments){
+                    for(const attachment of attachments){
+                        await this.loadAttachmentAsync(f.path,attachment,inputAry);
+                    }
+                }
+            }
+        }
 
         if(dec.instructions){
             const ary=asArray(dec.instructions);
@@ -552,7 +780,7 @@ export class ConvoMakeCtrl
                 inputAry.push(...await this.contentToConvoAsync(
                     undefined,
                     undefined,
-                    dec,
+                    {},
                     false,
                     true,
                     contentHasConvoRole(i)?instruction:`> appendUser\n${instruction}`,
@@ -561,46 +789,81 @@ export class ConvoMakeCtrl
             }
         }
 
-        if(dec.context){
-            const ary=asArray(dec.context);
-            for(const c of ary){
-                const path=removeDir(normalizePath(joinPaths(dir,c)),cwd);
-                const content=await this.loadFileAsync(path);
-                inputAry.push(...await this.contentToConvoAsync(path,undefined,dec,true,false,content))
-            }
-        }
-
-        if(inputFile){
-            const ary=asArray(inputFile);
-            for(const f of ary){
-                const content=await this.loadFileAsync(f.path);
-                inputAry.push(...await this.contentToConvoAsync(f.path,f.isList,dec,false,undefined,content))
-            }
-        }
-
-        inputAry.sort((a,b)=>getConvoMakeInputSortKey(a).localeCompare(getConvoMakeInputSortKey(b)));
+        ///inputAry.sort((a,b)=>getConvoMakeInputSortKey(a).localeCompare(getConvoMakeInputSortKey(b)));
 
         return inputAry;
+    }
+
+    private async loadAttachmentAsync(inputPath:string,attachment:ConvoMakeTargetAttachment,inputAry:ConvoMakeInput[]){
+        const name=getFileNameNoExt(inputPath);
+        const srcPath=joinPaths(
+            getDirectoryName(inputPath),
+            attachment.path.includes('*')?attachment.path.replace(/\*/g,name):attachment.path
+        );
+        let content=await this.loadFileAsync(srcPath);
+        if(content!==undefined){
+
+            if(attachment.listLoadPath){
+                const list=parseJson5(content);
+                if(Array.isArray(list)){
+                    const all=await Promise.all(list.map(async item=>{
+                        const name=item+'';
+                        const loadPath=attachment.listLoadPath?.replace(/\*/g,name)??'';
+                        let value=await this.loadFileAsync(loadPath);
+                        // todo - if no file loaded log error
+                        if(value===undefined){
+                            throw new Error(`No attachment list load file found at - ${loadPath}`)
+                        }
+                        if(attachment.item){
+                            value=applyConvoMakeContextTemplate(value,attachment.item,{name});
+                        }escapeConvo
+                        return value;
+                    }));
+                    content=all.join('\n\n');
+                }
+            }
+
+            content=applyConvoMakeContextTemplate(content,attachment);
+        }
+        inputAry.push(...await this.contentToConvoAsync(srcPath,false,{},true,false,content,false));
+
     }
 
     private fileCache:Record<string,Promise<string|undefined>>={};
     private loadFileAsync(relPath:string):Promise<string|undefined>
     {
         const path=normalizePath(joinPaths(this.options.dir,relPath));
-        return this.fileCache[relPath]??(this.fileCache[relPath]=(async ()=>{
-            try{
+        return this.fileCache[relPath]??(this.fileCache[relPath]=this.readFileAsync(path));
+    }
+
+    public async readFileAsync(path:string):Promise<string|undefined>{
+        try{
+            const item=await this.options.vfsCtrl.getItemAsync(path);
+            if(item?.type==='dir'){
+                const items=await this.options.vfsCtrl.readDirAsync({path:path});
+                const files=await Promise.all(items.items.map(async item=>{
+                    const content=await this.readFileAsync(item.path);
+                    return {
+                        path:item.path,
+                        name:item.name,
+                        hash:strHashBase64Fs(item.name+'::'+content),
+                    }
+                }));
+                files.sort((a,b)=>a.path.localeCompare(b.path));
+                return files.map(f=>`${f.name}:${f.hash}`).join('\n');
+            }else{
                 const contentType=getContentType(path);
                 if(contentType.startsWith('image/')){
                     const content=await this.options.vfsCtrl.readBufferAsync(path);
-                    return base64EncodeMarkdownImage('file',contentType,content);
+                    return base64EncodeMarkdownImage('image',contentType,content);
                 }else{
                     const content=await this.options.vfsCtrl.readStringAsync(path);
                     return this.options.disableInputTrimming?content:content?.trim();
                 }
-            }catch(ex){
-                return undefined;
             }
-        })())
+        }catch(ex){
+            return undefined;
+        }
     }
 
     public removeFromCache(relPath:string){
@@ -609,6 +872,15 @@ export class ConvoMakeCtrl
 
     public insertIntoCache(relPath:string,content:string){
         this.fileCache[relPath]=Promise.resolve(content);
+        this.triggerFileChange(relPath);
+    }
+
+    public triggerFileChange(relPath:string){
+        for(const ctrl of this.targets){
+            if(ctrl.target.in.some(i=>i.path===relPath)){
+                ctrl.onInputChange(relPath);
+            }
+        }
     }
 
     /**
@@ -741,11 +1013,12 @@ export class ConvoMakeCtrl
     public async contentToConvoAsync(
         relPath:string|undefined,
         isList:boolean|undefined,
-        tmpl:ConvoMakeContentTemplate,
+        tmpl:Partial<ConvoMakeTargetDeclaration>,
         isContext:boolean,
         isCommand:boolean|undefined,
         content:string|null|undefined,
-        isConvoFile?:boolean
+        isConvoFile?:boolean,
+        tags?:Record<string,string|boolean>
     ):Promise<ConvoMakeInput[]>{
 
         if(isList && (typeof content === 'string')){
@@ -759,6 +1032,24 @@ export class ConvoMakeCtrl
                 :
                     (asArray(JSON.parse(content))??[])
             ):[];
+
+            // filter items here
+            if(tmpl.inListFilter){
+                itemLoop: for(let i=0;i<items.length;i++){
+                    const item=items[i];
+                    if(!item){
+                        continue;
+                    }
+                    for(const e in tmpl.inListFilter){
+                        if(tmpl.inListFilter[e]!==item[e]){
+                            items.splice(i,1);
+                            i--;
+                            continue itemLoop;
+                        }
+                    }
+                }
+            }
+
             return await Promise.all(items.map((value,index)=>this._contentToConvoAsync(
                 relPath,
                 false,
@@ -768,7 +1059,8 @@ export class ConvoMakeCtrl
                 isCommand,
                 (typeof value === 'string'?value:JSON.stringify(value,null,4)),
                 value,
-                false
+                false,
+                tags
             )))
         }else{
             return [await this._contentToConvoAsync(
@@ -780,7 +1072,8 @@ export class ConvoMakeCtrl
                 isCommand,
                 content,
                 undefined,
-                isConvoFile
+                isConvoFile,
+                tags
             )];
         }
     }
@@ -789,12 +1082,13 @@ export class ConvoMakeCtrl
         relPath:string|undefined,
         isList:boolean|undefined,
         listIndex:number|undefined,
-        tmpl:ConvoMakeContentTemplate,
+        tmpl:ConvoMakeTargetContentTemplate,
         isContext:boolean,
         isCommand:boolean|undefined,
         content:string|null|undefined,
         jsonValue?:any,
-        isConvoFile?:boolean
+        isConvoFile?:boolean,
+        tags?:Record<string,string|boolean>
     ):Promise<ConvoMakeInput>{
 
         const ready=content!==null && content!==undefined;
@@ -836,7 +1130,7 @@ export class ConvoMakeCtrl
             inputTemplate:tmpl.inputTemplate,
             isContext,
             isCommand,
-            convo:content?isConvoFile?content:applyTemplate(content,isContext,isCommand,tmpl):undefined,
+            convo:content?isConvoFile?content:applyTemplate(content,relPath,isContext,tmpl,tags):undefined,
             ready,
             hash,
             isConvoFile,
@@ -872,6 +1166,21 @@ export class ConvoMakeCtrl
     }
 
     public getAppRef(target:ConvoMakeTarget):ConvoMakeAppTargetRef|undefined{
+
+        if(target.reviewUrl){
+            let appPath=target.reviewUrl;
+            if(!getUriProtocol(appPath)){
+                const firstApp=this.options.apps?.[0];
+                if(firstApp){
+                    appPath=getConvoMakeAppUrl(firstApp,appPath);
+                }
+            }
+            return {
+                reviewType:'http',
+                appPath,
+                app:{name:directUrlConvoMakeAppName,dir:'./'}
+            }
+        }
 
         let app:ConvoMakeApp|undefined;
 
@@ -975,6 +1284,11 @@ export class ConvoMakeCtrl
         }
         const app=this.options.apps.find(a=>a.name==name);
         if(!app){
+            if(name===directUrlConvoMakeAppName){
+                const appCtrl=new ConvoMakeAppCtrl({app:{name:directUrlConvoMakeAppName,dir:'./'},parent:this});
+                pushBehaviorSubjectAry(this._apps,appCtrl);
+                return appCtrl;
+            }
             return undefined;
         }
         const appCtrl=new ConvoMakeAppCtrl({app,parent:this});
@@ -995,10 +1309,35 @@ export class ConvoMakeCtrl
             sourceTargets:this.options.targets
         }
     }
+
+    public getTargetRebuildInfo(outPath:string):ConvoMakeTargetRebuild|undefined{
+        if(!this.options.rebuild){
+            return undefined;
+        }else if(this.options.rebuild===true){
+            return {
+                path:outPath,
+            }
+        }
+        const ary=asArray(this.options.rebuild);
+        for(const r of ary){
+            if(typeof r === 'string'){
+                if(r===outPath){
+                    return {
+                        path:outPath
+                    }
+                }
+            }else if(r.path===outPath){
+                return r;
+            }
+        }
+
+        return undefined;
+    }
 }
 
 interface StarPath
 {
+    path:string;
     start:string;
     end:string;
     recursiveBase?:string;
@@ -1039,6 +1378,7 @@ const parseStarPath=(path:string):StarPath|undefined=>{
         recursiveFilter={match:starStringToRegex(name)}
     }
     return {
+        path,
         start:parts[0] as string,
         end:parts[1] as string,
         recursiveBase,
@@ -1059,7 +1399,13 @@ const removeDir=(path:string,dir:string)=>{
 
 const importReg=/(^|\n)[ \t]*@import\s/
 
-const applyTemplate=(content:string,isContext:boolean,isCommand:boolean,inputTemplate:ConvoMakeContentTemplate)=>{
+const applyTemplate=(
+    content:string,
+    path:string|undefined,
+    isContext:boolean,
+    inputTemplate:ConvoMakeTargetContentTemplate,
+    tags?:Record<string,string|boolean>
+):string=>{
     if(isContext && content!==undefined && content!==null){
 
         if(inputTemplate.contextTag){
@@ -1073,8 +1419,12 @@ const applyTemplate=(content:string,isContext:boolean,isCommand:boolean,inputTem
 
     if(!isContext && content!==undefined && content!==null){
 
-        if(inputTemplate.inputTag){
-            content=`<${inputTemplate.inputTag}>\n${content}\n</${inputTemplate.inputTag}>`;
+        const tag=inputTemplate.inputTag??(!inputTemplate.inputTemplate && path?
+            (getFileName(path).replace(/[^\w-]/g,'_'))
+        :undefined);
+
+        if(tag){
+            content=`<${tag}>\n${content}\n</${tag}>`;
         }
 
         if(inputTemplate.inputTemplate){
@@ -1082,7 +1432,24 @@ const applyTemplate=(content:string,isContext:boolean,isCommand:boolean,inputTem
         }
     }
 
-    return `> appendUser\n${escapeConvo(content)}`;
+    let convo=`> appendUser\n${escapeConvo(content)}`;
+    if(tags){
+        for(const e in tags){
+            let v=tags[e];
+            if(v===false){
+                continue;
+            }else if(v===true){
+                v='';
+            }
+            v=v?.trim();
+            if(v){
+                convo=`@${e} ${v}\n${convo}`
+            }else{
+                convo=`@${e}\n${convo}`
+            }
+        }
+    }
+    return convo;
 }
 
 const mdSplitReg=/(?=\n[ \t]*##[ \t])/

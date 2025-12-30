@@ -1,9 +1,9 @@
 import { joinPaths } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
-import { ConvoHashCacheBase } from "./ConvoHashCacheBase";
-import { commonConvoCacheTypes } from "./convo-lib";
-import { ConvoCompletionMessage } from "./convo-types";
-import { convoProjectConfig } from "./convo.deps";
+import { ConvoHashCacheBase } from "./ConvoHashCacheBase.js";
+import { commonConvoCacheTypes } from "./convo-lib.js";
+import { ConvoCompletionMessage } from "./convo-types.js";
+import { convoProjectConfig } from "./convo.deps.js";
 
 
 export const defaultVfsConvoCacheDir='/cache/conversations'

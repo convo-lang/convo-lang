@@ -1,7 +1,7 @@
 import { ConvoExecutionContext, ConvoMessage, ConvoParsingOptions, getConvoTag, parseConvoCode, parseConvoJsonOrStringMessage } from "@convo-lang/convo-lang";
 import { CodeParser, getCodeParsingError, shortUuid } from "@iyio/common";
-import { createEmptyConvoGraphDb } from "./convo-graph-lib";
-import { ConvoEdge, ConvoGraphMsgType, ConvoGraphParsingData, ConvoGraphParsingResult, ConvoInputTemplate, ConvoNode, ConvoNodeStep, isConvoGraphMsgType } from "./convo-graph-types";
+import { createEmptyConvoGraphDb } from "./convo-graph-lib.js";
+import { ConvoEdge, ConvoGraphMsgType, ConvoGraphParsingData, ConvoGraphParsingResult, ConvoInputTemplate, ConvoNode, ConvoNodeStep, isConvoGraphMsgType } from "./convo-graph-types.js";
 
 const exitEarly=false;
 

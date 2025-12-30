@@ -1,5 +1,5 @@
 import { defineBoolParam, defineStringParam } from "@iyio/common";
-import { defaultPineconeAutoCreateIndex, defaultPineconeCloud, defaultPineconeIndex, defaultPineconeIndexKey, defaultPineconeModel, defaultPineconeRegion } from "./pinecone-const";
+import { defaultPineconeAutoCreateIndex, defaultPineconeCloud, defaultPineconeIndex, defaultPineconeIndexKey, defaultPineconeModel, defaultPineconeRegion } from "./pinecone-const.js";
 
 export const pineconeApiKeyParam=defineStringParam('pineconeApiKey');
 export const pineconeIndexParam=defineStringParam('pineconeIndex',defaultPineconeIndex);

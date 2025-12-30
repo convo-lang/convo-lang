@@ -1,26 +1,11 @@
 import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
-import { createConvoCliAsync } from "../lib/ConvoCli";
-import { ConvoCliOptions } from "../lib/convo-cli-types";
-import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter";
-import { createNextAppAsync } from "../lib/create-next-app";
+import { createConvoCliAsync } from "../lib/ConvoCli.js";
+import { ConvoCliOptions } from "../lib/convo-cli-types.js";
+import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
+import { createNextAppAsync } from "../lib/create-next-app.js";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const flags=['make'] as const;
 
 type Args=ConvoCliOptions;
 const args=parseCliArgsT<Args>({
@@ -77,6 +62,9 @@ const args=parseCliArgsT<Args>({
         listModels:args=>args.length?true:false,
         make:args=>args.length?true:false,
         makeTargets:args=>args.length?true:false,
+        var:args=>args,
+        vars:args=>args,
+        varsPath:args=>args,
     }
 }).parsed as Args;
 

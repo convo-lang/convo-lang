@@ -1,8 +1,8 @@
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
 import { ProviderResult, ThemeIcon, TreeItem, TreeItemCollapsibleState, Uri } from "vscode";
-import { ConvoExt } from "../ConvoExt";
-import { ConvoMakeExtTreeItemType } from "./convo-make-ext-types";
-import { ConvoMakeExtTree } from "./ConvoMakeExtTree";
+import { ConvoExt } from "../ConvoExt.js";
+import { ConvoMakeExtTreeItemType } from "./convo-make-ext-types.js";
+import { ConvoMakeExtTree } from "./ConvoMakeExtTree.js";
 
 
 export interface ConvoMakeExtTreeItemOptionsBase<T>

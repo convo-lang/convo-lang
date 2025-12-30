@@ -5,7 +5,7 @@ import * as db from "aws-cdk-lib/aws-dynamodb";
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
-import { convoLangAnonUsdCapParam, convoLangAnonUsdCapTotalParam, convoLangApiFnArnParam, convoLangApiFnUrlParam, convoLangCapsTableParam } from "./convo-lang-aws-cdk.deps";
+import { convoLangAnonUsdCapParam, convoLangAnonUsdCapTotalParam, convoLangApiFnArnParam, convoLangApiFnUrlParam, convoLangCapsTableParam } from "./convo-lang-aws-cdk.deps.js";
 
 export interface ConvoLangConstructOptions
 {

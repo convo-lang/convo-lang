@@ -1,6 +1,6 @@
 import { ScopeModule, initRootScope, rootScope } from '@iyio/common';
-import { openaiConvoModule } from './_module.openaiConvoModule';
-import { openAiApiKeyParam } from './convo-lang-openai-params';
+import { openaiConvoModule } from './_module.openaiConvoModule.js';
+import { openAiApiKeyParam } from './convo-lang-openai-params.js';
 
 let inited=false;
 /**

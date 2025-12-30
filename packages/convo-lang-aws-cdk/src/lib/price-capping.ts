@@ -1,7 +1,7 @@
 import { createUpdateExpression, dynamoClient } from "@iyio/aws-dynamo";
 import { DataTableDescription } from "@iyio/common";
-import { TokenQuota } from "./convo-lang-aws-cdk-types";
-import { convoLangAnonUsdCapParam, convoLangAnonUsdCapTotalParam, convoLangCapsTableParam } from "./convo-lang-aws-cdk.deps";
+import { TokenQuota } from "./convo-lang-aws-cdk-types.js";
+import { convoLangAnonUsdCapParam, convoLangAnonUsdCapTotalParam, convoLangCapsTableParam } from "./convo-lang-aws-cdk.deps.js";
 
 export interface CallerInfo
 {

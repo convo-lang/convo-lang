@@ -1,7 +1,7 @@
 import { writeFile } from 'fs/promises';
-import { convoGraphToConvo } from './convo-graph-converter';
-import { parseConvoGraphCode } from './convo-graph-parser';
-import { ConvoEdge, ConvoGraphDb, ConvoInputTemplate, ConvoNode, ConvoNodeStep } from './convo-graph-types';
+import { convoGraphToConvo } from './convo-graph-converter.js';
+import { parseConvoGraphCode } from './convo-graph-parser.js';
+import { ConvoEdge, ConvoGraphDb, ConvoInputTemplate, ConvoNode, ConvoNodeStep } from './convo-graph-types.js';
 
 describe('convo-graph-parser',()=>{
     it('should parse graph',()=>{

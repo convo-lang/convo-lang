@@ -1,0 +1,5 @@
+{
+    "scripts":{
+        "watch-mindark":"node ../../dist/packages/convo-lang-cli/bin/convo.cjs --sync-ts-config ../../../mindark-exit/tsconfig.json --sync-out ../../../mindark-exit/convo-generated --sync-watch"
+    }
+}

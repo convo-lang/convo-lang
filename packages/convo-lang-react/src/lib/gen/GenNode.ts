@@ -1,7 +1,7 @@
 import { Conversation, ConvoDocQuery, ConvoDocQueryResult, ConvoDocQueryRunner, ConvoDocQueryRunnerOptions, convoDoQueryOutputToMessageContent, convoDocPageToString } from "@convo-lang/convo-lang";
 import { ReadonlySubject, delayAsync, getErrorMessage, pushBehaviorSubjectAry, removeBehaviorSubjectAryValue } from "@iyio/common";
 import { BehaviorSubject, Subscription } from "rxjs";
-import { GenNodeOptions, GenNodeState } from "./gen-lib";
+import { GenNodeOptions, GenNodeState } from "./gen-lib.js";
 
 export class GenNode
 {

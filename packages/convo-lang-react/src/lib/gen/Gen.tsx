@@ -3,10 +3,10 @@ import { asArray } from "@iyio/common";
 import { useDeepCompareItem, useSubject } from "@iyio/react-common";
 import { VfsItem } from "@iyio/vfs";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ConversationStatusIndicator } from "../ConversationStatusIndicator";
-import { MarkdownViewer } from "../MarkdownViewer";
-import { GenNode } from "./GenNode";
-import { GenItemRenderer, GenListRenderer, GenListWrapperRenderer, GenNodeOptions, GenNodeOptionsReactContext, GenNodeReactContext, GenNodeSuccessState, useGenNode, useGenNodeOptions } from './gen-lib';
+import { ConversationStatusIndicator } from "../ConversationStatusIndicator.js";
+import { MarkdownViewer } from "../MarkdownViewer.js";
+import { GenNode } from "./GenNode.js";
+import { GenItemRenderer, GenListRenderer, GenListWrapperRenderer, GenNodeOptions, GenNodeOptionsReactContext, GenNodeReactContext, GenNodeSuccessState, useGenNode, useGenNodeOptions } from './gen-lib.js';
 
 export interface GenProps
 {

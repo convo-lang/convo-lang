@@ -5,9 +5,9 @@ import { wAryRemove, wSetProp, wSetPropOrDeleteFalsy } from "@iyio/common";
 import { SlimButton, View, useWProp } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback } from "react";
-import { ConvoEdge } from "../../convo-graph-types";
-import { ConvoNodeSelector } from "./ConvoNodeSelector";
-import { useConvoGraphViewCtrl } from "./convo-graph-react-lib";
+import { ConvoEdge } from "../../convo-graph-types.js";
+import { ConvoNodeSelector } from "./ConvoNodeSelector.js";
+import { useConvoGraphViewCtrl } from "./convo-graph-react-lib.js";
 
 export interface ConvoEdgeViewProps
 {

@@ -1,0 +1,10 @@
+{
+    "scripts":{
+        "test-make":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../convo-lang-make-example",
+        "test-make-nextjs-supabase":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../make-nextjs-supabase",
+        "test-mindark":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../mindark-exit",
+        "test-map-tool":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../map-tool",
+        "publish-ext":"./publish.sh",
+        "publish-ext-open":"./publish-ovsx.sh"
+    }
+}

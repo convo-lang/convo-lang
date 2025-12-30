@@ -4,17 +4,17 @@ import { stopWatchingObj, wSetProp, wSetPropOrDeleteFalsy, watchObj } from "@iyi
 import { SlimButton, Text, View, useElementSize, useSubject, useWProp } from "@iyio/react-common";
 import { useEffect, useMemo, useState } from "react";
 import { BehaviorSubject } from "rxjs";
-import { createConvoGraphEntity } from "../../convo-graph-lib";
-import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types";
-import { ConvoEdgeView } from "./ConvoEdgeView";
-import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
-import { ConvoInputView } from "./ConvoInputView";
-import { ConvoNodeView } from "./ConvoNodeView";
-import { ConvoSourceNodeView } from "./ConvoSourceNodeView";
-import { ConvoTraverserView } from "./ConvoTraverserView";
-import { ConvoUserDataView } from "./ConvoUserDataView";
-import { convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib";
-import { ConvoEntityLayoutCtrl, ConvoUiTarget } from "./convo-graph-react-type";
+import { createConvoGraphEntity } from "../../convo-graph-lib.js";
+import { ConvoEdge, ConvoInputTemplate, ConvoNode, ConvoSourceNode, ConvoTraverser } from "../../convo-graph-types.js";
+import { ConvoEdgeView } from "./ConvoEdgeView.js";
+import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl.js";
+import { ConvoInputView } from "./ConvoInputView.js";
+import { ConvoNodeView } from "./ConvoNodeView.js";
+import { ConvoSourceNodeView } from "./ConvoSourceNodeView.js";
+import { ConvoTraverserView } from "./ConvoTraverserView.js";
+import { ConvoUserDataView } from "./ConvoUserDataView.js";
+import { convoGraphEntityClass, convoGraphEntityDragClass } from "./convo-graph-react-lib.js";
+import { ConvoEntityLayoutCtrl, ConvoUiTarget } from "./convo-graph-react-type.js";
 
 export interface ConvoGraphEntityViewProps
 {

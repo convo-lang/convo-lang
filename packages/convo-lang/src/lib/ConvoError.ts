@@ -1,4 +1,4 @@
-import { ConvoErrorReferences, ConvoErrorType } from "./convo-types";
+import { ConvoErrorReferences, ConvoErrorType } from "./convo-types.js";
 
 
 

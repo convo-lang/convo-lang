@@ -1,14 +1,14 @@
-import { getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
+import { getDirectoryName, getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
-import { Conversation, ConversationOptions } from './Conversation';
-import { ConvoError } from './ConvoError';
-import { parseConvoType } from './convo-cached-parsing';
-import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars";
-import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib';
-import { doesConvoContentHaveMessage } from './convo-parser';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types";
-import { convoValueToZodType } from './convo-zod';
+import { Conversation, ConversationOptions } from './Conversation.js';
+import { ConvoError } from './ConvoError.js';
+import { parseConvoType } from './convo-cached-parsing.js';
+import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars.js";
+import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
+import { doesConvoContentHaveMessage } from './convo-parser.js';
+import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
+import { convoValueToZodType } from './convo-zod.js';
 
 
 const argsCacheKey=Symbol('argsCacheKey');
@@ -1225,15 +1225,41 @@ export class ConvoExecutionContext
      * Returns the full path of the give path if the path is relative. The __cwd variable is used to
      * determine the current working directory.
      */
-    public getFullPath(path:string|undefined|null){
+    public getFullPath(path:string|undefined|null,scope?:ConvoScope){
         if(!path || (typeof path !=='string')){
             return '.';
         }
         if(isRooted(path)){
             return normalizePath(path);
         }
-        const cwd=this.sharedVars[convoVars.__cwd];
+        const cwd=this.getCwdOrUndefined(scope);
         return normalizePath(cwd?joinPaths(cwd,path):path);
+    }
+
+    /**
+     * Gets the current working directory based on scope
+     */
+    public getCwd(scope?:ConvoScope){
+        const cwd=this.sharedVars[convoVars.__cwd];
+        if(typeof cwd === 'string'){
+            return normalizePath(cwd);
+        }
+        const file=this.getVarAlias(convoVars.__file,scope);
+        if(typeof file === 'string'){
+            const r=normalizePath(getDirectoryName(file));
+            return r;
+        }else{
+            return '.';
+        }
+    }
+
+    /**
+     * Gets the current working directory based on scope or undefined if the current working directory
+     * equals '.'
+     */
+    public getCwdOrUndefined(scope?:ConvoScope){
+        const cwd=this.getCwd(scope);
+        return cwd==='.'?undefined:cwd;
     }
 
     /**

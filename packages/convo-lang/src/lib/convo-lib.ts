@@ -1,13 +1,13 @@
-import { UnsupportedError, asArray, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
-import type { ConversationOptions } from "./Conversation";
-import { ConvoError } from "./ConvoError";
-import { ConvoExecutionContext } from "./ConvoExecutionContext";
-import { ConvoDocumentReference } from "./convo-rag-types";
-import { convoSystemMessages } from "./convo-system-messages";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types";
+import type { ConversationOptions } from "./Conversation.js";
+import { ConvoError } from "./ConvoError.js";
+import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
+import { ConvoDocumentReference } from "./convo-rag-types.js";
+import { convoSystemMessages } from "./convo-system-messages.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -35,6 +35,8 @@ export const convoEnumFnName='enum';
 export const convoMetadataKey=Symbol('convoMetadataKey');
 export const convoCaptureMetadataTag='captureMetadata';
 export const defaultConversationName='default';
+
+export const convoLogDir='.convo-lang-logs';
 
 export const convoMsgModifiers={
     /**
@@ -128,7 +130,7 @@ export const convoRoles={
     ragSuffix:'ragSuffix',
 
     /**
-     * A message used as a template to insert RAG content into. The value __RAG__ will be used replaced with the actual rag content
+     * A message used as a template to insert RAG content into. The value $$RAG$$ will be used replaced with the actual rag content
      */
     ragTemplate:'ragTemplate',
 
@@ -334,6 +336,13 @@ export const convoFunctions={
     fsReadBase64Image:'fsReadBase64Image',
 
     /**
+     * Creates a markdown image from the given path and description. mdImg is an alias of `fsReadBase64Image`
+     *
+     * @signature (path:string description?:string contentType?:string) -> string
+     */
+    mdImg:'mdImg',
+
+    /**
      * Writes a JSON value to the virtual file system and returns the written value.
      */
     fsWriteJson:'fsWriteJson',
@@ -342,6 +351,12 @@ export const convoFunctions={
      * Reads a string value from the virtual file system
      */
     fsRead:'fsRead',
+
+    /**
+     * Reads multiple files as a single string using a list of names and an optional pattern that
+     * the each name is inserted into.
+     */
+    fsMultiRead:'fsMultiRead',
 
     /**
      * Writes a string value to the virtual file system and returns the written value.
@@ -436,7 +451,12 @@ export const convoFunctions={
     /**
      * Similar to the map function except unlabeled values are place the the `_` property
      */
-    mapWithCapture:'mapWithCapture'
+    mapWithCapture:'mapWithCapture',
+
+    /**
+     * Used to access properties of a make target by path
+     */
+    mkt:'mkt',
 
 
 } as const;
@@ -694,6 +714,15 @@ export const convoVars={
     __makeStages:'__makeStages',
 
     /**
+     * Relative path to the make directory the current convo file was created in
+     */
+    __makeRoot:'__makeRoot',
+
+    __makeFile:'__makeFile',
+
+    __makeOut:'__makeOut',
+
+    /**
      * Maps custom messages to handler functions
      */
     __messageHandlers:'__messageHandlers',
@@ -701,7 +730,7 @@ export const convoVars={
     /**
      * Name of a type to be used as the default json response type
      */
-    __defaultResponseType:'__defaultResponseType'
+    __defaultResponseType:'__defaultResponseType',
 
 } as const;
 
@@ -1111,19 +1140,9 @@ export const convoTags={
     disabled:'disabled',
 
     /**
-     * A URL to the source of the message. Typically used with RAG.
+     * Reference to a document related to a message. Typically used with RAG.
      */
-    sourceUrl:'sourceUrl',
-
-    /**
-     * The ID of the source content of the message. Typically used with RAG.
-     */
-    sourceId:'sourceId',
-
-    /**
-     * The name of the source content of the message. Typically used with RAG.
-     */
-    sourceName:'sourceName',
+    docRef:'docRef',
 
     /**
      * When applied to a message the message becomes a clickable suggestion that when clicked will
@@ -1964,7 +1983,13 @@ export const escapeConvo=(content:string|null|undefined,isStartOfMessage=true,op
     }
 
     if(content.includes('{{')){
-        content=content.replace(/\{\{/g,'\\{{');
+        content=content.replace(/(\\*)\{\{/g,(_,slashes:string)=>{
+            if(!(slashes.length%2)){
+                return slashes+'\\{{';
+            }else{
+                return _;
+            }
+        });
     }
     if(content.includes('>')){
         content=content.replace(
@@ -2383,19 +2408,47 @@ export const shouldDisableConvoAutoScroll=(messages:FlatConvoMessage[]):boolean=
     return false;
 }
 
+const sortDocProps=(doc:ConvoDocumentReference)=>{
+    const keys=Object.keys(doc);
+    keys.sort();
+    let i=keys.indexOf('id');
+    if(i!==-1){
+        keys.splice(i,1);
+        keys.unshift('id');
+    }
+    i=keys.indexOf('content');
+    if(i!==-1){
+        keys.splice(i,1);
+        keys.push('content');
+    }
+    const sorted:Record<string,any>={};
+    for(const key of keys){
+        if(key==='vector'){
+            continue;
+        }
+        sorted[key]=(doc as any)[key];
+    }
+    return sorted as ConvoDocumentReference;
+}
+
+export const convoDocRefToTagValue=(doc:ConvoDocumentReference)=>{
+    return JSON.stringify(sortDocProps(doc));
+}
+
 export const convoRagDocRefToMessage=(
     flat:FlatConvoConversation,
     docs:ConvoDocumentReference|null|undefined|(ConvoDocumentReference|null|undefined)[],
     role:string
 ):ConvoMessage|undefined=>{
-    const ary=asArray(docs);
-    if(!ary){
+    const ary=asArray(docs)?.filter(d=>d) as ConvoDocumentReference[]|null|undefined;
+    if(!ary?.length){
         return undefined;
     }
     const msg:ConvoMessage={
         role,
         content:ary.map(d=>d?.content??'').join('\n\n'),
-        tags:[]
+        tags:[],
+        docRefs:deepClone(ary),
     }
 
     if(!msg.content){
@@ -2403,30 +2456,12 @@ export const convoRagDocRefToMessage=(
     }
 
     for(const doc of ary){
-        if(!doc){
-            continue;
-        }
-        if(doc.sourceId){
-            if(!msg.sourceId){
-                msg.sourceId=doc.sourceId;
-            }
-            msg.tags?.push({name:convoTags.sourceId,value:doc.sourceId})
-        }
-
-        if(doc.sourceName){
-            if(!msg.sourceName){
-                msg.sourceName=doc.sourceName;
-            }
-            msg.tags?.push({name:convoTags.sourceName,value:doc.sourceName})
-        }
-
-        if(doc.sourceUrl){
-            if(!msg.sourceUrl){
-                msg.sourceUrl=doc.sourceUrl;
-            }
-            msg.tags?.push({name:convoTags.sourceUrl,value:doc.sourceUrl})
-        }
+        msg.tags?.push({
+            name:convoTags.docRef,
+            value:convoDocRefToTagValue(doc),
+        });
     }
+
 
     let template=flat.ragTemplate;
     if(!template && (flat.ragPrefix || flat.ragSuffix)){
@@ -2606,6 +2641,7 @@ export const createTextConvoCompletionMessage=({
     outputTokens,
     tokenPrice,
     defaults,
+    tags,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     const lastContentMessage=getLastConvoContentMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
@@ -2619,6 +2655,7 @@ export const createTextConvoCompletionMessage=({
         assignTo:lastContentMessage?.responseAssignTo,
         endpoint:flat.responseEndpoint,
         model,
+        tags,
         ...((models && tokenPrice===undefined)?calculateConvoTokenUsage(
             model,
             models,
@@ -2727,6 +2764,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         responseEndpoint:flat.responseEndpoint,
         userId:flat.userId,
         apiKey:flat.apiKey,
+        model:flat.model,
     }
 }
 
@@ -3121,7 +3159,7 @@ export const insertConvoContentIntoSlot=(content:string,template:string,slotName
         if(slotName){
             return slot===slotName?escapeConvo(content):_;
         }else{
-            return escapeConvo(content);
+            return slot?_:escapeConvo(content);
         }
     })
 }
@@ -3132,3 +3170,11 @@ export const contentHasConvoRole=(content:string):boolean=>{
 }
 
 export const defaultConvoImportServicePriority=0;
+
+export const isConvoTypeArray=(value:any):boolean=>{
+    return (
+        Array.isArray(value) &&
+        value.length &&
+        value.every(v=>v?.[convoMetadataKey])
+    )?true:false;
+}

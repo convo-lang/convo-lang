@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
-import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl";
-import { ConvoGraphStyle } from "./convo-graph-react-type";
+import { ConvoGraphViewCtrl } from "./ConvoGraphViewCtrl.js";
+import { ConvoGraphStyle } from "./convo-graph-react-type.js";
 
 export const ConvoGraphReactCtx=createContext<ConvoGraphViewCtrl|null>(null);
 

@@ -1,8 +1,14 @@
-import { Conversation, ConversationOptions, ConvoConversationCache, ConvoDocOutput, ConvoDocPageResult, ConvoDocQuery, ConvoDocQueryResult, ConvoDocReader, ConvoDocReaderFactory, ConvoDocSelectStatement, ConvoLocalStorageCache, convoDocResultFormatVersion, convoScript, escapeConvoMessageContent, getConvoDocReaderAsync, getConvoSelectContentType, isConvoDocSelectMatch, isConvoDocSelectPerPage } from "@convo-lang/convo-lang";
-import { CancelToken, InternalOptions, Lock, Progress, ReadonlySubject, deepClone, dupDeleteUndefined, getFileName, getSortedObjectHash, joinPaths, minuteMs, readBlobAsDataUrlAsync } from '@iyio/common';
+import { CancelToken, deepClone, dupDeleteUndefined, getFileName, getSortedObjectHash, InternalOptions, joinPaths, Lock, minuteMs, Progress, readBlobAsDataUrlAsync, ReadonlySubject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { getVfsItemUrl, vfs } from '@iyio/vfs';
 import { BehaviorSubject } from 'rxjs';
+import { Conversation, ConversationOptions } from './Conversation.js';
+import { getConvoDocReaderAsync, getConvoSelectContentType, isConvoDocSelectMatch, isConvoDocSelectPerPage } from './convo-lang-doc-lib.js';
+import { ConvoDocOutput, ConvoDocPageResult, ConvoDocQuery, ConvoDocQueryResult, ConvoDocReader, ConvoDocReaderFactory, convoDocResultFormatVersion, ConvoDocSelectStatement } from './convo-lang-doc-types.js';
+import { escapeConvoMessageContent } from './convo-lib.js';
+import { convoScript } from './convo-template.js';
+import { ConvoConversationCache } from './convo-types.js';
+import { ConvoLocalStorageCache } from './ConvoLocalStorageCache.js';
 
 const lsKey='enableConvoDocRunnerLogging';
 let localStorageCheckedForLogging=false;

@@ -1,7 +1,7 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import * as ChatAPI from './chat';
-import * as CompletionsAPI from './completions';
+import * as ChatAPI from './chat.js';
+import * as CompletionsAPI from './completions.js';
 
 export type ChatModel =
   | 'o1-preview'

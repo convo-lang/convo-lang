@@ -1,8 +1,10 @@
-import { ConvoModelInfo, convoAnyModelName, convoCompletionService, convoConversationConverterProvider } from "@convo-lang/convo-lang";
 import { InternalOptions, ReadonlySubject, pushBehaviorSubjectAry } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
-import { ConvoModelTester } from "./ConvoModelTester";
-import { ConvoModelTestResult } from './convo-testing-types';
+import { convoAnyModelName } from "../convo-lib.js";
+import { ConvoModelInfo } from "../convo-types.js";
+import { convoCompletionService, convoConversationConverterProvider } from "../convo.deps.js";
+import { ConvoModelTester } from "./ConvoModelTester.js";
+import { ConvoModelTestResult } from './convo-testing-types.js';
 
 export interface ConvoModelTestManagerOptions
 {
