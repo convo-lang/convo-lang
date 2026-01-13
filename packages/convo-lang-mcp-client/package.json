@@ -1,0 +1,10 @@
+{
+    "name": "@convo-lang/convo-lang-mcp-client",
+    "version": "0.8.16",
+    "type": "module",
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
+}

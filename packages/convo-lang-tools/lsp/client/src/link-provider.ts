@@ -10,8 +10,8 @@ export class ConvoDocumentLinkProvider implements DocumentLinkProvider{
             const text=document.lineAt(line).text;
             let match:RegExpExecArray|null;
             while((match=regex.exec(text))){
-                let uri=/(^| |\t)([^!]\S*)/.exec(match[2]??'')?.[2];
-                if(!uri){
+                let uri=/(^| |\t)(\S*)/.exec(match[2]??'')?.[2];
+                if(!uri || uri.startsWith('!')){
                     continue;
                 }
                 const start=match.index+(match[1]?.length??0);

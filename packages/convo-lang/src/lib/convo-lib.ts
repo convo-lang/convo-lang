@@ -752,6 +752,15 @@ export const convoImportModifiers={
     merge:'merge'
 } as const;
 
+/**
+ * Used to indicate a result message will take over control flow
+ */
+export const convoControlResult=Symbol('convoControlResult');
+export const convoControlResultKeys={
+    source:'source',
+    messages:'messages',
+} as const;
+
 export const defaultConvoRagTol=1.2;
 
 export const convoEvents={
@@ -815,6 +824,16 @@ export const convoTags={
      * Defines the start index and length of the actual rag content without prefix and suffix
      */
     ragContentRage:'ragContentRage',
+
+    /**
+     * Name of the server a message was created from.
+     */
+    fromMcp:'fromMcp',
+
+    /**
+     * Marks a message as a resource list from an MCP server
+     */
+    mcpResourceList:'mcpResourceList',
 
     /**
      * Manually labels a message
@@ -944,6 +963,11 @@ export const convoTags={
      * Indicates a message was created by a afterCall tag
      */
     createdAfterCalling:'createdAfterCalling',
+
+    /**
+     * Applied to result values to indicate they will alter the control flow of a conversation.
+     */
+    controlResult:'controlResult',
 
     /**
      * Used to indicate that a message should be evaluated at the edge of a conversation with the
@@ -1175,7 +1199,10 @@ export const convoTags={
     errorCallback:'errorCallback',
 
     /**
-     * Used to import external convo script code
+     * Used to import external convo script code or other resource types.
+     *
+     * @usage
+     * (@)import [type[:label]] url
      */
     import:'import',
 

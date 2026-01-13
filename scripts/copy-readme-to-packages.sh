@@ -7,6 +7,7 @@ cp -v README.md packages/convo-lang-api-routes/README.md
 cp -v README.md packages/convo-lang-aws-cdk/README.md
 cp -v README.md packages/convo-lang-bedrock/README.md
 cp -v README.md packages/convo-lang-browser/README.md
+cp -v README.md packages/convo-lang-mcp-client/README.md
 cp -v README.md packages/convo-lang-cli/README.md
 cp -v README.md packages/convo-lang-make/README.md
 cp -v README.md packages/convo-lang-model-testing/README.md

@@ -2,6 +2,7 @@ import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, C
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
 import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
@@ -192,6 +193,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         reg.use(nodeCommonModule);
         reg.use(convoOpenAiModule);
         reg.use(convoBedrockModule);
+        reg.use(convoMcpClientModule);
         if(config.env?.[openRouterApiKeyParam.typeName]){
             reg.use(convoOpenRouterModule);
         }

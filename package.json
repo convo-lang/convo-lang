@@ -61,6 +61,7 @@
         "@iyio/syn-taxi": "^0.8.11",
         "@iyio/vfs": "^0.8.11",
         "@iyio/vfs-node": "^0.8.11",
+        "@modelcontextprotocol/sdk": "^1.24.3",
         "@pinecone-database/pinecone": "^6.1.1",
         "amazon-cognito-identity-js": "^6.3.15",
         "aws-cdk-lib": "^2.214.0",

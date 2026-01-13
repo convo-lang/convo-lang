@@ -17,18 +17,6 @@
     "references": [
         {
             "path": "../../packages/convo-lang"
-        },
-        {
-            "path": "../../packages/convo-lang-bedrock"
-        },
-        {
-            "path": "../../packages/convo-lang-browser"
-        },
-        {
-            "path": "../../packages/convo-lang-make"
-        },
-        {
-            "path": "../../packages/convo-lang-mcp-client"
         }
     ]
 }

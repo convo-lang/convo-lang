@@ -59,6 +59,9 @@
             "@convo-lang/convo-lang-make": [
                 "packages/convo-lang-make/src/index.ts"
             ],
+            "@convo-lang/convo-lang-mcp-client": [
+                "packages/convo-lang-mcp-client/src/index.ts"
+            ],
             "@convo-lang/convo-lang-openai": [
                 "packages/convo-lang-openai/src/index.ts"
             ],

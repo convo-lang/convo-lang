@@ -1632,6 +1632,16 @@ export interface ConvoImport extends ConvoImportContext
     modifiers:string[];
 
     /**
+     * Maps modifier key value pairs
+     * @example
+     * (@)import mcp:google-docs http://localhost:3000
+     * 👇
+     * {"mcp":"google-docs"}
+     *
+     */
+    modifierMap:Record<string,string>;
+
+    /**
      * If true only system messages should be imported.
      */
     system:boolean;
@@ -1664,6 +1674,11 @@ export interface ConvoImport extends ConvoImportContext
      */
     assign?:string;
 }
+
+/**
+ * Used to check if an import handler can import a requested import
+ */
+export type ConvoImportTest=Pick<ConvoImport,'name'|'modifierMap'|'modifiers'>;
 
 export interface ConvoModule
 {
@@ -1723,7 +1738,7 @@ export interface ConvoImportService
 {
     handleImport:ConvoImportHandler;
     priority?:number;
-    canImport(path:string):boolean;
+    canImport(path:string,importTest:ConvoImportTest):boolean;
 }
 
 

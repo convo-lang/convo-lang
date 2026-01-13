@@ -137,6 +137,18 @@ export const convoBaseTypeToZodType=(type:ConvoBaseType):ZodType<any>=>{
     }
 }
 
+export const schemeToConvoArgsString=(scheme:ZodTypeAny|JsonScheme,includeSafeNewlines:boolean,nameOverride?:string):string=>{
+    let type=schemeToConvoTypeString(scheme,nameOverride);
+    const i=type.indexOf('(');
+    if(i!==-1){
+        type=type.substring(i+1).trim();
+        if(type.endsWith(')')){
+            type=type.substring(0,type.length-1).trim();
+        }
+    }
+    return (type && includeSafeNewlines)?`\n${type}\n`:type;
+}
+
 export const schemeToConvoTypeString=(scheme:ZodTypeAny|JsonScheme,nameOverride?:string):string=>{
     if(valueIsZodType(scheme)){
         const json=zodTypeToJsonScheme(scheme);

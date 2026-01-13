@@ -29,6 +29,9 @@
             "path": "./packages/convo-lang-make"
         },
         {
+            "path": "./packages/convo-lang-mcp-client"
+        },
+        {
             "path": "./packages/convo-lang-model-testing"
         },
         {
