@@ -4,6 +4,7 @@
         "test-make-nextjs-supabase":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../make-nextjs-supabase",
         "test-mindark":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../mindark-exit",
         "test-map-tool":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../map-tool",
+        "test-guardians":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../guardians-collective-platform",
         "publish-ext":"./publish.sh",
         "publish-ext-open":"./publish-ovsx.sh"
     }
