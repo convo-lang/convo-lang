@@ -244,7 +244,22 @@ export const convoRoles={
     /**
      * Indicates graph traversal has stopped.
      */
+    graphStopped:'graphStopped',
+
+    /**
+     * Graph stop route
+     */
     stop:'stop',
+
+    /**
+     * Graph to route
+     */
+    to:'to',
+
+    /**
+     * Graph from route
+     */
+    from:'from',
 } as const;
 
 /**

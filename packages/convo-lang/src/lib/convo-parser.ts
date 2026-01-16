@@ -2,7 +2,7 @@ import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getError
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDisableStatementEvalTags, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledTags, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, defaultConvoNodeId, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
-import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
+import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNodeRoute, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
@@ -453,6 +453,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
             if(currentMessage.statement){
                 currentMessage.statement.e=index;
             }
+        }
+        if(currentMessage?.content==='' && currentMessage.statement?.value===''){
+            delete currentMessage.statement;
         }
         msgName=null;
         currentMessage=null;
@@ -1109,7 +1112,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
-    let nodeId=defaultConvoNodeId;
 
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
@@ -1118,15 +1120,66 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
             break;
         }
 
-        if(msg.role===convoRoles.node || msg.role===convoRoles.goto){
-            msg.nodeId=msg.head?.trim()||defaultConvoNodeId;
-            nodeId=msg.nodeId;
-        }else if(msg.role===convoRoles.nodeEnd || msg.role===convoRoles.gotoEnd || msg.role===convoRoles.stop){
-            nodeId=defaultConvoNodeId;
-        }else{
-            if(nodeId!==defaultConvoNodeId){
-                msg.nodeId=nodeId;
-            }
+        switch(msg.role){
+
+            case convoRoles.node:
+                msg.nodeId=msg.head?.trim()||defaultConvoNodeId;
+                break;
+
+            case convoRoles.goto:
+                msg.gotoNodeId=msg.head?.trim()||defaultConvoNodeId;
+                break;
+
+            case convoRoles.to:
+            case convoRoles.from:
+            case convoRoles.stop:
+                if(!msg.nodeRoutes){
+                    msg.nodeRoutes=[];
+                }
+                const head=(msg.head??'').split(' ').filter(v=>v);
+                const auto=head[0]==='auto';
+                const next=head[0]==='next';
+                if(auto || next){
+                    head.shift();
+                }
+                const route:ConvoNodeRoute={
+                    toNodeId:(next?'next':auto?'auto':head[0])??'',
+                    from:msg.role===convoRoles.from?true:undefined,
+                    stop:msg.role===convoRoles.stop?true:undefined,
+                    auto:auto?(head.length?head:true):undefined,
+                    next:next?true:undefined,
+
+                };
+                msg.nodeRoutes.push(route);
+                if(msg.tags?.length && msg.content?.trim()){
+                    msg.statement={
+                        s:0,
+                        e:0,
+                        params:[{value:msg.content,s:0,e:0},],
+                        fn:"md",
+                        c:0
+                    }
+                    delete msg.content;
+                }
+                if(msg.content?.trim()){
+                    route.nlCondition=msg.content;
+                }else if(msg.statement){
+                    const statements=[getNodeRouteInlinePromptTemplate(
+                        msg.statement,
+                        [
+                            {value:"\n\n<OUTPUT_RESULT>\n",s:0,e:0},
+                            {s:0,e:0,ref:"output"},
+                            {value:"\n</OUTPUT_RESULT>\n",s:0,e:0},
+                        ],
+                        msg.tags
+                    )];
+                    route.condition=statements;
+                }else if(msg.fn){
+                    const statements=msg.fn?.body??[];
+                    route.condition=statements;
+
+                }
+                break;
         }
 
         if(parseMd && msg.content!==undefined){
@@ -1491,6 +1544,38 @@ export const parseConvoMessageTrigger=(eventName:string,fnName:string,condition:
             fnName,
             condition: cond
         }
+    }
+
+}
+
+let baseNodeRoutePrompt:InlineConvoPrompt|undefined;
+const getNodeRouteInlinePromptTemplate=(statement:ConvoStatement,appendParams:ConvoStatement[],tags:ConvoTag[]|undefined):ConvoStatement=>{
+    if(!baseNodeRoutePrompt){
+        const r=parseInlineConvoPrompt('(boolean)');
+        if(!r.result){
+            throw new Error('Failed to parse baseNodeRoutePrompt template');
+        }
+        baseNodeRoutePrompt=r.result;
+    }
+    statement={...statement,params:[...(statement.params?deepClone(statement.params):[]),...appendParams]}
+    const prompt=deepClone(baseNodeRoutePrompt);
+    const first=prompt.messages[0];
+    if(first){
+        first.statement=statement;
+        delete first.content;
+        if(tags){
+            if(!first.tags){
+                first.tags=[];
+            }
+            first.tags.push(...tags.map(t=>({...t})))
+        }
+    }
+    return {
+        s:statement.s,
+        e:statement.e,
+        c:statement.c,
+        shared:true,
+        prompt
     }
 
 }

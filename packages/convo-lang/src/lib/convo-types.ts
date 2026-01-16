@@ -124,9 +124,19 @@ export interface ConvoMessage
     insert?:ConvoInsert;
 
     /**
-     * Id of node the message belongs to. By default messages belong to the main node.
+     * Node id when the role is node
      */
     nodeId?:string;
+
+    /**
+     * Id of node to goto
+     */
+    gotoNodeId?:string;
+
+    /**
+     * Node routes the message will add to the most resent node
+     */
+    nodeRoutes?:ConvoNodeRoute[];
 
     /**
      * Used to mark the message for insertion and control flow. Some message types like queue
@@ -1061,6 +1071,8 @@ export interface FlatConvoMessage
      * Id of node the message belongs to. By default messages belong to the main node.
      */
     nodeId?:string;
+
+    gotoNodeId?:string;
 
     /**
      * The index of the node step the message belongs to
@@ -2292,4 +2304,9 @@ export interface ConvoNodeRoute
     condition?:ConvoStatement[];
     stop?:boolean;
     auto?:boolean|string[];
+    /**
+     * If true the next defined node should be moved to if the route condition is true
+     */
+    next?:boolean;
+    from?:boolean;
 }

@@ -700,7 +700,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                     return;
                 }
                 const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
-                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto || lastMsg?.role===convoRoles.stop?'\n':'\n\n> user\n'),true,false);
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
             }catch(ex){
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'

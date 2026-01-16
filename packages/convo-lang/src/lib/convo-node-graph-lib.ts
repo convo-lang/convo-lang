@@ -31,10 +31,16 @@ export const applyConvoGotoMessages=(messages:ConvoMessage[]):ApplyConvoGotoMess
                 }
                 break;
 
+            case convoRoles.to:
+            case convoRoles.from:
             case convoRoles.stop:
+                // do nothing. Messages should not be added
+                break;
+
             case convoRoles.goto:
             case convoRoles.gotoEnd:
             case convoRoles.nodeEnd:
+            case convoRoles.graphStopped:
                 currentNodeId=undefined;
                 break;
 
@@ -43,7 +49,6 @@ export const applyConvoGotoMessages=(messages:ConvoMessage[]):ApplyConvoGotoMess
                     if(msg.fn && !msg.fn.topLevel && !msg.fn.call){
                         (functionMessages[currentNodeId]??(functionMessages[currentNodeId]=[])).push(msg);
                     }else{
-                        msg.nodeId=currentNodeId;
                         messages.splice(i,1);
                         i--;
                         (inlineMessages[currentNodeId]??(inlineMessages[currentNodeId]=[])).push(msg);
@@ -64,7 +69,7 @@ export const applyConvoGotoMessages=(messages:ConvoMessage[]):ApplyConvoGotoMess
             continue;
         }
 
-        const insert=inlineMessages[msg.nodeId??''];
+        const insert=inlineMessages[msg.gotoNodeId??''];
         if(!insert){
             continue;
         }

@@ -22,6 +22,7 @@
                 { "include": "#nop"},
                 { "include": "#thinkingRole"},
                 { "include": "#function"},
+                { "include": "#routeRoles"},
                 { "include": "#specialContentRoles"},
                 { "include": "#role" },
                 { "include": "#functionBody"},
@@ -64,13 +65,27 @@
             ]
         },
         "specialContentRoles": {
-            "match": "^\\s*(>)\\s*(nodeEnd|node|gotoEnd|goto|stop)([ \\t]+[^\\n\\r]*)?",
+            "match": "^\\s*(>)\\s*(nodeEnd|node|gotoEnd|goto|graphStopped)([ \\t]+[^\\n\\r]*)?",
             "captures": {
                 "1":{
                     "name":"keyword.control"
                 },
                 "2":{
                     "name":"keyword.control"
+                },
+                "3":{
+                    "name":"variable"
+                }
+            }
+        },
+        "routeRoles": {
+            "match": "^\\s*(>)\\s*(stop|to|from)([ \\t]+[^\\n\\r]*)?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"entity.name.function"
                 },
                 "3":{
                     "name":"variable"
@@ -569,7 +584,7 @@
         "tagStopCondition":{
             "match":"^\\s*(@stop)((\\s*(=.*))|(\\s+else[ \\t]*)|(.*))",
             "captures":{
-                "1":{"name":"entity.name.tag"},
+                "1":{"name":"entity.name.function"},
                 "4":{"patterns": [{"include":"#tagRequiredExpression"}]},
                 "5":{"name":"keyword.control"},
                 "6":{"name":"string"}
@@ -577,9 +592,9 @@
         },
 
         "tagNodeConnection":{
-            "match":"^\\s*(@to|@from)\\s+(((auto)(.*))|((\\w+)\\s*((=.*)|(else[ \\t]*)|(.*))))",
+            "match":"^\\s*(@to|@from)\\s+(((auto|next)(.*))|((\\w+)\\s*((=.*)|(else[ \\t]*)|(.*))))",
             "captures":{
-                "1":{"name":"entity.name.tag"},
+                "1":{"name":"entity.name.function"},
                 "2":{"name":"variable"},
                 "4":{"name":"keyword.control"},
                 "9":{"patterns": [{"include":"#tagRequiredExpression"}]},

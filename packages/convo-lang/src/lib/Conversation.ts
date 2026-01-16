@@ -1632,21 +1632,28 @@ export class Conversation
         if(appendOrOptions?.appendNextGoto && nodeId && flat){
             const flat=await this.flattenAsync();
             const output=getConvoNodeOutput(flat.messages,flat.exe);
+            flat.exe.setVar(true,output,'output');
             const nd=result.flat?.nodeDescriptions?.find(n=>n.nodeId===nodeId);
             let next:string|undefined;
             if(nd){
+                let autoNext=true;
                 if(nd.outRoutes?.length){
+                    autoNext=false;
                     const evaluatedRoutes=await Promise.all(nd.outRoutes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
                     evaluatedRoutes.sort((a,b)=>(a.isFallback?2:1)-(b.isFallback?2:1));
                     const route=evaluatedRoutes.find(n=>n.passed);
-                    if(route){
-                        if(route.route.stop){
+                    if(route?.passed){
+                        if(route.route.toNodeId==='next'){
+                            autoNext=true;
+                        }else if(route.route.stop){
                             next=undefined;
                         }else{
                             next=route.route.toNodeId;
                         }
                     }
-                }else{
+                }
+
+                if(autoNext){
                     const index=this.messages.findIndex(m=>m.role===convoRoles.node && m.nodeId===nodeId);
                     if(index!==-1){
                         for(let i=index+1;i<this.messages.length;i++){
@@ -1663,7 +1670,7 @@ export class Conversation
                 this.append(`> ${convoRoles.goto} ${next}`);
                 result.nextNodeId=next;
             }else{
-                this.append(`> ${convoRoles.stop}`);
+                this.append(`> ${convoRoles.graphStopped}`);
                 result.graphStopped=true;
             }
         }
@@ -1699,7 +1706,7 @@ export class Conversation
             }else{
 
                 const convo=this.fork({label:`route_auto${routeIndex?'_'+routeIndex:''}`});
-                const input=flat.exe.getVar('input');
+                const input=getConvoNodeOutput(flat.messages,flat.exe);
                 convo.append(/*convo*/`
 
                     @json = struct(nodeId:string)
@@ -1724,7 +1731,6 @@ export class Conversation
                 }
             }
         }else if(route.condition){
-            flat.exe.setVar(true,output,'output');
             const values=await flat.exe.getStatementValueAsync(route.condition,undefined,{label:`route_${route.toNodeId}${routeIndex?'_'+routeIndex:''}`});
             return {
                 route,
@@ -1739,9 +1745,9 @@ export class Conversation
                 > user
                 ${escapeConvo(route.nlCondition)}
 
-                <OUTPUT>
+                <OUTPUT_RESULT>
                 ${typeof output === 'string'?escapeConvo(output):JSON.stringify(output)}
-                </OUTPUT>
+                </OUTPUT_RESULT>
             `);
             const r=await convo.completeJsonAsync();
             return {route,isFallback:true,passed:r?.isTrue?true:false}
@@ -3126,6 +3132,9 @@ export class Conversation
         if(msg.nodeId){
             flat.nodeId=msg.nodeId;
         }
+        if(msg.gotoNodeId){
+            flat.gotoNodeId=msg.gotoNodeId;
+        }
         if(this.isUserMessage(msg)){
             flat.isUser=true;
         }else if(this.isAssistantMessage(msg)){
@@ -3610,7 +3619,9 @@ export class Conversation
             let inPara=false;
             let nodePass=false;
             let currentNodeId:string|undefined;
+            let currentDefiningNodeId:string|undefined;
             let nodeMessages:ApplyConvoGotoMessagesResult|undefined;
+            const nodeRoutes:Record<string,ConvoNodeRoute[]>={};
             const isStartOfGoto=(nodeBehavior==='default' || nodeBehavior==='keepAll') && (sourceMessages[sourceMessages.length-1]?.role===convoRoles.goto);
             let parallelMessages:ConvoMessage[]|undefined;
             let afterCall:Record<string,(ConvoPostCompletionMessage|string)[]>|undefined;
@@ -3644,6 +3655,23 @@ export class Conversation
                     continue;
                 }
 
+                if(msg.nodeRoutes){
+                    for(const r of msg.nodeRoutes){
+                        let route=r;
+                        let fromId=currentDefiningNodeId??'';
+                        if(route.from){
+                            fromId=route.toNodeId;
+                            route={...route}
+                            delete route.from;
+                            route.toNodeId=currentDefiningNodeId??'';
+                        }
+                        (nodeRoutes[fromId]??(nodeRoutes[fromId]=[])).push(route);
+                    }
+                    if(nodeBehavior!=='keepAll'){
+                        continue;
+                    }
+                }
+
                 let defaultLabel:string|undefined=undefined;
                 switch(msg.role){
 
@@ -3671,6 +3699,7 @@ export class Conversation
                             continue messagesLoop;
                         }
                         nodePass=true;
+                        currentDefiningNodeId=msg.nodeId;
                         if(!nodeMessages){
                             if(!sourceMessageCopied){
                                 sourceMessages=[...sourceMessages];
@@ -3681,7 +3710,7 @@ export class Conversation
 
                     case convoRoles.nodeEnd:
                     case convoRoles.gotoEnd:
-                    case convoRoles.stop:
+                    case convoRoles.graphStopped:
                         if(nodeBehavior==='ignore'){
                             break;
                         }else if(nodeBehavior==='removeAll'){
@@ -3689,6 +3718,7 @@ export class Conversation
                         }
                         nodePass=true;
                         currentNodeId=undefined;
+                        currentDefiningNodeId=undefined;
                         break;
 
                     case convoRoles.goto:{
@@ -3698,7 +3728,8 @@ export class Conversation
                             continue messagesLoop;
                         }
                         nodePass=true;
-                        currentNodeId=msg.nodeId;
+                        currentNodeId=msg.gotoNodeId;
+                        currentDefiningNodeId=undefined;
                         if(currentNodeId===defaultConvoNodeId){
                             currentNodeId=undefined;
                         }
@@ -4215,7 +4246,6 @@ export class Conversation
 
             const nodeDescriptions:ConvoNodeDescription[]=[];
             if(nodePass){
-                const fromRoutes:Record<string,ConvoNodeRoute[]>={};
                 let nodeId:string|undefined;
                 let nodeStepIndex=0;
 
@@ -4269,7 +4299,7 @@ export class Conversation
                                                 const route=convoTagToNodeRoute(tag);
                                                 const from=route.toNodeId;
                                                 route.toNodeId=msg.nodeId;
-                                                (fromRoutes[from]??(fromRoutes[from]=[])).push(route);
+                                                (nodeRoutes[from]??(nodeRoutes[from]=[])).push(route);
                                                 break;
                                             }
                                         }
@@ -4284,7 +4314,7 @@ export class Conversation
                             }
                             break;
 
-                        case convoRoles.stop:
+                        case convoRoles.graphStopped:
                         case convoRoles.nodeEnd:
                         case convoRoles.gotoEnd:
                             nodeId=undefined;
@@ -4295,9 +4325,9 @@ export class Conversation
                             break;
 
                         case convoRoles.goto:
-                            if(msg.nodeId){
+                            if(msg.gotoNodeId){
                                 nodeStepIndex++;
-                                nodeId=msg.nodeId;
+                                nodeId=msg.gotoNodeId;
                             }
                             if(nodeBehavior!=='keepAll'){
                                 messages.splice(i,1);
@@ -4323,8 +4353,8 @@ export class Conversation
 
                     }
                 }
-                for(const nodeId in fromRoutes){
-                    const route=fromRoutes[nodeId];
+                for(const nodeId in nodeRoutes){
+                    const route=nodeRoutes[nodeId];
                     if(!route){
                         continue;
                     }
@@ -4347,7 +4377,6 @@ export class Conversation
                         }
                     }
                 }
-
             }
 
             const lastUserMsg=this.getLastUserMessage(messages);
