@@ -1,4 +1,4 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
@@ -440,6 +440,8 @@ The current date and time is: "{{dateTime()}}"
             if(this.options.make || this.options.makeTargets){
                 writeOut=false;
                 await this.makeAsync(source);
+            }else if(this.options.graph){
+                await this.executeGraph(source);
             }else if(this.options.convert){
                 await this.convertCodeAsync(source);
             }else if(this.options.parse){
@@ -522,6 +524,29 @@ The current date and time is: "{{dateTime()}}"
             throw r.error;
         }
         await this.outAsync(this.convo.convo);
+    }
+    private async executeGraph(code:string):Promise<void>{
+
+        this.registerExec(false);
+        await this.appendCodeAsync(code);
+        const ctrl=new ConvoNodeGraphCtrl({
+            convo:this.convo,
+        });
+        let writeIndex=0;
+        const removeListener=ctrl.addStepCompletionListener(async ()=>{
+            if(!this.options.disableWriteGraphOnCompletion){
+                const src=this.convo.convo;
+                const i=writeIndex;
+                writeIndex=src.length;
+                await this.outAsync(this.convo.convo.substring(i));
+            }
+        });
+        try{
+            await ctrl.runAsync();
+        }finally{
+            removeListener();
+        }
+        await this.outAsync(this.convo.convo.substring(writeIndex));
     }
 
     private async makeAsync(code:string){

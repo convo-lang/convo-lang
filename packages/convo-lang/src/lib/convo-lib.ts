@@ -35,6 +35,12 @@ export const convoEnumFnName='enum';
 export const convoMetadataKey=Symbol('convoMetadataKey');
 export const convoCaptureMetadataTag='captureMetadata';
 export const defaultConversationName='default';
+export const defaultConvoNodeId='main';
+
+export const convoUtilModels={
+    empty:'empty',
+    echo:'echo',
+} as const;
 
 export const convoLogDir='.convo-lang-logs';
 
@@ -214,6 +220,31 @@ export const convoRoles={
      * be imported to function correctly
      */
     stage:'stage',
+
+    /**
+     * Defines the start of a node. Messages following the node will be part of the node.
+     */
+    node:'node',
+
+    /**
+     * Explicitly ends a node
+     */
+    nodeEnd:'nodeEnd',
+
+    /**
+     * Defines a node to goto by id
+     */
+    goto:'goto',
+
+    /**
+     * Explicitly ends a goto
+     */
+    gotoEnd:'gotoEnd',
+
+    /**
+     * Indicates graph traversal has stopped.
+     */
+    stop:'stop',
 } as const;
 
 /**
@@ -1406,9 +1437,32 @@ export const convoTags={
 
     router:'router',
 
-    routeTo:'routeTo',
+    /**
+     * Defines a to route for a node.
+     */
+    to:'to',
 
-    routeFrom:'routeFrom',
+    from:'from',
+
+    stop:'stop',
+
+    /**
+     * Allows a node to fork execution. When execution is allowed to be forked all routes with a
+     * true condition will be taken and if more than one route is taken a new conversation will
+     * be created.
+     */
+    fork:'fork',
+
+    /**
+     * Defines the input type expected by a node. If the input for a node does not match
+     * its input type the input will attempted to be converted using natural language
+     */
+    inputType:'inputType',
+
+    /**
+     * Indicates a message is the result of input conversation
+     */
+    inputConversation:'inputConversation',
 
     /**
      * Use to mark a function as a message handler. Functions tagged with `@messageHandler` will
@@ -1449,9 +1503,28 @@ export const convoDynamicTags:string[]=[
     convoTags.taskName,
     convoTags.taskDescription,
     convoTags.json,
-    convoTags.routeTo,
-    convoTags.routeFrom,
+    convoTags.to,
+    convoTags.from,
+    convoTags.stop,
 ];
+
+/**
+ * Tags who's first word on its value will be used as a label
+ */
+export const convoLabeledTags:string[]=[
+    convoTags.to,
+    convoTags.from,
+];
+
+/**
+ * Tags who's dynamic values will not be evaled when flattening. This can be useful when defining
+ * tags who's dynamic value will be used out of line of the flattening of a conversation.
+ */
+export const convoDisableStatementEvalTags:string[]=[
+    convoTags.to,
+    convoTags.from,
+    convoTags.stop,
+]
 
 /**
  * Tags whom have a dynamic expression will be evaluated as an anonymous type
@@ -2792,6 +2865,9 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         userId:flat.userId,
         apiKey:flat.apiKey,
         model:flat.model,
+        currentNodeId:flat.currentNodeId,
+        nodeDescriptions:flat.nodeDescriptions?[...flat.nodeDescriptions]:undefined,
+        isStartOfGoto:flat.isStartOfGoto
     }
 }
 

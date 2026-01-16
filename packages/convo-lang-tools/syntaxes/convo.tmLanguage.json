@@ -22,6 +22,7 @@
                 { "include": "#nop"},
                 { "include": "#thinkingRole"},
                 { "include": "#function"},
+                { "include": "#specialContentRoles"},
                 { "include": "#role" },
                 { "include": "#functionBody"},
                 { "include": "#functionType"},
@@ -61,6 +62,20 @@
                     "include": "#interpolation"
                 }
             ]
+        },
+        "specialContentRoles": {
+            "match": "^\\s*(>)\\s*(nodeEnd|node|gotoEnd|goto|stop)([ \\t]+[^\\n\\r]*)?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"variable"
+                }
+            }
         },
         "role": {
             "match": "^\\s*(>)\\s*(\\w+)([ \\t]+[^\\n\\r]*)?",
@@ -440,8 +455,10 @@
                 {"include":"#tagVarRef"},
                 {"include":"#tagCondition"},
                 {"include":"#tagName"},
+                {"include":"#tagStopCondition"},
+                {"include":"#tagNodeConnection"},
                 {"include":"#tagLabeledCondition"},
-                {"include":"#tagJson"},
+                {"include":"#tagTypeValue"},
                 {"include":"#tagDefault"}
 
             ]
@@ -544,13 +561,35 @@
             "match":"^\\s*(@routeTo|@routeFrom)\\s+(\\w+)\\s*(.*)",
             "captures":{
                 "1":{"name":"entity.name.tag"},
-                "2":{"name":"support.function"},
+                "2":{"name":"variable"},
                 "3":{"patterns": [{"include":"#tagRequiredExpression"}]}
             }
         },
 
-        "tagJson":{
-            "match":"^\\s*(@json)\\s*(.*)",
+        "tagStopCondition":{
+            "match":"^\\s*(@stop)((\\s*(=.*))|(\\s+else[ \\t]*)|(.*))",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "4":{"patterns": [{"include":"#tagRequiredExpression"}]},
+                "5":{"name":"keyword.control"},
+                "6":{"name":"string"}
+            }
+        },
+
+        "tagNodeConnection":{
+            "match":"^\\s*(@to|@from)\\s+(((auto)(.*))|((\\w+)\\s*((=.*)|(else[ \\t]*)|(.*))))",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "2":{"name":"variable"},
+                "4":{"name":"keyword.control"},
+                "9":{"patterns": [{"include":"#tagRequiredExpression"}]},
+                "10":{"name":"keyword.control"},
+                "11":{"name":"string"}
+            }
+        },
+
+        "tagTypeValue":{
+            "match":"^\\s*(@json|@inputConversation|@inputType)\\s*(.*)",
             "captures":{
                 "1":{"name":"entity.name.tag"},
                 "2":{"patterns": [

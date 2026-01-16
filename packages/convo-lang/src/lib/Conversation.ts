@@ -13,13 +13,14 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval.js";
 import { ConvoForm } from "./convo-forms-types.js";
 import { getGlobalConversationLock } from "./convo-lang-lock.js";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoUtilModels, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoNodeId, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
+import { ApplyConvoGotoMessagesResult, applyConvoGotoMessages, convoTagToNodeRoute, getConvoNodeOutput } from "./convo-node-graph-lib.js";
 import { parseConvoCode } from "./convo-parser.js";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib.js";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types.js";
 import { convoStdImportHandler } from "./convo-std-imports.js";
 import { convoScript } from "./convo-template.js";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoNodeDescription, ConvoNodeRoute, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod.js";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoImportService } from "./convo.deps.js";
 import { isConvoObject } from "./convoAsync.js";
@@ -223,6 +224,18 @@ export interface ConversationOptions
      * resources or tools
      */
     sandboxMode?:boolean;
+
+    /**
+     * Used when appending thinking messages to inline host
+     */
+    thinkingLabel?:string;
+
+    /**
+     * If true all completion models will be disabled causing the Conversation to not be able to
+     * consume LLM tokens. `disableCompletionModels` is implemented by forcing the completion model
+     * to always be the empty utility model that always returns an empty response.
+     */
+    disableCompletionModels?:boolean;
 }
 
 export class Conversation
@@ -811,15 +824,43 @@ export class Conversation
     }
 
     /**
+     * Creates a fork of the conversation. Messages appended to the fork will be appended to this
+     * Conversation as thinking messages.
+     */
+    public fork({
+        cloneOptions,
+        convoOptions,
+        label,
+        keepMessages,
+        defaultVars,
+    }:ForkConversationOptions):Conversation{
+        if(defaultVars instanceof ConvoExecutionContext){
+            defaultVars=defaultVars.getUserSharedVarsExcludeTypes();
+        }
+        return this.clone({
+            ...cloneOptions,
+            empty:keepMessages===undefined?(cloneOptions?.empty??true):!keepMessages,
+            fork:true,
+        },{
+            ...convoOptions,
+            thinkingLabel:label,
+            defaultVars:{...convoOptions?.defaultVars,...defaultVars}
+        })
+    }
+
+    /**
      * Creates a new Conversation and appends the messages of this conversation to the newly
      * created conversation.
      */
     public clone({
         inlinePrompt,
+        inlineHost,
+        fork,
         triggerName,
         empty=(inlinePrompt && !inlinePrompt.extend && !inlinePrompt.continue),
         noFunctions,
         systemOnly,
+        defineOnly,
         removeAgents,
         dropLast=inlinePrompt?.dropLast,
         dropUntilContent=inlinePrompt?true:false,
@@ -827,10 +868,13 @@ export class Conversation
         cloneConvoString,
     }:CloneConversationOptions={},convoOptions?:ConversationOptions):Conversation{
         const cloneOptions=this.getCloneOptions(convoOptions);
-        if(inlinePrompt){
+        if(fork){
+            inlineHost=this;
+        }
+        if(inlinePrompt || inlineHost){
             delete cloneOptions.debug;
             cloneOptions.inlinePrompt=inlinePrompt;
-            cloneOptions.inlineHost=this;
+            cloneOptions.inlineHost=inlineHost??this;
             cloneOptions.disableTriggers=true;
             cloneOptions.disableAutoFlatten=true;
         }
@@ -847,6 +891,9 @@ export class Conversation
         }
         if(systemOnly){
             messages=messages.filter(m=>m.role === 'system' || m.fn?.topLevel || m.fn?.name===convoFunctions.getState);
+        }
+        if(defineOnly){
+            messages=messages.filter(m=>m.role===convoRoles.define);
         }
         if(removeAgents){
             messages=messages.filter(m=>m.tags?.some(t=>t.name===convoTags.agentSystem) || (m.fn && this.agents.some(a=>a.name===m.fn?.name)));
@@ -1552,6 +1599,15 @@ export class Conversation
             this.append(appendOrOptions.append);
         }
 
+        const lastMsg=this.messages[this.messages.length-1];
+        if(lastMsg?.role===convoRoles.goto && appendOrOptions?.appendNextGoto!==false){
+            appendOrOptions={
+                ...appendOrOptions,
+                appendNextGoto:true,
+                returnOnCalled:true,
+            }
+        }
+
         if(appendOrOptions?.debug){
             console.info('Conversation.completeAsync:\n',appendOrOptions.append)
         }
@@ -1560,8 +1616,6 @@ export class Conversation
             appendOrOptions?.task,
             appendOrOptions,
             async flat=>{
-
-
                 return await this.completeWithServiceAsync(flat,modelInputOutput);
             },
         );
@@ -1573,7 +1627,128 @@ export class Conversation
             );
         }
 
+        const nodeId=result.flat?.currentNodeId;
+        const flat=result.flat;
+        if(appendOrOptions?.appendNextGoto && nodeId && flat){
+            const flat=await this.flattenAsync();
+            const output=getConvoNodeOutput(flat.messages,flat.exe);
+            const nd=result.flat?.nodeDescriptions?.find(n=>n.nodeId===nodeId);
+            let next:string|undefined;
+            if(nd){
+                if(nd.outRoutes?.length){
+                    const evaluatedRoutes=await Promise.all(nd.outRoutes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
+                    evaluatedRoutes.sort((a,b)=>(a.isFallback?2:1)-(b.isFallback?2:1));
+                    const route=evaluatedRoutes.find(n=>n.passed);
+                    if(route){
+                        if(route.route.stop){
+                            next=undefined;
+                        }else{
+                            next=route.route.toNodeId;
+                        }
+                    }
+                }else{
+                    const index=this.messages.findIndex(m=>m.role===convoRoles.node && m.nodeId===nodeId);
+                    if(index!==-1){
+                        for(let i=index+1;i<this.messages.length;i++){
+                            const msg=this.messages[i];
+                            if(msg?.role===convoRoles.node){
+                                next=msg.nodeId;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if(next){
+                this.append(`> ${convoRoles.goto} ${next}`);
+                result.nextNodeId=next;
+            }else{
+                this.append(`> ${convoRoles.stop}`);
+                result.graphStopped=true;
+            }
+        }
+
         return result;
+    }
+
+    private async evalNodeRouteAsync(
+        route:ConvoNodeRoute,
+        output:any,
+        flat:FlatConvoConversation,
+        routeIndex?:number
+    ):Promise<{route:ConvoNodeRoute;isFallback:boolean;passed:boolean}>{
+        if(route.auto){
+            const nodeId=flat.currentNodeId;
+            const ary=Array.isArray(route.auto)?route.auto:undefined;
+            const autoNodes=(ary?flat.nodeDescriptions?.filter(n=>ary.includes(n.nodeId)):flat.nodeDescriptions?.filter(n=>n.nodeId!==nodeId))??[];
+
+            if(autoNodes.length===0){
+                return {
+                    route,
+                    isFallback:true,
+                    passed:false,
+                }
+            }else if(autoNodes?.length===1){
+                return {
+                    route:{
+                        toNodeId:autoNodes[0]?.nodeId??'',
+                    },
+                    isFallback:true,
+                    passed:true,
+                }
+            }else{
+
+                const convo=this.fork({label:`route_auto${routeIndex?'_'+routeIndex:''}`});
+                const input=flat.exe.getVar('input');
+                convo.append(/*convo*/`
+
+                    @json = struct(nodeId:string)
+                    > user
+                    Select the next node to goto based on following input that will be passed to the node
+
+                    <NODE_INPUT>
+                    ${typeof input === 'string'?escapeConvo(input):JSON.stringify(input)}
+                    </NODE_INPUT>
+
+                    <NODES>
+                    ${JSON.stringify(flat.nodeDescriptions?.map(n=>({nodeId:n.nodeId,description:n.description})))}
+                    </NODES>
+
+                `);
+                const r=await convo.completeJsonAsync();
+                const selectedId=r?.nodeId;
+                return {
+                    route:{toNodeId:selectedId??''},
+                    isFallback:true,
+                    passed:selectedId?true:false
+                }
+            }
+        }else if(route.condition){
+            flat.exe.setVar(true,output,'output');
+            const values=await flat.exe.getStatementValueAsync(route.condition,undefined,{label:`route_${route.toNodeId}${routeIndex?'_'+routeIndex:''}`});
+            return {
+                route,
+                isFallback:false,
+                passed:values[values.length-1]?true:false,
+            }
+        }else if(route.nlCondition){
+
+            const convo=this.fork({label:`route_${route.toNodeId}${routeIndex?'_'+routeIndex:''}`});
+            convo.append(/*convo*/`
+                @json TrueFalse
+                > user
+                ${escapeConvo(route.nlCondition)}
+
+                <OUTPUT>
+                ${typeof output === 'string'?escapeConvo(output):JSON.stringify(output)}
+                </OUTPUT>
+            `);
+            const r=await convo.completeJsonAsync();
+            return {route,isFallback:true,passed:r?.isTrue?true:false}
+        }else{
+            return {route,isFallback:true,passed:true}
+        }
+
     }
 
     private readonly httpEndpointServices:Record<string,ConvoCompletionService<any,any>>={};
@@ -1643,7 +1818,7 @@ export class Conversation
         if(this.inlineHost){
             const last=this.getLastUserOrThinkingMessage(flat.messages);
             if(last){
-                this.inlineHost.append(`> ${convoRoles.thinking}${triggerName?' '+triggerName:''} ${last.role} (${this.inlinePrompt?.header})\n${escapeConvo(getFullFlatConvoMessageContent(last))}`,{disableAutoFlatten:true});
+                this.appendToInlineHost([last],triggerName);
             }
             if(flat.exe.getVar(convoVars.__debugInline)){
                 this.inlineHost.appendArgsAsComment('debug thinking',flat.messages,true);
@@ -1687,7 +1862,7 @@ export class Conversation
         }
 
         if(this.inlineHost){
-            this.inlineHost.append(messages.map(m=>`> ${convoRoles.thinking}${triggerName?' '+triggerName:''} ${m.role}\n${escapeConvo(m.content)}`),{disableAutoFlatten:true})
+            this.appendToInlineHost(messages,triggerName);
             if(flat.exe.getVar(convoVars.__debugInline)){
                 this.inlineHost.appendArgsAsComment('debug thinking response',messages,true);
             }
@@ -1699,6 +1874,20 @@ export class Conversation
 
         return messages;
 
+    }
+
+    /**
+     * Appends messages to the inline host of the Conversation as a set of thinking messages
+     */
+    private appendToInlineHost(messages:(ConvoCompletionMessage|FlatConvoMessage)[],label=this.defaultOptions.thinkingLabel)
+    {
+        if(!this.inlineHost){
+            return;
+        }
+        const append=messages.map(m=>`> ${convoRoles.thinking}${label?' '+label:''} ${m.role}\n${escapeConvo(m.content)}`);
+        if(append.length){
+            this.inlineHost.append(append,{disableAutoFlatten:true})
+        }
     }
 
     /**
@@ -1958,6 +2147,30 @@ export class Conversation
                 excludeMessageSetters:callerExcludeMessages
             });
 
+            const node=flat.currentNodeId?flat.nodeDescriptions?.find(n=>n.nodeId===flat.currentNodeId):undefined;
+            if(node?.inputType){
+                const input=flat.exe.getVar('input');
+                const inputType=flat.exe.getVarAsType(node.inputType);
+                if(inputType && !inputType.safeParse(input).success){
+                    const fork=this.fork({label:'convertInput'});
+                    const value=await fork.completeJsonAsync(/*convo*/`
+                        > define
+                        Output=${zodSchemeToConvoTypeString(inputType)}
+
+                        @json Output
+                        > user
+                        Convert the following input:
+
+                        <INPUT>
+                        ${(typeof input === 'string')?escapeConvo(input):JSON.stringify(input)}
+                        </INPUT>
+                    `);
+                    fork.dispose();
+                    flat.exe.setVar(true,value,'input');
+                    this.append(`@${convoTags.inputConversation} ${node.inputType}\n> define\ninput=${JSON.stringify(value)}`,{disableAutoFlatten:true});
+                }
+            }
+
             let nextCallerExcludeMessages:ConvoMessage[]|undefined;
 
             if(flat.parallelMessages?.length){
@@ -2075,6 +2288,28 @@ export class Conversation
                         callParams:[],
                         tags:{[convoTags.toolId]:shortUuid()}
                     }]
+                }else if(node && node.directInvoke){
+                    directInvoke=true;
+                    const fn=flat.messages.find(m=>m.fn?.name===node.directInvoke && !m.fn?.call);
+                    if(!fn){
+                        throw new Error('Node direct invoke function not found');
+                    }
+                    return [{
+                        role:'assistant',
+                        callFn:node.directInvoke,
+                        callParams:{
+                            [fn.fn?.params?.[0]?.label??'_']:flat.exe.getVar('input')
+                        },
+                        tags:{[convoTags.toolId]:shortUuid()}
+                    }]
+                }else if(flat.responseModel===convoUtilModels.empty){
+                    return [];
+                }else if(flat.responseModel===convoUtilModels.echo){
+                    const usr=this.getLastUserMessage(flat.messages);
+                    return usr?[{
+                        role:convoRoles.assistant,
+                        content:usr.content
+                    }]:[];
                 }else{
                     return await getCompletion(flat)
                 }
@@ -2416,7 +2651,8 @@ export class Conversation
                 exe,
                 returnValues,
                 lastFnCall,
-                task
+                task,
+                flat,
             }
         }finally{
             if(usage){
@@ -2846,6 +3082,10 @@ export class Conversation
             tags:tags?convoTagsToMap(tags,exe):undefined,
         }
 
+        if(msg.role===convoRoles.node){
+            (flat as any)[nodeSrcMsg]=msg;
+        }
+
         const cond=getConvoTag(msg.tags,convoTags.condition);
         if(cond){
             setFlatConvoMessageCondition(flat,cond);
@@ -2882,6 +3122,9 @@ export class Conversation
         }
         if(msg.markdown){
             flat.markdown=msg.markdown;
+        }
+        if(msg.nodeId){
+            flat.nodeId=msg.nodeId;
         }
         if(this.isUserMessage(msg)){
             flat.isUser=true;
@@ -3312,6 +3555,7 @@ export class Conversation
             excludeMessages,
             excludeMessageSetters,
             importOnly,
+            nodeBehavior='default',
         }:FlattenConvoOptions={}
     ):Promise<FlatConvoConversation>{
 
@@ -3335,18 +3579,21 @@ export class Conversation
             };
             exe.setVar(true,mdVarCtx.vars,convoVars.__md);
             let sourceMessages=this._messages;
+            let sourceMessageCopied=false;
             if(messageOverride){
                 sourceMessages=messageOverride;
             }else if(this.getStartOfConversation){
                 const start=this.getStartOfConversation();
                 if(Array.isArray(start)){
                     sourceMessages=[...start,...sourceMessages];
+                    sourceMessageCopied=true;
                 }else if(start){
                     const r=parseConvoCode(start,{logErrors:true});
                     if(r.error){
                         console.error('Dynamic start of conversation parsing failed'+r.error);
                     }else if(r.result){
                         sourceMessages=[...r.result,...sourceMessages];
+                        sourceMessageCopied=true;
                     }
                 }
             }
@@ -3361,6 +3608,10 @@ export class Conversation
             let queueIndex=0;
             let paraIndex=0;
             let inPara=false;
+            let nodePass=false;
+            let currentNodeId:string|undefined;
+            let nodeMessages:ApplyConvoGotoMessagesResult|undefined;
+            const isStartOfGoto=(nodeBehavior==='default' || nodeBehavior==='keepAll') && (sourceMessages[sourceMessages.length-1]?.role===convoRoles.goto);
             let parallelMessages:ConvoMessage[]|undefined;
             let afterCall:Record<string,(ConvoPostCompletionMessage|string)[]>|undefined;
             let messageTriggers:ConvoTrigger[]|undefined;
@@ -3412,6 +3663,51 @@ export class Conversation
                         inPara=false;
                         parallelMessages=undefined;
                         continue messagesLoop;
+
+                    case convoRoles.node:
+                        if(nodeBehavior==='ignore'){
+                            break;
+                        }else if(nodeBehavior==='removeAll'){
+                            continue messagesLoop;
+                        }
+                        nodePass=true;
+                        if(!nodeMessages){
+                            if(!sourceMessageCopied){
+                                sourceMessages=[...sourceMessages];
+                            }
+                            nodeMessages=applyConvoGotoMessages(sourceMessages);
+                        }
+                        break;
+
+                    case convoRoles.nodeEnd:
+                    case convoRoles.gotoEnd:
+                    case convoRoles.stop:
+                        if(nodeBehavior==='ignore'){
+                            break;
+                        }else if(nodeBehavior==='removeAll'){
+                            continue messagesLoop;
+                        }
+                        nodePass=true;
+                        currentNodeId=undefined;
+                        break;
+
+                    case convoRoles.goto:{
+                        if(nodeBehavior==='ignore'){
+                            break;
+                        }else if(nodeBehavior==='removeAll'){
+                            continue messagesLoop;
+                        }
+                        nodePass=true;
+                        currentNodeId=msg.nodeId;
+                        if(currentNodeId===defaultConvoNodeId){
+                            currentNodeId=undefined;
+                        }
+                        const stepOutput=getConvoNodeOutput(messages,exe);
+                        if(stepOutput!==undefined){
+                            exe.setVar(true,stepOutput,'input');
+                        }
+                        break;
+                    }
 
                     default:
                         if(inPara && this.userRoles.includes(msg.role as string) && !msg.fn){
@@ -3916,20 +4212,162 @@ export class Conversation
                 this.applyTagsAndState(u,messages,explicitlyEnabledTransforms,exe,false,mdVarCtx)
             }
 
+
+            const nodeDescriptions:ConvoNodeDescription[]=[];
+            if(nodePass){
+                const fromRoutes:Record<string,ConvoNodeRoute[]>={};
+                let nodeId:string|undefined;
+                let nodeStepIndex=0;
+
+                for(let i=0;i<messages.length;i++){
+                    const msg=messages[i];
+                    if(!msg){
+                        continue;
+                    }
+                    switch(msg.role){
+
+                        case convoRoles.node:
+                            if(msg.nodeId){
+                                let nd=nodeDescriptions.find(n=>n.nodeId===msg.nodeId);
+                                if(!nd){
+                                    nd={
+                                        nodeId:msg.nodeId,
+                                        description:msg.content??'',
+                                    }
+                                    const functionMessages=nodeMessages?.functionMessages[msg.nodeId]??[];
+                                    const inlineMessages=nodeMessages?.inlineMessages[msg.nodeId]??[];
+                                    if(!this.getLastUserMessage(inlineMessages) && functionMessages.length===1){
+                                        nd.directInvoke=functionMessages[0]?.fn?.name;
+                                    }
+                                    nodeDescriptions.push(nd);
+                                }else if(msg.content){
+                                    nd.description+='\n\n'+msg.content;
+                                }
+
+                                const srcMsg:ConvoMessage=(msg as any)[nodeSrcMsg];
+                                if(srcMsg?.tags){
+                                    for(const tag of srcMsg.tags){
+                                        switch(tag.name){
+
+                                            case convoTags.fork:
+                                                nd.allowFork=true;
+                                                break;
+
+                                            case convoTags.to:
+                                            case convoTags.stop:
+                                                if(!nd.outRoutes){
+                                                    nd.outRoutes=[];
+                                                }
+                                                nd.outRoutes.push(convoTagToNodeRoute(tag))
+                                                break;
+
+                                            case convoTags.inputType:
+                                                nd.inputType=tag.value;
+                                                break;
+
+                                            case convoTags.from:{
+                                                const route=convoTagToNodeRoute(tag);
+                                                const from=route.toNodeId;
+                                                route.toNodeId=msg.nodeId;
+                                                (fromRoutes[from]??(fromRoutes[from]=[])).push(route);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                nodeId=msg.nodeId;
+                            }
+                            if(nodeBehavior!=='keepAll'){
+                                messages.splice(i,1);
+                                i--;
+                            }
+                            break;
+
+                        case convoRoles.stop:
+                        case convoRoles.nodeEnd:
+                        case convoRoles.gotoEnd:
+                            nodeId=undefined;
+                            if(nodeBehavior!=='keepAll'){
+                                messages.splice(i,1);
+                                i--;
+                            }
+                            break;
+
+                        case convoRoles.goto:
+                            if(msg.nodeId){
+                                nodeStepIndex++;
+                                nodeId=msg.nodeId;
+                            }
+                            if(nodeBehavior!=='keepAll'){
+                                messages.splice(i,1);
+                                i--;
+                            }
+                            break;
+
+                        default:{
+                            msg.nodeId=nodeId;
+                            if(nodeStepIndex){
+                                msg.nodeStepIndex=nodeStepIndex;
+                            }
+                            if( currentNodeId && currentNodeId!==defaultConvoNodeId &&
+                                msg.nodeId && msg.nodeId!==defaultConvoNodeId && msg.nodeId!==currentNodeId
+                            ){
+                                if(nodeBehavior!=='keepAll'){
+                                    messages.splice(i,1);
+                                    i--;
+                                }
+                            }
+                            break;
+                        }
+
+                    }
+                }
+                for(const nodeId in fromRoutes){
+                    const route=fromRoutes[nodeId];
+                    if(!route){
+                        continue;
+                    }
+                    const fromNode=nodeDescriptions.find(n=>n.nodeId===nodeId);
+                    if(!fromNode){
+                        continue;
+                    }
+                    if(!fromNode.outRoutes){
+                        fromNode.outRoutes=[];
+                    }
+                    fromNode.outRoutes.push(...route);
+                }
+
+                if(nodeBehavior!=='keepAll'){
+                    for(let i=0;i<messages.length;i++){
+                        const msg=messages[i];
+                        if(!msg || (msg.nodeStepIndex!==undefined && msg.nodeStepIndex!==nodeStepIndex)){
+                            messages.splice(i,1);
+                            i--;
+                        }
+                    }
+                }
+
+            }
+
             const lastUserMsg=this.getLastUserMessage(messages);
             let responseEndpoint:string|undefined=exe.getVar(convoVars.__endpoint);
             let userId:string|undefined=exe.getVar(convoVars.__userId);
 
             let responseModel:string|undefined=exe.getVar(convoVars.__model);
-            if(typeof responseModel !== 'string'){
-                responseModel=undefined;
-            }
-            const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel]??lastUserMsg?.tags?.[convoTags.model];
-            if(modelTagValue){
-                responseModel=modelTagValue;
-            }
-            if(!responseModel){
-                responseModel=this.defaultModel;
+            if(this.defaultOptions.disableCompletionModels){
+                responseModel=convoUtilModels.empty;
+            }else{
+                if(typeof responseModel !== 'string'){
+                    responseModel=undefined;
+                }
+                const modelTagValue=lastUserMsg?.tags?.[convoTags.responseModel]??lastUserMsg?.tags?.[convoTags.model];
+                if(modelTagValue){
+                    responseModel=modelTagValue;
+                }
+                if(!responseModel){
+                    responseModel=this.defaultModel;
+                }
             }
 
             if(typeof responseEndpoint !== 'string'){
@@ -3976,6 +4414,10 @@ export class Conversation
             const apiKey=exe.getVar(convoVars.__apiKey);
             if(apiKey){
                 flat.apiKey=apiKey;
+            }
+
+            if(isStartOfGoto){
+                flat.isStartOfGoto=true;
             }
 
             let pv:any;
@@ -4033,6 +4475,12 @@ export class Conversation
             pv=exe.sharedVars[convoVars.__logitBias];
             if(pv!==undefined){
                 flat.logitBias=pv;
+            }
+            if(currentNodeId && currentNodeId!==defaultConvoNodeId){
+                flat.currentNodeId=currentNodeId;
+            }
+            if(nodeDescriptions.length){
+                flat.nodeDescriptions=nodeDescriptions;
             }
 
             let modelParams:Record<string,any>|undefined;
@@ -5328,3 +5776,5 @@ interface ModelConfigurationToInputResult
     lastMsg?:FlatConvoMessage;
     hasFunctions:boolean;
 }
+
+const nodeSrcMsg=Symbol('nodeSrcMsg');

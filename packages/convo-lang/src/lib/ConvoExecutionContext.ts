@@ -1,4 +1,4 @@
-import { getDirectoryName, getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
+import { aryRemoveItem, getDirectoryName, getErrorMessage, getValueByAryPath, isPromise, isRooted, joinPaths, normalizePath, valueIsZodObject, zodCoerceObject } from '@iyio/common';
 import { parseJson5 } from '@iyio/json5';
 import { ZodObject, ZodType } from 'zod';
 import { Conversation, ConversationOptions } from './Conversation.js';
@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing.js';
 import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars.js";
 import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
 import { doesConvoContentHaveMessage } from './convo-parser.js';
-import { ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
+import { CloneConversationOptions, ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, ForkConversationOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
 import { convoValueToZodType } from './convo-zod.js';
 
 
@@ -65,6 +65,8 @@ export class ConvoExecutionContext
 
     public isReadonly=0;
 
+    private inlineForkOptions?:ForkConversationOptions[];
+
     public flat?:FlatConvoConversation;
 
     public varPrefix?:string;
@@ -93,7 +95,7 @@ export class ConvoExecutionContext
         return vars;
     }
 
-    public getUserSharedVarsExcludeTypes(){
+    public getUserSharedVarsExcludeTypes():Record<string,any>{
         const vars=this.getUserSharedVars();
         for(const e in vars){
             if(e[0]===e[0]?.toUpperCase() || (typeof vars[e] === 'function')){
@@ -759,8 +761,35 @@ export class ConvoExecutionContext
 
     private createInlineConversation(prompt:InlineConvoPrompt)
     {
-        const options:ConversationOptions={disableAutoFlatten:true,disableTriggers:true,disableTransforms:!prompt.transforms}
-        return (this.parentConvo??new Conversation(options))?.clone({inlinePrompt:prompt,triggerName:this.getVar(convoVars.__trigger)},options)
+        const cloneOptions:CloneConversationOptions={
+            inlinePrompt:prompt,
+            triggerName:this.getVar(convoVars.__trigger),
+        }
+        const options:ConversationOptions={
+            disableAutoFlatten:true,
+            disableTriggers:true,
+            disableTransforms:!prompt.transforms,
+        }
+        if(this.parentConvo && this.inlineForkOptions?.length){
+            const forkOptions=this.inlineForkOptions[this.inlineForkOptions.length-1];
+            if(forkOptions){
+                return this.parentConvo.fork({
+                    ...forkOptions,
+                    defaultVars:forkOptions.defaultVars??this,
+                    cloneOptions:{
+                        ...cloneOptions,
+                        ...forkOptions.cloneOptions,
+                        inlinePrompt:cloneOptions.inlinePrompt,
+
+                    },
+                    convoOptions:{
+                        ...options,
+                        ...forkOptions.convoOptions,
+                    }
+                })
+            }
+        }
+        return (this.parentConvo??new Conversation(options))?.clone(cloneOptions,options)
 
     }
 
@@ -1175,7 +1204,7 @@ export class ConvoExecutionContext
     }
 
     public getTagStatementValue(tag:ConvoTag,message?:ConvoMessage):any[]{
-        if(!tag.statement?.length){
+        if(!tag.statement?.length || tag.disableStatementEval){
             return [];
         }
         this.isReadonly++;
@@ -1190,6 +1219,56 @@ export class ConvoExecutionContext
             return values;
         }finally{
             this.isReadonly--;
+        }
+    }
+
+    public getStatementValue(statements:ConvoStatement[],message?:ConvoMessage):any[]{
+        if(!statements.length){
+            return [];
+        }
+        this.isReadonly++;
+        try{
+            const values=statements.map(s=>{
+                const r=this.executeStatement(s,message);
+                if(r.valuePromise){
+                    throw new Error('Direct statements are not allowed to return promises');
+                }
+                return r.value;
+            });
+            return values;
+        }finally{
+            this.isReadonly--;
+        }
+    }
+
+    public async getStatementValueAsync(statements:ConvoStatement[],message?:ConvoMessage,forkOptions?:ForkConversationOptions):Promise<any[]>{
+        if(!statements.length){
+            return [];
+        }
+        this.isReadonly++;
+        if(forkOptions){
+            if(!this.inlineForkOptions){
+                this.inlineForkOptions=[];
+            }
+            this.inlineForkOptions.push(forkOptions);
+        }
+        try{
+            const values:any[]=[];
+            for(const s of statements){
+                const r=this.executeStatement(s,message);
+                if(r.valuePromise){
+                    values.push(await r.valuePromise);
+                }else{
+                    values.push(r.value);
+                }
+            }
+            return values;
+        }finally{
+            this.isReadonly--;
+
+            if(forkOptions && this.inlineForkOptions){
+                aryRemoveItem(this.inlineForkOptions,forkOptions);
+            }
         }
     }
 

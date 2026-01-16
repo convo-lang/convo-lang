@@ -65,6 +65,8 @@ const args=parseCliArgsT<Args>({
         var:args=>args,
         vars:args=>args,
         varsPath:args=>args,
+        graph:args=>args.length?true:false,
+        disableWriteGraphOnCompletion:args=>args.length?true:false,
     }
 }).parsed as Args;
 

@@ -26,10 +26,12 @@ export interface ConvoTag
     name:string;
     value?:string;
     statement?:ConvoStatement[];
+    disableStatementEval?:boolean;
     /**
      * Stores the original string source of the tag when the tag uses statements
      */
     srcValue?:string;
+    label?:string;
 }
 
 export type ConvoErrorType=(
@@ -120,6 +122,11 @@ export interface ConvoMessage
     markdown?:MarkdownLine[];
 
     insert?:ConvoInsert;
+
+    /**
+     * Id of node the message belongs to. By default messages belong to the main node.
+     */
+    nodeId?:string;
 
     /**
      * Used to mark the message for insertion and control flow. Some message types like queue
@@ -1050,6 +1057,16 @@ export interface FlatConvoMessage
 
     insert?:ConvoInsert;
 
+    /**
+     * Id of node the message belongs to. By default messages belong to the main node.
+     */
+    nodeId?:string;
+
+    /**
+     * The index of the node step the message belongs to
+     */
+    nodeStepIndex?:number;
+
 }
 
 export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
@@ -1163,6 +1180,9 @@ export interface ConvoCompletion
     lastFnCall?:ConvoFnCallInfo;
     returnValues?:any[];
     task:string;
+    flat?:FlatConvoConversation;
+    nextNodeId?:string;
+    graphStopped?:boolean;
 }
 
 export interface FlatConvoTransform
@@ -1210,6 +1230,10 @@ export interface FlatConvoConversationBase
 {
     messages:FlatConvoMessage[];
     capabilities:ConvoCapability[];
+
+    currentNodeId?:string;
+    nodeDescriptions?:ConvoNodeDescription[];
+    isStartOfGoto?:boolean;
 
     hiddenSource?:string;
 
@@ -1517,7 +1541,17 @@ export interface FlattenConvoOptions
      * If true only import messages should be evaluated
      */
     importOnly?:boolean;
+
+    nodeBehavior?:ConvoFlattenNodeBehavior;
 }
+
+/**
+ * - default: reorders messages based on nodes
+ * - ignore: ignores the default behavior of processing nodes and re-ordering messages based on nodes
+ * - keepAll: Keeps all messages created based on nodes, Useful for visualizing full graph progression
+ * - removeAll: Removes all messages related to node graph processing
+ */
+export type ConvoFlattenNodeBehavior='default'|'ignore'|'keepAll'|'removeAll';
 
 export interface ConvoSubTask
 {
@@ -1549,6 +1583,8 @@ export interface ConvoCompletionOptions
 
     threadFilter?:ConvoThreadFilter;
 
+    appendNextGoto?:boolean;
+
     /**
      * If defined the token usage will be added to the defined usage.
      */
@@ -1571,6 +1607,7 @@ export interface ConvoMessageTemplate
 export interface CloneConversationOptions
 {
     systemOnly?:boolean;
+    defineOnly?:boolean;
     noFunctions?:boolean;
     cloneConvoString?:boolean;
     removeAgents?:boolean;
@@ -1580,6 +1617,29 @@ export interface CloneConversationOptions
     empty?:boolean;
     triggerName?:string;
     inlinePrompt?:InlineConvoPrompt;
+    inlineHost?:Conversation;
+    fork?:boolean;
+}
+
+export interface ForkConversationOptions
+{
+    /**
+     * Thinking label used when appending messages to the parent of the clone
+     */
+    label:string;
+    cloneOptions?:CloneConversationOptions;
+    convoOptions?:ConversationOptions;
+    /**
+     * If true messages from the conversation the fork is cloned from will be preserved and
+     * be added to the fork.
+     */
+    keepMessages?:boolean;
+
+    /**
+     * Variables to pass into the fork. If defaultVars is a ConvoExecutionContext object the shared
+     * user variables excluding types will be used as the default vars.
+     */
+    defaultVars?:Record<string,any>|ConvoExecutionContext;
 }
 
 export interface AppendConvoMessageObjOptions
@@ -2202,4 +2262,34 @@ export interface ConvoMultiReadOptions
     tagItemsWithName?:string;
     itemTag?:string;
     tag?:string;
+}
+
+export interface ConvoNodeDescription
+{
+    nodeId:string;
+    description:string;
+    /**
+     * Name of type the input for the node must be. If the received input for the node does not
+     * match the type an attempt to transform the input to the proper type will be made using
+     * an LLM.
+     */
+    inputType?:string;
+
+    allowFork?:boolean;
+
+    outRoutes?:ConvoNodeRoute[];
+
+    /**
+     * Name of a function to directly invoke instead of using llm to eval
+     */
+    directInvoke?:string;
+}
+
+export interface ConvoNodeRoute
+{
+    toNodeId:string;
+    nlCondition?:string;
+    condition?:ConvoStatement[];
+    stop?:boolean;
+    auto?:boolean|string[];
 }

@@ -1,7 +1,7 @@
 import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getErrorMessage, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, starStringToRegex, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
-import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
+import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDisableStatementEvalTags, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledTags, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, defaultConvoNodeId, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
 import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
@@ -37,7 +37,7 @@ const msgStringReg=/(\{\{|[\n\r]\s*>|$)/gs;
 const heredocOpening=/^([^\n])*\n(\s*)/;
 const hereDocReplace=/\n(\s*)/g;
 
-const tagReg=/(\w+)\s*(=)?(.*)/
+const tagReg=/(\w+)\s*((\w+\s*)?=)?(.*)/
 
 const space=/\s/;
 const allSpace=/^\s$/;
@@ -238,12 +238,15 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         const tag=tagReg.exec(code.substring(index,newline).trim());
         if(tag){
             debug?.('TAG',tag);
-            let v=tag[3]?.trim()||undefined;
+            let v=tag[4]?.trim()||undefined;
             const tagObj:ConvoTag={name:tag[1]??''};
             if(tag[2]){
                 if(!convoDynamicTags.includes(tagObj.name)){
                     error=`Only ${convoDynamicTags.join(', ')} are allowed to have dynamic expressions`
                     return false;
+                }
+                if(tag[3]){
+                    tagObj.label=tag[3].trim()||undefined;
                 }
                 const optAnon=anonTypeOptReg.exec(v??'');
                 if(optAnon?.groups){
@@ -284,9 +287,22 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     }
                     tagObj.srcValue=v;
                     tagObj.statement=r.result?.[0]?.fn?.body;
+                    if(convoDisableStatementEvalTags.includes(tagObj.name)){
+                        tagObj.disableStatementEval=true;
+                    }
                 }
             }else{
-                tagObj.value=v;
+                if(convoLabeledTags.includes(tagObj.name)){
+                    const match=/(\w+)[ \t]*(.*)/.exec(v??'');
+                    if(match){
+                        tagObj.label=match[1];
+                        tagObj.value=match[2]||undefined;
+                    }else{
+                        tagObj.value=v;
+                    }
+                }else{
+                    tagObj.value=v;
+                }
             }
             tags.push(tagObj);
         }
@@ -471,8 +487,21 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
 
                 embedFound=e[0]==='{{';
-                endStringIndex=e.index;
-                nextIndex=(isMsgString && !embedFound)?e.index+e[0].length-1:e.index+e[0].length;
+
+                // Check if embed found in dynamic tag value
+                if( embedFound &&
+                    isMsgString &&
+                    code[(nextIndex=code.lastIndexOf('\n',e.index))+1]==='@' &&
+                    isEndOfMsgStr(code,nextIndex+1)
+                ){
+
+                    embedFound=false;
+                    endStringIndex=nextIndex-1;
+                    nextIndex=endStringIndex;
+                }else{
+                    endStringIndex=e.index;
+                    nextIndex=(isMsgString && !embedFound)?e.index+e[0].length-1:e.index+e[0].length;
+                }
 
                 if(isMsgString && !embedFound){
                     escaped=false;
@@ -1080,11 +1109,24 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
+    let nodeId=defaultConvoNodeId;
+
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
         if(!msg){
             error=`Undefined message in result messages at index ${i}`;
             break;
+        }
+
+        if(msg.role===convoRoles.node || msg.role===convoRoles.goto){
+            msg.nodeId=msg.head?.trim()||defaultConvoNodeId;
+            nodeId=msg.nodeId;
+        }else if(msg.role===convoRoles.nodeEnd || msg.role===convoRoles.gotoEnd || msg.role===convoRoles.stop){
+            nodeId=defaultConvoNodeId;
+        }else{
+            if(nodeId!==defaultConvoNodeId){
+                msg.nodeId=nodeId;
+            }
         }
 
         if(parseMd && msg.content!==undefined){
@@ -1102,7 +1144,16 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         if(msg.fn){
 
             if(!msg.fn.body && !msg.fn.call && !msg.fn.extern && !msg.fn.topLevel && (msg.fn.invoke || !msg.fn.local)){
-                msg.fn.body=[
+                msg.fn.body=(msg.fn.params.length===1 && msg.fn.params[0]?.label)?[
+                    {
+                        s:0,e:0,
+                        fn:'return',
+                        params:[{
+                            s:0,e:0,
+                            ref:msg.fn.params[0]?.label
+                        }]
+                    }
+                ]:[
                     {
                         s:0,e:0,
                         fn:'return',
@@ -1665,6 +1716,26 @@ export const parseConvoImportMatch=(value:string):CodeParsingResult<ConvoImportM
             result:{
                 path:value,
             }
+        }
+    }
+}
+
+const isEndOfMsgStr=(code:string,index:number)=>{
+    while(true){
+        const end=code.indexOf('\n',index);
+        if(end===-1){
+            return false;
+        }
+        const line=code.substring(index,end).trim();
+        index=end+1;
+        if(!line){
+            continue;
+        }
+        if(line[0]==='>'){
+            return true;
+        }
+        if(!tagOrCommentReg.test(line)){
+            return false;
         }
     }
 }

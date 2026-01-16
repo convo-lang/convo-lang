@@ -97,42 +97,52 @@
                 {
                     "command": "convo.complete",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@1"
+                    "group": "navigation@01"
                 },
                 {
                     "command": "convo.open-settings",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@2"
+                    "group": "navigation@02"
                 },
                 {
                     "command": "convo.split",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@3"
+                    "group": "navigation@03"
                 },
                 {
                     "command": "convo.convert",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@4"
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
                 },
                 {
                     "command": "convo.text",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@5"
+                    "group": "navigation@06"
                 },
                 {
                     "command": "convo.flat",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@6"
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
                 },
                 {
                     "command": "convo.vars",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@7"
+                    "group": "navigation@09"
                 },
                 {
                     "command": "convo.list-models",
                     "when": "resourceLangId == source.convo",
-                    "group": "navigation@9"
+                    "group": "navigation@10"
                 }
             ],
             "view/title": [
@@ -203,6 +213,12 @@
                 "icon": "$(play)"
             },
             {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
                 "command": "convo.refresh-make-targets",
                 "title": "Convo: Refresh make targets",
                 "icon": "$(refresh)"
@@ -220,7 +236,13 @@
             },
             {
                 "command": "convo.flat",
-                "title": "Convo: Message Objects - View of conversation as JSON message object. Useful for UI bindings.",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
                 "shortTitle": "Convo: Message Objects",
                 "icon": "$(code-review)"
             },

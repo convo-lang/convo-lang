@@ -1,5 +1,5 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, ConvoMakeTargetRebuild, convoResultErrorName, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, ConvoMakeTargetRebuild, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
@@ -275,6 +275,20 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         const doc=await workspace.openTextDocument({
             language:'json',
             content:JSON.stringify(getSerializableFlatConvoConversation(flat),null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.messages', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(ctx.convo.messages,createJsonRefReplacer(),4),
         });
 
         await window.showTextDocument(doc);
@@ -589,7 +603,7 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
         await window.withProgress({
             location: ProgressLocation.Notification,
-            title: "Completing conversation",
+            title: cliOptions.graph?"Completing Graph":"Completing conversation",
             cancellable: true
         }, async (progress, token) => {
 
@@ -685,7 +699,8 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                 if(token.isCancellationRequested){
                     return;
                 }
-                await setCodeAsync(cli.buffer.join('')+'\n\n> user\n',true,false);
+                const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto || lastMsg?.role===convoRoles.stop?'\n':'\n\n> user\n'),true,false);
             }catch(ex){
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
@@ -759,6 +774,10 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                 break;
         }
 
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
     }));
 
     const splitAsync=async (complete:boolean)=>{

@@ -229,6 +229,13 @@ export interface ConvoCliOptions
      * If true make targets will be printed as JSON
      */
     makeTargets?:boolean;
+
+    /**
+     * If true the conversation will be ran as a graph
+     */
+    graph?:boolean;
+
+    disableWriteGraphOnCompletion?:boolean;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;
