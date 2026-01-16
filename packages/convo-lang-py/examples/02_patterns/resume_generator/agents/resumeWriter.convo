@@ -1,0 +1,141 @@
+> define
+
+JobData = struct(
+    title:string
+    mustRequirements:array(string)
+    niceToHaveRequirements:array(string)
+    keywords:array(string)
+)
+
+MatchData = struct(
+    coverageProfileData: struct(
+        workExperience: array(
+            title: string
+            companyName: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+        projects?: array(
+            title: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+    )
+    gaps: struct(
+        mustRequirements: array(string)
+        niceToHaveRequirements: array(string)
+    )
+)
+
+ExperienceSnapshot = struct(
+    line1: string
+    highlights: array(string)
+)
+
+ResumeData = struct(
+    resume: struct(
+        targetTitle: string
+        summary: string
+        keySkills: array(string)
+        workExperience: array(
+            struct(
+                title: string
+                companyName: string
+                firstDate: string
+                lastDate?: string
+                experienceSnapshot: ExperienceSnapshot
+            )
+        )
+        projects?: array(
+            struct(
+                title: string
+                firstDate: string
+                lastDate?: string
+                experienceSnapshot: ExperienceSnapshot
+            )
+        )
+    )
+)
+
+> do 
+
+jobData = new(JobData job_data)
+matchData = new(MatchData match_data)
+
+
+> system
+You are a professional resume writer.
+
+Your task:
+Generate a structured, ATS-friendly resume strictly from the provided input data.
+
+Rules:
+- Use ONLY the provided data. Do NOT invent facts, skills, tools, companies, roles, dates, or achievements.
+- Rewrite and prioritize content, but stay factual.
+- Focus primarily on JobData.mustRequirements and JobData.keywords.
+- Output MUST be valid JSON only. No markdown, no extra text.
+- Do NOT make any hiring or application recommendations.
+
+
+@json ResumeData
+> user
+Create a tailored resume draft.
+
+INPUT
+MatchData: {{matchData}}
+JobData: {{jobData}}
+
+OUTPUT
+Return JSON that exactly matches ResumeData.
+
+GENERATION RULES
+
+General:
+- targetTitle:
+  Must be exactly JobData.title.
+
+- summary:
+  3–5 sentences, written in the first person ("I").
+  The first sentence must clearly state the target role (JobData.title) and the relevant domain.
+  The summary should explain why I am a good fit for this role by highlighting relevant skills and experience.
+  Use ONLY information present in MatchData (work experience or projects).
+  Focus on capabilities that directly match JobData.mustRequirements and JobData.keywords.
+  Do NOT mention gaps, missing skills, or personal traits.
+  Do NOT invent experience, metrics, or years.
+
+- keySkills:
+  A list of concrete skills and technologies extracted ONLY from MatchData.
+  Include only skills that are relevant to JobData.
+  Do NOT add skills that are not explicitly present in the profile.
+
+Experience & Projects:
+For EACH item:
+- experienceSnapshot.line1:
+  ONE short sentence written in the first person ("I").
+  Briefly describe what I did in this role at a high level:
+  role + domain + main responsibility or area of impact.
+  Keep it factual and specific.
+  Use ONLY information present in MatchData.
+  Avoid buzzwords, generic phrases, and self-evaluation.
+
+- experienceSnapshot.highlights:
+  4–7 bullet points written in the first person ("I").
+  Each bullet should describe a concrete responsibility, task, or contribution from this role.
+  Use ONLY information present in MatchData.
+  Prioritize items that are directly relevant to JobData.mustRequirements and JobData.keywords.
+  Keep bullets factual, specific, and ATS-friendly.
+  Avoid buzzwords, self-praise, and generic statements.
+
+Keywords:
+- keywords_used must include ONLY keywords that actually appear in the generated resume.
+
+FINAL CHECK
+- JSON only
+- No comments
+- No recommendation language

@@ -1,0 +1,93 @@
+> define
+
+JobData = struct(
+    title:string
+    mustRequirements:array(string)
+    niceToHaveRequirements:array(string)
+    keywords:array(string)
+)
+
+ProfileData = struct(
+    workExperience:array(
+        struct(
+            title:string
+            companyName:string
+            firstDate:string
+            lastDate?:string
+            summary:string
+            experience:array(string)
+        )
+    )
+    projects?:array(
+        struct(
+            title:string
+            firstDate:string
+            lastDate?:string
+            experience:array(string)
+        )
+    )
+)
+
+MatchData = struct(
+    coverageProfileData: struct(
+        workExperience: array(
+            title: string
+            companyName: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+        projects?: array(
+            title: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+    )
+    gaps: struct(
+        mustRequirements: array(string)
+        niceToHaveRequirements: array(string)
+    )
+)
+
+
+> do 
+
+jobData = new(JobData job_data)
+profileData = new(ProfileData profile_data)
+
+
+> system
+You are the Job Fit Matcher.
+
+You will receive:
+- JobData (title, mustRequirements, niceToHaveRequirements, keywords)
+- ProfileData (workExperience, optional projects)
+
+Your tasks:
+1) Select ONLY the most relevant items from:
+   - ProfileData.workExperience
+   - ProfileData.projects (if present)
+   that best match the job requirements.
+2) Produce gaps:
+   - gaps.mustRequirements: must-have items NOT clearly covered by the profile
+   - gaps.niceToHaveRequirements: nice-to-have items NOT clearly covered
+
+Coverage rules:
+- Include only roles/projects that directly support must-have, nice-to-have or key keywords.
+- For each included role/project, add matchReasons (2–6 short bullets) explaining what it covers.
+
+Output rules:
+- Return valid JSON only.
+- Do NOT invent facts.
+- If projects are missing from ProfileData, output an empty array for coverageProfileData.projects.
+
+
+@json MatchData
+> user
+My job Data: {{jobData}}
+My profile Data: {{profileData}}

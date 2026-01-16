@@ -1,0 +1,37 @@
+SENIOR BACKEND DEVELOPER
+
+SUMMARY
+I am a Senior Backend Developer focused on backend systems, distributed microservices, and high-throughput data pipelines. I have hands-on experience developing backend services in Python and building RESTful APIs across microservice architectures. I have worked with relational and document databases, caching, and ingestion pipelines to address schema, indexing, and performance concerns. I apply software design principles, clean architecture, and testing practices while using Docker and message-based components in production environments.
+
+KEY SKILLS
+Python, Node.js, REST APIs, microservices, distributed systems, Cloud SQL, MSSQL, MongoDB, Redis, RabbitMQ, Docker, ingestion pipelines, caching, React, unit testing, design patterns, production troubleshooting, incident response, high-throughput data pipelines, system design reviews
+
+WORK EXPERIENCE
+Senior Backend Developer — Guardio (Jun 2025 – present)
+I am a Senior Backend Developer at Guardio working on backend services, distributed microservices, and high-throughput data pipelines.
+- I developed backend services using Python for distributed microservices architectures.
+- I architected and scaled distributed microservices and high-throughput data pipelines.
+- I worked with Cloud SQL and large-scale ingestion pipelines to address database and ingestion concerns.
+- I participated in system design reviews and implemented scalable design patterns.
+
+Senior Software Engineer — SafeBreach (Apr 2024 – Jan 2025)
+I was a Senior Software Engineer at SafeBreach focused on backend platform services and internal tooling to improve stability and scalability.
+- I developed backend components using Python and Node.js.
+- I built and improved backend platform services and internal tooling to enhance stability and scalability.
+- I contributed to code quality initiatives and platform hardening efforts.
+- I supported distributed systems and platform/CI concerns through platform improvements.
+
+Software Engineer — Payoneer (Mar 2021 – Apr 2024)
+I was a Software Engineer at Payoneer building microservices and REST APIs to support payments processing.
+- I built microservices and RESTful APIs to support payments processing workflows.
+- I worked with relational and document databases including MSSQL and MongoDB, and addressed schema and performance considerations.
+- I used Redis for caching and optimization of service performance.
+- I used Docker and RabbitMQ in production environments and handled production troubleshooting and incident response.
+- I worked with frontend teams and technologies, including React, to integrate backend services.
+
+Full Stack Developer — PandoLogic (Dec 2018 – Mar 2021)
+I was a Full Stack Developer at PandoLogic designing and implementing microservices, REST APIs, and front-end integrations.
+- I designed and implemented microservices and REST APIs.
+- I built React front-end applications and integrated them with backend services.
+- I applied clean code principles, design patterns, and unit testing to improve maintainability.
+- I worked on high-scale and performance-sensitive system optimizations and caching strategies.

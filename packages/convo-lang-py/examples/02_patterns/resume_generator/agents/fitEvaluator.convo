@@ -1,0 +1,131 @@
+> define
+
+JobData = struct(
+    title:string
+    mustRequirements:array(string)
+    niceToHaveRequirements:array(string)
+    keywords:array(string)
+)
+
+MatchData = struct(
+    coverageProfileData: struct(
+        workExperience: array(
+            title: string
+            companyName: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+        projects?: array(
+            title: string
+            firstDate: string
+            lastDate?: string
+            summary: string
+            experience: array(string)
+            matchReasons: array(string)
+        )
+    )
+    gaps: struct(
+        mustRequirements: array(string)
+        niceToHaveRequirements: array(string)
+    )
+)
+
+RecommendationData = struct(
+    recommendation: struct(
+        decision: enum("apply", "maybe apply", "skip")
+        confidence: number
+        summary: string
+        reasons: struct(
+            mustGaps: array(string)
+            niceToHaveGaps: array(string)
+            strengths: array(string)
+        )
+    )
+)
+
+> do 
+
+jobData = new(JobData job_data)
+matchData = new(MatchData match_data)
+
+totalConfidence = 100
+jobRequirementsAmount = jobData.mustRequirements.length
+jobniceToHaveAmount = jobData.niceToHaveRequirements.length
+requirementPoints = div(totalConfidence jobRequirementsAmount)
+niceToHavePoins = div(requirementPoint 4)
+
+requirementGapAmount = matchData.gaps.mustRequirements.length
+jobniceToHaveGapAmount = matchData.gaps.niceToHaveRequirements.length
+mainConfidence = mul(sub(jobRequirementsAmount requirementGapAmount) requirementPoints)
+additionalConfidence = mul(sub(jobniceToHaveAmount jobniceToHaveGapAmount) niceToHavePoins)
+
+confidence = add(mainConfidence additionalConfidence)
+
+decision = "apply"
+decisionComment = "the candidate is a strong match, or gaps are minor and clearly compensated by experience."
+
+if (lt(confidence 70)) then (
+    decision = "skip"
+    decisionComment = "the role is likely not a good fit at this time due to major gaps or low relevance."
+) elif (lt(confidence 90)) then(
+    decision = "maybe apply"
+    decisionComment = "the candidate partially matches the role."
+)
+
+> system
+You are a career assistant helping a candidate decide whether to apply for a job.
+
+Your goal:
+- Help the candidate make an informed decision about applying.
+- Clearly explain strengths, gaps, and risks in a constructive, supportive way.
+- If applying is not recommended, explain why and what the candidate might improve or watch out for.
+
+Rules:
+- Base your analysis ONLY on the provided resume, MatchData gaps, and JobData.
+- Do NOT rewrite or change the resume.
+- Do NOT judge or criticize the candidate.
+- Be practical, honest, and respectful.
+- Focus on how well the candidate matches the job, not on how a recruiter might reject them.
+- Output MUST be valid JSON only. No markdown, no extra text.
+
+
+@json RecommendationData
+> user
+Help the candidate decide whether applying for this job makes sense.
+
+INPUT
+JobData: {{jobData}}
+MatchData: {{matchData}}
+
+OUTPUT
+Return JSON that exactly matches ResumeData.
+
+GUIDELINES
+
+Goal:
+- Help the candidate understand how well they match this job.
+- Explain strengths and gaps clearly and constructively.
+- If applying is not recommended, explain why in a supportive, practical way.
+
+Decision: {{decision}}
+
+Reasons:
+- must_gaps:
+  List unmet must-have requirements (use ONLY MatchData.gaps.mustRequirements).
+- nice_to_have_gaps:
+  List unmet nice-to-have requirements (use ONLY MatchData.gaps.niceToHaveRequirements).
+- strengths:
+  Reference concrete resume elements (skills, experienceSnapshot, keywordsUsed).
+
+Confidence: {{confidence}}
+
+Summary:
+- 1–2 clear sentences explaining the recommendation in plain, human language why {{decisionComment}}.
+
+FINAL CHECK
+- Output valid JSON only.
+- Do NOT rewrite or change the resume.
+- Do NOT invent facts or skills.

@@ -1,6 +1,6 @@
 [project]
 name = "convo_lang"
-version = "0.6.1"
+version = "0.6.3"
 description = "A conversational prompting and programming language"
 readme = "README.md"
 requires-python = ">=3.8"

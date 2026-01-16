@@ -1,0 +1,46 @@
+Senior Backend Developer at Guardio
+Jun 2025 – Present
+
+Part of the Detection Infrastructure team.
+Architected and scaled distributed microservices on Google Cloud Platform (GKE, Pub/Sub, BigQuery, Cloud SQL).
+Built high-throughput data pipelines and backend systems handling tens of thousands of requests per second.
+Designed and delivered core platform features and ingestion pipelines processing massive data volumes.
+Participated in system design reviews and implemented scalable patterns to meet performance and reliability goals.
+Technologies: Python, Node.js, GCP, Kubernetes, Pub/Sub, BigQuery, Cloud SQL.
+
+
+Senior Software Engineer at SafeBreach
+Apr 2024 – Jan 2025
+
+Member of the Platform team.
+Worked on backend platform services and internal tooling.
+Contributed to system stability, scalability, and code quality.
+Technologies: Python, Node.js, distributed systems.
+
+
+Software Engineer at Payoneer
+Mar 2021 – Apr 2024
+
+Part of the Payments domain.
+Built microservices and REST APIs.
+Developed backend and frontend features and handled production troubleshooting.
+Worked with both SQL and NoSQL databases.
+Technologies: C#, .NET Core, JavaScript, React, MSSQL, MongoDB, RabbitMQ, Redis, Docker, Azure, Grafana.
+
+
+Full Stack Developer at PandoLogic
+Dec 2018 – Mar 2021
+
+Built microservices, REST APIs, and React applications from scratch.
+Applied clean code principles, design patterns, and unit testing.
+Worked on high-scale and performance-sensitive systems.
+Technologies: JavaScript, React, Node.js, .NET Core, MSSQL, MySQL, RabbitMQ, Elasticsearch.
+
+
+Full Stack Developer at Tmura – Information Systems
+Sep 2017 – Dec 2018
+
+Developed large-scale information systems from scratch.
+Worked on both frontend and backend components.
+Used MVC architecture and responsive design.
+Technologies: JavaScript, jQuery, .NET Framework, MSSQL, HTML, CSS, WebSocket.

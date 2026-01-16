@@ -4,6 +4,7 @@ import json
 import subprocess
 from types import SimpleNamespace
 from pathlib import Path
+from collections import OrderedDict
 
 import pytest
 
@@ -27,61 +28,11 @@ def test_post_init_raises_when_discovery_fails(monkeypatch):
     with pytest.raises(ConvoNotFound):
         ConvoCLIRunner()
 
-def test__build_cmd_includes_flags_and_json():
-    runner = ConvoCLIRunner(convo_bin="convo-bin", config={"k": "v"})
-    vars_ = {"x": 1}
-    extra = ["--foo", "--bar"]
-    cmd = runner._build_cmd(
-        Path("script.convo"),
-        variables=vars_,
-        extra_args=extra,
-        use_prefix_output=True,
-    )
-    assert cmd[0] == "convo-bin"
-    assert str(Path("script.convo")) in cmd
-    assert "--inlineConfig" in cmd
-    cfg_index = cmd.index("--inlineConfig") + 1
-    parsed_cfg = json.loads(cmd[cfg_index])
-    assert parsed_cfg == {"k": "v"}
-    assert "--vars" in cmd
-    vars_index = cmd.index("--vars") + 1
-    parsed_vars = json.loads(cmd[vars_index])
-    assert parsed_vars == vars_
-    assert "--prefixOutput" in cmd
-    assert "--foo" in cmd and "--bar" in cmd
-    cmd2 = runner._build_cmd(
-        Path("script.convo"),
-        variables=None,
-        extra_args=None,
-        use_prefix_output=False,
-    )
-    assert "--prefixOutput" not in cmd2
-
 def test_run_file_raises_when_script_missing():
     runner = ConvoCLIRunner(convo_bin="convo")
     missing = "nonexistent_file.convo"
     with pytest.raises(ConvoNotFound):
         runner.run_file(missing)
-
-def test_run_file_calls_subprocess_and_returns_stdout(monkeypatch, tmp_path):
-    script = tmp_path / "script.convo"
-    script.write_text("dummy")
-    captured = {}
-
-    def fake_run(cmd, capture_output, text, cwd, timeout):
-        captured["cmd"] = cmd
-        captured["cwd"] = cwd
-        captured["timeout"] = timeout
-        return SimpleNamespace(returncode=0, stdout="full transcript",
-                               stderr="")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    runner = ConvoCLIRunner(convo_bin="/usr/bin/convo")
-    out = runner.run_file(str(script), timeout=1.5, working_dir=str(tmp_path))
-    assert out == "full transcript"
-    assert captured["timeout"] == 1.5
-    assert captured["cmd"][0] == "/usr/bin/convo"
-    assert str(script.resolve()) in captured["cmd"]
 
 def test_run_file_raises_timeout_when_subprocess_times_out(
     monkeypatch, tmp_path
@@ -204,3 +155,96 @@ def test_run_text_accepts_optional_args_and_vars_with_mock(tmp_path):
         working_dir=str(tmp_path)
     )
     assert out == "ok"
+
+def test_run_file_builds_command_including_prefix_vars_extra_args(monkeypatch, tmp_path):
+    script = tmp_path / "script.convo"
+    script.write_text("dummy")
+
+    captured = {}
+
+    def fake_run_subprocess(cmd, *, timeout, working_dir):
+        captured["cmd"] = cmd
+        captured["timeout"] = timeout
+        captured["working_dir"] = working_dir
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    runner = ConvoCLIRunner(convo_bin="convo")
+    monkeypatch.setattr(runner, "_run_subprocess", fake_run_subprocess)
+    out = runner.run_file(
+        str(script),
+        variables={"x": 1},
+        extra_args=["--foo", "bar"],
+        timeout=1.2,
+        working_dir=str(tmp_path),
+    )
+    assert out == "ok"
+    cmd = captured["cmd"]
+    assert cmd[0] == "convo"
+    assert str(script.resolve()) in cmd
+    assert "--prefixOutput" in cmd
+    assert "--vars" in cmd
+    assert "--foo" in cmd and "bar" in cmd
+
+def test_run_file_writes_config_and_deletes_it_on_success(monkeypatch, tmp_path):
+    script = tmp_path / "script.convo"
+    script.write_text("dummy")
+
+    captured = {}
+
+    def fake_run_subprocess(cmd, *, timeout, working_dir):
+        idx = cmd.index("--config")
+        cfg_path = Path(cmd[idx + 1])
+        captured["cfg_path"] = cfg_path
+        assert cfg_path.exists()
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    runner = ConvoCLIRunner(convo_bin="convo", config={"a": 1})
+    monkeypatch.setattr(runner, "_run_subprocess", fake_run_subprocess)
+    out = runner.run_file(str(script))
+    assert out == "ok"
+    assert "cfg_path" in captured
+    assert not captured["cfg_path"].exists()
+
+def test_run_file_deletes_config_even_when_cli_fails(monkeypatch, tmp_path):
+    script = tmp_path / "script.convo"
+    script.write_text("dummy")
+
+    captured = {}
+
+    def fake_run_subprocess(cmd, *, timeout, working_dir):
+        idx = cmd.index("--config")
+        cfg_path = Path(cmd[idx + 1])
+        captured["cfg_path"] = cfg_path
+        assert cfg_path.exists()
+        return SimpleNamespace(returncode=2, stdout="out", stderr="err")
+
+    def fake_raise_for_cli_failure(returncode, stdout, stderr):
+        raise ExecFailed(f"failed: {returncode}")
+
+    runner = ConvoCLIRunner(convo_bin="convo", config={"a": 1})
+    monkeypatch.setattr(runner, "_run_subprocess", fake_run_subprocess)
+    monkeypatch.setattr("convo_lang.convo_cli_runner.raise_for_cli_failure", fake_raise_for_cli_failure)
+
+    with pytest.raises(ExecFailed):
+        runner.run_file(str(script))
+    assert "cfg_path" in captured
+    assert not captured["cfg_path"].exists()
+
+def test_run_subprocess_maps_filenotfound_to_convonotfound(monkeypatch):
+    def fake_run(*args, **kwargs):
+        raise FileNotFoundError("no such file or directory")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    runner = ConvoCLIRunner(convo_bin="convo")
+    with pytest.raises(ConvoNotFound):
+        runner._run_subprocess(["convo", "x.convo"], timeout=1.0, working_dir=None)
+
+def test_run_subprocess_maps_oserror_to_execfailed(monkeypatch):
+    def fake_run(*args, **kwargs):
+        raise OSError("bad exec")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    runner = ConvoCLIRunner(convo_bin="convo")
+    with pytest.raises(ExecFailed):
+        runner._run_subprocess(["convo", "x.convo"], timeout=1.0, working_dir=None)
+
