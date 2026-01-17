@@ -33,14 +33,14 @@ export const applyConvoGotoMessages=(messages:ConvoMessage[]):ApplyConvoGotoMess
 
             case convoRoles.to:
             case convoRoles.from:
-            case convoRoles.stop:
+            case convoRoles.exit:
                 // do nothing. Messages should not be added
                 break;
 
             case convoRoles.goto:
             case convoRoles.gotoEnd:
             case convoRoles.nodeEnd:
-            case convoRoles.graphStopped:
+            case convoRoles.exitGraph:
                 currentNodeId=undefined;
                 break;
 
@@ -105,8 +105,8 @@ export const convoTagToNodeRoute=(tag:ConvoTag):ConvoNodeRoute=>{
     if(route.nlCondition==='else'){
         delete route.nlCondition;
     }
-    if(tag.name===convoTags.stop){
-        route.stop=true;
+    if(tag.name===convoTags.exit){
+        route.exit=true;
     }
     if(route.toNodeId==='auto'){
         if(route.nlCondition){

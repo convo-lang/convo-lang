@@ -242,14 +242,14 @@ export const convoRoles={
     gotoEnd:'gotoEnd',
 
     /**
-     * Indicates graph traversal has stopped.
+     * Indicates graph traversal has exited.
      */
-    graphStopped:'graphStopped',
+    exitGraph:'exitGraph',
 
     /**
-     * Graph stop route
+     * Graph exit route
      */
-    stop:'stop',
+    exit:'exit',
 
     /**
      * Graph to route
@@ -1450,16 +1450,20 @@ export const convoTags={
      */
     tokenLimit:'tokenLimit',
 
-    router:'router',
-
     /**
      * Defines a to route for a node.
      */
     to:'to',
 
+    /**
+     * Defines from route for a node.
+     */
     from:'from',
 
-    stop:'stop',
+    /**
+     * Defines an exit route for a node.
+     */
+    exit:'exit',
 
     /**
      * Allows a node to fork execution. When execution is allowed to be forked all routes with a
@@ -1520,7 +1524,7 @@ export const convoDynamicTags:string[]=[
     convoTags.json,
     convoTags.to,
     convoTags.from,
-    convoTags.stop,
+    convoTags.exit,
 ];
 
 /**
@@ -1538,7 +1542,7 @@ export const convoLabeledTags:string[]=[
 export const convoDisableStatementEvalTags:string[]=[
     convoTags.to,
     convoTags.from,
-    convoTags.stop,
+    convoTags.exit,
 ]
 
 /**

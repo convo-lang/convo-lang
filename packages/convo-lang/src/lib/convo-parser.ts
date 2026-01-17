@@ -1132,7 +1132,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
             case convoRoles.to:
             case convoRoles.from:
-            case convoRoles.stop:
+            case convoRoles.exit:
                 if(!msg.nodeRoutes){
                     msg.nodeRoutes=[];
                 }
@@ -1145,7 +1145,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 const route:ConvoNodeRoute={
                     toNodeId:(next?'next':auto?'auto':head[0])??'',
                     from:msg.role===convoRoles.from?true:undefined,
-                    stop:msg.role===convoRoles.stop?true:undefined,
+                    exit:msg.role===convoRoles.exit?true:undefined,
                     auto:auto?(head.length?head:true):undefined,
                     next:next?true:undefined,
 

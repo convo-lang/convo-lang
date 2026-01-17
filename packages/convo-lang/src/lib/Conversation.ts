@@ -1637,15 +1637,15 @@ export class Conversation
             let next:string|undefined;
             if(nd){
                 let autoNext=true;
-                if(nd.outRoutes?.length){
+                if(nd.routes?.length){
                     autoNext=false;
-                    const evaluatedRoutes=await Promise.all(nd.outRoutes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
+                    const evaluatedRoutes=await Promise.all(nd.routes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
                     evaluatedRoutes.sort((a,b)=>(a.isFallback?2:1)-(b.isFallback?2:1));
                     const route=evaluatedRoutes.find(n=>n.passed);
                     if(route?.passed){
                         if(route.route.toNodeId==='next'){
                             autoNext=true;
-                        }else if(route.route.stop){
+                        }else if(route.route.exit){
                             next=undefined;
                         }else{
                             next=route.route.toNodeId;
@@ -1670,7 +1670,7 @@ export class Conversation
                 this.append(`> ${convoRoles.goto} ${next}`);
                 result.nextNodeId=next;
             }else{
-                this.append(`> ${convoRoles.graphStopped}`);
+                this.append(`> ${convoRoles.exitGraph}`);
                 result.graphStopped=true;
             }
         }
@@ -3710,7 +3710,7 @@ export class Conversation
 
                     case convoRoles.nodeEnd:
                     case convoRoles.gotoEnd:
-                    case convoRoles.graphStopped:
+                    case convoRoles.exitGraph:
                         if(nodeBehavior==='ignore'){
                             break;
                         }else if(nodeBehavior==='removeAll'){
@@ -4284,11 +4284,11 @@ export class Conversation
                                                 break;
 
                                             case convoTags.to:
-                                            case convoTags.stop:
-                                                if(!nd.outRoutes){
-                                                    nd.outRoutes=[];
+                                            case convoTags.exit:
+                                                if(!nd.routes){
+                                                    nd.routes=[];
                                                 }
-                                                nd.outRoutes.push(convoTagToNodeRoute(tag))
+                                                nd.routes.push(convoTagToNodeRoute(tag))
                                                 break;
 
                                             case convoTags.inputType:
@@ -4314,7 +4314,7 @@ export class Conversation
                             }
                             break;
 
-                        case convoRoles.graphStopped:
+                        case convoRoles.exitGraph:
                         case convoRoles.nodeEnd:
                         case convoRoles.gotoEnd:
                             nodeId=undefined;
@@ -4362,10 +4362,10 @@ export class Conversation
                     if(!fromNode){
                         continue;
                     }
-                    if(!fromNode.outRoutes){
-                        fromNode.outRoutes=[];
+                    if(!fromNode.routes){
+                        fromNode.routes=[];
                     }
-                    fromNode.outRoutes.push(...route);
+                    fromNode.routes.push(...route);
                 }
 
                 if(nodeBehavior!=='keepAll'){
