@@ -2,7 +2,7 @@ import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getError
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDisableStatementEvalTags, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledTags, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, defaultConvoNodeId, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
-import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNodeRoute, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
+import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNodeRoute, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoSourceRef, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoMessageSourceReferenceKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 
@@ -98,6 +98,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         code='> user\n'+code;
     }
 
+    const sourceRef:ConvoSourceRef={source:code};
     const messages:ConvoMessage[]=[];
     const parseMd=options?.parseMarkdown??false;
 
@@ -112,7 +113,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
     let inString:StringType|null=null;
     let lastComment='';
     let tags:ConvoTag[]=[];
-    const includeLineNumbers=options?.includeLineNumbers;
     let index=options?.startIndex??0;
     let currentMessage:ConvoMessage|null=null;
     let currentFn:ConvoFunction|null=null;
@@ -120,8 +120,11 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
     const anonTypes:Record<string,string>={};
     const stack:ConvoStatement[]=[];
     const len=code.length;
+    let prevSourceMsg:ConvoMessage|undefined;
 
-    const setLineNumber=(msg:ConvoMessage)=>{
+    const pushNewMessage=(msg:ConvoMessage)=>{
+        msg[convoMessageSourceReferenceKey]=sourceRef;
+        messages.push(msg);
         let ci=index;
 
         let e=ci-1;
@@ -147,9 +150,13 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
 
         }
 
-        msg.sourceCharIndex=ci;
-        msg.sourceLineNumber=getLineNumber(code,index);
-        (msg as any).__=code.substring(msg.sourceCharIndex,msg.sourceCharIndex+50);
+        if(prevSourceMsg){
+            prevSourceMsg.e=ci;
+        }
+        msg.s=ci;
+        msg.ln=getLineNumber(code,index);
+
+        prevSourceMsg=msg;
     }
 
     const setStringEndReg=(type:StringType)=>{
@@ -960,10 +967,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         fn:currentFn,
                         description:lastComment||undefined,
                     }
-                    if(includeLineNumbers){
-                        setLineNumber(currentMessage);
-                    }
-                    messages.push(currentMessage);
+                    pushNewMessage(currentMessage);
                     lastComment='';
                     if(tags.length){
                         currentMessage.tags=tags;
@@ -1000,11 +1004,9 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         fn:currentFn,
                         description:lastComment||undefined,
                         head:match[3]?.trim()||undefined,
+                        [convoMessageSourceReferenceKey]:sourceRef,
                     }
-                    if(includeLineNumbers){
-                        setLineNumber(currentMessage);
-                    }
-                    messages.push(currentMessage);
+                    pushNewMessage(currentMessage);
                     lastComment='';
                     if(tags.length){
                         currentMessage.tags=tags;
@@ -1031,11 +1033,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         role:msgName,
                         description:lastComment||undefined,
                         head:match[3]?.trim()||undefined,
+                        [convoMessageSourceReferenceKey]:sourceRef,
                     }
-                    if(includeLineNumbers){
-                        setLineNumber(currentMessage);
-                    }
-                    messages.push(currentMessage);
+                    pushNewMessage(currentMessage);
+
                     lastComment='';
                     if(tags.length){
                         currentMessage.tags=tags;
@@ -1095,7 +1096,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
     }
 
     if(tags.length || lastComment){
-        messages.push({
+        pushNewMessage({
             tags:tags.length?tags:undefined,
             description:lastComment||undefined,
             role:'define',

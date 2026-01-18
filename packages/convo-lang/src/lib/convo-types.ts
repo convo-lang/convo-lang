@@ -191,11 +191,17 @@ export interface ConvoMessage
     /**
      * The line number the message started on in source code.
      */
-    sourceLineNumber?:number;
+    ln?:number;
+
     /**
-     * The character index the message started on
+     * The inclusive start character index the message started on in the convo source code
      */
-    sourceCharIndex?:number;
+    s?:number;
+
+    /**
+     * The exclusive end character index the message started on in the convo source code
+     */
+    e?:number;
 
     /**
      * If true the message should be evaluated as code
@@ -233,6 +239,19 @@ export interface ConvoMessage
      * Path to file where the message was defined in
      */
     [convoMessageSourcePathKey]?:string;
+
+    /**
+     * A reference to the source code the message was parsed from.
+     */
+    [convoMessageSourceReferenceKey]?:ConvoSourceRef;
+}
+
+/**
+ * A reference to convo source
+ */
+export interface ConvoSourceRef
+{
+    source:string;
 }
 
 export interface ConvoImportMatch{
@@ -255,6 +274,7 @@ export interface ConvoImportMatch{
 export const convoImportMatchRegKey=Symbol('convoImportMatchRegKey');
 
 export const convoMessageSourcePathKey=Symbol('convoMessageSourcePathKey');
+export const convoMessageSourceReferenceKey=Symbol('convoMessageSourceReferenceKey');
 
 export const baseConvoToolChoice=['none','auto','required'] as const;
 export type ConvoToolChoice=(typeof baseConvoToolChoice[number])|{name:string};
@@ -1235,7 +1255,11 @@ export interface FlatConvoConversation extends FlatConvoConversationBase
 
     response?:ConvoCompletionMessage[];
 
+    nodeDescriptions?:ConvoNodeDescription[];
 
+    nodeTailMessages?:FlatConvoMessage[];
+
+    runtimeNodes?:ConvoRuntimeNodeInfo[];
 }
 
 export interface FlatConvoConversationBase
@@ -1244,7 +1268,8 @@ export interface FlatConvoConversationBase
     capabilities:ConvoCapability[];
 
     currentNodeId?:string;
-    nodeDescriptions?:ConvoNodeDescription[];
+    nodeStepIndex?:number;
+    nodeDepth?:number;
     isStartOfGoto?:boolean;
 
     hiddenSource?:string;
@@ -1816,7 +1841,6 @@ export interface ConvoImportService
 
 export interface ConvoParsingOptions extends CodeParsingOptions
 {
-    includeLineNumbers?:boolean;
     logErrors?:boolean;
 }
 
@@ -2276,10 +2300,24 @@ export interface ConvoMultiReadOptions
     tag?:string;
 }
 
+export interface ConvoRuntimeNodeInfo
+{
+    /**
+     * Id of the node
+     */
+    nodeId:string;
+
+    /**
+     * Input passed to the node
+     */
+    input?:any;
+
+}
+
 export interface ConvoNodeDescription
 {
     /**
-     * Id of the nodes
+     * Id of the node
      */
     nodeId:string;
 
@@ -2288,6 +2326,11 @@ export interface ConvoNodeDescription
      * appropriate next node.
      */
     description:string;
+
+    /**
+     * Controls the number of node contexts to include in the context of the node.
+     */
+    contextDepth:number;
 
     /**
      * Name of type the input for the node must be. If the received input for the node does not

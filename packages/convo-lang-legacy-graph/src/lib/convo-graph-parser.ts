@@ -11,7 +11,6 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
     const result=parseConvoCode(code,{
         logErrors:true,
         ...options,
-        includeLineNumbers:true,
     });
 
     if(result.error || !result.result || exitEarly){
@@ -52,7 +51,7 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
             return true;
         }
 
-        if(stepContentMsg.sourceCharIndex===undefined){
+        if(stepContentMsg.s===undefined){
             error='content message source char index undefined';
             return false;
         }
@@ -62,7 +61,7 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
             return false;
         }
 
-        const content=code.substring(stepContentMsg.sourceCharIndex,endIndex);
+        const content=code.substring(stepContentMsg.s,endIndex);
         if(currentStep){
             currentStep.convo+='\n\n'+content;
         }else{
@@ -82,12 +81,12 @@ export const parseConvoGraphCode:CodeParser<ConvoGraphParsingData>=(code:string,
         if(!msg){continue}
 
 
-        if(msg.sourceCharIndex===undefined){
+        if(msg.s===undefined){
             error='message source char index undefined';
             break parsingLoop;
         }
 
-        index=msg.sourceCharIndex;
+        index=msg.s;
         const fn=msg.fn;
 
         if(!appendContent(index)){

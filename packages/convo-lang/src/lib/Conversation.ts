@@ -14,13 +14,13 @@ import { evalConvoMessageAsCodeAsync } from "./convo-eval.js";
 import { ConvoForm } from "./convo-forms-types.js";
 import { getGlobalConversationLock } from "./convo-lang-lock.js";
 import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoUtilModels, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoNodeId, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
-import { ApplyConvoGotoMessagesResult, applyConvoGotoMessages, convoTagToNodeRoute, getConvoNodeOutput } from "./convo-node-graph-lib.js";
+import { ConvoNodeOrderingResult, applyConvoNodeOrdering, convoTagToNodeRoute, getConvoNodeOutput } from "./convo-node-graph-lib.js";
 import { parseConvoCode } from "./convo-parser.js";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib.js";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types.js";
 import { convoStdImportHandler } from "./convo-std-imports.js";
 import { convoScript } from "./convo-template.js";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoNodeDescription, ConvoNodeRoute, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoNodeDescription, ConvoNodeRoute, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoRuntimeNodeInfo, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod.js";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoImportService } from "./convo.deps.js";
 import { isConvoObject } from "./convoAsync.js";
@@ -1705,7 +1705,7 @@ export class Conversation
                 }
             }else{
 
-                const convo=this.fork({label:`route_auto${routeIndex?'_'+routeIndex:''}`});
+                const convo=this.fork({label:`route_${routeIndex}_auto`});
                 const input=getConvoNodeOutput(flat.messages,flat.exe);
                 convo.append(/*convo*/`
 
@@ -1731,7 +1731,7 @@ export class Conversation
                 }
             }
         }else if(route.condition){
-            const values=await flat.exe.getStatementValueAsync(route.condition,undefined,{label:`route_${route.toNodeId}${routeIndex?'_'+routeIndex:''}`});
+            const values=await flat.exe.getStatementValueAsync(route.condition,undefined,{label:`route_${routeIndex}_${route.toNodeId}`});
             return {
                 route,
                 isFallback:false,
@@ -1739,7 +1739,7 @@ export class Conversation
             }
         }else if(route.nlCondition){
 
-            const convo=this.fork({label:`route_${route.toNodeId}${routeIndex?'_'+routeIndex:''}`});
+            const convo=this.fork({label:`route_${routeIndex}_${route.toNodeId}`});
             convo.append(/*convo*/`
                 @json TrueFalse
                 > user
@@ -2263,6 +2263,13 @@ export class Conversation
             const lastMsgIsFnCall=lastMsg?.fn?.call?true:false;
             let directInvoke=false;
             const completion:ConvoCompletionMessage[]=await (async ()=>{
+
+                if(flat.isStartOfGoto && flat.nodeTailMessages && isDefaultTask){
+                    const append=flat.nodeTailMessages
+                        .filter(m=>m.content!==undefined)
+                        .map(m=>m.role===convoRoles._sourceRef?m.content:`${m.tags?convoTagMapToCode(m.tags,'\n'):''}> ${m.role}\n${escapeConvo(m.content)}`).join('\n\n');
+                    this.append(append,{disableAutoFlatten:true});
+                }
 
                 if(flat.response){
                     return flat.response;
@@ -3620,7 +3627,8 @@ export class Conversation
             let nodePass=false;
             let currentNodeId:string|undefined;
             let currentDefiningNodeId:string|undefined;
-            let nodeMessages:ApplyConvoGotoMessagesResult|undefined;
+            let nodeMessages:ConvoNodeOrderingResult|undefined;
+            const runtimeNodes:ConvoRuntimeNodeInfo[]=[];
             const nodeRoutes:Record<string,ConvoNodeRoute[]>={};
             const isStartOfGoto=(nodeBehavior==='default' || nodeBehavior==='keepAll') && (sourceMessages[sourceMessages.length-1]?.role===convoRoles.goto);
             let parallelMessages:ConvoMessage[]|undefined;
@@ -3704,7 +3712,7 @@ export class Conversation
                             if(!sourceMessageCopied){
                                 sourceMessages=[...sourceMessages];
                             }
-                            nodeMessages=applyConvoGotoMessages(sourceMessages);
+                            nodeMessages=applyConvoNodeOrdering(sourceMessages,this,isStartOfGoto);
                         }
                         break;
 
@@ -3734,6 +3742,12 @@ export class Conversation
                             currentNodeId=undefined;
                         }
                         const stepOutput=getConvoNodeOutput(messages,exe);
+                        const runTimeNode:ConvoRuntimeNodeInfo={
+                            nodeId:msg.gotoNodeId??defaultConvoNodeId,
+                            input:stepOutput
+                        }
+                        runtimeNodes.push(runTimeNode);
+                        exe.setVar(true,runtimeNodes,convoVars.__nodeStack);
                         if(stepOutput!==undefined){
                             exe.setVar(true,stepOutput,'input');
                         }
@@ -3754,7 +3768,7 @@ export class Conversation
                     secondPass=true;
                 }
 
-                if(msg.role==='user' && !msg.content && !msg.statement){
+                if(this.isUserMessage(msg) && !msg.content && !msg.statement){
                     continue;
                 }
 
@@ -4245,9 +4259,10 @@ export class Conversation
 
 
             const nodeDescriptions:ConvoNodeDescription[]=[];
+            let nodeStepIndex:number|undefined;
             if(nodePass){
                 let nodeId:string|undefined;
-                let nodeStepIndex=0;
+                const defaultContextDepth=safeParseNumber(exe.getVar(convoVars.__nodeContextDepth),1);
 
                 for(let i=0;i<messages.length;i++){
                     const msg=messages[i];
@@ -4263,6 +4278,7 @@ export class Conversation
                                     nd={
                                         nodeId:msg.nodeId,
                                         description:msg.content??'',
+                                        contextDepth:safeParseNumberOrUndefined(msg.tags?.[convoTags.contextDepth])??defaultContextDepth,
                                     }
                                     const functionMessages=nodeMessages?.functionMessages[msg.nodeId]??[];
                                     const inlineMessages=nodeMessages?.inlineMessages[msg.nodeId]??[];
@@ -4326,7 +4342,11 @@ export class Conversation
 
                         case convoRoles.goto:
                             if(msg.gotoNodeId){
-                                nodeStepIndex++;
+                                if(nodeStepIndex===undefined){
+                                    nodeStepIndex=0;
+                                }else{
+                                    nodeStepIndex++;
+                                }
                                 nodeId=msg.gotoNodeId;
                             }
                             if(nodeBehavior!=='keepAll'){
@@ -4337,13 +4357,20 @@ export class Conversation
 
                         default:{
                             msg.nodeId=nodeId;
-                            if(nodeStepIndex){
+                            if(nodeStepIndex!==undefined){
                                 msg.nodeStepIndex=nodeStepIndex;
-                            }
-                            if( currentNodeId && currentNodeId!==defaultConvoNodeId &&
-                                msg.nodeId && msg.nodeId!==defaultConvoNodeId && msg.nodeId!==currentNodeId
-                            ){
-                                if(nodeBehavior!=='keepAll'){
+                            }else if(nodeBehavior!=='keepAll'){
+                                if(currentNodeId && currentNodeId!==defaultConvoNodeId){
+                                    if(msg.nodeId && msg.nodeId!==defaultConvoNodeId){
+                                        if(msg.nodeId!==currentNodeId){
+                                            messages.splice(i,1);
+                                            i--;
+                                        }
+                                    }else if(this.isContentMessage(msg) && !getFlatConvoTagBoolean(msg,convoTags.includeInNodes)){
+                                        messages.splice(i,1);
+                                        i--;
+                                    }
+                                }else if(msg.nodeId && msg.nodeId!==defaultConvoNodeId){
                                     messages.splice(i,1);
                                     i--;
                                 }
@@ -4369,11 +4396,25 @@ export class Conversation
                 }
 
                 if(nodeBehavior!=='keepAll'){
-                    for(let i=0;i<messages.length;i++){
-                        const msg=messages[i];
-                        if(!msg || (msg.nodeStepIndex!==undefined && msg.nodeStepIndex!==nodeStepIndex)){
-                            messages.splice(i,1);
-                            i--;
+                    if(nodeStepIndex!==undefined && currentNodeId && currentNodeId!==defaultConvoNodeId){
+                        const cdOffset=(nodeDescriptions.find(n=>n.nodeId===currentNodeId)?.contextDepth??1)-1;
+                        for(let i=0;i<messages.length;i++){
+                            const msg=messages[i];
+                            if( !msg || (
+                                msg.nodeStepIndex!==undefined &&
+                                msg.nodeStepIndex+cdOffset<nodeStepIndex
+                            )){
+                                messages.splice(i,1);
+                                i--;
+                            }
+                        }
+                    }else{
+                        for(let i=0;i<messages.length;i++){
+                            const msg=messages[i];
+                            if( !msg || msg.nodeStepIndex!==undefined || msg.nodeId!==undefined){
+                                messages.splice(i,1);
+                                i--;
+                            }
                         }
                     }
                 }
@@ -4507,9 +4548,22 @@ export class Conversation
             }
             if(currentNodeId && currentNodeId!==defaultConvoNodeId){
                 flat.currentNodeId=currentNodeId;
+                flat.nodeStepIndex=nodeStepIndex;
+                const tail:FlatConvoMessage[]=[];
+                for(let i=messages.length-1;i>=0;i--){
+                    const msg=messages[i];
+                    if(!msg || msg.nodeStepIndex!==nodeStepIndex || msg.nodeId!==currentNodeId){
+                        break;
+                    }
+                    tail.unshift(msg);
+                }
+                flat.nodeTailMessages=tail;
             }
             if(nodeDescriptions.length){
                 flat.nodeDescriptions=nodeDescriptions;
+            }
+            if(runtimeNodes.length){
+                flat.runtimeNodes=runtimeNodes;
             }
 
             let modelParams:Record<string,any>|undefined;
@@ -4531,39 +4585,35 @@ export class Conversation
             }
 
             let includeInTransforms:FlatConvoMessage[]|undefined;
-            for(let i=0;i<messages.length;i++){
+            endPass: for(let i=0;i<messages.length;i++){
                 const msg=messages[i];
                 if(!msg){continue}
-
-                let removed=false;
 
                 switch(msg.role){
 
                     case convoRoles.ragPrefix:
                         flat.ragPrefix=msg.content;
                         messages.splice(i,1);
-                        removed=true;
                         i--;
-                        break;
+                        continue endPass;
 
                     case convoRoles.ragSuffix:
                         flat.ragSuffix=msg.content;
                         messages.splice(i,1);
-                        removed=true;
                         i--;
-                        break;
+                        continue endPass;
 
                     case convoRoles.ragTemplate:
                         flat.ragTemplate=msg.content;
                         messages.splice(i,1);
-                        removed=true;
                         i--;
-                        break;
+                        continue endPass;
 
-                }
+                    case convoRoles._sourceRef:
+                        messages.splice(i,1);
+                        i--;
+                        continue endPass;
 
-                if(removed){
-                    continue;
                 }
 
                 if(msg.tags && (convoTags.includeInTransforms in msg.tags)){
@@ -4576,7 +4626,6 @@ export class Conversation
                 if(msg.tags && (convoTags.transform in msg.tags) && !disableTransforms){
                     const transformGroup=msg.tags?.[convoTags.transformGroup]??defaultConvoTransformGroup;
                     messages.splice(i,1);
-                    removed=true;
                     i--;
 
                     if(!flat.transforms){
@@ -4609,14 +4658,15 @@ export class Conversation
                         transform.optional=true;
                     }
                     transform.messages.push(msg);
+                    continue endPass;
                 }else if(msg.tags && (convoTags.transformFilter in msg.tags)){
                     messages.splice(i,1);
-                    removed=true;
                     i--;
                     if(!flat.transformFilterMessages){
                         flat.transformFilterMessages=[];
                     }
                     flat.transformFilterMessages.push(msg);
+                    continue endPass;
                 }
 
             }

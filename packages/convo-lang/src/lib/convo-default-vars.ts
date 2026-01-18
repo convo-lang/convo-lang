@@ -7,13 +7,46 @@ import { ConvoForm } from "./convo-forms-types.js";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
 import { convoPipeScopeFunction } from "./convo-pipe.js";
 import { createConvoSceneDescription } from "./convo-scene-lib.js";
-import { ConvoIterator, ConvoMultiReadOptions, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
+import { ConvoIterator, ConvoMultiReadOptions, ConvoRuntimeNodeInfo, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod.js";
 import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc.js";
 
 const ifFalse=Symbol();
 const ifTrue=Symbol();
 const breakIteration=Symbol();
+
+const getNodeInfo=(scope:ConvoScope,ctx:ConvoExecutionContext):ConvoRuntimeNodeInfo|undefined=>{
+
+    const stack:ConvoRuntimeNodeInfo[]=ctx.getVar(convoVars.__nodeStack);
+    if(!Array.isArray(stack)){
+        return undefined;
+    }
+    let n=scope.paramValues?.[0];
+    if(n===undefined){
+        n=stack.length-1;
+    }
+
+    switch(typeof n){
+
+        case 'number':
+            if(n<0){
+                return stack[stack.length+n];
+            }else{
+                return stack[n];
+            }
+
+        case 'string':
+            for(let i=stack.length-1;i>=0;i--){
+                const node=stack[i];
+                if(node?.nodeId===n){
+                    return node;
+                }
+            }
+            break;
+    }
+
+    return undefined;
+}
 
 const mdImg=createConvoScopeFunction(async (scope,ctx)=>{
     const [
@@ -1628,6 +1661,11 @@ export const extendedConvoVars={
             return [];
         }
     }),
+
+    [convoFunctions.getNodeInfo]:createConvoScopeFunction(getNodeInfo),
+
+    [convoFunctions.getNodeInput]:createConvoScopeFunction((scope,ctx)=>getNodeInfo(scope,ctx)?.input),
+
 } as const;
 Object.freeze(extendedConvoVars);
 

@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, getObjKeyCount, getValueByPath, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, getObjKeyCount, getValueByPath, isClassInstanceObject, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoDocumentReference } from "./convo-rag-types.js";
 import { convoSystemMessages } from "./convo-system-messages.js";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -260,6 +260,11 @@ export const convoRoles={
      * Graph from route
      */
     from:'from',
+
+    /**
+     * A temporary message type use to pass convo source code.
+     */
+    _sourceRef:'_sourceRef'
 } as const;
 
 /**
@@ -503,6 +508,18 @@ export const convoFunctions={
      * Used to access properties of a make target by path
      */
     mkt:'mkt',
+
+    /**
+     * Returns information about the current graph node or a node by step index.
+     * Negative indexes can be used to return nodes indexed from the end of the node stack
+     */
+    getNodeInfo:'getNodeInfo',
+
+    /**
+     * Returns node input for the current graph node or a node by step index.
+     * Negative indexes can be used to return nodes indexed from the end of the node stack
+     */
+    getNodeInput:'getNodeInput',
 
 
 } as const;
@@ -777,6 +794,16 @@ export const convoVars={
      * Name of a type to be used as the default json response type
      */
     __defaultResponseType:'__defaultResponseType',
+
+    /**
+     * Sets the default node context depth
+     */
+    __nodeContextDepth:'__nodeContextDepth',
+
+    /**
+     * Stores historical node information including each node input
+     */
+    __nodeStack:'__nodeStack',
 
 } as const;
 
@@ -1451,26 +1478,42 @@ export const convoTags={
     tokenLimit:'tokenLimit',
 
     /**
-     * Defines a to route for a node.
+     * When applied to a node message a `to` route for is added to the node.
      */
     to:'to',
 
     /**
-     * Defines from route for a node.
+     * When applied to a node message a `from` route for is added to the node.
      */
     from:'from',
 
     /**
-     * Defines an exit route for a node.
+     * When applied to a node message an `exit` route for is added to the node.
      */
     exit:'exit',
 
     /**
-     * Allows a node to fork execution. When execution is allowed to be forked all routes with a
-     * true condition will be taken and if more than one route is taken a new conversation will
-     * be created.
+     * Controls the LLM model used to evaluate route conditions.
+     */
+    routingModel:'routingModel',
+
+    /**
+     * When applied to a node message forking node execution is allowed. When execution is allowed
+     * to be forked all routes with a true condition will be taken and if more than one route is
+     * taken a new conversation will be created.
      */
     fork:'fork',
+
+    /**
+     * Controls the number of node contexts to include in the context of the node.
+     */
+    contextDepth:'contextDepth',
+
+    /**
+     * Causes a content message to be included in node execution context. By Default all non-node
+     * messages are excluded from node execution context.
+     */
+    includeInNodes:'includeInNodes',
 
     /**
      * Defines the input type expected by a node. If the input for a node does not match
@@ -2610,7 +2653,21 @@ export const escapeConvoTagValue=(value:string):string=>{
     return value.replace(/[\n\r\s]/g,' ');
 }
 
+export const convoMessageToStringSafe=(msg:ConvoMessage):string|undefined=>{
+    try{
+        return convoMessageToString(msg);
+    }catch{
+        return undefined;
+    }
+}
+
 export const convoMessageToString=(msg:ConvoMessage):string=>{
+
+    const ref=msg[convoMessageSourceReferenceKey];
+    if(ref && msg.s!==undefined && msg.e!==undefined){
+        return ref.source.substring(msg.s,msg.e);
+    }
+
     if(msg.fn || msg.statement){
         throw new UnsupportedError(
             'convoMessageToString only supports text based messages without embedded statements'
@@ -2839,8 +2896,16 @@ export const createFunctionCallConvoCompletionMessage=({
     };
 }
 
-export const getSerializableFlatConvoConversation=(flat:FlatConvoConversation|FlatConvoConversationBase):FlatConvoConversationBase=>{
-    const flatBase=flatConvoConversationToBase(flat);
+export const getSerializableFlatConvoConversation=(flat:FlatConvoConversation|FlatConvoConversationBase,includeMetadata?:boolean):FlatConvoConversationBase=>{
+    const flatBase=includeMetadata?{...flat}:flatConvoConversationToBase(flat);
+    if(includeMetadata){
+        for(const e in flatBase){
+            const value=(flatBase as any)[e];
+            if(isClassInstanceObject(value)){
+                delete (flatBase as any)[e];
+            }
+        }
+    }
 
     const messages=[...flatBase.messages];
     flatBase.messages=messages;
@@ -2855,9 +2920,9 @@ export const getSerializableFlatConvoConversation=(flat:FlatConvoConversation|Fl
             if(!updated){
                 msg={...msg};
                 updated=true;
-                msg._fnParams=zodTypeToJsonScheme(msg.fnParams as ZodObject<any>);
-                delete msg.fnParams;
             }
+            msg._fnParams=zodTypeToJsonScheme(msg.fnParams as ZodObject<any>);
+            delete msg.fnParams;
         }
 
         if(updated){
@@ -2885,8 +2950,9 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         apiKey:flat.apiKey,
         model:flat.model,
         currentNodeId:flat.currentNodeId,
-        nodeDescriptions:flat.nodeDescriptions?[...flat.nodeDescriptions]:undefined,
-        isStartOfGoto:flat.isStartOfGoto
+        nodeStepIndex:flat.nodeStepIndex,
+        nodeDepth:flat.nodeDepth,
+        isStartOfGoto:flat.isStartOfGoto,
     }
 }
 
@@ -3299,4 +3365,77 @@ export const isConvoTypeArray=(value:any):boolean=>{
         value.length &&
         value.every(v=>v?.[convoMetadataKey])
     )?true:false;
+}
+
+/**
+ * Returns the first found reference to the given variable or function
+ */
+export const getConvoMessagesVarReference=(messages:ConvoMessage[],varName:string|string[]):ConvoStatement|undefined=>{
+    varName=asArray(varName);
+    for(const m of messages){
+        const r=getConvoMessageVarReference(m,varName);
+        if(r){
+            return r;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Returns the first found reference to the given variable or function
+ */
+export const getConvoMessageVarReference=(msg:ConvoMessage,varName:string|string[]):ConvoStatement|undefined=>{
+    varName=asArray(varName);
+    if(msg.statement){
+        return getConvoStatementVarReference(msg.statement,varName);
+    }
+    if(msg.fn?.body){
+        for(const s of msg.fn.body){
+            const r=getConvoStatementVarReference(s,varName);
+            if(r){
+                return r;
+            }
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Returns the first found reference to the given variable or function
+ */
+export const getConvoStatementVarReference=(s:ConvoStatement,varName:string|string[]):ConvoStatement|undefined=>{
+    if(Array.isArray(varName)){
+        for(const n of varName){
+            const r=_getConvoStatementVarReference(s,n);
+            if(r){
+                return r;
+            }
+        }
+        return undefined;
+    }else{
+        return _getConvoStatementVarReference(s,varName);
+    }
+}
+
+const _getConvoStatementVarReference=(s:ConvoStatement,varName:string):ConvoStatement|undefined=>{
+    if(s.ref===varName || s.fn===varName){
+        return s;
+    }
+    if(s.params){
+        for(const p of s.params){
+            const r=getConvoStatementVarReference(p,varName);
+            if(r){
+                return r;
+            }
+        }
+    }
+    if(s.prompt?.messages){
+        for(const m of s.prompt.messages){
+            const r=getConvoMessageVarReference(m,varName);
+            if(r){
+                return r;
+            }
+        }
+    }
+    return undefined;
 }

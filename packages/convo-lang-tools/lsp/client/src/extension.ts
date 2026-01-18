@@ -270,11 +270,29 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        const flat=await ctx.convo.flattenAsync();
+        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(),true);
+        const obj:any={}
+        for(const e in flat){
+            const v=(flat as any)[e];
+            if((typeof v !== 'object') || v===null){
+                obj[e]=v;
+            }
+        }
+        obj.messages=flat.messages;
+        obj.vars=(flat as any).vars;
+        for(const e in flat){
+            if(e in obj){
+                continue;
+            }
+            const v=(flat as any)[e];
+            if((typeof v === 'object') && v!==null){
+                obj[e]=v;
+            }
+        }
 
         const doc=await workspace.openTextDocument({
             language:'json',
-            content:JSON.stringify(getSerializableFlatConvoConversation(flat),null,4),
+            content:JSON.stringify(obj,null,4),
         });
 
         await window.showTextDocument(doc);
