@@ -130,19 +130,24 @@
                     "group": "navigation@07"
                 },
                 {
-                    "command": "convo.messages",
+                    "command": "convo.flat-all",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@08"
                 },
                 {
-                    "command": "convo.vars",
+                    "command": "convo.messages",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@09"
                 },
                 {
-                    "command": "convo.list-models",
+                    "command": "convo.vars",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
                 }
             ],
             "view/title": [
@@ -237,6 +242,12 @@
             {
                 "command": "convo.flat",
                 "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
                 "shortTitle": "Convo: Flat Message Objects",
                 "icon": "$(code-review)"
             },

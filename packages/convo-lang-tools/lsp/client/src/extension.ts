@@ -1,5 +1,5 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
-import { Conversation, ConvoMakeTargetRebuild, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
@@ -264,13 +264,13 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         await window.showTextDocument(doc);
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+    const getFlat=async (options?:FlattenConvoOptions)=>{
         const ctx=await getConvoEditorContextAsync();
         if(!ctx){
             return;
         }
 
-        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(),true);
+        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(undefined,options),true);
         const obj:any={}
         for(const e in flat){
             const v=(flat as any)[e];
@@ -289,6 +289,24 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                 obj[e]=v;
             }
         }
+        return obj;
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.flat-all', async () => {
+
+        const obj=await getFlat({nodeBehavior:'keepAll'});
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+
+        const obj=await getFlat();
 
         const doc=await workspace.openTextDocument({
             language:'json',

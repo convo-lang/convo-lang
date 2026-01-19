@@ -2,7 +2,8 @@ import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getError
 import { parseJson5 } from "@iyio/json5";
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDisableStatementEvalTags, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledTags, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, defaultConvoNodeId, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
-import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNodeRoute, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoSourceRef, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoMessageSourceReferenceKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
+import { ConvoNodeRoute } from './convo-node-graph-types.js';
+import { ConvoFunction, ConvoImportMatch, ConvoMessage, ConvoNonFuncKeyword, ConvoParsingOptions, ConvoParsingResult, ConvoSourceRef, ConvoStatement, ConvoTag, ConvoTrigger, ConvoValueConstant, InlineConvoParsingOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoImportMatchRegKey, convoMessageSourceReferenceKey, convoNonFuncKeywords, convoValueConstants, isConvoComponentMode } from "./convo-types.js";
 
 type StringType='"'|"'"|'---'|'>'|'???'|'===';
 

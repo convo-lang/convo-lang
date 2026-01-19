@@ -1,7 +1,7 @@
-import { deepClone } from "@iyio/common";
 import { Conversation } from "./Conversation.js";
-import { convoFunctions, convoMessageToStringSafe, convoRoles, convoTags, convoVars, defaultConvoNodeId, getConvoMessagesVarReference } from "./convo-lib.js";
-import { ConvoMessage, ConvoNodeRoute, ConvoStatement, ConvoTag, FlatConvoMessage } from "./convo-types.js";
+import { convoMessageToStringSafe, convoRoles, convoTags, convoVars, defaultConvoNodeId } from "./convo-lib.js";
+import { ConvoNodeDescription, ConvoNodeExtendedDescription, ConvoNodeGraph, ConvoNodeGraphSource, ConvoNodeRoute } from "./convo-node-graph-types.js";
+import { ConvoMessage, ConvoTag, FlatConvoMessage } from "./convo-types.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 
 export interface ConvoNodeOrderingResult
@@ -94,43 +94,6 @@ export const applyConvoNodeOrdering=(
             if(!insert){
                 break;
             }
-            const inputRef=getConvoMessagesVarReference(insert,['input',convoFunctions.getNodeInfo,convoFunctions.getNodeInput,convoVars.__nodeStack]);
-            if(!inputRef){
-                const statements:ConvoStatement[]=[
-                    {value:"<INPUT>",s:0,e:0},
-                    {s:0,e:0,ref:"input"},
-                    {value:"</INPUT>",s:0,e:0}
-                ]
-                let last=insert[insert.length-1];
-                if(!last || (!conversation.isUserMessage(last) && !conversation.isAssistantMessage(last))){
-                    insert.push({
-                        role:"user",
-                        statement:{
-                            fn:"md",s:0,e:0,c:0,
-                            params:statements,
-                        }
-                    })
-                }else{
-                    last=deepClone(last);
-                    insert[insert.length-1]=last;
-                    if(!last.statement){
-                        last.statement={
-                            fn:"md",s:0,e:0,c:0,
-                            params:[],
-                        }
-                    }
-                    if(!last.statement.params){
-                        last.statement.params=[];
-                    }
-                    if(last.content!==undefined){
-                        last.statement.params.push({s:0,e:0,value:last.content});
-                        delete last.content;
-                    }
-                    last.statement.params.push({value:"\n\n",s:0,e:0});
-                    last.statement.params.push(...statements)
-
-                }
-            }
             messages.splice(i+1,0,...insert.map(m=>({...m})));
             i+=insert.length;
             break;
@@ -177,4 +140,86 @@ export const convoTagToNodeRoute=(tag:ConvoTag):ConvoNodeRoute=>{
         }
     }
     return route;
+}
+
+export const getConvoNodeMessages=(nodeId:string,messages:ConvoMessage[],includeRoutes=true):ConvoMessage[]=>{
+
+    let inNode=false;
+
+    const nodeMessages:ConvoMessage[]=[];
+
+    for(const msg of messages){
+
+        switch(msg.role){
+
+            case convoRoles.node:
+                if(msg.nodeId===nodeId){
+                    inNode=true;
+                    nodeMessages.push(msg);
+                }else{
+                    inNode=false;
+                }
+                break;
+
+            case convoRoles.nodeEnd:
+            case convoRoles.goto:
+            case convoRoles.gotoEnd:
+            case convoRoles.exitGraph:
+                inNode=false;
+                break;
+
+            case convoRoles.to:
+            case convoRoles.from:
+            case convoRoles.exit:
+                if(includeRoutes && inNode){
+                    nodeMessages.push(msg);
+                }
+                break;
+
+            default:
+                if(inNode){
+                    nodeMessages.push(msg);
+                }
+                break;
+        }
+
+    }
+
+
+    return nodeMessages;
+
+}
+
+export const getExtendedConvoNodeDescription=(node:ConvoNodeDescription,source:ConvoNodeGraphSource,sourceMessages:ConvoMessage[]):ConvoNodeExtendedDescription=>{
+    const messages=source.messages.filter(m=>m.nodeId===node.nodeId);
+    const srcMsgs=getConvoNodeMessages(node.nodeId,sourceMessages);
+    const extended:ConvoNodeExtendedDescription={
+        ...node,
+        messages,
+        sourceMessages:srcMsgs,
+        convo:srcMsgs.map(m=>convoMessageToStringSafe(m)??'').join('\n\n'),
+    }
+    return extended;
+}
+
+export const createConvoNodeGraph=(source:ConvoNodeGraphSource,sourceMessages:ConvoMessage[]):ConvoNodeGraph=>{
+
+    const graph:ConvoNodeGraph={
+        nodes:(source.nodeDescriptions??[]).map(n=>getExtendedConvoNodeDescription(n,source,sourceMessages)),
+        entry:undefined,
+    }
+
+    let entryId:string|undefined;
+    for(const msg of source.messages){
+        if(msg.role===convoRoles.goto && msg.gotoNodeId){
+            entryId=msg.gotoNodeId;
+            break;
+        }
+    }
+
+    if(entryId){
+        graph.entry=graph.nodes.find(n=>n.nodeId=entryId);
+    }
+
+    return graph;
 }

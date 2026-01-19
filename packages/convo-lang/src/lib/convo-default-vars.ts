@@ -5,9 +5,10 @@ import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoForm } from "./convo-forms-types.js";
 import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
+import { ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
 import { convoPipeScopeFunction } from "./convo-pipe.js";
 import { createConvoSceneDescription } from "./convo-scene-lib.js";
-import { ConvoIterator, ConvoMultiReadOptions, ConvoRuntimeNodeInfo, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
+import { ConvoIterator, ConvoMultiReadOptions, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod.js";
 import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc.js";
 

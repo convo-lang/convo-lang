@@ -865,7 +865,6 @@ export const convoEvents={
 
 export const convoTags={
 
-
     /**
      * When applied to a user message and the message is the last message in a conversation the message
      * is considered a conversation initializer.
@@ -2953,6 +2952,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         nodeStepIndex:flat.nodeStepIndex,
         nodeDepth:flat.nodeDepth,
         isStartOfGoto:flat.isStartOfGoto,
+        nodeBehavior:flat.nodeBehavior,
     }
 }
 
