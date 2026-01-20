@@ -1567,6 +1567,7 @@ export const convoDynamicTags:string[]=[
     convoTags.to,
     convoTags.from,
     convoTags.exit,
+    convoTags.on,
 ];
 
 /**

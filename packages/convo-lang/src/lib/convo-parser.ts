@@ -256,18 +256,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                 if(tag[3]){
                     tagObj.label=tag[3].trim()||undefined;
                 }
-                const optAnon=anonTypeOptReg.exec(v??'');
-                if(optAnon?.groups){
-                    const {aryType,type,ary}=optAnon.groups;
-                    if(aryType){
-                        tagObj.value=aryType+'[]';
-                    }else if(type){
-                        tagObj.value=type+(ary?'[]':'');
-                    }
-                    if(tagObj.value!==v){
-                        tagObj.srcValue=v;
-                    }
-                }else if(convoAnonTypeTags.includes(tagObj.name)){
+                if(convoAnonTypeTags.includes(tagObj.name)){
                     const anonType=convoAnonTypePrefix+(
                         strHashBase64Fs(v??'')
                         .replace(anonEscapeReg,(value)=>'_'+(value==='_'?'0':'1'))
@@ -288,6 +277,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     tagObj.value=anonType;
                     tagObj.srcValue=v;
                 }else{
+                    console.log('hio 👋 👋 👋 parse source',v);
                     const r=parseConvoCode(`> do\n${v}`);
                     if(r.error){
                         error=r.error.message;
@@ -1354,11 +1344,13 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
-                    case convoTags.on:
-                        if(tag.value && msg.fn){
-                            const i=tag.value.indexOf(' ');
-                            const name=i===-1?tag.value:tag.value.substring(0,i);
-                            const content=i===-1?'':tag.value.substring(i+1).trim();
+                    case convoTags.on:{
+                        if(tag.statement){
+                            tag.disableStatementEval=true;
+                        }
+                        const name=tag.label?tag.label:tag.value;
+                        const content=tag.statement??tag.value;
+                        if(name && content && msg.fn){
                             const trigger=parseConvoMessageTrigger(
                                 name,
                                 msg.fn.name,
@@ -1376,6 +1368,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                             }
                         }
                         break;
+                    }
 
                     case convoTags.transformComponent:{
                         const parsed=parseConvoComponentTransform(tag.value);
@@ -1520,21 +1513,25 @@ const removeBackslashes=(params:ConvoStatement[])=>{
  * @param role - The message role that will trigger this function
  * @returns Parsed ConvoMessageTrigger object, or undefined if parsing fails
  */
-export const parseConvoMessageTrigger=(eventName:string,fnName:string,condition:string,role?:string):CodeParsingResult<ConvoTrigger>=>{
+export const parseConvoMessageTrigger=(eventName:string,fnName:string,condition:string|ConvoStatement[],role?:string):CodeParsingResult<ConvoTrigger>=>{
     // todo - parse condition as conditional code
 
     let cond:ConvoStatement[]|undefined;
     let endIndex=0;
-    condition=condition.trim();
-    if(condition.startsWith('=')){
-        const r=parseConvoCode(`> do\n${condition.substring(1)}`);
-        if(r.error){
-            return {
-                endIndex:r.endIndex,
-                error:r.error
+    if(typeof condition === 'string'){
+        condition=condition.trim();
+        if(condition.startsWith('=')){
+            const r=parseConvoCode(`> do\n${condition.substring(1)}`);
+            if(r.error){
+                return {
+                    endIndex:r.endIndex,
+                    error:r.error
+                }
             }
+            cond=r.result?.[0]?.fn?.body;
         }
-        cond=r.result?.[0]?.fn?.body;
+    }else{
+        cond=condition;
     }
 
 
