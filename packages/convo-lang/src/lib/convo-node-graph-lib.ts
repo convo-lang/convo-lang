@@ -223,3 +223,56 @@ export const createConvoNodeGraph=(source:ConvoNodeGraphSource,sourceMessages:Co
 
     return graph;
 }
+
+export const removeConvoNodeMessages=(messages:ConvoMessage[])=>{
+
+    let currentNodeId:string|undefined;
+
+    for(let i=0;i<messages.length;i++){
+
+        const msg=messages[i];
+        if(!msg){
+            continue;
+        }
+
+
+        switch(msg.role){
+
+            case convoRoles.node:
+                currentNodeId=msg.nodeId;
+                messages.splice(i,1);
+                i--;
+                break;
+
+            case convoRoles.goto:
+            case convoRoles.nodeEnd:
+            case convoRoles.gotoEnd:
+            case convoRoles.exitGraph:
+                currentNodeId=undefined;
+                messages.splice(i,1);
+                i--;
+                break;
+
+            // always remove
+            case convoRoles.to:
+            case convoRoles.from:
+            case convoRoles.exit:
+                messages.splice(i,1);
+                i--;
+                break;
+
+            default:
+                console.log('hio 👋 👋 👋 default',currentNodeId,msg);
+                if(currentNodeId){
+                    messages.splice(i,1);
+                    i--;
+                }
+                break;
+
+        }
+
+
+
+    }
+
+}

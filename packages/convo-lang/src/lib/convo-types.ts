@@ -1650,6 +1650,7 @@ export interface CloneConversationOptions
     noFunctions?:boolean;
     cloneConvoString?:boolean;
     removeAgents?:boolean;
+    removeNodes?:boolean;
     last?:number;
     dropLast?:number;
     dropUntilContent?:boolean;
