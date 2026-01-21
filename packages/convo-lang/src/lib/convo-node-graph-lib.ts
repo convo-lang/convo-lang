@@ -49,7 +49,6 @@ export const applyConvoNodeOrdering=(
                 break;
 
             case convoRoles.goto:
-            case convoRoles.gotoEnd:
             case convoRoles.nodeEnd:
             case convoRoles.exitGraph:
                 currentNodeId=undefined;
@@ -163,7 +162,6 @@ export const getConvoNodeMessages=(nodeId:string,messages:ConvoMessage[],include
 
             case convoRoles.nodeEnd:
             case convoRoles.goto:
-            case convoRoles.gotoEnd:
             case convoRoles.exitGraph:
                 inNode=false;
                 break;
@@ -246,7 +244,6 @@ export const removeConvoNodeMessages=(messages:ConvoMessage[])=>{
 
             case convoRoles.goto:
             case convoRoles.nodeEnd:
-            case convoRoles.gotoEnd:
             case convoRoles.exitGraph:
                 currentNodeId=undefined;
                 messages.splice(i,1);

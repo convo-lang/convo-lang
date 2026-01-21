@@ -65,7 +65,7 @@
             ]
         },
         "specialContentRoles": {
-            "match": "^\\s*(>)\\s*(nodeEnd|node|gotoEnd|goto|exitGraph)([ \\t]+[^\\n\\r]*)?",
+            "match": "^\\s*(>)\\s*(nodeEnd|node|goto|exitGraph)([ \\t]+[^\\n\\r]*)?",
             "captures": {
                 "1":{
                     "name":"keyword.control"

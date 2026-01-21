@@ -3771,7 +3771,6 @@ export class Conversation
                         break;
 
                     case convoRoles.nodeEnd:
-                    case convoRoles.gotoEnd:
                     case convoRoles.exitGraph:
                         if(nodeBehavior==='ignore'){
                             break;
@@ -4397,7 +4396,6 @@ export class Conversation
                             break;
 
                         case convoRoles.nodeEnd:
-                        case convoRoles.gotoEnd:
                             nodeId=undefined;
                             if(nodeBehavior!=='keepAll'){
                                 messages.splice(i,1);

@@ -237,11 +237,6 @@ export const convoRoles={
     goto:'goto',
 
     /**
-     * Explicitly ends a goto
-     */
-    gotoEnd:'gotoEnd',
-
-    /**
      * Indicates graph traversal has exited.
      */
     exitGraph:'exitGraph',
