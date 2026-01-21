@@ -1647,21 +1647,18 @@ export class Conversation
             flat.exe.setVar(true,output,'output');
             const nd=result.flat?.nodeDescriptions?.find(n=>n.nodeId===nodeId);
             let next:string|undefined;
-            if(nd){
-                let autoNext=true;
-                if(nd.routes?.length){
-                    autoNext=false;
-                    const evaluatedRoutes=await Promise.all(nd.routes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
-                    evaluatedRoutes.sort((a,b)=>(a.isFallback?2:1)-(b.isFallback?2:1));
-                    const route=evaluatedRoutes.find(n=>n.passed);
-                    if(route?.passed){
-                        if(route.route.toNodeId==='next'){
-                            autoNext=true;
-                        }else if(route.route.exit){
-                            next=undefined;
-                        }else{
-                            next=route.route.toNodeId;
-                        }
+            if(nd?.routes?.length){
+                let autoNext=false;
+                const evaluatedRoutes=await Promise.all(nd.routes.map((r,i)=>this.evalNodeRouteAsync(r,output,flat,i)));
+                evaluatedRoutes.sort((a,b)=>(a.isFallback?2:1)-(b.isFallback?2:1));
+                const route=evaluatedRoutes.find(n=>n.passed);
+                if(route?.passed){
+                    if(route.route.toNodeId==='next'){
+                        autoNext=true;
+                    }else if(route.route.exit){
+                        next=undefined;
+                    }else{
+                        next=route.route.toNodeId;
                     }
                 }
 
@@ -1682,13 +1679,14 @@ export class Conversation
                 this.append(`> ${convoRoles.goto} ${next}`);
                 result.nextNodeId=next;
             }else{
+                const nodeResults=getConvoConvoNodeResults(flat);
+                result.nodeResults=nodeResults;
                 result.graphExited=true;
                 if(!appendOrOptions.disableGraphSummary && !this.defaultOptions.disableGraphSummary){
-                    const results=getConvoConvoNodeResults(flat);
                     this.append(`> ${convoRoles.exitGraph
                     }\n\n@${convoTags.hidden}\n> ${convoRoles.assistant
                     }\nThe following actions have been taken:\n\n${
-                        results.map(r=>{
+                        nodeResults.map(r=>{
                             const node=flat.nodeDescriptions?.find(n=>n.nodeId===r.nodeId);
                             const desc=node?.description;
                             return (
@@ -1721,6 +1719,7 @@ export class Conversation
                     graphResult.graphExited=true;
                     graphResult.isGraphSummary=true;
                     graphResult.exitingGraphCompletion=result;
+                    graphResult.nodeResults=nodeResults;
                     return graphResult;
                 }
             }
