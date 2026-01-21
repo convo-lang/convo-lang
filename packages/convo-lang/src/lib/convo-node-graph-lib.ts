@@ -1,7 +1,8 @@
+import { getErrorMessage } from "@iyio/common";
 import { Conversation } from "./Conversation.js";
 import { convoMessageToStringSafe, convoRoles, convoTags, convoVars, defaultConvoNodeId } from "./convo-lib.js";
-import { ConvoNodeDescription, ConvoNodeExtendedDescription, ConvoNodeGraph, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
-import { ConvoMessage, ConvoTag, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { ConvoNodeDescription, ConvoNodeExtendedDescription, ConvoNodeGraph, ConvoNodeGraphResult, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
+import { ConvoCompletion, ConvoMessage, ConvoTag, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 
 export interface ConvoNodeOrderingResult
@@ -294,4 +295,40 @@ export const getConvoConvoNodeResults=(flat:FlatConvoConversation):ConvoNodeResu
     }
 
     return results;
+}
+
+export const createConvoNodeGraphResult=(
+    completion:ConvoCompletion|null|undefined,
+    errorObject?:any,
+    error=errorObject?getErrorMessage(errorObject):undefined,
+):ConvoNodeGraphResult=>{
+
+    if(!completion){
+        return {
+            success:false,
+            error:error??'Completion unable to be created',
+            errorObject,
+            exited:false,
+        }
+    }
+
+    const last=completion.nodeResults?.[0];
+    if(!last || error){
+        return {
+            success:false,
+            error:error??'Completion contained no node results',
+            errorObject,
+            finalCompletion:completion,
+            exited:completion.graphExited??false,
+        }
+    }
+
+    return {
+        success:true,
+        result:last,
+        allResults:completion.nodeResults??[],
+        finalCompletion:completion,
+        exited:completion.graphExited??false,
+    }
+
 }

@@ -1,7 +1,8 @@
-import { aryRemoveItem, DisposeCallback, InternalOptions, ReadonlySubject } from "@iyio/common";
+import { aryRemoveItem, DisposeCallback, getErrorMessage, InternalOptions, ReadonlySubject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { Conversation, ConversationOptions } from "./Conversation.js";
-import { ConvoNodeGraphState } from "./convo-node-graph-types.js";
+import { createConvoNodeGraphResult } from "./convo-node-graph-lib.js";
+import { ConvoNodeGraphResult, ConvoNodeGraphState } from "./convo-node-graph-types.js";
 import { ConvoCompletion } from "./convo-types.js";
 
 export type ConvoNodeGraphStepCompletionHandler=(completion:ConvoCompletion)=>void|Promise<void>;
@@ -11,16 +12,21 @@ export interface ConvoNodeGraphCtrlOptions
     convo:Conversation|string;
     convoOptions?:ConversationOptions;
     maxSteps?:number;
+    initCtrl?:(ctrl:ConvoNodeGraphCtrl)=>void;
 }
 
 export class ConvoNodeGraphCtrl
 {
     public readonly conversation:Conversation;
 
-    private readonly options:InternalOptions<ConvoNodeGraphCtrlOptions,'maxSteps','convo'|'convoOptions'>;
+    private readonly options:InternalOptions<ConvoNodeGraphCtrlOptions,'maxSteps'|'convoOptions','convo'|'initCtrl'>;
 
     private readonly _onStepComplete=new Subject<ConvoCompletion>();
     public get onStepComplete():Observable<ConvoCompletion>{return this._onStepComplete}
+
+    private readonly _result:BehaviorSubject<ConvoNodeGraphResult|null>=new BehaviorSubject<ConvoNodeGraphResult|null>(null);
+    public get resultSubject():ReadonlySubject<ConvoNodeGraphResult|null>{return this._result}
+    public get result(){return this._result.value}
 
     private readonly onStepCompleteCallbacks:ConvoNodeGraphStepCompletionHandler[]=[];
     public addStepCompletionListener(listener:ConvoNodeGraphStepCompletionHandler):DisposeCallback{
@@ -43,9 +49,14 @@ export class ConvoNodeGraphCtrl
 
     public constructor({
         maxSteps,
-        convoOptions,
+        convoOptions={},
         convo,
+        initCtrl,
     }:ConvoNodeGraphCtrlOptions){
+        convoOptions={
+            ...convoOptions,
+            disableGraphSummary:convoOptions.disableGraphSummary??true,
+        }
         this.conversation=(typeof convo === 'string')?
             new Conversation({
                 ...convoOptions,
@@ -54,7 +65,10 @@ export class ConvoNodeGraphCtrl
             convo;
         this.options={
             maxSteps,
+            convoOptions,
         }
+
+        initCtrl?.(this);
     }
 
     private _isDisposed=false;
@@ -76,40 +90,78 @@ export class ConvoNodeGraphCtrl
         )
     }
 
-    private runPromise?:Promise<void>;
-    public async runAsync()
+    private runPromise?:Promise<ConvoNodeGraphResult>;
+    /**
+     * Runs a convo node graph by calling `Conversation.completeAsync` in a loop until the graph
+     * exists. `runAsync` is guaranteed to not throw an error, the returned result object will
+     * contain an error if an error is thrown inside the function.
+     */
+    public async runAsync():Promise<ConvoNodeGraphResult>
     {
-        await (this.runPromise??(this.runPromise=this._runAsync()))
+        return await (this.runPromise??(this.runPromise=this._runAsync()))
     }
 
-    private async _runAsync()
+    private async _runAsync():Promise<ConvoNodeGraphResult>
     {
-        this._state.next('running');
+        let result:ConvoNodeGraphResult|undefined;
+        let lastCompletion:ConvoCompletion|undefined;
+        try{
+            this._state.next('running');
 
-        while(this.shouldContinue()){
+            while(this.shouldContinue()){
 
-            const completion=await this.conversation.completeAsync({
-                appendNextGoto:true,
-            });
+                lastCompletion=undefined
+                const completion=await this.conversation.completeAsync({
+                    appendNextGoto:true,
+                    disableGraphSummary:this.options.convoOptions?.disableGraphSummary
+                });
+                lastCompletion=completion;
 
-            try{
-                this._onStepComplete.next(completion);
-                if(this.onStepCompleteCallbacks.length){
-                    await Promise.all(this.onStepCompleteCallbacks.map(async c=>{
-                        await c(completion);
-                    }));
+                try{
+                    this._onStepComplete.next(completion);
+                    if(this.onStepCompleteCallbacks.length){
+                        await Promise.all(this.onStepCompleteCallbacks.map(async c=>{
+                            await c(completion);
+                        }));
+                    }
+                }catch(ex){
+                    const msg='Convo node graph stopped due to completion callback error';
+                    console.error(msg,ex);
+                    result=createConvoNodeGraphResult(completion,ex,`${msg}: ${getErrorMessage(ex)}`);
+                    break;
                 }
-            }catch(ex){
-                console.error('ConvoNodeGraph controller stopped due to completion callback error',ex);
-                break;
+
+                if(!completion.nextNodeId || completion.graphExited){
+                    result=createConvoNodeGraphResult(completion);
+                    break;
+                }
             }
 
-            if(!completion.nextNodeId || completion.graphExited){
-                break;
-            }
+
+        }catch(ex){
+            const msg='Convo node graph stopped due to an error';
+            const errorMsg=`${msg}: ${getErrorMessage(ex)}`;
+            console.error(msg,ex);
+            result=createConvoNodeGraphResult(lastCompletion,ex,errorMsg)
         }
 
-         this._state.next('stopped');
+        if(!result){
+            result=createConvoNodeGraphResult(null,null,'ConvoNodeGraphCtrl existed early');
+        }
+
+        try{
+            this._result.next(result);
+        }catch(ex){
+            console.error('Error while setting ConvoNodeGraphCtrl result',ex);
+        }
+
+        try{
+            this._state.next('stopped');
+        }catch(ex){
+            console.error('Error while setting ConvoNodeGraphCtrl state to stopped',ex);
+        }
+
+        return result;
 
     }
 }

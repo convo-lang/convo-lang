@@ -2,7 +2,10 @@ import { getErrorMessage } from "@iyio/common";
 import { ZodType, ZodTypeAny, z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
 import { escapeConvoMessageContent } from "./convo-lib.js";
+import { createConvoNodeGraphResult } from "./convo-node-graph-lib.js";
+import { ConvoNodeGraphResult } from "./convo-node-graph-types.js";
 import { ConvoCompletion, ConvoCompletionOptions, ConvoParsingResult, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { ConvoNodeGraphCtrl, ConvoNodeGraphCtrlOptions } from "./ConvoNodeGraphCtrl.js";
 
 export const getConvoCompletionAsync=(
     messagesOrOptions:string|ConvoCompletionOptions,
@@ -121,4 +124,19 @@ export const flattenConvoAsync=async (code:string,options?:ConversationOptions):
             messages:[]
         };
     }
+}
+
+/**
+ * Executes Convo-Lang code as a node graph and returns the output of the last node.
+ */
+export const executeConvoGraphAsync=async (code:string,options?:ConvoNodeGraphCtrlOptions):Promise<ConvoNodeGraphResult>=>{
+    let ctrl:ConvoNodeGraphCtrl|undefined;
+    try{
+        ctrl=new ConvoNodeGraphCtrl({convo:code});
+    }catch(ex){
+        return createConvoNodeGraphResult(null,ex,`Unable to create new ConvoNodeGraphCtrl instance: ${getErrorMessage(ex)}`);
+    }
+    const graphResult=await ctrl.runAsync();
+    ctrl.dispose();
+    return graphResult;
 }

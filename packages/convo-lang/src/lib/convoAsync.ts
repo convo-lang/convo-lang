@@ -1,9 +1,10 @@
 import { AnyFunction, getZodTypeName } from "@iyio/common";
 import { ZodType, z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
-import { getAssumedConvoCompletionValue } from "./convo-lib.js";
+import { getAssumedConvoCompletionValue, isConvoStringTemplateLiteralOptions } from "./convo-lib.js";
 import { convoScript } from "./convo-template.js";
-import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, LockedConvoObject, convoScopeFnDefKey } from "./convo-types.js";
+import { ConvoObject, ConvoObjectCompletion, ConvoObjectOutputOptions, ConvoScopeFunction, ConvoStringTemplateLiteralOptions, LockedConvoObject, convoScopeFnDefKey, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
+import { ConvoNodeGraphCtrl } from "./ConvoNodeGraphCtrl.js";
 
 const jsonEndReg=/@json[ \t]*$/;
 
@@ -21,6 +22,8 @@ export const convo=<T>(
     valueOrZodType?:T,
     ...values:any[]
 ):ConvoObject<T extends ZodType?z.infer<T>:any>=>{
+
+    let tmplOptions:ConvoStringTemplateLiteralOptions|undefined;
 
     const isLocked=valueOrZodType===lockFlag;
     if(isLocked){
@@ -59,6 +62,11 @@ export const convo=<T>(
 
         for(let i=0;i<values.length;i++){
             const fn=values[i];
+            if(isConvoStringTemplateLiteralOptions(fn)){
+                values[i]='';
+                tmplOptions=tmplOptions?{...tmplOptions,...fn}:fn;
+                continue;
+            }
             if(typeof fn !== 'function'){
                 continue;
             }
@@ -160,10 +168,23 @@ export const convo=<T>(
     const _getCompletionAsync=async ():Promise<ConvoObjectCompletion<any>>=>{
         const cv=getConversation();
         cv.append(getInput());
-        const completion=await cv.completeAsync({returnOnCalled:true});
-        return {
-            value:getAssumedConvoCompletionValue(completion),
-            completion
+        if(tmplOptions?.enableNodeGraphCompletion){
+            const graphCtrl=new ConvoNodeGraphCtrl({convo:cv});
+            const graphResult=await graphCtrl.runAsync();
+            if(!graphResult.success){
+                throw new Error(graphResult.error??'Unable to complete convo graph');
+            }
+            return {
+                value:graphResult.result.output,
+                completion:graphResult.finalCompletion,
+                graphResult,
+            }
+        }else{
+            const completion=await cv.completeAsync({returnOnCalled:true});
+            return {
+                value:getAssumedConvoCompletionValue(completion),
+                completion
+            }
         }
 
     }
@@ -310,6 +331,22 @@ export const convo=<T>(
     (_self as any)[isLocked?lockedConvoObjectIdentifier:convoObjectIdentifier]=true;
 
     return _self as any;
+}
+
+/**
+ * Functions identically to the `convo` string template literal process excepts it automatically
+ * enables node graph completion.
+ */
+export const convoGraph=<T>(
+    strings:TemplateStringsArray,
+    valueOrZodType?:T,
+    ...values:any[]
+):ConvoObject<T extends ZodType?z.infer<T>:any>=>{
+    const tmplOptions:ConvoStringTemplateLiteralOptions={
+        enableNodeGraphCompletion:true,
+        [convoStringTemplateLiteralOptionsFlag]:true,
+    }
+    return convoGraph(strings,valueOrZodType,[...values,tmplOptions]);
 }
 
 export const isConvoObject=(value:any):value is ConvoObject<any>=>{

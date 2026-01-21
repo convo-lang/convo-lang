@@ -1,4 +1,4 @@
-import { ConvoMessage, ConvoStatement, FlatConvoMessage } from "./convo-types.js";
+import { ConvoCompletion, ConvoMessage, ConvoStatement, FlatConvoMessage } from "./convo-types.js";
 
 export type ConvoNodeGraphState='ready'|'running'|'stopped';
 
@@ -25,6 +25,42 @@ export interface ConvoNodeResult extends ConvoRuntimeNodeInfo
     output:any;
 
 }
+
+export type ConvoNodeGraphResult=(
+    {
+
+        /**
+        * If true the graph has existed and no more nodes are to be executed.
+        */
+        exited:boolean;
+    } & (
+        {
+            success:true;
+            allResults:ConvoNodeResult[];
+            /**
+            * The last result in `allResults`
+            */
+            result:ConvoNodeResult;
+
+            /**
+            * The completion result from the last call to Conversation.completeAsync
+            */
+            finalCompletion:ConvoCompletion;
+
+
+
+        } | {
+            success:false;
+            error:string;
+            errorObject:any;
+
+            /**
+            * The completion result from the last call to Conversation.completeAsync
+            */
+            finalCompletion?:ConvoCompletion;
+        }
+    )
+)
 
 export interface ConvoNodeDescription
 {

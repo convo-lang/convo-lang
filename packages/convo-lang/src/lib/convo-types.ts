@@ -4,7 +4,7 @@ import type { Conversation, ConversationOptions } from "./Conversation.js";
 import type { ConvoExecutionContext } from './ConvoExecutionContext.js';
 import type { ConvoComponentDef } from './convo-component-types.js';
 import type { convoReservedRoles } from './convo-lib.js';
-import { ConvoNodeDescription, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from './convo-node-graph-types.js';
+import { ConvoNodeDescription, ConvoNodeGraphResult, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from './convo-node-graph-types.js';
 import { ConvoDocumentReference } from './convo-rag-types.js';
 import type { convoSystemMessages } from './convo-system-messages.js';
 
@@ -2162,6 +2162,14 @@ export interface ConvoObjectCompletion<T>
 {
     value:T;
     completion:ConvoCompletion;
+    graphResult?:ConvoNodeGraphResult;
+}
+
+export const convoStringTemplateLiteralOptionsFlag=Symbol('ConvoStringTemplateLiteralOptions');
+export interface ConvoStringTemplateLiteralOptions
+{
+    [convoStringTemplateLiteralOptionsFlag]:true;
+    enableNodeGraphCompletion?:boolean;
 }
 
 /**

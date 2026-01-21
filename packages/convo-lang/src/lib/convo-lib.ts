@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoDocumentReference } from "./convo-rag-types.js";
 import { convoSystemMessages } from "./convo-system-messages.js";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker } from "./convo-types.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -3434,4 +3434,8 @@ const _getConvoStatementVarReference=(s:ConvoStatement,varName:string):ConvoStat
         }
     }
     return undefined;
+}
+
+export const isConvoStringTemplateLiteralOptions=(value:any):value is ConvoStringTemplateLiteralOptions=>{
+    return value?.[convoStringTemplateLiteralOptionsFlag]===true;
 }
