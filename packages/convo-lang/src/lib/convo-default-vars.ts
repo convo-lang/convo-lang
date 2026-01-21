@@ -407,6 +407,18 @@ export const defaultConvoVarsBase={
         return value;
     }),
 
+    neq:createConvoScopeFunction(scope=>{
+        if(!scope.paramValues || scope.paramValues.length<2){
+            return false;
+        }
+        for(let i=1;i<scope.paramValues.length;i++){
+            if(scope.paramValues[i-1]!==scope.paramValues[i]){
+                return true;
+            }
+        }
+        return false;
+    }),
+
     eq:createConvoScopeFunction(scope=>{
         if(!scope.paramValues || scope.paramValues.length<2){
             return false;
@@ -1751,4 +1763,3 @@ const isPrimitiveArray=(value:any)=>{
     }
     return true;
 }
-

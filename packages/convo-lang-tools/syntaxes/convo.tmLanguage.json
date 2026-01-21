@@ -352,7 +352,7 @@
             ]
         },
         "functionCallOperator":{
-            "begin":"(lt|lte|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)\\s*(\\()",
+            "begin":"(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)\\s*(\\()",
             "end":"\\)",
             "beginCaptures": {
                 "1":{
@@ -897,7 +897,7 @@
             }
         },
         "operators":{
-            "match":"\\b(lt|lte|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)$",
+            "match":"\\b(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)$",
             "captures":{
                 "1":{
                     "name":"keyword"

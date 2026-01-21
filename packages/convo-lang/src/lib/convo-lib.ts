@@ -1708,6 +1708,7 @@ export const allowedConvoDefinitionFunctions=[
     'and',
     'or',
     'not',
+    'neq',
     'eq',
     'gt',
     'gte',

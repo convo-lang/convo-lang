@@ -37,7 +37,7 @@ The following example defines a node that:
 - has a description of "Categorizes user input"
 - has a single route that points to a node with an id of "rank" when the output of the node is not equal to "other"
 ``` convo
-@to rank = not(eq(output "other"))
+@to rank = neq(output "other")
 > node categorize
 Categorizes user input
 
