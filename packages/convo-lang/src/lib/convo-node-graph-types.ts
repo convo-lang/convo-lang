@@ -16,6 +16,16 @@ export interface ConvoRuntimeNodeInfo
 
 }
 
+
+export interface ConvoNodeResult extends ConvoRuntimeNodeInfo
+{
+    /**
+     * Output created by node passed to the node
+     */
+    output:any;
+
+}
+
 export interface ConvoNodeDescription
 {
     /**

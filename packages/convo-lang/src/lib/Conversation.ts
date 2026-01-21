@@ -14,7 +14,7 @@ import { evalConvoMessageAsCodeAsync } from "./convo-eval.js";
 import { ConvoForm } from "./convo-forms-types.js";
 import { getGlobalConversationLock } from "./convo-lang-lock.js";
 import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoUtilModels, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoNodeId, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoContentMessage, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, mapToConvoTags, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
-import { ConvoNodeOrderingResult, applyConvoNodeOrdering, convoTagToNodeRoute, getConvoNodeOutput, removeConvoNodeMessages } from "./convo-node-graph-lib.js";
+import { ConvoNodeOrderingResult, applyConvoNodeOrdering, convoTagToNodeRoute, getConvoConvoNodeResults, getConvoNodeOutput, removeConvoNodeMessages } from "./convo-node-graph-lib.js";
 import { ConvoNodeDescription, ConvoNodeRoute, ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
 import { parseConvoCode } from "./convo-parser.js";
 import { defaultConvoRagServiceCallback } from "./convo-rag-lib.js";
@@ -159,6 +159,11 @@ export interface ConversationOptions
     externScopeFunctions?:Record<string,ConvoScopeFunction>;
 
     components?:Record<string,ConvoComponentDef>;
+
+    /**
+     * When true and a node graph is completed a summary response will not be generated.
+     */
+    disableGraphSummary?:boolean;
 
     /**
      * Array of modules that can be imported. The modules are not automatically imported, they have
@@ -1677,8 +1682,47 @@ export class Conversation
                 this.append(`> ${convoRoles.goto} ${next}`);
                 result.nextNodeId=next;
             }else{
-                this.append(`> ${convoRoles.exitGraph}`);
-                result.graphStopped=true;
+                result.graphExited=true;
+                if(!appendOrOptions.disableGraphSummary && !this.defaultOptions.disableGraphSummary){
+                    const results=getConvoConvoNodeResults(flat);
+                    this.append(`> ${convoRoles.exitGraph
+                    }\n\n@${convoTags.hidden}\n> ${convoRoles.assistant
+                    }\nThe following actions have been taken:\n\n${
+                        results.map(r=>{
+                            const node=flat.nodeDescriptions?.find(n=>n.nodeId===r.nodeId);
+                            const desc=node?.description;
+                            return (
+                                `<ACTION name="${
+                                    escapeConvo(r.nodeId)
+                                }">\n${
+                                    desc?`    ${escapeConvo(desc)}\n`:''
+                                }    <RESULT>\n    ${
+                                    (typeof r.output === 'string'?escapeConvo(r.output):JSON.stringify(r.output))
+                                }\n    </RESULT>\n</ACTION>`
+                            )
+                        }).join('\n\n')
+                    }\n\n@${convoTags.hidden}\n> user${'\n'
+                    }<moderator>${'\n'
+                    }Give the user a brief summary of what happened in node graph. Give the summary from a first person perspective${'\n'
+                    }as if you executed all the actions avoid technical terms when possible.${'\n'
+                    }${'\n'
+                    }Start your response with a sentence that connects the user input to the graph result followed by${'\n'
+                    }bullet points of what was done.${'\n'
+                    }</moderator>`,{disableAutoFlatten:true});
+
+                    const graphResult=await this.tryCompleteAsync(
+                        appendOrOptions?.task,
+                        appendOrOptions,
+                        async flat=>{
+                            return await this.completeWithServiceAsync(flat,modelInputOutput);
+                        },
+                    );
+
+                    graphResult.graphExited=true;
+                    graphResult.isGraphSummary=true;
+                    graphResult.exitingGraphCompletion=result;
+                    return graphResult;
+                }
             }
         }
 
@@ -2159,6 +2203,7 @@ export class Conversation
                 toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
                 excludeMessageSetters:callerExcludeMessages
             });
+            const exe=flat.exe;
 
             const node=flat.currentNodeId?flat.nodeDescriptions?.find(n=>n.nodeId===flat.currentNodeId):undefined;
             if(node?.inputType){
@@ -2222,7 +2267,6 @@ export class Conversation
             if(flat.templates && !templates){
                 templates=flat.templates;
             }
-            const exe=flat.exe;
             if(this._isDisposed){
                 return {messages:[],status:'disposed',task}
             }
@@ -3758,7 +3802,7 @@ export class Conversation
                             input:stepOutput
                         }
                         if(runtimeNodes.length===0){
-                            exe.setVar(true,stepOutput,'initInput');
+                            exe.setVar(true,stepOutput,'graphInput');
                         }
                         runtimeNodes.push(runTimeNode);
                         exe.setVar(true,runtimeNodes,convoVars.__nodeStack);
@@ -4345,6 +4389,14 @@ export class Conversation
                             break;
 
                         case convoRoles.exitGraph:
+                            nodeId=undefined;
+                            nodeStepIndex=undefined;
+                            if(nodeBehavior!=='keepAll'){
+                                messages.splice(i,1);
+                                i--;
+                            }
+                            break;
+
                         case convoRoles.nodeEnd:
                         case convoRoles.gotoEnd:
                             nodeId=undefined;

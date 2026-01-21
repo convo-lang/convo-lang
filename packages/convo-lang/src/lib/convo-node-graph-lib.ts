@@ -1,7 +1,7 @@
 import { Conversation } from "./Conversation.js";
 import { convoMessageToStringSafe, convoRoles, convoTags, convoVars, defaultConvoNodeId } from "./convo-lib.js";
-import { ConvoNodeDescription, ConvoNodeExtendedDescription, ConvoNodeGraph, ConvoNodeGraphSource, ConvoNodeRoute } from "./convo-node-graph-types.js";
-import { ConvoMessage, ConvoTag, FlatConvoMessage } from "./convo-types.js";
+import { ConvoNodeDescription, ConvoNodeExtendedDescription, ConvoNodeGraph, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
+import { ConvoMessage, ConvoTag, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 
 export interface ConvoNodeOrderingResult
@@ -275,4 +275,26 @@ export const removeConvoNodeMessages=(messages:ConvoMessage[])=>{
 
     }
 
+}
+
+export const getConvoConvoNodeResults=(flat:FlatConvoConversation):ConvoNodeResult[]=>{
+    const results:ConvoNodeResult[]=[];
+    const stack:ConvoRuntimeNodeInfo[]=flat.exe.getVar(convoVars.__nodeStack);
+    if(!Array.isArray(stack)){
+        return results;
+    }
+
+    for(let i=0;i<stack.length;i++){
+        const node=stack[i];
+        if(!node){
+            continue;
+        }
+        const next=stack[i+1];
+        results.push({
+            ...node,
+            output:next?next.input:flat.exe.getVar('output'),
+        })
+    }
+
+    return results;
 }

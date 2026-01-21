@@ -104,7 +104,7 @@ export class ConvoNodeGraphCtrl
                 break;
             }
 
-            if(!completion.nextNodeId || completion.graphStopped){
+            if(!completion.nextNodeId || completion.graphExited){
                 break;
             }
         }

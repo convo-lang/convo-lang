@@ -1215,7 +1215,9 @@ export interface ConvoCompletion
     task:string;
     flat?:FlatConvoConversation;
     nextNodeId?:string;
-    graphStopped?:boolean;
+    graphExited?:boolean;
+    exitingGraphCompletion?:ConvoCompletion;
+    isGraphSummary?:boolean;
 }
 
 export interface FlatConvoTransform
@@ -1632,6 +1634,11 @@ export interface ConvoCompletionOptions
     debug?:boolean;
 
     toolChoice?:ConvoToolChoice;
+
+    /**
+     * When true and a node graph is completed a summary response will not be generated.
+     */
+    disableGraphSummary?:boolean;
 }
 
 export interface ConvoMessageTemplate
