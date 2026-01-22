@@ -1701,8 +1701,8 @@ export class Conversation
                         }).join('\n\n')
                     }\n\n@${convoTags.hidden}\n> user${'\n'
                     }<moderator>${'\n'
-                    }Give the user a brief summary of what happened in node graph. Give the summary from a first person perspective${'\n'
-                    }as if you executed all the actions avoid technical terms when possible.${'\n'
+                    }Give the user a brief summary of what happened in the node graph. Give the summary from a first-person perspective${'\n'
+                    }as if you executed all the actions, avoiding technical terms when possible.${'\n'
                     }${'\n'
                     }Start your response with a sentence that connects the user input to the graph result followed by${'\n'
                     }bullet points of what was done.${'\n'
