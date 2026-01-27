@@ -6,8 +6,8 @@ import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
 import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
-import { convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types.js";
+import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -592,7 +592,27 @@ export class ConversationUiCtrl
         return this.convo?.appendDefineVar(name,value);
     }
 
-    public async appendUiMessageAsync(message:string):Promise<boolean|'command'>{
+    public async appendWithFunctionCallAsync(message:string,fn?:string):Promise<boolean|'command'>{
+
+        const options:ConvoCompletionOptions={}
+
+        if(fn && !fn.includes('(')){
+            fn+='()';
+        }
+
+        if(fn && fn.startsWith('!')){
+            fn=fn.substring(1);
+            options.returnOnCalled=true;
+        }
+
+        return this._appendUiMessageAsync(message,fn?`@${convoTags.toolId} call_${shortUuid()}\n> call ${fn}`:undefined,options);
+    }
+
+    public appendUiMessageAsync(message:string):Promise<boolean|'command'>{
+        return this._appendUiMessageAsync(message);
+    }
+
+    private async _appendUiMessageAsync(message:string,raw?:string,completionOptions?:ConvoCompletionOptions):Promise<boolean|'command'>{
 
         if(this.isDisposed){
             return false;
@@ -697,10 +717,14 @@ export class ConversationUiCtrl
         }
 
         if(message.trim()){
+
             convo.appendUserMessage(message);
             this.triggerAppendUiMessageEvt(message);
         }
-        await convo.completeAsync();
+        if(raw?.trim()){
+            convo.append(raw);
+        }
+        const r=await convo.completeAsync(completionOptions);
         this._lastCompletion.next(convo.convo??null);
         if(this.autoSave){
             this.queueAutoSave();

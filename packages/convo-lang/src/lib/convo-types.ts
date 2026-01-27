@@ -125,6 +125,11 @@ export interface ConvoMessage
     insert?:ConvoInsert;
 
     /**
+     * Name of a group the message belongs to.
+     */
+    group?:string;
+
+    /**
      * Node id when the role is node
      */
     nodeId?:string;
@@ -931,6 +936,11 @@ export interface FlatConvoMessage
     isSystem?:boolean;
 
     content?:string;
+
+    /**
+     * Name of a group the message belongs to.
+     */
+    group?:string;
 
     /**
      * Name given to the message using the (@)name tag
@@ -2317,4 +2327,12 @@ export interface ConvoMultiReadOptions
     tagItemsWithName?:string;
     itemTag?:string;
     tag?:string;
+}
+
+export interface ConvoMessageScope
+{
+    openRole:string;
+    closeRole:string;
+    removeMessagesFromParent:boolean|((msg:ConvoMessage,parent:Conversation)=>boolean);
+    appendToParent?:string|((parent:Conversation)=>string|undefined);
 }

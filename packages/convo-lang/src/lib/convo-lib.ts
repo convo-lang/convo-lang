@@ -51,6 +51,8 @@ export const convoMsgModifiers={
     agent:'agent',
 } as const;
 
+
+
 export const convoScopedModifiers=[convoMsgModifiers.agent]
 
 export const defaultConvoTask='default';
@@ -60,9 +62,31 @@ export const convoAnyModelName='__any__';
 export const convoRagTemplatePlaceholder='$$RAG$$';
 
 export const convoRoles={
+
+    /**
+     * Represents messages from the user
+     */
     user:'user',
+
+    /**
+     * Represents messages from the LLM
+     */
     assistant:'assistant',
+
+    /**
+     * System instruction messages
+     */
     system:'system',
+
+    /**
+     * Groups messages together
+     */
+    group:'group',
+
+    /**
+     * Ends a group of messages
+     */
+    groupEnd:'groupEnd',
 
     /**
      * Used to add a prefix to the previous content message. Prefixes are not seen by the user.
@@ -220,6 +244,13 @@ export const convoRoles={
      * be imported to function correctly
      */
     stage:'stage',
+
+    /**
+     * Groups following nodes as a single graph. The context of the
+     */
+    graph:'graph',
+
+    graphEnd:'graphEnd',
 
     /**
      * Defines the start of a node. Messages following the node will be part of the node.
@@ -1250,6 +1281,11 @@ export const convoTags={
     suggestionTitle:'suggestionTitle',
 
     /**
+     * A function to call when a suggestion is selected by the user instead of sending message to LLM
+     */
+    suggestionCallback:'suggestionCallback',
+
+    /**
      * Sets the threadId of the current message and all following messages. Using the `@thread` tag
      * without a value will clear the current thread id.
      */
@@ -1485,6 +1521,11 @@ export const convoTags={
      * When applied to a node message an `exit` route for is added to the node.
      */
     exit:'exit',
+
+    /**
+     * Used by graph messages to mark their default entry node
+     */
+    entryNode:'entryNode',
 
     /**
      * Controls the LLM model used to evaluate route conditions.
@@ -3439,4 +3480,47 @@ const _getConvoStatementVarReference=(s:ConvoStatement,varName:string):ConvoStat
 
 export const isConvoStringTemplateLiteralOptions=(value:any):value is ConvoStringTemplateLiteralOptions=>{
     return value?.[convoStringTemplateLiteralOptionsFlag]===true;
+}
+
+export const groupConvoMessages=(messages:ConvoMessage[],startIndex=0)=>{
+
+    let group:ConvoMessage|undefined;
+    const groups:ConvoMessage[]=[];
+
+    for(let i=startIndex;i<messages.length;i++){
+        const msg=messages[i];
+        if(!msg){
+            continue;
+        }
+
+        switch(msg.role){
+
+            case convoRoles.group:
+                groups.push(msg);
+                group=msg;
+                break;
+
+            case convoRoles.groupEnd:
+                groups.pop();
+                group=groups[groups.length-1];
+                break;
+
+            default:
+                if(group){
+                    msg.group=group.group;
+                    if(group.tags?.length){
+                        const copy=deepClone(group.tags);
+                        if(msg.tags?.length){
+                            msg.tags=[...msg.tags,...copy];
+                        }else{
+                            msg.tags=copy;
+                        }
+                    }
+                }else{
+                    delete msg.group;
+                }
+                break;
+
+        }
+    }
 }

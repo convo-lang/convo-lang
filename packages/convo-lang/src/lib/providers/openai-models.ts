@@ -11,6 +11,7 @@ const m=(num:number)=>num/1000000;
 
 export const openAiModels:ConvoModelInfo[]=[
 
+    // gpt-5.1
 
 
     // gpt-5

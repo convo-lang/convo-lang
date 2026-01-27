@@ -1,16 +1,16 @@
 import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoMessageRenderResult, ConvoRagRenderer, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, defaultConvoRenderTarget, isMdConvoEnabledFor, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { atDotCss } from "@iyio/at-dot-css";
 import { aryRemoveWhere, cn, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
-import { Image, ScrollView, SlimButton, Text, useSubject } from "@iyio/react-common";
+import { Image, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
-import { ConversationStatusIndicator } from "./ConversationStatusIndicator.js";
+import { ConversationStatusIndicator, ConversationStatusIndicatorProps } from "./ConversationStatusIndicator.js";
 import { MarkdownViewer } from "./MarkdownViewer.js";
 import { MessageComponentRenderer } from "./MessageComponentRenderer.js";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
 
 export type ConvoMessageIconRenderer=(msg:FlatConvoMessage)=>string|any;
 
-interface RenderOptions
+export interface ConvoMessageRenderOptions
 {
     ctrl:ConversationUiCtrl;
     flat:FlatConvoConversation|null;
@@ -29,12 +29,16 @@ interface RenderOptions
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
     enableMarkdown?:ConvoMarkdownEnableState;
     markdownClassName?:string;
+    messageClassName?:string;
+    userClassName?:string;
+    assistantClassName?:string;
+    style:ConvoMessagesViewStyle;
 }
 
 const renderResult=(
     i:number,
     result:ConvoMessageRenderResult,
-    options:RenderOptions,
+    options:ConvoMessageRenderOptions,
 ):any=>{
     const {ctrl,flat}=options;
     if((typeof result !== 'object') || !result){
@@ -50,9 +54,12 @@ const renderResult=(
 }
 
 const renderMessage=(
-    i:number,
+    keyBase:number,
     m:FlatConvoMessage,
-    {
+    renderOptions:ConvoMessageRenderOptions
+)=>{
+
+    const {
         ctrl,
         flat,
         showSystemMessages,
@@ -69,27 +76,36 @@ const renderMessage=(
         iconClassName,
         callRenderer,
         enableMarkdown,
-        markdownClassName
-    }:RenderOptions
-)=>{
+        markdownClassName,
+        messageClassName,
+        userClassName,
+        assistantClassName,
+        style
+    }=renderOptions;
 
     if(!flat){
         return null;
     }
 
     const className=style.msg({user:m.role==='user',agent:m.role!=='user',suggestion:m.isSuggestion});
+    const roleClass=cn(messageClassName,m.role==='assistant' && assistantClassName,m.role==='user' && userClassName);
 
     if(m.component!==undefined){
         return (
             <MessageComponentRenderer
-                key={i+'comp'}
+                key={keyBase+'comp'}
                 message={m}
+                defaultRenderer={(msg,index)=>(
+                    <Fragment key={`${keyBase}comp${index}`}>
+                        {renderMessage(index,msg,renderOptions)}
+                    </Fragment>
+                )}
                 ctx={{
-                    id:i+'comp',
+                    id:keyBase+'comp',
                     ctrl,
                     convo:flat.conversation,
                     flat,
-                    index:i,
+                    index:keyBase,
                     message:m,
                     isUser:m.role==='user',
                     className,
@@ -116,7 +132,7 @@ const renderMessage=(
         }
         const singleItem=keys.length===1 && firstValue && (typeof firstValue==='object');
         return (
-            <div className={rowClassName} key={i}>
+            <div className={rowClassName} key={keyBase}>
                 <div className={cn(className,style.data())}>
                     <div className={style.table({singleItem})}>
                         {keys.map((k,ki)=>{
@@ -141,7 +157,7 @@ const renderMessage=(
         )
     }else if(m.role===convoRoles.rag){
         return (
-            <div className={rowClassName} key={i+'rag'}>
+            <div className={rowClassName} key={keyBase+'rag'}>
                 {ragRenderer?.(m,ctrl)??
                     <div className={cn(className,style.rag())}>
                         {m.content}
@@ -152,7 +168,7 @@ const renderMessage=(
     }else if(m.fn || (m.role!=='user' && m.role!=='assistant')){
         if(showSystemMessages && m.role==='system'){
             return (
-                <div className={rowClassName} key={i+'s'}>
+                <div className={rowClassName} key={keyBase+'s'}>
                     <div className={className}>
                         {m.content}
                     </div>
@@ -160,7 +176,7 @@ const renderMessage=(
             )
         }else if(showFunctions && ( m.fn || m.called)){
             return (
-                <div className={rowClassName} key={i+'f'}>
+                <div className={rowClassName} key={keyBase+'f'}>
                     <div className={className}>
                         {JSON.stringify(m,null,4)}
                     </div>
@@ -175,11 +191,11 @@ const renderMessage=(
                     return null;
                 }
                 const ctx:ConvoComponentRendererContext={// todo - merge with component renderer above, MAYBE?
-                    id:i+'comp',
+                    id:keyBase+'comp',
                     ctrl,
                     convo:flat.conversation,
                     flat,
-                    index:i,
+                    index:keyBase,
                     message:m,
                     isUser:m.role==='user',
                     className,
@@ -198,7 +214,7 @@ const renderMessage=(
                 }
             }
             return (
-                <div className={rowClassName} key={i+'fr'}>
+                <div className={rowClassName} key={keyBase+'fr'}>
                     <div className={className}>
                         {callRendered}
                     </div>
@@ -215,7 +231,7 @@ const renderMessage=(
 
         // add renderer here
 
-        return (<Fragment key={i+'f'}>{
+        return (<Fragment key={keyBase+'f'}>{
             parts.map((p,pi)=>p.image?(
                 <div className={rowClassName} key={pi}>
                     {ctrl.imageRenderer?.(p.image,style.img({user:m.role==='user',agent:m.role!=='user'}),m)??
@@ -228,7 +244,7 @@ const renderMessage=(
                 </div>
             ):(
                 <div className={rowClassName} key={pi}>
-                    <div className={className}>
+                    <div className={cn(className,roleClass)}>
                         {(enableMarkdown && isMdConvoEnabledFor(m.isUser?'user':'assistant',enableMarkdown))?
                             <MarkdownViewer markdown={p.text} contentClassName={markdownClassName}/>:p.text
                         }
@@ -241,13 +257,13 @@ const renderMessage=(
         if(hideSuggestions){
             return true;
         }
-        const isFirst=!flat.messages[i-1]?.isSuggestion;
+        const isFirst=!flat.messages[keyBase-1]?.isSuggestion;
         if(!isFirst){
             return null;
         }
         const titles:string[]=[];
         const group:FlatConvoMessage[]=[];
-        for(let x=i;x<flat.messages.length;x++){
+        for(let x=keyBase;x<flat.messages.length;x++){
             const segMsg=flat.messages[x];
             if(!segMsg?.isSuggestion){
                 break;
@@ -259,18 +275,18 @@ const renderMessage=(
             }
         }
         return (
-            <div className={rowClassName} key={i+'d'}>
+            <div className={rowClassName} key={keyBase+'d'}>
 
                 {!!titles.length && <div className={style.suggestTitles()}>
                     {titles.map((t,i)=>(
-                        <Text text={t} key={i} />
+                        <span key={i}>{t}</span>
                     ))}
                 </div>}
 
-                <div className={className}>
+                <div className={cn(className,roleClass)}>
                     {group.map((msg,gi)=>(
                         <SlimButton className={style.suggestBtn()} key={gi} onClick={()=>{
-                            ctrl.appendUiMessageAsync(msg.content??'')
+                            ctrl.appendWithFunctionCallAsync(msg.content??'',msg.tags?.[convoTags.suggestionCallback])
                         }}>
                             {msg.tags?.[convoTags.suggestion]??msg.content}
                         </SlimButton>
@@ -281,12 +297,12 @@ const renderMessage=(
         )
     }else{
         return (
-            <div className={rowClassName} key={i+'d'}>
+            <div className={rowClassName} key={keyBase+'d'}>
                 <div className={style.textMsg()}>
                     {(m.isAssistant && (!!assistantIcon || assistantIconRender))?getMessageIcon(m,assistantIcon,assistantIconRender,iconSize,iconClassName):null}
 
                     <div className={style.textMsgContent()}>
-                        <div className={className}>
+                        <div className={cn(className,roleClass)}>
                             {(enableMarkdown && isMdConvoEnabledFor(m.isUser?'user':'assistant',enableMarkdown))?
                                 <MarkdownViewer markdown={m.content} contentClassName={markdownClassName}/>:m.content
                             }
@@ -330,6 +346,11 @@ export interface MessagesViewProps
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
     enableMarkdown?:ConvoMarkdownEnableState;
     markdownClassName?:string;
+    messageClassName?:string;
+    userClassName?:string;
+    assistantClassName?:string;
+    style?:ConvoMessagesViewStyle;
+    statusIndicatorRenderer?:(props:ConversationStatusIndicatorProps)=>any;
 }
 
 export function MessagesView({
@@ -347,7 +368,12 @@ export function MessagesView({
     iconSize,
     callRenderer,
     enableMarkdown,
-    markdownClassName
+    markdownClassName,
+    messageClassName,
+    userClassName,
+    assistantClassName,
+    style=defaultStyle,
+    statusIndicatorRenderer=(props)=><ConversationStatusIndicator {...props}/>
 }:MessagesViewProps){
 
     const ctrl=useConversationUiCtrl(_ctrl)
@@ -371,11 +397,13 @@ export function MessagesView({
         style.row({fixedWidth:theme.rowWidth!==undefined},theme.messageRowClassName)
     );
 
-    const options:RenderOptions={
+    const options:ConvoMessageRenderOptions={
         ctrl,flat:flat??null,showSystemMessages,
         showFunctions,showResults,hideSuggestions,rowClassName,ragRenderer,
         assistantIcon,userIcon,assistantIconRender,userIconRender,iconClassName,iconSize,
-        callRenderer,enableMarkdown,markdownClassName
+        callRenderer,enableMarkdown,markdownClassName,
+        messageClassName,userClassName,assistantClassName,
+        style
     }
 
     const mapped=messages.map((m,i)=>{
@@ -415,10 +443,10 @@ export function MessagesView({
 
             {!!currentTask && <div className={rowClassName}>{
                 (theme.wrapLoader===false?
-                    <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
+                    statusIndicatorRenderer({conversation:convo,uiCtrl:ctrl})
                 :
                     <div className={style.msg({agent:true})}>
-                        <ConversationStatusIndicator conversation={convo} uiCtrl={ctrl} />
+                        {statusIndicatorRenderer({conversation:convo,uiCtrl:ctrl})}
                     </div>
                 )
             }</div>}
@@ -439,7 +467,9 @@ export function MessagesView({
 
 }
 
-const style=atDotCss({name:'MessagesView',order:'framework',namespace:'iyio',css:`
+export type ConvoMessagesViewStyle=typeof defaultStyle;
+
+const defaultStyle=atDotCss({name:'MessagesView',order:'framework',namespace:'convo-lang',css:`
     @.root{
         flex:1;
         display:flex;

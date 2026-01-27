@@ -9,6 +9,7 @@ export interface MessageComponentRendererProps
     ctrl?:ConversationUiCtrl;
     ctx?:ConvoComponentRendererContext;
     doNotRenderInRow?:boolean;
+    defaultRenderer?:(message:FlatConvoMessage,index:number)=>any;
 }
 
 /**
@@ -19,6 +20,7 @@ export function MessageComponentRenderer({
     ctrl,
     ctx:_ctx,
     doNotRenderInRow=(message && ctrl)?true:false,
+    defaultRenderer,
 }:MessageComponentRendererProps){
 
     const convo=useSubject(ctrl?.convoSubject);
@@ -67,6 +69,16 @@ export function MessageComponentRenderer({
                 }else{
                     options=renderer;
                     fn=options?.render;
+                }
+
+                if(c.name==='text' && message && defaultRenderer){
+                    const textOnly={...message};
+                    delete textOnly.component;
+                    textOnly.content=c.text;
+                    const defaultRendered=defaultRenderer(textOnly,i);
+                    if(defaultRendered){
+                        return defaultRendered;
+                    }
                 }
 
                 if(fn){

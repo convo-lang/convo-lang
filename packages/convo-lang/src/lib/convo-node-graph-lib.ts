@@ -260,7 +260,6 @@ export const removeConvoNodeMessages=(messages:ConvoMessage[])=>{
                 break;
 
             default:
-                console.log('hio 👋 👋 👋 default',currentNodeId,msg);
                 if(currentNodeId){
                     messages.splice(i,1);
                     i--;

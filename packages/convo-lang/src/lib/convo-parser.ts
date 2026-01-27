@@ -277,7 +277,6 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     tagObj.value=anonType;
                     tagObj.srcValue=v;
                 }else{
-                    console.log('hio 👋 👋 👋 parse source',v);
                     const r=parseConvoCode(`> do\n${v}`);
                     if(r.error){
                         error=r.error.message;
@@ -1104,6 +1103,11 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
+    const last=messages[messages.length];
+    if(last){
+        last.e=code.length;
+    }
+
 
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
@@ -1171,6 +1175,10 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                     route.condition=statements;
 
                 }
+                break;
+
+            case convoRoles.group:
+                msg.group=msg.label?.trim()||undefined;
                 break;
         }
 
