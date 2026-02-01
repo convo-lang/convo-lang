@@ -7,7 +7,7 @@ import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoMessage } from "./convo-types.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -61,6 +61,10 @@ export class ConversationUiCtrl
     private readonly _currentTask:BehaviorSubject<ConversationUiCtrlTask|null>=new BehaviorSubject<ConversationUiCtrlTask|null>(null);
     public get currentTaskSubject():ReadonlySubject<ConversationUiCtrlTask|null>{return this._currentTask}
     public get currentTask(){return this._currentTask.value}
+
+    private readonly _flat:BehaviorSubject<FlatConvoConversation|null>=new BehaviorSubject<FlatConvoConversation|null>(null);
+    public get flatSubject():ReadonlySubject<FlatConvoConversation|null>{return this._flat}
+    public get flat(){return this._flat.value}
 
     private readonly _template:BehaviorSubject<string|undefined>;
     public get templateSubject():ReadonlySubject<string|undefined>{return this._template}
@@ -512,6 +516,7 @@ export class ConversationUiCtrl
         while(this.tasks.includes('completing')){
             this.popTask('completing');
         }
+        this._flat.next(null);
         const sub=convo.activeTaskCountSubject.subscribe(n=>{
             if(n===1){
                 if(!this.tasks.includes('completing')){
@@ -525,10 +530,14 @@ export class ConversationUiCtrl
         })
         const sub2=convo.onAppend.subscribe(v=>{
             this._onAppend.next(v);
+        });
+        const sub3=convo.flatSubject.subscribe(v=>{
+            this._flat.next(v);
         })
         this.convoCleanup=()=>{
             sub.unsubscribe();
             sub2.unsubscribe();
+            sub3.unsubscribe();
         }
         this._convo.next(convo);
         if(this.enabledInitMessage && convo.initMessageReady()){
@@ -723,6 +732,7 @@ export class ConversationUiCtrl
         }
         if(raw?.trim()){
             convo.append(raw);
+            await convo.flattenAsync();
         }
         const r=await convo.completeAsync(completionOptions);
         this._lastCompletion.next(convo.convo??null);

@@ -1528,6 +1528,30 @@ export const extendedConvoVars={
         return true;
     }),
 
+    getRoutePath:createConvoScopeFunction(()=>{
+        let p=globalThis.window?.location.pathname??'/';
+        if(!p.startsWith('/')){
+            p='/'+p;
+        }
+        return p;
+    }),
+
+    isRouteMatch:createConvoScopeFunction((scope)=>{
+        const match=scope.paramValues?.[0];
+        if(!(typeof match === 'string')){
+            return false;
+        }
+        let p=globalThis.window?.location.pathname??'/';
+        if(!p.startsWith('/')){
+            p='/'+p;
+        }
+        if(match.endsWith('*')){
+            return p.startsWith(match.substring(0,match.length-1));
+        }else{
+            return match===p;
+        }
+    }),
+
     [convoFunctions.readDoc]:convoScopeFunctionReadDoc,
 
     [convoFunctions.fsWriteJson]:createConvoScopeFunction(async (scope,ctx)=>{

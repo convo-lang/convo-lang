@@ -442,12 +442,12 @@ export function MessagesView({
             {mapped}
 
             {!!currentTask && <div className={rowClassName}>{
-                (theme.wrapLoader===false?
-                    statusIndicatorRenderer({conversation:convo,uiCtrl:ctrl})
-                :
+                (theme.wrapLoader?
                     <div className={style.msg({agent:true})}>
                         {statusIndicatorRenderer({conversation:convo,uiCtrl:ctrl})}
                     </div>
+                :
+                    statusIndicatorRenderer({conversation:convo,uiCtrl:ctrl})
                 )
             }</div>}
         </div>

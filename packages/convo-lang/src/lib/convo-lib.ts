@@ -1743,6 +1743,7 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.dayMs,
     convoFunctions.aryFindMatch,
     convoFunctions.aryRemoveMatch,
+    'merge',
     'print',
     'setObjDefaults',
     'is',
