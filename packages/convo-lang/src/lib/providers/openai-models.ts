@@ -11,11 +11,79 @@ const m=(num:number)=>num/1000000;
 
 export const openAiModels:ConvoModelInfo[]=[
 
+    // gpt-5.2
+    {
+        name:'gpt-5.2-pro',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(21),
+        outputTokenPriceUsd:m(168),
+    },
+    {
+        name:'gpt-5.2',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.75),
+        outputTokenPriceUsd:m(14),
+    },
+    {
+        name:'gpt-5.2-codex',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.75),
+        outputTokenPriceUsd:m(14),
+    },
+
     // gpt-5.1
+    {
+        name:'gpt-5.1-codex',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+    },
+    {
+        name:'gpt-5.1-codex-max',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+    },
+    {
+        name:'gpt-5.1',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+    },
 
 
     // gpt-5
-    _chat=_vision={
+    _vision={
         name:'gpt-5',
         matchNameStart:true,
         supportsFunctionCalling:true,
@@ -25,7 +93,6 @@ export const openAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(1.25),
         outputTokenPriceUsd:m(10),
-        isServiceDefault:true,
     },
     {
         name:'gpt-5-mini',
@@ -59,6 +126,28 @@ export const openAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(1.25),
         outputTokenPriceUsd:m(10),
+    },
+    {
+        name:'gpt-5-codex',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(1.25),
+        outputTokenPriceUsd:m(10),
+    },
+    {
+        name:'gpt-5-pro',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:400000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(15),
+        outputTokenPriceUsd:m(120),
     },
 
 
@@ -214,7 +303,7 @@ export const openAiModels:ConvoModelInfo[]=[
     },
 
     // gpt-4.1
-    {
+    _chat={
         name:'gpt-4.1',
         matchNameStart:true,
         supportsFunctionCalling:true,
@@ -224,6 +313,7 @@ export const openAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
         inputTokenPriceUsd:m(2),
         outputTokenPriceUsd:m(8),
+        isServiceDefault:true,
     },
     {
         name:'gpt-4.1-mini',
