@@ -1,6 +1,5 @@
 import json
 import logging
-import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
@@ -13,7 +12,7 @@ from nano_graphrag.base import (
 )
 from unstructured.documents.elements import Element
 
-from .types import GraphRagConfig
+from ..types import GraphRagConfig
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +129,7 @@ class AgeGraphStorage(BaseGraphStorage):
 async def graph_embed_docs(
     graph_db: age.Age,
     chunks: List[Element],
+    chunk_ids: List[int],
     doc_path: str,
     cols: Dict[str, Any],
     clear_matching: Optional[List[str]],
@@ -148,15 +148,15 @@ async def graph_embed_docs(
     if cols and clear_matching:
         await age_graph.delete_matching(clear_matching)
 
-    ids = [str(uuid.uuid4()) for _ in chunks]
+    ids = [str(i) for i in chunk_ids]
     chunks = {
-        uuid: TextChunkSchema(
+        i: TextChunkSchema(
             tokens=0,  # Unused by graph-rag
             content=chunk.text,
             full_doc_id=doc_path,
             chunk_order_index=0,  # Unused by graph-rag
         )
-        for i, (uuid, chunk) in enumerate(zip(ids, chunks))
+        for i, chunk in zip(ids, chunks)
     }
 
     _ = await extract_entities(

@@ -18,8 +18,11 @@ def mock_db():
         def __init__(self):
             self.queries = list()
 
-        async def execute(self, query):
-            self.queries.append(query)
+        async def execute(self, query, values=None):
+            self.queries.append((query, values))
+
+        async def execute_many(self, *, query, values):
+            self.queries.extend((query, values))
 
     return MockDB()
 
@@ -58,10 +61,14 @@ def test_document_embedding(mock_db, mock_open_ai):
         )
     )
     assert len(mock_db.queries) == 1
-    assert mock_db.queries[0] == (
-        'INSERT INTO "TextBlob" ("text","embedding") VALUES '
-        "('Foo Bar Baz','[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]')"
+    assert mock_db.queries[0][0] == (
+        'INSERT INTO "TextBlob" ("text", "embedding") '
+        "VALUES (:text, :embedding) RETURNING id"
     )
+    assert mock_db.queries[0][1] == {
+        "embedding": "[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]",
+        "text": "Foo Bar Baz",
+    }
 
 
 def test_document_embedding_dry_run(mock_db, mock_open_ai):
@@ -91,8 +98,13 @@ def test_document_embedding_w_delete(mock_db, mock_open_ai):
         )
     )
     assert len(mock_db.queries) == 2
-    assert mock_db.queries[0] == 'DELETE FROM "TextBlob" where "foo" = 10'
-    assert mock_db.queries[1] == (
-        'INSERT INTO "TextBlob" ("text","embedding","foo") VALUES '
-        "('Foo Bar Baz','[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]',10)"
+    assert mock_db.queries[0][0] == 'DELETE FROM "TextBlob" where "foo" = 10'
+    assert mock_db.queries[1][0] == (
+        'INSERT INTO "TextBlob" ("text", "embedding", "foo") '
+        "VALUES (:text, :embedding, :foo) RETURNING id"
     )
+    assert mock_db.queries[1][1] == {
+        "embedding": "[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]",
+        "foo": "10",
+        "text": "Foo Bar Baz",
+    }
