@@ -1518,6 +1518,33 @@ export class Conversation
         return serviceAndModel;
 
     }
+    private watchUpdates:Record<string,any>={};
+    /**
+     * Queues a var change that will be appended just before the next completion or call the
+     * flushQueuedVarChanges. This is useful for synchronizing changes to variables made outside
+     * of the conversion.
+     */
+    public queueVarChange(name:string,value:any){
+        if(!/^\w+$/.test(name)){
+            return;
+        }
+        this.watchUpdates[name]=value;
+    }
+    public flushQueuedVarChanges()
+    {
+        let watchUpdate='';
+        for(const e in this.watchUpdates){
+            const v=this.watchUpdates[e];
+            delete this.watchUpdates[e];
+            if(!watchUpdate){
+                watchUpdate='@queueChanges\n> define'
+            }
+            watchUpdate+=`\n${e} = ${JSON.stringify(v)}`
+        }
+        if(watchUpdate){
+            this.append(watchUpdate,{disableAutoFlatten:true});
+        }
+    }
     private setFlat(flat:FlatConvoConversation,dup=true){
         if(this.isDisposed){
             return;
@@ -2178,6 +2205,7 @@ export class Conversation
     ):Promise<ConvoCompletion>{
 
         //@@complete
+        this.flushQueuedVarChanges();
 
         if(task===undefined){
             task=defaultConvoTask;
