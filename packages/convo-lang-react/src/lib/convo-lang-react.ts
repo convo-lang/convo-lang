@@ -1,5 +1,5 @@
 import { Conversation, ConversationOptions, ConversationUiCtrl, ConvoObject, ConvoObjectCompletion, ConvoTask, FlatConvoMessage } from "@convo-lang/convo-lang";
-import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, watchObjDeep, zodTypeToJsonScheme } from "@iyio/common";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoLangTheme } from "./convo-lang-theme.js";
@@ -286,4 +286,27 @@ export const useConvoValue=<T,C extends ConvoObject<T>,R extends Awaited<ReturnT
 ):R|undefined=>{
     const c=useConvo<T,C,R>(convo,options);
     return c?.value;
+}
+
+/**
+ * Watches changes to the given value and queues changes to the value to the given
+ * conversation. Changes to the value must be made by the wSet functions to be seen by
+ * the watcher.
+ */
+export const useQueueConvoVarChanges=(
+    conversation:Conversation|null|undefined,
+    varName:string|null|undefined,
+    value:any
+)=>{
+    useEffect(()=>{
+        if(!value || (typeof value !== 'object') || !conversation || !varName){
+            return;
+        }
+        const w=watchObjDeep(value,()=>{
+            conversation.queueVarChange(varName,value);
+        },{deep:true,skipInitCall:true});
+        return ()=>{
+            w.dispose();
+        }
+    },[conversation,varName,value]);
 }
