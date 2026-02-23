@@ -1537,7 +1537,7 @@ export class Conversation
             const v=this.watchUpdates[e];
             delete this.watchUpdates[e];
             if(!watchUpdate){
-                watchUpdate='@queueChanges\n> define'
+                watchUpdate='@flushChangeQueue\n> define'
             }
             watchUpdate+=`\n${e} = ${JSON.stringify(v)}`
         }
