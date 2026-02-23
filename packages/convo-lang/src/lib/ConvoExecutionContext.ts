@@ -5,7 +5,7 @@ import { Conversation, ConversationOptions } from './Conversation.js';
 import { ConvoError } from './ConvoError.js';
 import { parseConvoType } from './convo-cached-parsing.js';
 import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars.js";
-import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
+import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoResultReturnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
 import { doesConvoContentHaveMessage } from './convo-parser.js';
 import { CloneConversationOptions, ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, ForkConversationOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
 import { convoValueToZodType } from './convo-zod.js';
@@ -69,7 +69,7 @@ export class ConvoExecutionContext
 
     public flat?:FlatConvoConversation;
 
-    public varPrefix?:string;
+    public pauseVarChanges=0;
 
     public constructor(convo?:Partial<ConvoGlobal>,parentConvo?:Conversation)
     {
@@ -1047,6 +1047,19 @@ export class ConvoExecutionContext
         return this.setVar(true,value,name,path);
     }
 
+    private changeQueue:{name:string,path?:string[],value:any}[]=[];
+    public flushChangeQueue()
+    {
+        if(!this.changeQueue.length){
+            return;
+        }
+        const q=this.changeQueue;
+        this.changeQueue=[];
+        for(const c of q){
+            this.setVar(true,c.value,c.name,c.path);
+        }
+    }
+
     public setVar(shared:boolean|undefined,value:any,name:string,path?:string[],scope?:ConvoScope){
 
         if(name in defaultConvoVars){
@@ -1064,8 +1077,9 @@ export class ConvoExecutionContext
             }
         }
 
-        if(this.varPrefix){
-            name=this.varPrefix+name;
+        if(this.pauseVarChanges && shared && !scope && name!==convoResultReturnName){
+            this.changeQueue.push({name,path,value});
+            return;
         }
 
         const vars=(

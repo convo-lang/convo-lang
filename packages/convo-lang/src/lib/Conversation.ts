@@ -2188,7 +2188,7 @@ export class Conversation
     public get isCompleting(){return this._isCompleting.value}
 
     private async _completeAsync(
-        callerExcludeMessages:ConvoMessage[]|undefined,
+        excludeMessageSetters:ConvoMessage[]|undefined,
         isSourceMessage:boolean,
         usage:ConvoTokenUsage|undefined,
         task:string|undefined,
@@ -2226,7 +2226,7 @@ export class Conversation
                 discardTemplates:!isDefaultTask || templates!==undefined,
                 threadFilter:additionalOptions?.threadFilter,
                 toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
-                excludeMessageSetters:callerExcludeMessages
+                excludeMessageSetters
             });
             const exe=flat.exe;
 
@@ -2254,7 +2254,7 @@ export class Conversation
                 }
             }
 
-            let nextCallerExcludeMessages:ConvoMessage[]|undefined;
+            let nextCallerExcludeMessages:ConvoMessage[]|undefined;//=excludeMessageSetters?[...excludeMessageSetters]:undefined;
 
             if(flat.parallelMessages?.length){
                 const parallelResult=await this.completeParallelAsync(flat,additionalOptions);
@@ -4018,10 +4018,9 @@ export class Conversation
                     if(msg.fn.local || msg.fn.call){
                         continue;
                     }else if(msg.fn.topLevel){
-                        const prevVarPrefix=exe.varPrefix??'';
-                        const prefix=excludeMessageSetters?.includes(msg)?'__excluded_setter__':'';
-                        if(prefix){
-                            exe.varPrefix=prefix;
+                        const pause=excludeMessageSetters?.includes(msg);
+                        if(pause){
+                            exe.pauseVarChanges++;
                         }
                         exe.clearSharedSetters();
                         const handlerMsg=messageHandlers[msg.fn.name];
@@ -4035,7 +4034,10 @@ export class Conversation
                         if(r.valuePromise){
                             await r.valuePromise;
                         }
-                        exe.varPrefix=prevVarPrefix;
+
+                        if(pause){
+                            exe.pauseVarChanges--;
+                        }
                         if(exe.sharedSetters.length){
                             const varSetter:FlatConvoMessage={
                                 role:msg.role??'define',
@@ -4050,7 +4052,7 @@ export class Conversation
                         if(prev?.fn){
                             flat.role='function';
                             flat.called=prev.fn;
-                            flat.calledReturn=exe.getVarEx(prevVarPrefix+convoResultReturnName,undefined,undefined,false);
+                            flat.calledReturn=exe.getVarEx(convoResultReturnName,undefined,undefined,false);
                             flat.calledParams=exe.getConvoFunctionArgsValue(prev.fn,prev);
                             // if(prev.component){
                             //     flat.component=prev.component;
@@ -4213,6 +4215,8 @@ export class Conversation
                 }
                 this.applyTagsAndState(pair.flat,messages,explicitlyEnabledTransforms,exe,pair.setMdVars,mdVarCtx);
             }
+
+            exe.flushChangeQueue();
 
             const ragMsg=getLastCompletionMessage(messages);
             if(ragMsg?.tags && (convoTags.ragForMsg in ragMsg.tags) && (this.isUserMessage(ragMsg) || this.isModificationMessage(ragMsg))){
