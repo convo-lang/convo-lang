@@ -290,7 +290,10 @@ export const convoRoles={
     /**
      * A temporary message type use to pass convo source code.
      */
-    _sourceRef:'_sourceRef'
+    _sourceRef:'_sourceRef',
+
+    template:'template',
+    templateEnd:'templateEnd',
 } as const;
 
 /**
@@ -499,6 +502,11 @@ export const convoFunctions={
      * Finds an item in an array using shallow comparison.
      */
     aryFindMatch:'aryFindMatch',
+
+    /**
+     * Finds an item's index in an array using shallow comparison.
+     */
+    aryFindIndex:'aryFindIndex',
 
     /**
      * Removes the first matching item in an array using shallow comparison.

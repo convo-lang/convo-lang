@@ -3717,6 +3717,8 @@ export class Conversation
                 if( !msg ||
                     exe.isTagConditionTrueByName(msg,convoTags.disabled,true) ||
                     msg.role===convoRoles.nop ||
+                    msg.role===convoRoles.template ||
+                    msg.role===convoRoles.templateEnd ||
                     msg.role===convoRoles.transformResult ||
                     msg.role===convoRoles.thinking ||
                     msg.role===convoRoles.importTemplate ||

@@ -217,7 +217,7 @@
             }
         },
         "nop":{
-            "match": "^\\s*(>)\\s*(nop)(\\s*|\\s(.*))$",
+            "match": "^\\s*(>)\\s*(nop|templateEnd|template)(\\s*|\\s(.*))$",
             "captures": {
                 "1":{
                     "name":"keyword.control"

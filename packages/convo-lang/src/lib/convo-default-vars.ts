@@ -1,4 +1,4 @@
-import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, getFileNameNoExt, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
+import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, getFileNameNoExt, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, safeParseNumberOrUndefined, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
 import { ConvoError } from "./ConvoError.js";
@@ -572,6 +572,22 @@ export const defaultConvoVarsBase={
         ary=[...ary];
         for(let i=1;i<scope.paramValues.length;i++){
             ary.push(scope.paramValues[i]);
+        }
+        return ary;
+    }),
+
+    aryInsert:createConvoScopeFunction(scope=>{
+        let ary=scope.paramValues?.[0];
+        if(!scope.paramValues || !Array.isArray(ary)){
+            return ary;
+        }
+        const index=safeParseNumberOrUndefined(scope.paramValues?.[1]);
+        if(index===undefined){
+            return ary;
+        }
+        ary=[...ary];
+        for(let i=2;i<scope.paramValues.length;i++){
+            ary.splice(index+i-1,0,scope.paramValues[i]);
         }
         return ary;
     }),
@@ -1418,6 +1434,24 @@ export const defaultConvoVarsBase={
         }
 
         return undefined;
+    }),
+
+    [convoFunctions.aryFindIndex]:createConvoScopeFunction(async (scope)=>{
+        const ary=scope.paramValues?.[0];
+        const match=scope.paramValues?.[1];
+
+        if(!Array.isArray(ary)){
+            return -1;
+        }
+
+        for(let i=0;i<ary.length;i++){
+            const item=ary[i];
+            if(isShallowEqualTo(match,item)){
+                return i;
+            }
+        }
+
+        return -1;
     }),
 
     [convoFunctions.aryRemoveMatch]:createConvoScopeFunction(async (scope)=>{
