@@ -385,7 +385,7 @@ const modsToString=(mods:Mod[],exportName:string,namePrefix:string):string=>{
     const convoImportNames=Object.keys(convoLangImports);
     convoImportNames.sort();
 
-    out.unshift(`import { ${convoImportNames.join(', ')} } from "@convo-lang/convo-lang";\n`)
+    out.unshift(`import type { ${convoImportNames.join(', ')} } from "@convo-lang/convo-lang";\n`)
 
     return out.join('');
 }
@@ -415,7 +415,7 @@ const scanConvoFileAsync=async (fullPath:string,project:ProjectCtx)=>{
     let relPath=relative(project.fullPath,fullPath);
 
     const mod:Mod={
-        name:relPath,
+        name:formatImportName(relPath),
         convo:content,
         hashSrc:strHashBase64(content??''),
         tsImports:[],
@@ -423,6 +423,19 @@ const scanConvoFileAsync=async (fullPath:string,project:ProjectCtx)=>{
 
     project.mods.push(mod);
 
+}
+
+const formatImportName=(name:string)=>{
+    const d=name.lastIndexOf('.');
+    const s=name.lastIndexOf('/');
+    if(d===-1){
+        return name;
+    }
+    if(s===-1 || s<d){
+        return name.substring(0,d);
+    }else{
+        return name;
+    }
 }
 
 const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
@@ -477,7 +490,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
     const relPath=relative(project.fullPath,file.getFilePath());
 
     const mod:Mod={
-        name:relPath,
+        name:formatImportName(relPath),
         convo:'',
         hashSrc:relPath,
         tsImports:[],
@@ -1016,14 +1029,17 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
 }
 
 const getIgnoredPathsAsync=async (dir:string,paths:string[]):Promise<string[]>=>{
+    if(!paths.length){
+        paths=['.'];
+    }
     try{
         const r=await execAsync({
             cwd:dir,
-            cmd:`echo -e "\\n${paths.join('\\n')}" | git check-ignore --stdin`,
+            cmd:`echo -e "\\n${paths.map(v=>v.trim()||'.').join('\\n')}" | git check-ignore --stdin`,
+            silent:true
         });
         return r.split('\n').map(v=>v.trim());
-    }catch(ex){
-        console.error('Unable to check git ignored files',ex);
+    }catch{
         return [];
     }
 }
