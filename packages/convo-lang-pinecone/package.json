@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/convo-lang-pinecone",
-    "version": "0.8.16",
+    "version": "0.8.18",
     "type": "module",
     "sideEffects": false,
     "license": "Apache-2.0",
