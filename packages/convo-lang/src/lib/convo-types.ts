@@ -1932,6 +1932,7 @@ export interface ConvoModelInfo
     outputMinutePriceUsd?:number;
     outputDimension?:number;
     imagePriceUsd?:number;
+    inputImageTokenPriceUsd?:number;
     imageLgPriceUsd?:number;
     imageHdPriceUsd?:number;
     imageLgHdPriceUsd?:number;
