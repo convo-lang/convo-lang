@@ -715,6 +715,12 @@ export interface ConvoFlowController
      */
     keepData?:boolean;
 
+    /**
+     * If true each param passed to the function will cause the output buffer to be flushed and if
+     * the normal return value of the param is null, undefined or a symbol the buffered value will be used instead.
+     */
+    bufferParamOutput?:boolean;
+
     startParam?(
         scope:ConvoScope,
         parentScope:ConvoScope|undefined,
@@ -746,8 +752,16 @@ export type ConvoScopeFunction=(scope:ConvoScope,ctx:ConvoExecutionContext)=>any
 
 export const convoScopeFnKey=Symbol('convoScopeFnKey');
 export const convoScopeFnDefKey=Symbol('convoScopeFnDefKey');
+export const convoScopeParentKey=Symbol('convoScopeParentKey');
 export const convoScopeMsgKey=Symbol('convoScopeMsgKey');
 export const convoScopeLocationMsgKey=Symbol('convoScopeLocationMsgKey');
+
+export interface ConvoScopeOutputBuffer
+{
+    separator:string;
+    count:number;
+    buffer:any[];
+}
 
 export interface ConvoScope
 {
@@ -816,6 +830,9 @@ export interface ConvoScope
      */
     [convoScopeFnDefKey]?:ConvoFunction;
 
+
+    [convoScopeParentKey]?:ConvoScope;
+
     /**
      * The message the scope is in
      */
@@ -835,6 +852,11 @@ export interface ConvoScope
      * Maps label names to param indexes
      */
     labels?:Record<string,number|OptionalConvoValue<number>>;
+
+    /**
+     * output buffer
+     */
+    outputBuffer?:ConvoScopeOutputBuffer;
 
     error?:ConvoScopeError;
 

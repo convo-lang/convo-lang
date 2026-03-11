@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoDocumentReference } from "./convo-rag-types.js";
 import { convoSystemMessages } from "./convo-system-messages.js";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoScopeParentKey, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -477,6 +477,21 @@ export const convoFunctions={
      * Returns true if all values passed to the function are undefined
      */
     isUndefined:'isUndefined',
+
+    /**
+     * Returns the number of keys in an option
+     */
+    getObjKeyCount:'getObjKeyCount',
+
+    /**
+     * Returns the keys of an options
+     */
+    getObjKeys:'getObjKeys',
+
+    /**
+     * Returns the values of an options
+     */
+    getObjKeyValues:'getObjKeyValues',
 
     /**
      * Returns the passed in value as milliseconds
@@ -1758,6 +1773,7 @@ export const allowedConvoDefinitionFunctions=[
     'and',
     'or',
     'not',
+    'no',
     'neq',
     'eq',
     'gt',
@@ -1840,6 +1856,14 @@ export const createConvoScopeFunction:CreateConvoScopeFunctionOverloads=(
     }
     (fn as any)[convoScopeFunctionMarker]=true;
     return fn;
+}
+
+export const getConvoBufferedOutputScope=(from:ConvoScope):ConvoScope|undefined=>{
+    let scope:ConvoScope|undefined=from;
+    while(scope && !scope.outputBuffer){
+        scope=scope[convoScopeParentKey];
+    }
+    return scope;
 }
 
 export const isConvoScopeFunction=(value:any):value is ConvoScopeFunction=>{

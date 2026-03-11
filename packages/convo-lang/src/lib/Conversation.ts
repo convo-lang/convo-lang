@@ -5788,6 +5788,7 @@ export class Conversation
                         }
                         messages[lastUserMessageI]=lastUserMessage;
                         messages.splice(i,1);
+                        i--;
                         updated.push(lastUserMessage);
                         continue;
                     }else{
@@ -5803,6 +5804,7 @@ export class Conversation
                         }
                         messages[lastAssistantMessageI]=lastAssistantMessage;
                         messages.splice(i,1);
+                        i--;
                         updated.push(lastAssistantMessage);
                         continue;
                     }else{
@@ -5818,10 +5820,11 @@ export class Conversation
                         }
                         messages[lastSystemMessageI]=lastSystemMessage;
                         messages.splice(i,1);
+                        i--;
                         updated.push(lastSystemMessage);
                         continue;
                     }else{
-                        msg={...msg,role:convoRoles.assistant,isSystem:true};
+                        msg={...msg,role:convoRoles.system,isSystem:true};
                         messages[i]=msg;
                         updated.push(msg);
                     }

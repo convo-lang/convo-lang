@@ -7,7 +7,7 @@ import { parseConvoType } from './convo-cached-parsing.js';
 import { defaultConvoVars, sandboxConvoVars } from "./convo-default-vars.js";
 import { convoArgsName, convoBodyFnName, convoFunctions, convoGlobalRef, convoLabeledScopeFnParamsToObj, convoMapFnName, convoResultReturnName, convoStructFnName, convoTags, convoVars, createConvoScopeFunction, createOptionalConvoValue, defaultConvoPrintFunction, escapeConvo, getConvoSystemMessage, getConvoTag, isConvoScopeFunction, parseConvoJsonMessage, setConvoScopeError } from './convo-lib.js';
 import { doesConvoContentHaveMessage } from './convo-parser.js';
-import { CloneConversationOptions, ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, ForkConversationOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, isConvoMessageModification } from "./convo-types.js";
+import { CloneConversationOptions, ConvoCompletion, ConvoCompletionMessage, ConvoExecuteFunctionOptions, ConvoExecuteResult, ConvoFlowController, ConvoFlowControllerDataRef, ConvoFunction, ConvoGlobal, ConvoMessage, ConvoPrintFunction, ConvoScope, ConvoScopeFunction, ConvoStatement, ConvoTag, FlatConvoConversation, ForkConversationOptions, InlineConvoPrompt, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourcePathKey, convoScopeFnDefKey, convoScopeFnKey, convoScopeLocationMsgKey, convoScopeMsgKey, convoScopeParentKey, isConvoMessageModification } from "./convo-types.js";
 import { convoValueToZodType } from './convo-zod.js';
 
 
@@ -535,6 +535,7 @@ export class ConvoExecutionContext
             scope=copyDefaultScope(scope);
             if(parent){
                 scope[convoScopeFnDefKey]=parent[convoScopeFnDefKey];
+                scope[convoScopeParentKey]=parent;
             }
             const fn=scope[convoScopeFnKey]??(scope[convoScopeFnKey]=statement.fnPath?
                 (
@@ -587,6 +588,15 @@ export class ConvoExecutionContext
                                 paramScope=resumeParamScope;
                                 resumeParamScope=undefined;
                             }else{
+                                if(flowCtrl?.bufferParamOutput){
+                                    if(scope.outputBuffer){
+                                        if(scope.outputBuffer.buffer.length){
+                                            scope.outputBuffer.buffer.splice(0,scope.outputBuffer.buffer.length);
+                                        }
+                                    }else{
+                                        scope.outputBuffer={buffer:[],separator:'',count:0};
+                                    }
+                                }
                                 const d=defaultScope;
                                 d.s=paramStatement;
                                 paramScope=this.executeScope(d,scope,defaultScope);
@@ -606,10 +616,20 @@ export class ConvoExecutionContext
                                 return scope;
                             }
 
-                            if(flowCtrl?.discardParams){
-                                scope.paramValues[0]=paramScope.v;
-                            }else{
-                                scope.paramValues.push(paramScope.v);
+                            if(scope.outputBuffer){
+                                if(scope.outputBuffer.buffer.length){
+                                    paramScope.v=scope.outputBuffer.buffer.join('');
+                                }else if(typeof scope.v === 'symbol'){
+                                    paramScope.v='';
+                                }
+                            }
+
+                            if(!(scope.outputBuffer && scope.v==='')){
+                                if(flowCtrl?.discardParams){
+                                    scope.paramValues[0]=paramScope.v;
+                                }else{
+                                    scope.paramValues.push(paramScope.v);
+                                }
                             }
 
                             if(paramScope.r){
@@ -1226,7 +1246,7 @@ export class ConvoExecutionContext
             const values=tag.statement.map(s=>{
                 const r=this.executeStatement(s,message);
                 if(r.valuePromise){
-                    throw new Error('Tag value statements are not allowed to return promises');
+                    throw new Error(`Tag value statements are not allowed to return promises. tag - @${tag.name}=${tag.srcValue}`);
                 }
                 return r.value;
             });

@@ -1,10 +1,10 @@
-import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, getFileNameNoExt, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, safeParseNumberOrUndefined, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
+import { SceneCtrl, aryRandomize, base64Encode, base64EncodeMarkdownImage, base64EncodeUrl, createJsonRefReplacer, deepClone, deepCompare, escapeHtml, escapeHtmlKeepDoubleQuote, getContentType, getErrorMessage, getFileName, getFileNameNoExt, getObjKeyCount, httpClient, joinPaths, markdownLineToString, objectToMarkdownBuffer, safeParseNumberOrUndefined, shortUuid, starStringTest, toCsvLines, uuid, valueIsZodObject } from "@iyio/common";
 import { vfs } from "@iyio/vfs";
 import { format } from "date-fns";
 import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoForm } from "./convo-forms-types.js";
-import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
+import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, convoDateFormat, convoDefaultFnName, convoEnumFnName, convoFunctions, convoGlobalRef, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledScopeParamsToObj, convoMapFnName, convoMetadataKey, convoParamsToObj, convoPipeFnName, convoStructFnName, convoSwitchFnName, convoTestFnName, convoVars, createConvoBaseTypeDef, createConvoMetadataForStatement, createConvoScopeFunction, createConvoType, getConvoBufferedOutputScope, isConvoTypeArray, makeAnyConvoType } from "./convo-lib.js";
 import { ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
 import { convoPipeScopeFunction } from "./convo-pipe.js";
 import { createConvoSceneDescription } from "./convo-scene-lib.js";
@@ -15,6 +15,41 @@ import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionR
 const ifFalse=Symbol();
 const ifTrue=Symbol();
 const breakIteration=Symbol();
+
+const not=createConvoScopeFunction(scope=>{
+    if(!scope.paramValues?.length){
+        return true;
+    }
+    for(let i=0;i<scope.paramValues.length;i++){
+        if(scope.paramValues[i]){
+            return false;
+        }
+    }
+    return true;
+})
+
+const writeOutput=(scope:ConvoScope,sep:string,trim?:boolean)=>{
+    const params=scope.paramValues?.length?scope.paramValues:[''];
+    const buffered=getConvoBufferedOutputScope(scope)?.outputBuffer;
+    if(!buffered){
+        return;
+    }
+    sep+=buffered.separator;
+    if(buffered.count && sep){
+        buffered.buffer.push(sep);
+    }
+    if(trim){
+        buffered.buffer.push(params.join('').trim());
+    }else{
+        buffered.buffer.push(...params);
+    }
+    buffered.count++;
+    if(params.length>1){
+        return params;
+    }else{
+        return params[0];
+    }
+}
 
 const getNodeInfo=(scope:ConvoScope,ctx:ConvoExecutionContext):ConvoRuntimeNodeInfo|undefined=>{
 
@@ -190,16 +225,35 @@ export const defaultConvoVarsBase={
     }),
     and,
     or,
-    not:createConvoScopeFunction(scope=>{
-        if(!scope.paramValues?.length){
-            return true;
+    not,
+    no:not,
+
+    out:createConvoScopeFunction((scope)=>{
+        return writeOutput(scope,'\n');
+    }),
+
+    outTrim:createConvoScopeFunction((scope)=>{
+        return writeOutput(scope,'\n',true);
+    }),
+
+    outInline:createConvoScopeFunction((scope)=>{
+        return writeOutput(scope,'');
+    }),
+
+    outSep:createConvoScopeFunction((scope)=>{
+        let sep=scope.paramValues?.[0]??'';
+        if(typeof sep !== 'string'){
+            sep=sep===true?'\n':'';
         }
-        for(let i=0;i<scope.paramValues.length;i++){
-            if(scope.paramValues[i]){
-                return false;
-            }
+        const buffered=getConvoBufferedOutputScope(scope);
+        if(buffered?.outputBuffer){
+            buffered.outputBuffer.separator=sep;
         }
-        return true;
+        return '';
+    }),
+
+    getFileName:createConvoScopeFunction((scope)=>{
+        return getFileName(scope.paramValues?.[0]??'');
     }),
 
     if:createConvoScopeFunction({
@@ -995,18 +1049,23 @@ export const defaultConvoVarsBase={
         return format(new Date(),'yyyy-MM-dd');
     }),
 
-    md:createConvoScopeFunction((scope)=>{
+    md:createConvoScopeFunction({
+        bufferParamOutput:true,
+    },(scope)=>{
         if(!scope.paramValues?.length){
             return '';
         }
         const out:string[]=[];
         for(let i=0;i<scope.paramValues.length;i++){
             const value=scope.paramValues[i];
+            const type=typeof value;
             if(value===undefined){
                 out.push('undefined');
             }else if(value===null){
                 out.push('null');
-            }else if((typeof value === 'object') && !isPrimitiveArray(value) && !(value instanceof Date)){
+            }else if(type==='string'){
+                out.push(value);
+            }else if(type==='object' && !isPrimitiveArray(value) && !(value instanceof Date)){
                 if(value[convoMetadataKey] || isConvoTypeArray(value)){
                     out.push(JSON.stringify(convoTypeToJsonScheme(value)));
                 }else{
@@ -1020,6 +1079,8 @@ export const defaultConvoVarsBase={
                         }
                     }
                 }
+            }else if(type==='symbol'){
+                continue;
             }else{
                 objectToMarkdownBuffer(value,out,'',5);
             }
@@ -1473,8 +1534,24 @@ export const defaultConvoVarsBase={
         return false;
     }),
 
+    [convoFunctions.getObjKeyCount]:createConvoScopeFunction((scope,ctx)=>{
+        const value=scope.paramValues?.[0];
+        return value && (typeof value === 'object')?getObjKeyCount(value):0;
+    }),
+
+    [convoFunctions.getObjKeys]:createConvoScopeFunction((scope,ctx)=>{
+        const value=scope.paramValues?.[0];
+        return value && (typeof value === 'object')?Object.keys(value):0;
+    }),
+
+    [convoFunctions.getObjKeyValues]:createConvoScopeFunction((scope,ctx)=>{
+        const value=scope.paramValues?.[0];
+        return value && (typeof value === 'object')?Object.values(value):0;
+    }),
+
 } as const;
 Object.freeze(defaultConvoVarsBase);
+
 
 export const extendedConvoVars={
 

@@ -332,7 +332,7 @@
             ]
         },
         "functionCallSystem":{
-            "begin":"(elif|if|else|while|break|foreach|for|in|do|then|fn|return|case|default|switch|test)\\s*(\\()",
+            "begin":"(elif|if|else|while|break|foreach|for|in|do|outInline|outTrim|out|then|fn|return|case|default|switch|test)\\s*(\\()",
             "end":"\\)",
             "beginCaptures": {
                 "1":{
@@ -352,7 +352,7 @@
             ]
         },
         "functionCallOperator":{
-            "begin":"(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)\\s*(\\()",
+            "begin":"(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec|no)\\s*(\\()",
             "end":"\\)",
             "beginCaptures": {
                 "1":{
