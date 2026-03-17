@@ -3293,7 +3293,10 @@ export class Conversation
         name='';
         for(let i=0;i<modifiers.length;i++){
             const m=modifiers[i];
-            if(m?.startsWith('!')){
+            if(m==='as'){
+                modifiers.splice(i,2,`!assign:${modifiers[i+1]||'defaultImportAssignment'}`);
+                i--;
+            }else if(m?.startsWith('!')){
                 modifiers[i]=m.substring(1);
                 if(m.startsWith('!template:')){
                     templateName=m.substring(10);

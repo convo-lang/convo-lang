@@ -555,12 +555,14 @@
         },
 
         "tagImportValue":{
-            "match":"((!\\S+:(\\S+))|(!\\S+)|(\\S+))",
+            "match":"(((as)[ \\t]+(\\w+))|(!\\S+:(\\S+))|(!\\S+)|(\\S+))",
             "captures":{
                 "1":{"name":"string"},
-                "2":{"name":"keyword.modifier"},
-                "3":{"name":"variable"},
-                "4":{"name":"keyword.modifier"}
+                "3":{"name":"keyword.control"},
+                "4":{"name":"variable"},
+                "5":{"name":"keyword.modifier"},
+                "6":{"name":"variable"},
+                "7":{"name":"keyword.modifier"}
             }
         },
 
