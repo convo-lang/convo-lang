@@ -1,4 +1,4 @@
-import { NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
+import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
@@ -22,6 +22,11 @@ export interface HttpConvoCompletionServiceOptions
      * by evenly distributing request between each URL.
      */
     endpoint:string|string[];
+
+    /**
+     * Allows http request options to be customize
+     */
+    getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
 }
 
 /**
@@ -43,7 +48,7 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
 
     public readonly serviceId='http';
 
-    public static fromScope(scope:Scope,endpoint?:string|string[]){
+    public static fromScope(scope:Scope,endpoint?:string|string[],getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>){
         if(!endpoint){
             const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
             endpoint=ep.length===1?ep[0]:ep;
@@ -52,7 +57,8 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
             throw new Error('Empty HttpConvoCompletionService provided');
         }
         return new HttpConvoCompletionService({
-            endpoint
+            endpoint,
+            getRequestOptions
         })
     }
 
@@ -62,14 +68,18 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
 
     private readonly endpoint:string|string[];
 
+    private readonly getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
+
     public constructor({
-        endpoint
+        endpoint,
+        getRequestOptions
     }:HttpConvoCompletionServiceOptions){
         if(Array.isArray(endpoint)){
             endpoint=[...endpoint];
             aryRandomize(endpoint);
         }
         this.endpoint=endpoint;
+        this.getRequestOptions=getRequestOptions;
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -98,7 +108,8 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
     {
         const r=await httpClient().postAsync<ConvoCompletionMessage[]>(
             joinPaths(this.getEndpoint(),'/completion'),
-            getSerializableFlatConvoConversation(flat)
+            getSerializableFlatConvoConversation(flat),
+            await this.getRequestOptions?.()
         );
         if(!r){
             throw new Error('convo-lang ai endpoint returned empty response');
@@ -110,9 +121,12 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         }
     }
 
-    public getModelsAsync():Promise<ConvoModelInfo[]|undefined>
+    public async getModelsAsync():Promise<ConvoModelInfo[]|undefined>
     {
-        return httpClient().getAsync<ConvoModelInfo[]>(joinPaths(this.getEndpoint(),'/models'));
+        return await httpClient().getAsync<ConvoModelInfo[]>(
+            joinPaths(this.getEndpoint(),'/models'),
+            await this.getRequestOptions?.()
+        );
     }
 
     public async relayConvertConvoToInputAsync(flat:FlatConvoConversationBase,inputType?:string):Promise<FlatConvoConversationBase>{
@@ -120,7 +134,11 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
             flat:getSerializableFlatConvoConversation(flat),
             inputType
         };
-        const r=await httpClient().postAsync<FlatConvoConversationBase>(joinPaths(this.getEndpoint(),'/convert'),request);
+        const r=await httpClient().postAsync<FlatConvoConversationBase>(
+            joinPaths(this.getEndpoint(),'/convert'),
+            request,
+            await this.getRequestOptions?.()
+        );
         if(!r){
             throw new NotFoundError();
         }
@@ -131,7 +149,8 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
     {
         const r=await httpClient().postAsync<ConvoRagSearchResult>(
             joinPaths(this.getEndpoint(),'/rag/search'),
-            search
+            search,
+            await this.getRequestOptions?.()
         );
         if(!r){
             throw new Error('convo-lang ai endpoint returned empty response');
