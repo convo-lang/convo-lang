@@ -1,6 +1,6 @@
 import { Conversation, ConversationUiCtrl } from "@convo-lang/convo-lang";
 import { LoadingDots, useSubject } from "@iyio/react-common";
-import { ConvoTaskView } from "./ConvoTaskView.js";
+import { ConvoTaskViewLegacy } from "./ConvoTaskViewLegacy.js";
 
 export interface ConversationStatusIndicatorProps
 {
@@ -28,7 +28,7 @@ export function ConversationStatusIndicator({
 
     return (<>{
         convoTasks?.length?
-            convoTasks.map((t,i)=><ConvoTaskView mt05={i!==0} className={convoTaskViewClassName} key={i} task={t} />)
+            convoTasks.map((t,i)=><ConvoTaskViewLegacy mt05={i!==0} className={convoTaskViewClassName} key={i} task={t} />)
         :(currentTask || busy)?
             (loadingIndicator??<LoadingDots/>)
         :

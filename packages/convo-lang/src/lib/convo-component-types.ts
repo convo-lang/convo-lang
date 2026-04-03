@@ -4,6 +4,7 @@ import { ZodType } from "zod";
 import { Conversation } from "./Conversation.js";
 import type { ConversationUiCtrl } from "./ConversationUiCtrl.js";
 import { ConvoCompletionMessage, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { ConvoViewTheme } from "./convo-view-theme.js";
 
 export interface ConvoComponentDef
 {
@@ -28,6 +29,7 @@ export interface ConvoComponentRendererContext
     index:number;
     className?:string;
     rowClassName?:string;
+    theme?:ConvoViewTheme;
 }
 
 export type ConvoComponentRenderFunction=(

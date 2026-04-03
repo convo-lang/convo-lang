@@ -8,8 +8,10 @@ import { MarkdownViewer } from "./MarkdownViewer.js";
 import { MessageComponentRenderer } from "./MessageComponentRenderer.js";
 import { useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
 
+/** @deprecated */
 export type ConvoMessageIconRenderer=(msg:FlatConvoMessage)=>string|any;
 
+/** @deprecated */
 export interface ConvoMessageRenderOptions
 {
     ctrl:ConversationUiCtrl;
@@ -329,6 +331,7 @@ const getMessageIcon=(msg:FlatConvoMessage,icon:any,renderer:ConvoMessageIconRen
     return icon||null;
 }
 
+/** @deprecated */
 export interface MessagesViewProps
 {
     ctrl?:ConversationUiCtrl;
@@ -353,6 +356,7 @@ export interface MessagesViewProps
     statusIndicatorRenderer?:(props:ConversationStatusIndicatorProps)=>any;
 }
 
+/** @deprecated */
 export function MessagesView({
     renderTarget=defaultConvoRenderTarget,
     ctrl:_ctrl,

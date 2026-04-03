@@ -81,6 +81,11 @@ export interface ConvoLangRouteOptions extends ConvoLangRouteOptionsBase
      * If true a mock route will be added for demoing purposes
      */
     enableMockRoute?:boolean;
+
+    /**
+     * If true the dependency scopes will be auto initializes with built-in completion providers
+     */
+    autoInit?:boolean;
 }
 
 

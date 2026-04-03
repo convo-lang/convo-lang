@@ -1,55 +1,54 @@
-import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, HttpConvoCompletionService, defaultConvoRenderTarget, removeDanglingConvoUserMessage } from '@convo-lang/convo-lang';
-import { atDotCss } from "@iyio/at-dot-css";
-import { BaseLayoutProps, deepCompare } from '@iyio/common';
-import { useDeepCompareItem, useShallowCompareItem, useSubject } from "@iyio/react-common";
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, ConvoViewTheme, HttpConvoCompletionService, defaultConvoRenderTarget } from '@convo-lang/convo-lang';
+import { deepCompare } from '@iyio/common';
+import { useDeepCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo, useRef } from "react";
 import { Subscription } from 'rxjs';
-import { ConversationInput, ConversationInputProps } from "./ConversationInput.js";
-import { MessagesSourceView } from "./MessagesSourceView.js";
-import { MessagesView, MessagesViewProps } from "./MessagesView.js";
-import { SuggestionsView, SuggestionsViewProps } from './SuggestionsView.js';
 import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react.js";
-import { ConvoLangTheme, defaultDarkConvoLangTheme, defaultLightConvoLangTheme } from "./convo-lang-theme.js";
+import { getConvoViewTheme } from './convo-view-themes.js';
+import { ConvoInput, ConvoInputProps } from "./ConvoInput.js";
+import { ConvoMessageListView } from './ConvoMessageListView.js';
+import { ConvoMessageViewProps } from './ConvoMessageView.js';
+import { ConvoSuggestionsView, ConvoSuggestionsViewProps } from './ConvoSuggestionsView.js';
+import { MessagesSourceView } from "./MessagesSourceView.js";
+import { cn } from './util.js';
 
-/** @deprecated */
-export interface ConversationViewProps
+
+export interface ConvoViewProps
 {
     className?:string;
     ctrl?:ConversationUiCtrl;
     getCtrl?:(ctrl:ConversationUiCtrl)=>void;
     appendTrigger?:ConvoUiAppendTrigger;
-    ctrlOptions?:ConversationUiCtrlOptions,
-    content?:string;
+    ctrlOptions?:ConversationUiCtrlOptions;
     enabledSlashCommands?:boolean;
     renderInput?:(ctrl:ConversationUiCtrl)=>any;
     ragRenderer?:ConvoRagRenderer;
     noInput?:boolean;
-    inputProps?:ConversationInputProps;
-    theme?:ConvoLangTheme|'dark'|'light';
+    inputProps?:Partial<ConvoInputProps>;
     showSource?:boolean;
     sourceMode?:ConvoEditorMode;
     showInputWithSource?:boolean;
     renderTarget?:string;
     redirectMessagesView?:(view:any)=>void;
-    min?:boolean;
     defaultVars?:Record<string,any>;
     externFunctions?:Record<string,(...params:any[])=>any>;
     codeInputAutoScrollBehavior?:ScrollBehavior;
-    messageBottomPadding?:string;
+    messageBottomPadding?:string|null;
     httpEndpoint?:string;
     templatePrefix?:string;
     template?:string;
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
-    autoHeight?:boolean;
+    disableScroll?:boolean;
     suggestionsLocation?:'inline'|'before-input'|'after-input';
-    messagesProps?:MessagesViewProps;
-    suggestionProps?:SuggestionsViewProps & BaseLayoutProps;
+    forceInlineSuggestionsLocation?:boolean;
+    messagesProps?:ConvoMessageViewProps;
+    suggestionProps?:Partial<ConvoSuggestionsViewProps>;
     componentRenderers?:Record<string,ConvoComponentRenderer>;
     enabledInitMessage?:boolean;
     onVarsChange?:(vars:Record<string,any>)=>void;
     enableMarkdown?:ConvoMarkdownEnableState;
     enableUserMarkdown?:boolean;
-    markdownClassName?:string;
+    inputPlaceholder?:string;
     /**
      * Modules to register with conversation. The value of modules is cached and must be refreshed
      * using the modulesRefreshKey for changes to be reflected
@@ -60,27 +59,25 @@ export interface ConversationViewProps
     imports?:string|string[];
 
     onInputChange?:(change:ConversationInputChange)=>void;
+
+    theme?:ConvoViewTheme;
 }
 
-/** @deprecated */
-export function ConversationView({
+export function ConvoView({
     className,
     ctrl:ctrlProp,
     getCtrl,
     ctrlOptions,
-    content,
     enabledSlashCommands,
     renderInput,
     noInput,
     inputProps,
-    theme:_theme='light',
     sourceMode:_sourceMode,
     showSource:_showSource,
     showInputWithSource=true,
     ragRenderer,
     renderTarget=defaultConvoRenderTarget,
     redirectMessagesView,
-    min,
     defaultVars,
     externFunctions,
     codeInputAutoScrollBehavior,
@@ -90,20 +87,24 @@ export function ConversationView({
     template,
     appendTrigger,
     beforeCreateExeCtx,
-    autoHeight,
+    disableScroll,
     suggestionsLocation='inline',
+    forceInlineSuggestionsLocation,
     messagesProps,
     suggestionProps,
-    componentRenderers,
+    componentRenderers={},
     enabledInitMessage,
     onVarsChange,
     enableMarkdown,
-    markdownClassName,
     modules,
     modulesRefreshKey,
     imports,
     onInputChange,
-}:ConversationViewProps){
+    theme,
+    inputPlaceholder,
+}:ConvoViewProps){
+
+    theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
 
     const refs=useRef({modules});
     refs.current.modules=modules;
@@ -190,6 +191,7 @@ export function ConversationView({
         }
     },[ctrl,defaultVars]);
 
+
     const compRenderers=useDeepCompareItem(componentRenderers);
     useEffect(()=>{
         if(!compRenderers){
@@ -212,15 +214,6 @@ export function ConversationView({
             }
         }
     },[ctrl,compRenderers]);
-
-    useEffect(()=>{
-        if(content &&
-            removeDanglingConvoUserMessage(content).trim()!==
-            removeDanglingConvoUserMessage(ctrl.convo?.convo??'').trim()
-        ){
-            ctrl.replace(content);
-        }
-    },[ctrl,content]);
 
     useEffect(()=>{
         if(enabledSlashCommands!==undefined){
@@ -262,24 +255,11 @@ export function ConversationView({
         getCtrl?.(ctrl);
     },[ctrl,getCtrl]);
 
-    const themeValue=useShallowCompareItem(_theme);
-    useEffect(()=>{
-        if(themeValue!==undefined){
-            let t=themeValue;
-            if(typeof t === 'string'){
-                t=t==='dark'?defaultDarkConvoLangTheme:defaultLightConvoLangTheme;
-            }
-            ctrl.theme=t;
-        }
-    },[themeValue,ctrl]);
-
     useEffect(()=>{
         if(enabledInitMessage!==undefined){
             ctrl.enabledInitMessage=enabledInitMessage;
         }
     },[ctrl,enabledInitMessage]);
-
-    const theme=useSubject(ctrl.themeSubject);
 
     const showSourceCtrl=useSubject(ctrl.showSourceSubject);
     const showSource=_showSource??showSourceCtrl;
@@ -292,19 +272,19 @@ export function ConversationView({
             ctrl={ctrl}
             autoScrollBehavior={codeInputAutoScrollBehavior}
             mode={sourceMode}
-            autoHeight={autoHeight}
+            autoHeight={disableScroll}
             onInputChange={onInputChange}
         />
     :
-        <MessagesView
+        <ConvoMessageListView
             ctrl={ctrl}
             messageBottomPadding={messageBottomPadding}
             renderTarget={renderTarget}
             ragRenderer={ragRenderer}
-            autoHeight={autoHeight}
-            hideSuggestions={suggestionsLocation!=='inline'}
+            disableScroll={disableScroll}
+            hideSuggestions={suggestionsLocation!=='inline' && !forceInlineSuggestionsLocation}
             enableMarkdown={enableMarkdown}
-            markdownClassName={markdownClassName}
+            theme={theme}
             {...messagesProps}
          />
     )
@@ -314,25 +294,35 @@ export function ConversationView({
     },[redirectMessagesView,messagesView]);
 
     const suggestions=suggestionsLocation==='inline'?null:(
-        <SuggestionsView {...suggestionProps}/>
+        <ConvoSuggestionsView theme={theme} {...suggestionProps}/>
     )
 
     return (
 
         <ConversationUiContext.Provider value={ctrl}>
 
-            <div className={style.root({autoHeight},className)} style={style.vars(theme)}>
+            <div className={cn(theme.convoViewClassName,className)}>
 
                 {redirectMessagesView?null:messagesView}
 
                 {
                     (!showSource || showInputWithSource) &&
                     !noInput &&
-                    <>
+                    <div className={theme.inputAreaClassName}>
                         {suggestionsLocation==='before-input' && suggestions}
-                        {renderInput?renderInput(ctrl):<ConversationInput ctrl={ctrl} min={min} onInputChange={onInputChange} {...inputProps} />}
+                        {renderInput?
+                            renderInput(ctrl)
+                        :
+                            <ConvoInput
+                                theme={theme}
+                                ctrl={ctrl}
+                                onInputChange={onInputChange}
+                                placeholder={inputPlaceholder}
+                                {...inputProps}
+                            />
+                        }
                         {suggestionsLocation==='after-input' && suggestions}
-                    </>
+                    </div>
                 }
 
             </div>
@@ -340,15 +330,3 @@ export function ConversationView({
     )
 
 }
-
-const style=atDotCss({name:'ConversationView',order:'framework',namespace:'iyio',css:`
-    @.root{
-        display:flex;
-        flex-direction:column;
-        flex:1;
-        position:relative;
-    }
-    @.root.autoHeight{
-        flex:unset;
-    }
-`});

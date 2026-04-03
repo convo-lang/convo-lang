@@ -1,11 +1,29 @@
-import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
-import { BadRequestError, InternalOptions, NotFoundError, dupDeleteUndefined, escapeRegex, getErrorMessage, safeParseNumber } from "@iyio/common";
+import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnthropicModule, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoOpenAiModule, convoOpenRouterModule, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
+import { BadRequestError, EnvParams, InternalOptions, NotFoundError, dupDeleteUndefined, escapeRegex, getErrorMessage, initRootScope, rootScope, safeParseNumber } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib.js';
 import { createImageGenRoute } from './createImageGenRoute.js';
 import { getMockConvoRoutes } from './mock-routes.js';
 
 const modelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={}
+
+let inited=false;
+export const initScope=()=>{
+    if(inited){
+        return;
+    }
+    inited=true;
+    if(rootScope.initCalled()){
+        return;
+    }
+    initRootScope(reg=>{
+        reg.addParams(new EnvParams());
+        reg.use(convoOpenAiModule);
+        reg.use(convoOpenRouterModule);
+        reg.use(convoAnthropicModule);
+    })
+}
+
 
 export const createConvoLangApiRoutes=({
     prefix=defaultConvoHttpEndpointPrefix,
@@ -21,8 +39,13 @@ export const createConvoLangApiRoutes=({
     onCompletion,
     completionCtx,
     getUsage,
-    enableMockRoute
+    enableMockRoute,
+    autoInit
 }:ConvoLangRouteOptions={}):HttpRoute[]=>{
+
+    if(autoInit){
+        initScope();
+    }
 
     const baseOptions:InternalOptions<ConvoLangRouteOptionsBase,'cacheQueryParam'|'publicWebBasePath'>={
         fsRoot,

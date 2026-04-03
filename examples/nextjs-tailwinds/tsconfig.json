@@ -1,0 +1,26 @@
+{
+  "extends":"../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"],
+  "references": [
+    {
+        "path":"../../packages/convo-lang"
+    },
+    {
+        "path":"../../packages/convo-lang-react"
+    },
+    {
+        "path":"../../packages/convo-lang-api-routes"
+    }
+  ]
+}

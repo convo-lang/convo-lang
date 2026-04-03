@@ -1,18 +1,22 @@
-import { ConvoTask } from "@convo-lang/convo-lang";
-import { atDotCss } from "@iyio/at-dot-css";
-import { BaseLayoutProps } from "@iyio/common";
-import { LoadingDots, ProgressBar, SlimButton, Text, View, useSubject } from "@iyio/react-common";
+import { ConvoTask, ConvoViewTheme } from "@convo-lang/convo-lang";
+import { ProgressBar, useSubject } from "@iyio/react-common";
 import { useEffect, useState } from "react";
+import { Button } from "./Button.js";
+import { ConvoLoader } from "./ConvoLoader.js";
+import { cn } from "./util.js";
 
 export interface ConvoTaskViewProps
 {
+    className?:string;
     task:ConvoTask;
+    theme:ConvoViewTheme;
 }
 
 export function ConvoTaskView({
+    className,
     task,
-    ...props
-}:ConvoTaskViewProps & BaseLayoutProps){
+    theme,
+}:ConvoTaskViewProps){
 
     const progress=useSubject(task.progress?.progressSubject);
     const status=useSubject(task.progress?.statusSubject);
@@ -36,34 +40,22 @@ export function ConvoTaskView({
     }
 
     return (
-        <div className={style.root(null,null,props)}>
-            <View row alignCenter g05 opacity075>
+        <div className={cn(theme.taskClassName,className)}>
+            <div className={theme.taskRowClassName}>
                 {task.documentUrl?
-                    <SlimButton openLinkInNewWindow to={task.documentUrl}>
-                        <Text sm className={style.link()} text={task.name}/>
-                    </SlimButton>
+                    <Button openLinkInNewWindow to={task.documentUrl}>
+                        <span className={cn(theme.taskNameClassName,theme.taskLinkClassName)}>{task.name}</span>
+                    </Button>
                 :
-                    <Text sm text={task.name}/>
+                    <span className={theme.taskNameClassName}>{task.name}</span>
                 }
-                <LoadingDots size="0.5rem"/>
-                </View>
-            {!!status && <Text mt050 sm text={status}/>}
-            {progress!==undefined && <ProgressBar className={style.bar()} mt025 value={progress} />}
+                <ConvoLoader theme={theme} />
+            </div>
+            {!!status && <span className={theme.taskStatusClassName}>{status}</span>}
+            {progress!==undefined && <ProgressBar className={theme.taskProgressBarClassName} value={progress} />}
 
         </div>
     )
 
 }
 
-const style=atDotCss({name:'ConvoTaskView',css:`
-    @.root{
-        display:flex;
-        flex-direction:column;
-    }
-    @.link{
-        text-decoration:underline;
-    }
-    @.bar{
-        max-width:250px;
-    }
-`});

@@ -110,3 +110,6 @@ export interface ConvoUiAppendTrigger
      */
     errorCallback?:(error:any)=>void;
 }
+
+
+export type ConvoIconType=(props:{className?:string})=>any;

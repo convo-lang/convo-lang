@@ -180,8 +180,11 @@ export class ConversationUiCtrl
     }
 
     private readonly _theme:BehaviorSubject<Record<string,any>>=new BehaviorSubject<Record<string,any>>({});
+    /** @deprecated */
     public get themeSubject():ReadonlySubject<Record<string,any>>{return this._theme}
+    /** @deprecated */
     public get theme(){return this._theme.value}
+    /** @deprecated */
     public set theme(value:Record<string,any>){
         if(value==this._theme.value){
             return;
@@ -756,7 +759,9 @@ export class ConversationUiCtrl
 
     public printHelp()
     {
+        const t3='```'
         this.convo?.appendAssistantMessage(/*convo*/`
+${t3} text
 /source     - Display convo script source
 /imports    - Display convo script source and imported modules
 /modules    - Display convo script source and registered modules
@@ -772,6 +777,7 @@ export class ConversationUiCtrl
 /convert    - Display messages in the format of the current model
 /clear      - Clears all messages
 /help       - Prints this help message
+${t3}
         `)
     }
 

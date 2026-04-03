@@ -41,6 +41,7 @@ export const useConversationMessages=(ctrlOverride?:ConversationUiCtrl):FlatConv
     return messages??[];
 }
 
+/** @deprecated */
 export const useConversationTheme=(ctrlOverride?:ConversationUiCtrl):Partial<ConvoLangTheme>=>{
     const ctrl=useConversationUiCtrl(ctrlOverride);
     return useSubject(ctrl.themeSubject);

@@ -1,8 +1,10 @@
 import { BaseLayoutOuterProps, baseLayoutCn } from '@iyio/common';
 import { iconSources } from './icon-source.js';
 
+/** @deprecated */
 export type IconType=keyof typeof iconSources;
 
+/** @deprecated */
 interface IconProps extends BaseLayoutOuterProps
 {
     icon:IconType;
@@ -15,6 +17,7 @@ interface IconProps extends BaseLayoutOuterProps
     dark?:boolean;
 }
 
+/** @deprecated */
 export function Icon({
     icon,
     size=16,
