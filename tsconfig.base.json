@@ -23,7 +23,7 @@
             "dom"
         ],
         "types": [
-            "node"
+            "node","bun"
         ],
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
@@ -73,6 +73,9 @@
             ],
             "@convo-lang/convo-lang-react": [
                 "packages/convo-lang-react/src/index.ts"
+            ],
+            "@convo-lang/convo-lang-hono": [
+                "packages/convo-lang-hono/src/index.ts"
             ]
         }
     },
