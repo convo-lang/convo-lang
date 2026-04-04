@@ -1,5 +1,6 @@
 {
     "scripts":{
-        "watch-mindark":"node ../../dist/packages/convo-lang-cli/bin/convo.cjs --sync-ts-config ../../../mindark-exit/tsconfig.json --sync-out ../../../mindark-exit/convo-generated --sync-watch"
+        "watch-mindark":"node ../../dist/packages/convo-lang-cli/bin/convo.cjs --sync-ts-config ../../../mindark-exit/tsconfig.json --sync-out ../../../mindark-exit/convo-generated --sync-watch",
+        "test-worker":"node ../../dist/packages/convo-lang-cli/bin/convo.js --worker ../../Documents/wt/poem.worker.convo"
     }
 }

@@ -45,6 +45,9 @@
         },
         {
             "path": "./packages/convo-lang-react"
+        },
+        {
+            "path": "./packages/convo-lang-hono"
         }
     ]
 }

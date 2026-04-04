@@ -1,7 +1,9 @@
-import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumberOrUndefined } from "@iyio/common";
+import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumber, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
-import { createConvoCliAsync } from "../lib/ConvoCli.js";
+import { createConvoCliAsync, initConvoCliAsync } from "../lib/ConvoCli.js";
+import { runConvoCliApiAsync } from "../lib/convo-cli-api-server.js";
+import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
@@ -67,6 +69,17 @@ const args=parseCliArgsT<Args>({
         varsPath:args=>args,
         graph:args=>args.length?true:false,
         disableWriteGraphOnCompletion:args=>args.length?true:false,
+        worker:args=>args,
+        workerBasePath:args=>args[0],
+        watchWorkers:args=>args.length?true:false,
+        dryRun:args=>args.length?true:false,
+        disableThreadLogging:args=>args.length?true:false,
+        api:args=>args.length?true:false,
+        apiPort:args=>safeParseNumber(args[0],defaultConvoCliApiPort),
+        apiReusePort:args=>args.length?true:false,
+        apiCors:args=>args.length?true:false,
+        apiCorsOrigins:args=>args,
+        env:args=>args,
     }
 }).parsed as Args;
 
@@ -75,7 +88,13 @@ const main=async()=>{
     const cancel=new CancelToken();
     let done=false;
     let shutdownIv:any;
+    let killCount=0;
     process.on('SIGINT',()=>{
+        killCount++;
+        if(killCount>1){
+            console.log('Forcefully exiting process');
+            process.exit();
+        }
         stopReadingStdIn();
         console.log("Stopping Convo-Lang");
         cancel.cancelNow();
@@ -94,6 +113,10 @@ const main=async()=>{
         console.error('Unhandled Exception',ex,'origin',origin);
         process.exit(1);
     });
+
+    if(args.env){
+        await loadEnvFileAsync(args.env);
+    }
 
     args.exeCwd=normalizePath(args.exeCwd?await realpath(args.exeCwd):globalThis.process.cwd());
 
@@ -116,7 +139,16 @@ const main=async()=>{
             cmd:args.spawn,
             cwd:args.spawnDir,
             cancel,
-        }))
+        }));
+    }
+
+    if(args.api){
+        await initConvoCliAsync(args);
+        toolPromises.push(runConvoCliApiAsync({
+            port:args.apiPort,
+            reusePort:args.apiReusePort,
+            cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
+        },cancel));
     }
 
     await Promise.all(toolPromises);

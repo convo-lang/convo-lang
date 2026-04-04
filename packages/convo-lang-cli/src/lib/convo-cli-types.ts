@@ -37,6 +37,11 @@ export interface ConvoCliOptions
     config?:string|ConvoCliConfig;
 
     /**
+     * Path to env files to load environment variables from
+     */
+    env?:string|string[];
+
+    /**
      * Inline configuration as json
      */
     inlineConfig?:string;
@@ -236,6 +241,49 @@ export interface ConvoCliOptions
     graph?:boolean;
 
     disableWriteGraphOnCompletion?:boolean;
+
+    /**
+     * Path or paths to a convo worker file
+     */
+    worker?:string[];
+
+    /**
+     * If true worker files will be watched
+     */
+    watchWorkers?:boolean;
+
+    workerBasePath?:string;
+
+    dryRun?:boolean;
+
+    disableThreadLogging?:boolean;
+
+    /**
+     * If true the CLI will run an HTTP API server with a convo-lang endpoint
+     */
+    api?:boolean;
+
+    /**
+     * Port the API server will run on.
+     * @default 7222
+     */
+    apiPort?:number;
+
+    /**
+     * If true the API port will be allowed to be reused for load balancing.
+     * @note This option is only available when using the Bun runtime.
+     */
+    apiReusePort?:boolean;
+
+    /**
+     * If true CORS will be enabled for the API
+     */
+    apiCors?:boolean;
+
+    /**
+     * List of allowed origins for API CORS
+     */
+    apiCorsOrigins?:string[];
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

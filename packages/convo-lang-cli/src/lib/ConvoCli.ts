@@ -1,9 +1,9 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, openRouterApiKeyParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
-import { CancelToken, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
+import { CancelToken, DisposeContainer, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
 import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
@@ -194,9 +194,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         reg.use(convoOpenAiModule);
         reg.use(convoBedrockModule);
         reg.use(convoMcpClientModule);
-        if(config.env?.[openRouterApiKeyParam.typeName]){
-            reg.use(convoOpenRouterModule);
-        }
+        reg.use(convoOpenRouterModule);
 
         reg.implementService(convoImportService,()=>new ConvoVfsImportService());
         reg.implementService(convoImportService,()=>new ConvoHttpImportService());
@@ -266,6 +264,7 @@ export class ConvoCli
         }
     }
 
+    private readonly disposables=new DisposeContainer();
     private _isDisposed=false;
     public get isDisposed(){return this._isDisposed}
     public dispose()
@@ -274,6 +273,7 @@ export class ConvoCli
             return;
         }
         this._isDisposed=true;
+        this.disposables.dispose();
         this.convo.dispose();
     }
 
@@ -435,7 +435,10 @@ The current date and time is: "{{dateTime()}}"
                 await readFileAsStringAsync(this.options.source??'');
         }
 
-        if(source!==undefined){
+
+        if(this.options.worker){
+            await this.runWorkers();
+        }else if(source!==undefined){
             let writeOut=true;
             if(this.options.make || this.options.makeTargets){
                 writeOut=false;
@@ -457,6 +460,23 @@ The current date and time is: "{{dateTime()}}"
         if(this.options.repl){
             await this.runReplAsync(cancel);
         }
+    }
+
+    private async runWorkers()
+    {
+        const ctx=new ConvoWorkerCtx({
+            basePath:this.options.workerBasePath??process.cwd(),
+            dryRun:this.options.dryRun,
+            disableThreadLogging:this.options.disableThreadLogging,
+        });
+        this.disposables.add(ctx);
+
+        await Promise.all((this.options.worker??[])?.map(async path=>{
+            const worker=new ConvoWorker({ctx,path});
+            this.disposables.add(worker);
+            await worker.runAsync();
+            return worker;
+        }));
     }
 
     private readonly execConfirmAsync=async (command:string):Promise<boolean>=>{
