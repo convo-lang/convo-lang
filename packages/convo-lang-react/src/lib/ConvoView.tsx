@@ -8,8 +8,8 @@ import { getConvoViewTheme } from './convo-view-themes.js';
 import { ConvoInput, ConvoInputProps } from "./ConvoInput.js";
 import { ConvoMessageListView } from './ConvoMessageListView.js';
 import { ConvoMessageViewProps } from './ConvoMessageView.js';
+import { ConvoSourceView } from './ConvoSourceView.js';
 import { ConvoSuggestionsView, ConvoSuggestionsViewProps } from './ConvoSuggestionsView.js';
-import { MessagesSourceView } from "./MessagesSourceView.js";
 import { cn } from './util.js';
 
 
@@ -27,6 +27,9 @@ export interface ConvoViewProps
     inputProps?:Partial<ConvoInputProps>;
     showSource?:boolean;
     sourceMode?:ConvoEditorMode;
+    showFunctions?:boolean;
+    showResults?:boolean;
+    showSystem?:boolean;
     showInputWithSource?:boolean;
     renderTarget?:string;
     redirectMessagesView?:(view:any)=>void;
@@ -61,6 +64,8 @@ export interface ConvoViewProps
     onInputChange?:(change:ConversationInputChange)=>void;
 
     theme?:ConvoViewTheme;
+    sourceDarkMode?:boolean|'auto';
+    defaultValue?:string;
 }
 
 export function ConvoView({
@@ -74,6 +79,9 @@ export function ConvoView({
     inputProps,
     sourceMode:_sourceMode,
     showSource:_showSource,
+    showFunctions,
+    showResults,
+    showSystem,
     showInputWithSource=true,
     ragRenderer,
     renderTarget=defaultConvoRenderTarget,
@@ -102,6 +110,8 @@ export function ConvoView({
     onInputChange,
     theme,
     inputPlaceholder,
+    sourceDarkMode,
+    defaultValue,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -149,6 +159,12 @@ export function ConvoView({
     }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr]);
 
     useEffect(()=>{
+        if(defaultValue!==undefined){
+            ctrl.replace(defaultValue);
+        }
+    },[defaultValue]);
+
+    useEffect(()=>{
         if(!ctrl || !onVarsChange){
             return;
         }
@@ -190,6 +206,24 @@ export function ConvoView({
             ctrl.defaultVars=defaultVars;
         }
     },[ctrl,defaultVars]);
+
+    useEffect(()=>{
+        if(showResults!==undefined && ctrl){
+            ctrl.showResults=showResults;
+        }
+    },[showResults,ctrl]);
+
+    useEffect(()=>{
+        if(showSystem!==undefined && ctrl){
+            ctrl.showSystemMessages=showSystem;
+        }
+    },[showSystem,ctrl]);
+
+    useEffect(()=>{
+        if(showFunctions!==undefined && ctrl){
+            ctrl.showFunctions=showFunctions;
+        }
+    },[showFunctions,ctrl]);
 
 
     const compRenderers=useDeepCompareItem(componentRenderers);
@@ -268,12 +302,14 @@ export function ConvoView({
     const sourceMode=_sourceMode??sourceModeCtrl;
 
     const messagesView=(showSource?
-        <MessagesSourceView
+        <ConvoSourceView
             ctrl={ctrl}
             autoScrollBehavior={codeInputAutoScrollBehavior}
             mode={sourceMode}
-            autoHeight={disableScroll}
+            disableScroll={disableScroll}
             onInputChange={onInputChange}
+            theme={theme}
+            darkMode={sourceDarkMode}
         />
     :
         <ConvoMessageListView

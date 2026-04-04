@@ -41,6 +41,8 @@ export interface ConvoViewTheme
     systemMessageClassName?:string;
     callMessageClassName?:string;
     functionMessageClassName?:string;
+    functionIcon?:ConvoIconType;
+    functionIconClassName?:string;
     suggestionMessageClassName?:string;
 
 
@@ -63,12 +65,15 @@ export interface ConvoViewTheme
     suggestionRowClassName?:string;
     componentRowClassName?:string;
 
+    assignmentMessageClassName?:string;
     assignmentListClassName?:string;
-    assignmentSingleItemListClassName?:string;
+    assignmentFunctionCallClassName?:string;
     assignmentRowClassName?:string;
     assignmentNameClassName?:string;
-    assignmentIconClassName?:string;
     assignmentValueClassName?:string;
+    assignmentOperatorIcon?:ConvoIconType;
+    assignmentOperatorIconClassName?:string;
+    assignmentIconClassName?:string;
     assignmentIcon?:ConvoIconType;
 
     imageClassName?:string;
@@ -181,5 +186,20 @@ export interface ConvoViewTheme
     // ------- Rag ------- //
     ragIcon?:ConvoIconType;
     ragIconClassName?:string;
+
+
+    // ------- Source View ------- //
+    sourceViewContainerClassName?:string;
+    sourceViewContainerScrollDisabledClassName?:string;
+    sourceViewScrollViewClassName?:string;
+    sourceViewBusyContainer?:string;
+    sourceViewSubmitButtonClassName?:string;
+    sourceViewSubmitButtonShortcutClassName?:string;
+    sourceViewClassName?:string;
+    sourceViewTextareaClassName?:string;
+    sourceViewErrorClassName?:string;
+    sourceViewErrorMessageClassName?:string;
+    sourceViewErrorHighlightMessageClassName?:string;
+    sourceViewLineNumberClassName?:string;
 
 }

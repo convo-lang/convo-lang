@@ -3173,6 +3173,7 @@ export class Conversation
         const flat:FlatConvoMessage={
             role:this.getMappedRole(msg.role),
             tags:tags?convoTagsToMap(tags,exe):undefined,
+            [convoFlatMessageSourceMessageKey]:msg,
         }
 
         if(msg.role===convoRoles.node){

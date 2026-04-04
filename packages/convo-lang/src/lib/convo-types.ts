@@ -1132,7 +1132,14 @@ export interface FlatConvoMessage
      */
     nodeStepIndex?:number;
 
+    /**
+     * The ConvoMessage that the flat message was created from.
+     */
+    [convoFlatMessageSourceMessageKey]?:ConvoMessage;
+
 }
+
+export const convoFlatMessageSourceMessageKey=Symbol('convoFlatMessageSourceMessageKey');
 
 export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
 {

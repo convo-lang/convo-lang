@@ -1,4 +1,4 @@
-import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, convoRoles, convoTags, isMdConvoEnabledFor } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, convoFlatMessageSourceMessageKey, convoMessageToStringSafe, convoRoles, convoTags, isMdConvoEnabledFor } from "@convo-lang/convo-lang";
 import { aryRemoveWhere, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
 import { Fragment } from "react";
 import { Button } from "./Button.js";
@@ -108,6 +108,7 @@ export function ConvoMessageView({
         if(!message.setVars || (!showResults && !showFunctions)){
             return null;
         }
+        const called=flat.messages[messageIndex+1];
         const keys=Object.keys(message.setVars);
         aryRemoveWhere(keys,k=>k.startsWith('__') && k!=='__return');
         if(!keys.length){
@@ -117,11 +118,14 @@ export function ConvoMessageView({
         if(keys.length===1 && Array.isArray(firstValue) && firstValue.length===1){
             firstValue=firstValue[0];
         }
-        const singleItem=keys.length===1 && firstValue && (typeof firstValue==='object');
         return (
             <div className={rowClassName}>
-                <div className={messageClassName}>
-                    <div className={cn(theme.assignmentListClassName,singleItem && theme.assignmentSingleItemListClassName)}>
+                <ConvoThemeIcon theme={theme} icon="assignmentIcon" className={theme.assistantIconClassName}/>
+                <div className={cn(messageClassName,theme.assignmentMessageClassName)}>
+                    <div className={cn(theme.assignmentListClassName)}>
+                        {called?.called && <div className={theme.assignmentFunctionCallClassName}>
+                            {called.called.name}({JSON.stringify(called.calledParams,null,4)})
+                        </div>}
                         {keys.map((k,ki)=>{
 
                             const value=ki===0?firstValue:(message.setVars?.[k]);
@@ -129,11 +133,11 @@ export function ConvoMessageView({
                             return (
                                 <div className={theme.assignmentRowClassName} key={k+'r'}>
                                     <div className={theme.assignmentNameClassName}>{k}</div>
-                                    {!singleItem && (theme.assignmentIcon?
-                                        <ConvoThemeIcon theme={theme} icon="assignmentIcon"/>
+                                    {theme.assignmentOperatorIcon?
+                                        <ConvoThemeIcon theme={theme} icon="assignmentOperatorIcon"/>
                                     :
                                         <div className={cn(theme.iconClassName,theme.assignmentIconClassName)}>=</div>
-                                    )}
+                                    }
                                     <div className={theme.assignmentValueClassName}>{k[0]===k[0]?.toLowerCase()?
                                         objectToMarkdown(value)
                                     :
@@ -167,11 +171,12 @@ export function ConvoMessageView({
                     message={message}
                 />
             )
-        }else if(showFunctions && ( message.fn || message.called)){
+        }else if(showFunctions && ( message.fn || (message.called && !showResults))){
             return (
                 <div className={rowClassName}>
+                    <ConvoThemeIcon theme={theme} icon="functionIcon" className={theme.assistantIconClassName}/>
                     <div className={messageClassName}>
-                        {JSON.stringify(message,null,4)}
+                        {(!message.called?convoMessageToStringSafe(message[convoFlatMessageSourceMessageKey]):null)??JSON.stringify(message,null,4)}
                     </div>
                 </div>
             )
@@ -324,7 +329,7 @@ function BubbleMessageView({
 
     return (
         <div className={rowClassName}>
-            {message.role==='system' && <ConvoThemeIcon theme={theme} icon="systemIcon" />}
+            {message.role==='system' && <ConvoThemeIcon theme={theme} icon="systemIcon" className={theme.assistantIconClassName} />}
             {message.isAssistant && <ConvoThemeIcon theme={theme} icon="assistantIcon" />}
             <div className={cn(messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
                 (enableMarkdown && isMdConvoEnabledFor(message.isUser?'user':'assistant',enableMarkdown))?

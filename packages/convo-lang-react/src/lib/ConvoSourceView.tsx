@@ -1,35 +1,37 @@
 
-import { LazyCodeInput } from "@iyio/syn-taxi";
-
-import { ConversationUiCtrl, ConvoEditorMode, flatConvoMessagesToTextView, getConvoDebugLabelComment, parseConvoCode } from "@convo-lang/convo-lang";
-import { atDotCss } from "@iyio/at-dot-css";
+import { ConversationUiCtrl, ConvoEditorMode, ConvoViewTheme, flatConvoMessagesToTextView, getConvoDebugLabelComment, parseConvoCode } from "@convo-lang/convo-lang";
 import { createJsonRefReplacer } from "@iyio/common";
-import { LoadingDots, ScrollView, SlimButton, useSubject } from "@iyio/react-common";
+import { ScrollView, useSubject } from "@iyio/react-common";
+import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConversationInputChange, useConversation, useConversationTheme, useConversationUiCtrl } from "./convo-lang-react.js";
+import { Button } from "./Button.js";
+import { ConversationInputChange, useConversation, useConversationUiCtrl } from "./convo-lang-react.js";
+import { ConvoLoader } from "./ConvoLoader.js";
+import { cn } from "./util.js";
 
-export interface MessagesSourceViewProps
+export interface ConvoSourceViewProps
 {
     ctrl?:ConversationUiCtrl;
     mode?:ConvoEditorMode;
     autoScrollBehavior?:ScrollBehavior;
-    autoHeight?:boolean;
+    disableScroll?:boolean;
     onInputChange?:(change:ConversationInputChange)=>void;
+    theme:ConvoViewTheme;
+    darkMode?:boolean|'auto';
 }
 
-/**
- * @acIgnore
- * @deprecated
- */
-export function MessagesSourceView({
+
+export function ConvoSourceView({
     ctrl:_ctrl,
     mode='code',
     autoScrollBehavior,
-    autoHeight,
-    onInputChange
-}:MessagesSourceViewProps){
+    disableScroll,
+    onInputChange,
+    theme,
+    darkMode='auto',
+}:ConvoSourceViewProps){
 
-    const refs=useRef({onInputChange});
+    const refs=useRef({onInputChange,lastChange:null as string|null});
     refs.current.onInputChange=onInputChange;
 
     const ctrl=useConversationUiCtrl(_ctrl);
@@ -37,8 +39,6 @@ export function MessagesSourceView({
     const convo=useConversation(_ctrl);
 
     const flatConvo=useSubject((mode==='vars' || mode==='flat' || mode==='text' || mode==='model')?convo?.flatSubject:undefined);
-
-    const theme=useConversationTheme(_ctrl);
 
     const [code,setCode]=useState('');
 
@@ -100,17 +100,36 @@ export function MessagesSourceView({
         }
     },[mode,flatConvo,convo]);
 
-    const changeCode=onInputChange?code:undefined;
     useEffect(()=>{
-        if(changeCode!==undefined && refs.current.onInputChange){
-            refs.current.onInputChange({type:'source',value:changeCode});
+        if(code!==undefined){
+            refs.current.lastChange=code;
         }
-    },[changeCode]);
+        if(code!==undefined && refs.current.onInputChange){
+            refs.current.onInputChange({type:'source',value:code});
+        }
+    },[code]);
+
+    useEffect(()=>{
+        return ()=>{
+            if(refs.current.lastChange!==null){
+                ctrl.replace(refs.current.lastChange);
+            }
+        }
+    },[ctrl]);
 
     const codeInput=(
         <LazyCodeInput
+            theme={darkMode==='auto'?'auto':darkMode?'dark-plus':'github-light'}
             lineNumbers
             fillScrollHeight
+            disableColors
+            className={theme.sourceViewClassName}
+            errorClassName={theme.sourceViewErrorClassName}
+            errorMessageClassName={theme.sourceViewErrorMessageClassName}
+            errorHighlightClassName={theme.sourceViewErrorHighlightMessageClassName}
+            textareaClassName={theme.sourceViewTextareaClassName}
+            lineNumberClassName={theme.sourceViewLineNumberClassName}
+
             language={mode==='code' || mode==='imports' || mode==='modules' || mode==='text'?'convo':'json'}
             value={
                 mode==='vars'?
@@ -142,12 +161,12 @@ export function MessagesSourceView({
     )
 
     return (
-        <div className={style.root({autoHeight})} style={style.vars(theme)}>
-            {autoHeight?
+        <div className={cn(theme.sourceViewContainerClassName,disableScroll&&theme.sourceViewContainerScrollDisabledClassName)}>
+            {disableScroll?
                 codeInput
             :
-                    <ScrollView
-                    flex1
+                <ScrollView
+                    className={theme.sourceViewScrollViewClassName}
                     autoScrollTrigger={lastMsg}
                     autoScrollBehavior={autoScrollBehavior}
                     autoScrollSelector=".language-convo"
@@ -157,66 +176,17 @@ export function MessagesSourceView({
                     {codeInput}
                 </ScrollView>
             }
-            <div className={style.busy({show:currentTask})}>
-                <LoadingDots disabled={!currentTask}/>
-            </div>
-
-            {mode==='code' && <div className={style.shortcut()}>
-                <SlimButton onClick={()=>submit(code)}>Submit</SlimButton>
-                <span>( ctrl + enter )</span>
+            {currentTask && <div className={theme.sourceViewBusyContainer}>
+                <ConvoLoader theme={theme}/>
             </div>}
+
+            {mode==='code' &&
+                <Button onClick={()=>submit(code)} className={theme.sourceViewSubmitButtonClassName}>
+                    Submit
+                    <span className={theme.sourceViewSubmitButtonShortcutClassName}>( ctrl + enter )</span>
+                </Button>
+            }
         </div>
     )
 
 }
-
-const style=atDotCss({name:'MessagesSourceView',order:'framework',namespace:'iyio',css:`
-    @.root{
-        display:flex;
-        flex-direction:column;
-        flex:1;
-        color:#ffffff;
-        position:relative;
-    }
-    @.root.autoHeight{
-        flex:unset;
-    }
-    @.busy{
-        position:absolute;
-        right:1rem;
-        bottom:1rem;
-        pointer-events:none;
-        opacity:0;
-        visibility:hidden;
-        transition:opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
-    }
-    @.busy.show{
-        opacity:1;
-        visibility:visible;
-    }
-    @.shortcut{
-        position:absolute;
-        left:50%;
-        transform:translateX(-50%);
-        bottom:0.5rem;
-        display:flex;
-        align-items:center;
-    }
-    @.shortcut button{
-        padding:0.5rem 1rem;
-        border-radius:@@borderRadius;
-        background-color:@@buttonColor;
-        font-size:0.8rem;
-    }
-    @.shortcut span{
-        position:absolute;
-        top:0;
-        left:50%;
-        transform:translate(-50%, calc(-100% - 0.5rem));
-        white-space:pre;
-        font-size:0.5rem;
-        opacity:0.3;
-        pointer-events:none;
-    }
-
-`});

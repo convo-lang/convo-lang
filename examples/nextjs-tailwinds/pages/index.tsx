@@ -81,14 +81,38 @@ export default function IndexPage()
             </div>
             <div className="max-w-200 w-full mx-auto flex flex-col flex-1 m-4 border rounded-3xl overflow-clip">
                 <ConvoView
-                    httpEndpoint="/api/convo-lang"
+                    httpEndpoint="http://localhost:7222/api/convo-lang"
                     className="flex-1"
                     inputPlaceholder="Ask something cool"
                     enableMarkdown
                     enabledSlashCommands
                     suggestionsLocation="before-input"
                     forceInlineSuggestionsLocation
-                    template={/*convo*/`
+                    showFunctions
+                    showResults
+                    showSystem
+                    defaultValue={defaultValue}
+                />
+            </div>
+        </div>
+    )
+}
+
+let lastUpdate:string='';
+
+
+const t3='```'
+
+const defaultValue=/*convo*/`
+> assistant
+hi
+
+`
+
+const defaultValuex=/*convo*/`
+> define
+__model='gpt-4.1'
+
 > system
 You are a friendly assistant and an expert at everything in the universe.
 Make not mistakes.
@@ -96,6 +120,7 @@ Make not mistakes.
 Current Date and Time {{dateTime()}}
 
 > addNumber(a:number b:number)->(
+    sleep(10000)
     'The result is {{add(a b)}}'
 )
 
@@ -179,12 +204,4 @@ __return="The result is 14"
 > assistant
 7 plus 7 equals 14.
 
-                    `}
-                />
-            </div>
-        </div>
-    )
-}
-
-
-const t3='```'
+`;
