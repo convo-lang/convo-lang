@@ -1,4 +1,4 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoAnthropicModule, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
@@ -195,6 +195,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         reg.use(convoBedrockModule);
         reg.use(convoMcpClientModule);
         reg.use(convoOpenRouterModule);
+        reg.use(convoAnthropicModule);
 
         reg.implementService(convoImportService,()=>new ConvoVfsImportService());
         reg.implementService(convoImportService,()=>new ConvoHttpImportService());

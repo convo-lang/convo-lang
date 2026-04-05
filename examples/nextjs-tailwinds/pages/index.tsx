@@ -117,8 +117,13 @@ let lastUpdate:string='';
 const t3='```'
 
 const defaultValue=/*convo*/`
-> define
-__model='gpt-4.1'
+
+> user
+hi
+
+`.trim()+'\n'
+
+const defaultValue2=/*convo*/`
 
 > addNumber(a:number b:number)->(
     'The result is {{add(a b)}}'

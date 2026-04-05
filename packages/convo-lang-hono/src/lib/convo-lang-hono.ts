@@ -17,11 +17,17 @@ export const getConvoHonoRoutes=({
 
     const routes=new Hono();
 
+    let modelCache:ConvoModelInfo[]|undefined;
 
 
     routes.get('/models',async (c)=>{
 
+        if(modelCache){
+            return c.json(modelCache);
+        }
+
         await initConvoHonoAsync();
+
 
         const services=convoCompletionService.all();
         const models:ConvoModelInfo[]=[];
@@ -35,6 +41,10 @@ export const getConvoHonoRoutes=({
                 models.push(...ms);
             }
         }
+
+        models.sort((a,b)=>(b.priority??0)-(a.priority??0));
+
+        modelCache=models;
 
         return c.json(models);
     });

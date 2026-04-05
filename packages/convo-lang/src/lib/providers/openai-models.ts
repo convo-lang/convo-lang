@@ -556,6 +556,7 @@ export const openAiModels:ConvoModelInfo[]=[
         inputTokenPriceUsd:m(2),
         outputTokenPriceUsd:m(8),
         isServiceDefault:true,
+        priority:100,
     },
     {
         name:'gpt-4.1-2025-04-14',
