@@ -1,6 +1,6 @@
 import { NotFoundError, SecretManager, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
-import { ConvoCompletionCtx, ConvoCompletionService, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
+import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
 import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessageToolCall } from './open-ai/resources/chat/index.js';
 import { CompletionUsage } from "./open-ai/resources/completions.js";
 
@@ -89,6 +89,12 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         this.updateRequest=updateRequest;
         this._getModelsAsync=getModelsAsync;
         this._canComplete=canComplete;
+    }
+
+    public getSupportAsync(modelName:string):Promise<ConvoCompletionServiceFeatureSupport>{
+        return Promise.resolve({
+            streaming:true,
+        });
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean

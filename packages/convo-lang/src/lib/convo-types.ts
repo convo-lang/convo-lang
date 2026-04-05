@@ -1184,6 +1184,11 @@ export interface ConvoCompletionService<TInput,TOutput>
     getModelsAsync?():Promise<ConvoModelInfo[]|undefined>;
 
     /**
+     * Returns completion service support for a given model
+     */
+    getSupportAsync?(modelName:string):Promise<ConvoCompletionServiceFeatureSupport>;
+
+    /**
      * If true models return from getModelsAsync will not be cached.
      */
     disableModelInfoCaching?:boolean;
@@ -1193,6 +1198,14 @@ export interface ConvoCompletionService<TInput,TOutput>
      * to convert message using converters server side.
      */
     relayConvertConvoToInputAsync?(flat:FlatConvoConversationBase,inputType?:string):Promise<TInput>;
+}
+
+export interface ConvoCompletionServiceFeatureSupport
+{
+    /**
+     * If true the Completion Service support streaming
+     */
+    streaming?:boolean;
 }
 
 export interface ConvoCompletionCtx<TInput=any,TOutput=any>

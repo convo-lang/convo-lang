@@ -2,7 +2,7 @@ import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryR
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
-import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
+import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService } from "./convo.deps.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -106,20 +106,26 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
 
     public async completeConvoAsync(flat:FlatConvoConversationBase,_:FlatConvoConversationBase,ctx:ConvoCompletionCtx<FlatConvoConversationBase,ConvoCompletionMessage[]>):Promise<ConvoCompletionMessage[]>
     {
+        let support:ConvoCompletionServiceFeatureSupport|undefined;
+        if(flat.enableStreaming && flat.model){
+            support=await this.getSupportAsync(flat.model.name);
+        }
+        const stream=(flat.enableStreaming && support?.streaming)??false;
+
         const options=await this.getRequestOptions?.();
         const response=await httpClient().postAsync<Response|ConvoCompletionMessage[]>(
-            joinPaths(this.getEndpoint(),'/completion'+(flat.enableStreaming?'/stream':'')),
+            joinPaths(this.getEndpoint(),'/completion'+(stream?'/stream':'')),
             getSerializableFlatConvoConversation(flat),
             {
                 ...options,
-                returnFetchResponse:flat.enableStreaming??false,
+                returnFetchResponse:stream,
             }
         );
         if(!response){
-            throw new Error('convo-lang ai endpoint returned empty response');
+            throw new Error('convo-lang API endpoint returned empty response');
         }
 
-        if(flat.enableStreaming){
+        if(stream){
             const reader=(response as Response).body?.getReader();
             if(!reader){
                 throw new Error('Unable to get response reader');
@@ -177,6 +183,31 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         }
     }
 
+    private supportMap:Record<string,Promise<ConvoCompletionServiceFeatureSupport>>={};
+    public async getSupportAsync(modelName:string):Promise<ConvoCompletionServiceFeatureSupport>
+    {
+        return await (this.supportMap[modelName]??(this.supportMap[modelName]=this._getSupportAsync(modelName)));
+    }
+
+    private async _getSupportAsync(modelName:string):Promise<ConvoCompletionServiceFeatureSupport>
+    {
+        const options=await this.getRequestOptions?.();
+        const response=await httpClient().getAsync<Response>(
+            joinPaths(this.getEndpoint(),`/support/${encodeURIComponent(modelName)}`),
+            {
+                ...options,
+                returnFetchResponse:true,
+            }
+        );
+        if(!response){
+            throw new Error('convo-lang API endpoint returned empty response');
+        }
+        if(response.status===404){
+            return {}
+        }
+        return await response.json();
+    }
+
     public async getModelsAsync():Promise<ConvoModelInfo[]|undefined>
     {
         return await httpClient().getAsync<ConvoModelInfo[]>(
@@ -209,7 +240,7 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
             await this.getRequestOptions?.()
         );
         if(!r){
-            throw new Error('convo-lang ai endpoint returned empty response');
+            throw new Error('convo-lang API endpoint returned empty response');
         }
         return r;
     }

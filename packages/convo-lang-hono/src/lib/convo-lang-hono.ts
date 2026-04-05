@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { streamSSE } from 'hono/streaming';
@@ -37,6 +37,26 @@ export const getConvoHonoRoutes=({
         }
 
         return c.json(models);
+    });
+
+    routes.get('/support/:modelName',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const services=convoCompletionService.all();
+
+        const name=c.req.param('modelName');
+
+        const service=(await getConvoCompletionServicesForModelAsync(name,services,convoModelServiceMap))?.[0]?.service;
+
+        let support:ConvoCompletionServiceFeatureSupport;
+        if(service?.getSupportAsync){
+            support=await service.getSupportAsync(name);
+        }else{
+            support={};
+        }
+
+        return c.json(support,200);
     });
 
     routes.post('/completion',timeout(completionTimeoutMs),async (c)=>{
