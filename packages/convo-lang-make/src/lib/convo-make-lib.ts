@@ -1,5 +1,5 @@
 import { ConvoMakeApp, ConvoMakeContentTemplate, ConvoMakeInput, ConvoMakeStage, ConvoMakeTarget, ConvoMakeTargetDeclaration, ConvoMakeTargetSharedProps, convoMakeTargetShellInputPlaceholder, convoTypeToJsonScheme, convoVars, defaultConvoMakeStageName, insertConvoContentIntoSlot, schemeToConvoTypeString } from "@convo-lang/convo-lang";
-import { asArray, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, joinPaths, normalizePath, valueIsZodType } from "@iyio/common";
+import { asArray, escapeHtml, getContentType, getDirectoryName, getErrorMessage, getFileExt, getFileName, getObjKeyCount, getValueByPath, joinPaths, normalizePath, valueIsZodType } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import type { ConvoMakeCtrlOptions } from "./ConvoMakeCtrl.js";
 
@@ -260,9 +260,10 @@ const selectContextContent=(content:string,tmpl:ConvoMakeContentTemplate,select:
 }
 export interface ApplyConvoMakeContentTemplateOptions{
     name?:string;
+    path:string;
     templateVars?:Record<string,string>;
 }
-export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContentTemplate,options?:ApplyConvoMakeContentTemplateOptions):string=>{
+export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContentTemplate,options:ApplyConvoMakeContentTemplateOptions):string=>{
 
     if(tmpl.select){
         content=asArray(tmpl.select).map(s=>selectContextContent(content,tmpl,s)).join('\n\n');
@@ -273,7 +274,22 @@ export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContent
     }
 
     if(tmpl.tag){
-        content=`<${tmpl.tag}>\n${content}\n</${tmpl.tag}>`;
+        const path=options?.path??tmpl.path;
+        let pathAtt=(tmpl.pathAtt && path)?(tmpl.pathAttBase && path.startsWith(tmpl.pathAttBase))?path.substring(tmpl.pathAttBase.length):path:undefined;
+        if(pathAtt && tmpl.pathAttNoExt){
+            const e=pathAtt.lastIndexOf('.');
+            const s=pathAtt.lastIndexOf('/');
+            if(e!==-1 && e>s){
+                pathAtt=pathAtt.substring(0,e);
+            }
+        }
+        if(pathAtt?.startsWith('./')){
+            pathAtt=pathAtt.substring(2);
+            if(!pathAtt){
+                pathAtt='.'
+            }
+        }
+        content=`<${tmpl.tag}${pathAtt?` path="${escapeHtml(pathAtt)}"`:''}${tmpl.description?` description="${escapeHtml(tmpl.description)}"`:''}>\n${content}\n</${tmpl.tag}>`;
     }
     if(options?.name && tmpl.tagWithName){
         content=`<${options.name}>\n${content}\n</${options.name}>`;
@@ -288,6 +304,9 @@ export const applyConvoMakeContextTemplate=(content:string,tmpl:ConvoMakeContent
                 content=insertConvoContentIntoSlot(options.templateVars[e]??'',content,e);
             }
         }
+    }
+    if(tmpl.description && !tmpl.tag){
+        content=`<description>${tmpl.description}</description>\n\n${content}`;
     }
     if(tmpl.prefix){
         content=tmpl.prefix+'\n\n'+content;

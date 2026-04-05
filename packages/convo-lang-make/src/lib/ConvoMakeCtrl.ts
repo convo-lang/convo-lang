@@ -729,7 +729,15 @@ export class ConvoMakeCtrl
         const inputAry:ConvoMakeInput[]=[];
 
         if(dec.context){
-            const ary=asArray(dec.context);
+            const ary=[...asArray(dec.context)];
+            for(let i=0;i<ary.length;i++){
+                const v=ary[i];
+                if(v && Array.isArray(v)){
+                    ary.splice(i,1,...v);
+                    i--;
+                    continue;
+                }
+            }
             for(const c of ary){
                 const context:ConvoMakeContextTemplate=(typeof c === 'string')?{path:c}:c;
                 const path=removeDir(normalizePath(joinPaths(dir,context.path)),cwd);
@@ -741,7 +749,7 @@ export class ConvoMakeCtrl
                     const contentList=await Promise.all(items.map(async item=>{
                         let content=await this.loadFileAsync(removeDir(item.path,cwd));
                         if(content!==undefined){
-                            content=applyConvoMakeContextTemplate(content,context);
+                            content=applyConvoMakeContextTemplate(content,context,{path:item.path.substring(dir.length+(dir.endsWith('/')?0:1))});
                         }
                         return {item,content}
                     }))
@@ -750,7 +758,7 @@ export class ConvoMakeCtrl
                 }else{
                     let content=await this.loadFileAsync(path);
                     if(content!==undefined){
-                        content=applyConvoMakeContextTemplate(content,context);
+                        content=applyConvoMakeContextTemplate(content,context,{path:path.substring(dir.length+(dir.endsWith('/')?0:1))});
                     }
                     inputAry.push(...await this.contentToConvoAsync(path,undefined,{},true,false,content,undefined,context.tags));
                 }
@@ -796,9 +804,10 @@ export class ConvoMakeCtrl
 
     private async loadAttachmentAsync(inputPath:string,attachment:ConvoMakeTargetAttachment,inputAry:ConvoMakeInput[]){
         const name=getFileNameNoExt(inputPath);
+        const srcBase=attachment.path.includes('*')?attachment.path.replace(/\*/g,name):attachment.path;
         const srcPath=joinPaths(
             getDirectoryName(inputPath),
-            attachment.path.includes('*')?attachment.path.replace(/\*/g,name):attachment.path
+            srcBase
         );
         let content=await this.loadFileAsync(srcPath);
         if(content!==undefined){
@@ -815,7 +824,7 @@ export class ConvoMakeCtrl
                             throw new Error(`No attachment list load file found at - ${loadPath}`)
                         }
                         if(attachment.item){
-                            value=applyConvoMakeContextTemplate(value,attachment.item,{name});
+                            value=applyConvoMakeContextTemplate(value,attachment.item,{name,path:loadPath});
                         }escapeConvo
                         return value;
                     }));
@@ -823,9 +832,11 @@ export class ConvoMakeCtrl
                 }
             }
 
-            content=applyConvoMakeContextTemplate(content,attachment);
+            content=applyConvoMakeContextTemplate(content,attachment,{path:srcBase});
         }
-        inputAry.push(...await this.contentToConvoAsync(srcPath,false,{},true,false,content,false));
+        if(content!==undefined){
+            inputAry.push(...await this.contentToConvoAsync(srcPath,false,{},true,false,content,false));
+        }
 
     }
 

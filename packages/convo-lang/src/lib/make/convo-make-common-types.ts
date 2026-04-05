@@ -408,6 +408,28 @@ export interface ConvoMakeContentTemplate
     tagWithName?:boolean;
 
     /**
+     * If true and the content has a path and is tagged a path attribute will be added to the tag
+     * with the value of the path.
+     */
+    pathAtt?:boolean;
+
+    /**
+     * A description that will be added to the tag of the template or as a prefix if not tagged
+     */
+    description?:string;
+
+    /**
+     * Used with pathAtt and will case the value of `pathAttBase` to be removed from the path
+     * attribute if path starts with `pathAttBase`.
+     */
+    pathAttBase?:string;
+
+    /**
+     * If true the path attribute should not include an extension
+     */
+    pathAttNoExt?:boolean;
+
+    /**
      * Used to override content type of file extension of path
      */
     contentType?:string;
