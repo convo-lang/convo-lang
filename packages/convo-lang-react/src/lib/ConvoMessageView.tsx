@@ -176,7 +176,7 @@ export function ConvoMessageView({
                 <div className={rowClassName}>
                     <ConvoThemeIcon theme={theme} icon="functionIcon" className={theme.assistantIconClassName}/>
                     <div className={messageClassName}>
-                        {(!message.called?convoMessageToStringSafe(message[convoFlatMessageSourceMessageKey]):null)??JSON.stringify(message,null,4)}
+                        {(!message.called?convoMessageToStringSafe(message[convoFlatMessageSourceMessageKey]):null)?.trim()??JSON.stringify(message,null,4)}
                     </div>
                 </div>
             )

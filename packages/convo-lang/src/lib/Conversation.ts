@@ -463,6 +463,16 @@ export class Conversation
      */
     public readonly subs:Record<string,Conversation>={}
 
+    private readonly _enableStreaming:BehaviorSubject<boolean>;
+    public get enableStreamingSubject():ReadonlySubject<boolean>{return this._enableStreaming}
+    public get enableStreaming(){return this._enableStreaming.value}
+    public set enableStreaming(value:boolean){
+        if(value==this._enableStreaming.value){
+            return;
+        }
+        this._enableStreaming.next(value);
+    }
+
     public constructor(options:ConversationOptions={}){
         const {
             name=defaultConversationName,
@@ -509,6 +519,7 @@ export class Conversation
             disableTriggers=false,
             inlineHost,
             inlinePrompt,
+            enableStreaming,
         }=options;
         this.instanceId=nextInstanceId++;
         this.name=name;
@@ -543,6 +554,7 @@ export class Conversation
         this._trackTime=new BehaviorSubject<boolean>(trackTime);
         this._trackTokens=new BehaviorSubject<boolean>(trackTokens);
         this._trackModel=new BehaviorSubject<boolean>(trackModel);
+        this._enableStreaming=new BehaviorSubject<boolean>(enableStreaming??false);
         this._onTokenUsage=onTokenUsage;
         this.disableAutoFlatten=disableAutoFlatten;
         this.disableTransforms=disableTransforms;
@@ -4606,7 +4618,7 @@ export class Conversation
                 apiKey:this.getDefaultApiKey()??undefined,
                 afterCall,
                 messageTriggers,
-                enableStreaming:this.defaultOptions.enableStreaming
+                enableStreaming:this.enableStreaming,
             });
             exe.flat=flat;
             const apiKey=exe.getVar(convoVars.__apiKey);

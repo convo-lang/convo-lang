@@ -1,6 +1,7 @@
-import { ConvoView } from "@convo-lang/convo-lang-react";
-import { MoonIcon, SunIcon } from "lucide-react";
+import { Button, cn, ConvoView } from "@convo-lang/convo-lang-react";
+import { MaximizeIcon, MoonIcon, SunIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Label } from "../components/Label";
 
 interface State
 {
@@ -22,12 +23,32 @@ const themes=[
 
 type Theme=typeof themes[number];
 
+interface HtmlTool
+{
+    name:string;
+    html:string;
+}
+
 export default function IndexPage()
 {
 
     const [dark,setDark]=useState(true);
     const [theme,setTheme]=useState<Theme>('default');
-    const [htmlTool,setHtmlTool]=useState('');
+
+    const [showFunctions,setShowFunctions]=useState(true);
+    const [showResults,setShowResults]=useState(true);
+    const [showSystem,setShowSystem]=useState(true);
+    const [enableStreaming,setEnableStreaming]=useState(true);
+    const [enableMarkdown,setEnableMarkdown]=useState(true);
+    const [enabledSlashCommands,setEnabledSlashCommands]=useState(true);
+
+    const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
+    const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
+    const [toolFullScreen,setToolFullScreen]=useState(false);
+
+    useEffect(()=>{
+        setHtmlTools(getTools());
+    },[]);
 
 
     useEffect(()=>{
@@ -68,62 +89,164 @@ export default function IndexPage()
 
     const ModeIcon=dark?MoonIcon:SunIcon;
 
+    const toolSelect=(isHeader:boolean)=>(
+        <select
+            id="artifact"
+            className={cn(
+                "cursor-pointer",
+                isHeader?'p-3 pr-5 flex-1':'field-sizing-content border rounded p-1'
+            )}
+            value={htmlTool?.name??'**none!'}
+            onChange={e=>setHtmlTool(htmlTools.find(t=>t.name===e.target.value)??null)}
+        >
+            {!isHeader && <option value="**none!">(none)</option>}
+            {htmlTools.map(t=>(
+                <option key={t.name} value={t.name}>{t.name}</option>
+            ))}
+        </select>
+    )
+
     return (
-        <div className="w-full h-full flex relative">
-            <div className="absolute right-4 top-4 cursor-pointer flex items-center gap-4">
-                <select className="cursor-pointer field-sizing-content" value={theme} onChange={e=>setTheme(e.target.value as Theme)}>
-                    {themes.map(t=>(
-                        <option key={t} value={t}>{t}</option>
-                    ))}
-                </select>
-                <button className="cursor-pointer" onClick={()=>setDark(!dark)}>
-                    <ModeIcon className="size-4"/>
-                </button>
-            </div>
-            {!!htmlTool &&
-                <div className="relative flex-1">
-                    <iframe className="border-none absolute left-0 top-0 w-full h-full" srcDoc={htmlTool}/>
+        <div className={cn("w-full h-full flex relative gap-4",!toolFullScreen&&'p-4')}>
+
+            <form
+                className={cn("flex flex-col gap-2 border rounded-3xl p-4 min-w-60 max-w-60",toolFullScreen&&'hidden')}
+                onSubmit={e=>e.preventDefault()}
+            >
+
+                <div className="flex items-center justify-between gap-4">
+                    <h1 className="text-lg tracking-wide">ConvoView Demo</h1>
+                    <button className="cursor-pointer" onClick={()=>setDark(!dark)}>
+                        <ModeIcon className="size-4"/>
+                    </button>
                 </div>
-            }
-            <div className="max-w-200 w-full mx-auto flex flex-col flex-1 m-4 border rounded-3xl overflow-clip">
+
+                <p className="text-xs opacity-70 flex flex-col gap-1">
+                    <span className="flex items-center gap-1">GitHub<a href="https://github.com/convo-lang/convo-lang" target="_blank" className="font-mono underline">GitHub convo-lang</a></span>
+                    <span className="flex items-center gap-1">NPM<a href="https://www.npmjs.com/package/@convo-lang/convo-lang" target="_blank" className="font-mono underline">@convo-lang</a></span>
+                    <span className="flex items-center gap-1">Learn more<a href="https://learn.convo-lang.ai/#convolang" target="_blank" className="font-mono underline">convo-lang.ai</a></span>
+                </p>
+
+                <Label label="theme">
+                    <select id="theme" className="cursor-pointer field-sizing-content border rounded p-1" value={theme} onChange={e=>setTheme(e.target.value as Theme)}>
+                        {themes.map(t=>(
+                            <option key={t} value={t}>{t}</option>
+                        ))}
+                    </select>
+                </Label>
+
+                <Label label="showSystem" row>
+                    <input type="checkbox" id="showSystem" checked={showSystem} onChange={e=>setShowSystem(e.target.checked)}/>
+                </Label>
+
+                <Label label="showFunctions" row>
+                    <input type="checkbox" id="showFunctions" checked={showFunctions} onChange={e=>setShowFunctions(e.target.checked)}/>
+                </Label>
+
+                <Label label="showResults" row>
+                    <input type="checkbox" id="showResults" checked={showResults} onChange={e=>setShowResults(e.target.checked)}/>
+                </Label>
+
+                <Label label="enableStreaming" row>
+                    <input type="checkbox" id="enableStreaming" checked={enableStreaming} onChange={e=>setEnableStreaming(e.target.checked)}/>
+                </Label>
+
+                <Label label="enableSlashCommands" row>
+                    <input type="checkbox" id="enableSlashCommands" checked={enabledSlashCommands} onChange={e=>setEnabledSlashCommands(e.target.checked)}/>
+                </Label>
+
+                <Label label="enableMarkdown" row>
+                    <input type="checkbox" id="enableMarkdown" checked={enableMarkdown} onChange={e=>setEnableMarkdown(e.target.checked)}/>
+                </Label>
+
+                {!!htmlTools.length &&
+                    <Label label="artifact">
+                        {toolSelect(false)}
+                    </Label>
+                }
+
+            </form>
+
+            <div className={cn(
+                "max-w-200 w-full mx-auto flex flex-col flex-1 border rounded-3xl overflow-clip",
+                toolFullScreen&&'hidden'
+            )}>
                 <ConvoView
                     httpEndpoint="http://localhost:7222/api/convo-lang"
                     className="flex-1"
                     inputPlaceholder="Ask something cool"
-                    enableMarkdown
-                    enabledSlashCommands
+                    enableMarkdown={enableMarkdown}
+                    enabledSlashCommands={enabledSlashCommands}
                     suggestionsLocation="before-input"
                     forceInlineSuggestionsLocation
-                    showFunctions
-                    showResults
-                    showSystem
-                    enableStreaming
+                    showFunctions={showFunctions}
+                    showResults={showResults}
+                    showSystem={showSystem}
+                    enableStreaming={enableStreaming}
                     defaultValue={defaultValue}
                     externFunctions={{
-                        createHtmlTool(content:string){
-                            setHtmlTool(content);
+                        createHtmlTool(name:string,content:string){
+                            const tool:HtmlTool={
+                                name,
+                                html:content,
+                            }
+                            setHtmlTools(v=>[...v,tool].sort((a,b)=>a.name.localeCompare(b.name)));
+                            setHtmlTool(tool);
+                            saveTool(tool);
                             return 'created';
                         }
                     }}
                 />
             </div>
+
+            {!!htmlTool &&
+                <div className={cn("flex-1 flex flex-col",!toolFullScreen&&'border rounded-3xl overflow-clip')}>
+                    <div className="border-b flex">
+                        {toolSelect(true)}
+                        <Button onClick={()=>setToolFullScreen(v=>!v)} className="ml-4 px-4 border-l opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                            <MaximizeIcon className="size-4"/>
+                        </Button>
+                        <Button onClick={()=>setHtmlTool(null)} className="px-4 border-l opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                            <XIcon className="size-4"/>
+                        </Button>
+                    </div>
+                    <div className="relative flex-1">
+                        <iframe className="border-none absolute left-0 top-0 w-full h-full" srcDoc={htmlTool.html}/>
+                    </div>
+                </div>
+            }
+
         </div>
     )
 }
 
-let lastUpdate:string='';
+const toolKey='convo-html-tools'
+const saveTool=(tool:HtmlTool)=>{
+    globalThis.localStorage?.setItem(toolKey,JSON.stringify([...getTools(),tool]));
+}
 
+const getTools=():HtmlTool[]=>{
+    const json=globalThis?.localStorage?.getItem(toolKey);
+    if(!json){
+        return [];
+    }
+    try{
+        return JSON.parse(json);
+    }catch{
+        return [];
+    }
+}
 
 const t3='```'
 
-const defaultValue=/*convo*/`
+const defaultValue2=/*convo*/`
 
 > user
 hi
 
 `.trim()+'\n'
 
-const defaultValue2=/*convo*/`
+const defaultValue3=/*convo*/`
 
 > addNumber(a:number b:number)->(
     'The result is {{add(a b)}}'
@@ -132,7 +255,10 @@ const defaultValue2=/*convo*/`
 # Creates an HTML tool the user can interact with. The value passed to this function should be a
 # standalone HTML page.
 > extern createHtmlTool(
-    # Value use to set the srcDoc value of an iframe
+    # Display name of the tool
+    name:string
+
+    # Value use to set the srcDoc value of an iframe.
     iframeContent:string
 )
 
@@ -140,11 +266,11 @@ const defaultValue2=/*convo*/`
 hi
 
 > user
-Add 7 plus 7
+Create me a retro style calculator with a VIC 20 look a feel
 
 `.trim()+'\n';
 
-const defaultValuex=/*convo*/`
+const defaultValue=/*convo*/`
 > define
 __model='gpt-4.1'
 
@@ -157,6 +283,16 @@ Current Date and Time {{dateTime()}}
 > addNumber(a:number b:number)->(
     //sleep(10000)
     'The result is {{add(a b)}}'
+)
+
+# Creates an HTML tool the user can interact with. The value passed to this function should be a
+# standalone HTML page.
+> extern createHtmlTool(
+    # Display name of the tool
+    name:string
+
+    # Value use to set the srcDoc value of an iframe.
+    iframeContent:string
 )
 
 > assistant

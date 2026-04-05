@@ -118,8 +118,9 @@ export function ConvoView({
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
 
-    const refs=useRef({modules});
+    const refs=useRef({modules,enableStreaming});
     refs.current.modules=modules;
+    refs.current.enableStreaming=enableStreaming;
     const importStr=Array.isArray(imports)?imports.join(';'):imports;
 
     const compConvoAry:string[]=[];
@@ -149,7 +150,7 @@ export function ConvoView({
             (template??ctrlOptions?.template)
         ),
         convoOptions:{
-            enableStreaming,
+            enableStreaming:refs.current.enableStreaming,
             ...ctrlOptions?.convoOptions,
             modules:[
                 ...(ctrlOptions?.convoOptions?.modules??[]),
@@ -159,13 +160,19 @@ export function ConvoView({
                 new HttpConvoCompletionService({endpoint:httpEndpoint})
             ):ctrlOptions?.convoOptions?.completionService
         }
-    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr,enableStreaming]);
+    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr]);
 
     useEffect(()=>{
         if(defaultValue!==undefined){
             ctrl.replace(defaultValue);
         }
     },[defaultValue]);
+
+    useEffect(()=>{
+        if(enableStreaming!==undefined){
+            ctrl.enableStreaming=enableStreaming;
+        }
+    },[enableStreaming]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){

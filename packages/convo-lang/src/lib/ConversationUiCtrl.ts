@@ -64,6 +64,19 @@ export class ConversationUiCtrl
     public get streamingMessagesSubject():ReadonlySubject<FlatConvoMessage[]|null>{return this._streamingMessages}
     public get streamingMessages(){return this._streamingMessages.value}
 
+    private readonly _enableStreaming:BehaviorSubject<boolean|null>=new BehaviorSubject<boolean|null>(null);
+    public get enableStreamingSubject():ReadonlySubject<boolean|null>{return this._enableStreaming}
+    public get enableStreaming(){return this._enableStreaming.value}
+    public set enableStreaming(value:boolean|null){
+        if(value==this._enableStreaming.value){
+            return;
+        }
+        this._enableStreaming.next(value);
+        if(value!==null && this.convo){
+            this.convo.enableStreaming=value;
+        }
+    }
+
     private readonly tasks:ConversationUiCtrlTask[]=[];
     private readonly _currentTask:BehaviorSubject<ConversationUiCtrlTask|null>=new BehaviorSubject<ConversationUiCtrlTask|null>(null);
     public get currentTaskSubject():ReadonlySubject<ConversationUiCtrlTask|null>{return this._currentTask}
@@ -379,6 +392,9 @@ export class ConversationUiCtrl
     protected initConvo(convo:Conversation,options:InitConversationUiCtrlConvoOptions){
         if(this.initConvoCallback){
             this.initConvoCallback(convo);
+        }
+        if(this.enableStreaming!==null){
+            convo.enableStreaming=this.enableStreaming;
         }
         for(const e in this.defaultVars){
             convo.defaultVars[e]=this.defaultVars[e];
@@ -753,6 +769,10 @@ export class ConversationUiCtrl
                     this.clear();
                     break;
 
+                case '/stream':
+                    this.enableStreaming=!this.enableStreaming;
+                    break;
+
                 case '/help':
                     this.printHelp();
                     break;
@@ -825,6 +845,7 @@ ${t3} text
 /function   - Display function messages
 /results    - Display function call results
 /convert    - Display messages in the format of the current model
+/stream     - Toggle streaming responses
 /clear      - Clears all messages
 /help       - Prints this help message
 ${t3}
