@@ -37,6 +37,7 @@ export * from './lib/convo-template.js';
 export * from './lib/convo-types.js';
 export * from './lib/convo-url-opener.js';
 export * from './lib/convo-value-conditions.js';
+export * from './lib/convo-view-theme.js';
 export * from './lib/convo-zod.js';
 export * from './lib/convo.deps.js';
 export * from './lib/convoAsync.js';
@@ -75,4 +76,7 @@ export * from './lib/providers/openai-service.js';
 export * from './lib/testing/convo-testing-types.js';
 export * from './lib/testing/ConvoModelTester.js';
 export * from './lib/testing/ConvoModelTestManager.js';
+export * from './lib/worker/convo-worker-types.js';
+export * from './lib/worker/ConvoWorker.js';
+export * from './lib/worker/ConvoWorkerCtx.js';
 

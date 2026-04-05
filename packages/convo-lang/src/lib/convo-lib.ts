@@ -294,6 +294,11 @@ export const convoRoles={
 
     template:'template',
     templateEnd:'templateEnd',
+
+    /**
+     * Indicates a worker is ready to run
+     */
+    run:'run',
 } as const;
 
 /**
@@ -1315,7 +1320,7 @@ export const convoTags={
     thread:'thread',
 
     /**
-     * Used to mark a function as a node output.
+     * Defines a path to write a messages output to
      */
     output:'output',
 
@@ -1601,6 +1606,16 @@ export const convoTags={
      * the handler is handling
      */
     assumeHandledMessageLocation:'assumeHandledMessageLocation',
+
+    /**
+     * Enables auto memory management in works
+     */
+    autoMemory:'autoMemory',
+
+    /**
+     * Causes the output of a message to be saved as a workers memory
+     */
+    saveMemory:'saveMemory',
 
 } as const;
 
@@ -3566,4 +3581,44 @@ export const groupConvoMessages=(messages:ConvoMessage[],startIndex=0)=>{
 
         }
     }
+}
+
+export interface ConvoImportBase
+{
+    name:string;
+    modifiers:string[];
+    templateName?:string;
+    role?:string;
+    assign?:string;
+}
+
+export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
+    const modifiers=name.split(' ');
+
+    let templateName:string|undefined;
+    let role:string|undefined;
+    let assign:string|undefined;
+    name='';
+    for(let i=0;i<modifiers.length;i++){
+        const m=modifiers[i];
+        if(m==='as'){
+            modifiers.splice(i,2,`!assign:${modifiers[i+1]||'defaultImportAssignment'}`);
+            i--;
+        }else if(m?.startsWith('!')){
+            modifiers[i]=m.substring(1);
+            if(m.startsWith('!template:')){
+                templateName=m.substring(10);
+            }else if(m.startsWith('!role:')){
+                role=m.substring(6);
+            }else if(m.startsWith('!assign:')){
+                assign=m.substring(8);
+            }
+        }else{
+            name=m??'';
+            modifiers.splice(i,1);
+            i--;
+        }
+
+    }
+    return {name,modifiers,templateName,role,assign}
 }
