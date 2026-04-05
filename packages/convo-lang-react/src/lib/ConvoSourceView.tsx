@@ -40,7 +40,11 @@ export function ConvoSourceView({
 
     const flatConvo=useSubject((mode==='vars' || mode==='flat' || mode==='text' || mode==='model')?convo?.flatSubject:undefined);
 
-    const [code,setCode]=useState('');
+    const [code,_setCode]=useState('');
+    const setCode=useCallback((code:string)=>{
+        refs.current.lastChange=code;
+        _setCode(code);
+    },[]);
 
     const currentTask=useSubject(ctrl?.currentTaskSubject);
 
@@ -100,14 +104,12 @@ export function ConvoSourceView({
         }
     },[mode,flatConvo,convo]);
 
+    const changeCode=refs.current.onInputChange?code:undefined;
     useEffect(()=>{
-        if(code!==undefined){
-            refs.current.lastChange=code;
+        if(changeCode!==undefined && refs.current.onInputChange){
+            refs.current.onInputChange({type:'source',value:changeCode});
         }
-        if(code!==undefined && refs.current.onInputChange){
-            refs.current.onInputChange({type:'source',value:code});
-        }
-    },[code]);
+    },[changeCode]);
 
     useEffect(()=>{
         return ()=>{
