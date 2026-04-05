@@ -1,0 +1,205 @@
+> define
+__trackModel=true
+__trackTokenUsage=true
+
+> user
+Create an overview of the following document that focuses on the basic usage of `> system`, `> assistant`
+and `> user` messages for building chat interfaces. Include notes about how to escape the `>` and `\{{`
+characters.
+
+<CONVO_LANG_DOCUMENT>
+{{fsRead('./learn-convo-lang.md')}}
+</CONVO_LANG_DOCUMENT>
+
+
+
+@tokenUsage 32319 / 914 / $0.066466
+@model gpt-4.1-2025-04-14
+> assistant
+Certainly! Here’s a focused overview from your **Convo-Lang** document, highlighting the basic usage and concepts behind the `> system`, `> assistant`, and `> user` message types, **plus how to escape special characters** (`>` and `\{{}`):
+
+---
+
+# Convo-Lang Chat Interface Basics
+
+Convo-Lang is a domain-specific language designed for creating structured conversations and workflows for LLM agents (like OpenAI, Claude, Llama, etc.). Its core building blocks enable clear, readable, and testable multi-turn dialogues—going beyond freeform English for robust AI app development.
+
+## Core Message Types
+
+**Convo-Lang structures conversation using three primary message roles. These roles define who is "speaking" and how the message is treated during the conversation:**
+
+- ### `> system`
+  - **Purpose**: Sets instructions, behavior, or context for the LLM agent.
+  - **Visibility**: Hidden from the end user but visible to the model.
+  - **Usage Example**:
+    ```convo
+    \> system
+    You are a friendly assistant who answers math questions cheerfully.
+    ```
+
+- ### `> assistant`
+  - **Purpose**: Represents messages (responses) from the LLM agent.
+  - **Visibility**: Displayed to the user.
+  - **Usage Example**:
+    ```convo
+    \> assistant
+    Hello! How can I help you today?
+    ```
+
+- ### `> user`
+  - **Purpose**: Represents input or questions from the user.
+  - **Visibility**: Displayed as user input.
+  - **Usage Example**:
+    ```convo
+    \> user
+    What is the capital of France?
+    ```
+
+**Basic flow in a conversation:**
+```convo
+\> system
+You are a helpful, concise assistant.
+
+\> assistant
+Hi! How can I help you?
+
+\> user
+What's the weather in Paris?
+```
+
+## Dynamic Content
+
+- You can interpolate variables or execute expressions inside messages using double curly braces `\{{ ... }}`.
+  ```convo
+  \> assistant
+  The current date is \{{dateTime()}}.
+  ```
+
+## Escaping Special Characters
+
+Since both `>` and `\{{` have special syntactic meaning, you’ll sometimes need to **escape them to insert them literally into messages**.
+
+- ### To write a literal `>` at the start of a line (so it’s not treated as a new message):
+  - **Solution**: Use a backslash escape `\>` or another context (e.g., inside a string) so it's not parsed as a message marker.
+    ```convo
+    \> assistant
+    To quote a command, type \> help
+    ```
+
+- ### To include literal `\{{` (not treated as an expression):
+  - **Solution**: Use `\{{` to escape.
+    ```convo
+    \> assistant
+    Curly braces example: \{{not-an-expression\}}
+    ```
+  - **In string templates**: Single quote strings allow `\{{ ... }}` expressions; otherwise, use escaping if you want them as plain text.
+
+## Practical Example
+
+```convo
+\> system
+You are a joke-telling assistant.
+
+\> assistant
+Ask me for a joke, and I’ll do my best.
+
+\> user
+Tell me a joke.
+
+\> assistant
+Why did the chicken cross the road?
+
+\> user
+I don’t know, why?
+
+\> assistant
+To get to the other side!
+```
+
+## Summary
+
+- Use `> system` to instruct and set the context for the assistant. This keeps your LLM on-task and consistent.
+- Use `> assistant` for agent replies.
+- Use `> user` for user turns in the conversation.
+- **Escape** `>` and `\{{` when you want literal characters, not Convo-Lang syntax:
+  - `\>` for a literal greater-than
+  - `\{{` for a literal open double-curly
+
+This foundational structure lets you build robust conversational flows, blending static instructions, user simulation, and dynamic variable usage in a compact, readable format.
+
+---
+
+**For further learning:** Check out the language’s [detailed guide and examples in the official documentation](https://marketplace.visualstudio.com/items?itemName=IYIO.convo-lang-tools), or try writing your first script in the Convo-Lang Playground.
+
+
+
+@tokenUsage 31507 / 778 / $0.023245200000000004
+@model us.meta.llama3-3-70b-instruct-v1:0
+> assistant
+Overview of Basic Usage of `> system`, `> assistant`, and `> user` Messages for Building Chat Interfaces
+====================================================================================
+
+Convo-Lang is an open-source AI-native programming language and ecosystem designed for building powerful, structured prompts and agent workflows for large language models (LLMs). The language uses a simple syntax to define messages that can be used to build chat interfaces.
+
+### Message Types
+
+There are three main types of messages in Convo-Lang:
+
+*   `> system`: This message type is used to control the behavior of the LLM and is hidden from the user. It can be used to define the persona, tone, and language of the agent.
+*   `> assistant`: This message type is used to define the response of the agent to the user's input. It can be used to provide information, answer questions, or engage in conversation.
+*   `> user`: This message type is used to define the input of the user. It can be used to simulate user interactions or to define the context of the conversation.
+
+### Escaping `>` and `\{{` Characters
+
+To escape the `>` character, you can use a backslash (`\`) before the character. For example: `\>`
+
+To escape the `\{{` characters, you can use a backslash (`\`) before the first `{` character. For example: `\{{`
+
+### Example Usage
+
+Here is an example of how to use these message types to build a simple chat interface:
+```convo
+\> system
+You are a customer support agent for a company that sells flooring products.
+
+\> assistant
+Hello! How can I help you today?
+
+\> user
+I'm looking for a new floor for my living room. Can you recommend something?
+
+\> assistant
+We have a wide range of flooring products available. What type of flooring are you interested in? Hardwood, laminate, or tile?
+
+\> user
+I'm not sure. What are the pros and cons of each?
+
+\> assistant
+Hardwood flooring is durable and easy to clean, but it can be expensive. Laminate flooring is more affordable, but it may not be as durable. Tile flooring is easy to clean and maintain, but it can be cold and hard on joints.
+
+\> user
+That helps. Can you show me some examples of each?
+
+\> assistant
+Here are some examples of our flooring products: [insert images or links to products]
+
+\> user
+I like the look of the hardwood flooring. Can you tell me more about it?
+
+\> assistant
+Our hardwood flooring is made from high-quality wood and is available in a variety of styles and finishes. It's durable and easy to clean, and it can add value to your home.
+
+\> user
+That sounds great. How much does it cost?
+
+\> assistant
+The cost of our hardwood flooring varies depending on the style and finish you choose. However, we currently have a sale on our most popular style, which starts at $3.99 per square foot.
+```
+This example demonstrates how to use the `> system`, `> assistant`, and `> user` messages to build a simple chat interface for a customer support agent. The `> system` message is used to define the persona and tone of the agent, while the `> assistant` message is used to provide information and answer questions. The `> user` message is used to simulate user interactions and define the context of the conversation.
+
+### Conclusion
+
+Convo-Lang provides a simple and powerful way to build chat interfaces using the `> system`, `> assistant`, and `> user` messages. By using these message types, you can create complex conversations that simulate real-world interactions. The language also provides a way to escape special characters, such as `>` and `\{{`, which can be useful when working with user input or output.
+
+
+> user
