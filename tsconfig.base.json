@@ -62,9 +62,6 @@
             "@convo-lang/convo-lang-mcp-client": [
                 "packages/convo-lang-mcp-client/src/index.ts"
             ],
-            "@convo-lang/convo-lang-openai": [
-                "packages/convo-lang-openai/src/index.ts"
-            ],
             "@convo-lang/convo-lang-pdf": [
                 "packages/convo-lang-pdf/src/index.ts"
             ],

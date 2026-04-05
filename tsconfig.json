@@ -35,9 +35,6 @@
             "path": "./packages/convo-lang-model-testing"
         },
         {
-            "path": "./packages/convo-lang-openai"
-        },
-        {
             "path": "./packages/convo-lang-pdf"
         },
         {
