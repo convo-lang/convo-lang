@@ -137,7 +137,7 @@ hi
 > user
 Add 7 plus 7
 
-`
+`.trim()+'\n';
 
 const defaultValuex=/*convo*/`
 > define
@@ -234,4 +234,4 @@ __return="The result is 14"
 > assistant
 7 plus 7 equals 14.
 
-`;
+`.trim()+'\n';
