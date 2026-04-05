@@ -122,6 +122,8 @@ export interface ConvoMessage
     tags?:ConvoTag[];
     markdown?:MarkdownLine[];
 
+    streamingId?:string;
+
     insert?:ConvoInsert;
 
     /**
@@ -957,6 +959,10 @@ export interface FlatConvoMessage
 
     isSystem?:boolean;
 
+    streamingId?:string;
+
+    streamingActive?:boolean;
+
     content?:string;
 
     /**
@@ -1154,6 +1160,7 @@ export interface ConvoCompletionMessage extends Partial<ConvoTokenUsage>
     formatIsArray?:boolean;
     assignTo?:string;
     endpoint?:string;
+    streamingId?:string;
 }
 
 export interface ConvoCompletionService<TInput,TOutput>
@@ -1192,6 +1199,18 @@ export interface ConvoCompletionCtx<TInput=any,TOutput=any>
 {
     beforeComplete?:(service:ConvoCompletionService<TInput,TOutput>,input:TInput,flat:FlatConvoConversationBase)=>void|Promise<void>;
     afterComplete?:(service:ConvoCompletionService<TInput,TOutput>,output:TOutput,input:TInput,flat:FlatConvoConversationBase)=>void|Promise<void>;
+    onChunk?:(service:ConvoCompletionService<TInput,TOutput>,chunk:ConvoCompletionChunk,flat:FlatConvoConversationBase)=>void|Promise<void>;
+}
+
+export type ConvoCompletionChunkType='content'|'function'|'completion';
+
+export interface ConvoCompletionChunk
+{
+    id:string;
+    mid:string;
+    type:ConvoCompletionChunkType;
+    chunk?:string;
+    completion?:ConvoCompletionMessage[];
 }
 
 export interface ConvoCompletionServiceAndModel
@@ -1325,6 +1344,11 @@ export interface FlatConvoConversationBase
     ragTemplate?:string;
 
     toolChoice?:ConvoToolChoice;
+
+    /**
+     * If true streaming responses will be enabled
+     */
+    enableStreaming?:boolean;
 
     /**
      * The model the conversation has been requested to be completed with.
@@ -1753,6 +1777,7 @@ export interface AppendConvoOptions
     mergeWithPrev?:boolean;
     throwOnError?:boolean;
     disableAutoFlatten?:boolean;
+    streamingId?:string;
     addTags?:ConvoTag[];
     /**
      * Will be assigned to all appended messages

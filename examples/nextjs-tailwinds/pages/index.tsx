@@ -27,6 +27,7 @@ export default function IndexPage()
 
     const [dark,setDark]=useState(true);
     const [theme,setTheme]=useState<Theme>('default');
+    const [htmlTool,setHtmlTool]=useState('');
 
 
     useEffect(()=>{
@@ -68,7 +69,7 @@ export default function IndexPage()
     const ModeIcon=dark?MoonIcon:SunIcon;
 
     return (
-        <div className="w-full h-full flex flex-col relative">
+        <div className="w-full h-full flex relative">
             <div className="absolute right-4 top-4 cursor-pointer flex items-center gap-4">
                 <select className="cursor-pointer field-sizing-content" value={theme} onChange={e=>setTheme(e.target.value as Theme)}>
                     {themes.map(t=>(
@@ -79,6 +80,11 @@ export default function IndexPage()
                     <ModeIcon className="size-4"/>
                 </button>
             </div>
+            {!!htmlTool &&
+                <div className="relative flex-1">
+                    <iframe className="border-none absolute left-0 top-0 w-full h-full" srcDoc={htmlTool}/>
+                </div>
+            }
             <div className="max-w-200 w-full mx-auto flex flex-col flex-1 m-4 border rounded-3xl overflow-clip">
                 <ConvoView
                     httpEndpoint="http://localhost:7222/api/convo-lang"
@@ -91,7 +97,14 @@ export default function IndexPage()
                     showFunctions
                     showResults
                     showSystem
+                    enableStreaming
                     defaultValue={defaultValue}
+                    externFunctions={{
+                        createHtmlTool(content:string){
+                            setHtmlTool(content);
+                            return 'created';
+                        }
+                    }}
                 />
             </div>
         </div>
@@ -104,8 +117,25 @@ let lastUpdate:string='';
 const t3='```'
 
 const defaultValue=/*convo*/`
+> define
+__model='gpt-4.1'
+
+> addNumber(a:number b:number)->(
+    'The result is {{add(a b)}}'
+)
+
+# Creates an HTML tool the user can interact with. The value passed to this function should be a
+# standalone HTML page.
+> extern createHtmlTool(
+    # Value use to set the srcDoc value of an iframe
+    iframeContent:string
+)
+
 > assistant
 hi
+
+> user
+Add 7 plus 7
 
 `
 
@@ -120,7 +150,7 @@ Make not mistakes.
 Current Date and Time {{dateTime()}}
 
 > addNumber(a:number b:number)->(
-    sleep(10000)
+    //sleep(10000)
     'The result is {{add(a b)}}'
 )
 

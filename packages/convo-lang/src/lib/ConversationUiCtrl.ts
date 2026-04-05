@@ -1,4 +1,4 @@
-import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, wSetProp, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
@@ -7,7 +7,7 @@ import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -56,6 +56,13 @@ export class ConversationUiCtrl
 
     private readonly _onAppend=new Subject<ConvoAppend>();
     public get onAppend():Observable<ConvoAppend>{return this._onAppend}
+
+    private readonly _onChunk=new Subject<ConvoCompletionChunk>();
+    public get onChunk():Observable<ConvoCompletionChunk>{return this._onChunk}
+
+    private readonly _streamingMessages:BehaviorSubject<FlatConvoMessage[]|null>=new BehaviorSubject<FlatConvoMessage[]|null>(null);
+    public get streamingMessagesSubject():ReadonlySubject<FlatConvoMessage[]|null>{return this._streamingMessages}
+    public get streamingMessages(){return this._streamingMessages.value}
 
     private readonly tasks:ConversationUiCtrlTask[]=[];
     private readonly _currentTask:BehaviorSubject<ConversationUiCtrlTask|null>=new BehaviorSubject<ConversationUiCtrlTask|null>(null);
@@ -519,7 +526,9 @@ export class ConversationUiCtrl
         while(this.tasks.includes('completing')){
             this.popTask('completing');
         }
+        let m=true;
         this._flat.next(null);
+        this._streamingMessages.next(null);
         const sub=convo.activeTaskCountSubject.subscribe(n=>{
             if(n===1){
                 if(!this.tasks.includes('completing')){
@@ -533,14 +542,55 @@ export class ConversationUiCtrl
         })
         const sub2=convo.onAppend.subscribe(v=>{
             this._onAppend.next(v);
+            for(const m of v.messages){
+                if(m.streamingId){
+                    setTimeout(()=>{
+                        if(!m){
+                            return;
+                        }
+                        const match=this._streamingMessages.value?.find(m=>m.streamingId===m.streamingId);
+                        if(match && this._streamingMessages.value){
+                            const update=aryDuplicateRemoveItem(this._streamingMessages.value,match);
+                            if(update.length){
+                                this._streamingMessages.next(update);
+                            }else{
+                                this._streamingMessages.next(null);
+                            }
+                        }
+                    },2000);
+                }
+            }
+
         });
-        const sub3=convo.flatSubject.subscribe(v=>{
+        const sub3=convo.onChunk.subscribe(v=>{
+            if(v.chunk){
+                const mid=v.mid;
+                let ary=this._streamingMessages.value??[];
+                let current=ary.find(m=>m.streamingId===mid);
+                if(!current){
+                    current={
+                        isAssistant:true,
+                        role:'assistant',
+                        content:'',
+                        streamingId:mid,
+                        streamingActive:true,
+                    }
+                    ary=[...ary,current]
+                    this._streamingMessages.next(ary);
+                }
+                wSetProp(current,'content',(current.content??'')+v.chunk);
+            }
+            this._onChunk.next(v);
+        });
+        const sub4=convo.flatSubject.subscribe(v=>{
             this._flat.next(v);
         })
         this.convoCleanup=()=>{
             sub.unsubscribe();
             sub2.unsubscribe();
             sub3.unsubscribe();
+            sub4.unsubscribe();
+            m=false;
         }
         this._convo.next(convo);
         if(this.enabledInitMessage && convo.initMessageReady()){

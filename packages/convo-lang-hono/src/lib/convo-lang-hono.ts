@@ -1,6 +1,7 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, convoCompletionService, ConvoCompletionServiceAndModel, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
-import { minuteMs } from "@iyio/common";
-import { Hono } from "hono";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { minuteMs, uuid } from "@iyio/common";
+import { Context, Hono } from "hono";
+import { streamSSE } from 'hono/streaming';
 import { timeout } from 'hono/timeout';
 import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
 
@@ -39,13 +40,43 @@ export const getConvoHonoRoutes=({
     });
 
     routes.post('/completion',timeout(completionTimeoutMs),async (c)=>{
+        return await completeAsync(c,true) as any;
+    });
+
+    routes.post('/completion/stream',timeout(completionTimeoutMs),(c)=>{
+        return streamSSE(c,async stream=>{
+            let mid='';
+            const result=await completeAsync(c,false,{
+                onChunk:async (_service,chunk)=>{
+                    mid=chunk.mid;
+                    await stream.writeSSE({
+                        event:'chunk',
+                        id:chunk.id,
+                        data:JSON.stringify(chunk)
+                    })
+                }
+            });
+            const id=uuid();
+            await stream.writeSSE({
+                event:'complete',
+                id,
+                data:JSON.stringify({
+                    id,
+                    mid:mid||uuid(),
+                    type:'completion',
+                    completion:result as ConvoCompletionMessage[],
+                } satisfies ConvoCompletionChunk),
+            })
+        });
+    });
+
+    const completeAsync=async (c:Context,returnJson:boolean,ctx?:ConvoCompletionCtx<any,any>)=>{
 
         await initConvoHonoAsync();
 
-        const body=await c.req.json();
-        const services=convoCompletionService.all();
+        const flat:FlatConvoConversation=await c.req.json();
 
-        const flat:FlatConvoConversation=body;
+        const services=convoCompletionService.all();
 
         const service=(await getConvoCompletionServicesForModelAsync(flat.responseModel??convoAnyModelName,services,convoModelServiceMap))?.[0]?.service;
 
@@ -53,15 +84,19 @@ export const getConvoHonoRoutes=({
             const result=await completeConvoUsingCompletionServiceAsync(
                 flat,
                 service,
-                convoConversationConverterProvider.all()
+                convoConversationConverterProvider.all(),
+                ctx
             );
 
-            return c.json(result);
+            return returnJson?c.json(result):result;
         }catch(error){
             console.error('completion failed',error);
+            if(!returnJson){
+                throw error;
+            }
             return c.json(error,500);
         }
-    });
+    }
 
     routes.post('/convert',async (c)=>{
 
@@ -87,3 +122,5 @@ export const getConvoHonoRoutes=({
 
     return routes;
 }
+
+

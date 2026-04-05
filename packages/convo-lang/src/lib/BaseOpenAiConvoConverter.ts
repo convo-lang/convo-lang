@@ -1,8 +1,9 @@
 import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib.js";
+import { ChatCompletionRequest } from "./convo-openai-types.js";
 import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types.js";
-import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat/index.js';
+import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat/index.js';
 
 export interface BaseOpenAiConvoConverterOptions
 {
@@ -36,14 +37,14 @@ export interface BaseOpenAiConvoConverterOptions
 
     hasVision?:(modelName:string)=>boolean;
 
-    transformInput?:(input:ChatCompletionCreateParamsNonStreaming)=>ChatCompletionCreateParamsNonStreaming;
+    transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
     transformOutput?:(output:ChatCompletion)=>ChatCompletion;
 }
 
 /**
  * A conversation converter for OpenAI like APIs
  */
-export class BaseOpenAiConvoConverter implements ConvoConversationConverter<ChatCompletionCreateParamsNonStreaming,ChatCompletion>
+export class BaseOpenAiConvoConverter implements ConvoConversationConverter<ChatCompletionRequest,ChatCompletion>
 {
 
     public readonly supportedInputTypes:string[];
@@ -60,7 +61,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public readonly includeModalities?:boolean;
     public readonly hasVision?:(modelName:string)=>boolean;
 
-    public readonly transformInput?:(input:ChatCompletionCreateParamsNonStreaming)=>ChatCompletionCreateParamsNonStreaming;
+    public readonly transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
     public readonly transformOutput?:(output:ChatCompletion)=>ChatCompletion;
     public readonly getModelsAsync?:()=>Promise<ConvoModelInfo[]>
 
@@ -107,7 +108,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public convertOutputToConvo(
         output:ChatCompletion,
         outputType:string,
-        input:ChatCompletionCreateParamsNonStreaming,
+        input:ChatCompletionRequest,
         inputType:string,
         flat:FlatConvoConversation):ConvoCompletionMessage[]
     {
@@ -157,6 +158,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 models:this.models,
                 inputTokens:output.usage?.prompt_tokens,
                 outputTokens:output.usage?.completion_tokens,
+                streamingId:flat.enableStreaming?output.id:undefined,
             })];
         }else{
             let content=msg.message.content;
@@ -176,12 +178,13 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 models:this.models,
                 inputTokens:output.usage?.prompt_tokens,
                 outputTokens:output.usage?.completion_tokens,
-                tags:vision?{[convoTags.vision]:''}:undefined
+                tags:vision?{[convoTags.vision]:''}:undefined,
+                streamingId:flat.enableStreaming?output.id:undefined,
             })];
         }
     }
 
-    public convertConvoToInput(flat:FlatConvoConversation,inputType:string):ChatCompletionCreateParamsNonStreaming{
+    public convertConvoToInput(flat:FlatConvoConversation,inputType:string):ChatCompletionRequest{
 
         const messages=getNormalizedFlatMessageList(flat);
 
@@ -257,17 +260,20 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
 
         const jsonMode=lastContentMessage?.responseFormat==='json';
 
-        const cParams:ChatCompletionCreateParamsNonStreaming={
+        const cParams:ChatCompletionRequest={
             model,
             response_format:jsonMode?{type:'json_object'}:undefined,
-            stream:false,
+            stream:flat.enableStreaming,
+            stream_options:flat.enableStreaming?{
+                include_usage:true,
+            }:undefined,
             messages:oMsgs,
             tools:oFns?.length?oFns:undefined,
             user:flat?.userId,
             tool_choice:flat.toolChoice?(
                 (typeof flat.toolChoice === 'string')?
                 flat.toolChoice:{type:"function","function":flat.toolChoice}
-            ):undefined
+            ):undefined,
         };
 
         if(this.includeModalities && flat.model?.outputCapabilities?.length){

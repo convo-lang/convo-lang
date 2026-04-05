@@ -66,6 +66,7 @@ export interface ConvoViewProps
     theme?:ConvoViewTheme;
     sourceDarkMode?:boolean|'auto';
     defaultValue?:string;
+    enableStreaming?:boolean;
 }
 
 export function ConvoView({
@@ -112,6 +113,7 @@ export function ConvoView({
     inputPlaceholder,
     sourceDarkMode,
     defaultValue,
+    enableStreaming,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -147,6 +149,7 @@ export function ConvoView({
             (template??ctrlOptions?.template)
         ),
         convoOptions:{
+            enableStreaming,
             ...ctrlOptions?.convoOptions,
             modules:[
                 ...(ctrlOptions?.convoOptions?.modules??[]),
@@ -156,7 +159,7 @@ export function ConvoView({
                 new HttpConvoCompletionService({endpoint:httpEndpoint})
             ):ctrlOptions?.convoOptions?.completionService
         }
-    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr]);
+    }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr,enableStreaming]);
 
     useEffect(()=>{
         if(defaultValue!==undefined){

@@ -333,9 +333,9 @@ function BubbleMessageView({
             {message.isAssistant && <ConvoThemeIcon theme={theme} icon="assistantIcon" />}
             <div className={cn(messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
                 (enableMarkdown && isMdConvoEnabledFor(message.isUser?'user':'assistant',enableMarkdown))?
-                    <ConvoMarkdownViewer markdown={message.content} className={theme.markdownClassName}/>
+                    <ConvoMarkdownViewer markdown={message.content??''} className={theme.markdownClassName}/>
                 :
-                    message.content
+                    (message.content??'')
             }</div>
             {message.isUser && <ConvoThemeIcon theme={theme} icon="userIcon" />}
         </div>

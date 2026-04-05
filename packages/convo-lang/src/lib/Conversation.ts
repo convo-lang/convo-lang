@@ -272,6 +272,9 @@ export class Conversation
     private readonly _onAppend=new Subject<ConvoAppend>();
     public get onAppend():Observable<ConvoAppend>{return this._onAppend}
 
+    private readonly _onChunk=new Subject<ConvoCompletionChunk>();
+    public get onChunk():Observable<ConvoCompletionChunk>{return this._onChunk}
+
     private readonly _onImportSource=new Subject<ConvoImportSourceEvt>();
     public get onImportSource():Observable<ConvoImportSourceEvt>{return this._onImportSource}
 
@@ -1312,18 +1315,26 @@ export class Conversation
             throw r.error
         }
 
-        if(options.filePath && r.result){
-            for(const m of r.result){
-                m[convoMessageSourcePathKey]=options.filePath;
+        if(r.result){
+            if(options.streamingId){
+                for(const m of r.result){
+                    m.streamingId=options.streamingId;
+                }
             }
-        }
 
-        if(addTags?.length && r.result){
-            for(const m of r.result){
-                if(m.tags){
-                    m.tags.push(...addTags);
-                }else{
-                    m.tags=[...addTags];
+            if(options.filePath){
+                for(const m of r.result){
+                    m[convoMessageSourcePathKey]=options.filePath;
+                }
+            }
+
+            if(addTags?.length){
+                for(const m of r.result){
+                    if(m.tags){
+                        m.tags.push(...addTags);
+                    }else{
+                        m.tags=[...addTags];
+                    }
                 }
             }
         }
@@ -1929,7 +1940,14 @@ export class Conversation
                     flat
                 );
             }else{
-                messages=await completeConvoUsingCompletionServiceAsync(flat,serviceAndModel.service,this.converters);
+                messages=await completeConvoUsingCompletionServiceAsync(
+                    flat,
+                    serviceAndModel.service,
+                    this.converters,
+                    {onChunk:flat.enableStreaming?(_,chunk)=>{
+                        this._onChunk.next(chunk);
+                    }:undefined},
+                );
             }
         }finally{
             release?.();
@@ -2460,7 +2478,7 @@ export class Conversation
                             this.getReversedMappedRole(msg.role)
                         }\n${
                             escapeConvoMessageContent(msg.content)
-                        }\n`);
+                        }\n`,{streamingId:msg.streamingId});
                     }
                     includeTokenUsage=false;
 
@@ -2496,7 +2514,7 @@ export class Conversation
                         }(${
                             msg.callParams===undefined?'':spreadConvoArgs(msg.callParams,true)
                         })`
-                        const result=isDefaultTask?this.append(callMsg):this.parseCode(callMsg);
+                        const result=isDefaultTask?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
                         includeTokenUsage=false;
                         callMessage=result.result?.[0];
                         if(result.result?.length!==1 || !callMessage){
@@ -3174,6 +3192,10 @@ export class Conversation
             role:this.getMappedRole(msg.role),
             tags:tags?convoTagsToMap(tags,exe):undefined,
             [convoFlatMessageSourceMessageKey]:msg,
+        }
+
+        if(msg.streamingId){
+            flat.streamingId=msg.streamingId;
         }
 
         if(msg.role===convoRoles.node){
@@ -4578,6 +4600,7 @@ export class Conversation
                 userId=userIdTagValue;
             }
 
+            // @@make-flat
             const flat:FlatConvoConversation=deleteUndefined({
                 exe,
                 vars:exe.getUserSharedVars(),
@@ -4602,6 +4625,7 @@ export class Conversation
                 apiKey:this.getDefaultApiKey()??undefined,
                 afterCall,
                 messageTriggers,
+                enableStreaming:this.defaultOptions.enableStreaming
             });
             exe.flat=flat;
             const apiKey=exe.getVar(convoVars.__apiKey);

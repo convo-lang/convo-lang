@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { useConversationUiCtrl } from "./convo-lang-react.js";
 import { ConvoMessageView, ConvoMessageViewProps } from "./ConvoMessageView.js";
 import { ConvoStatusIndicator, ConvoStatusIndicatorProps } from "./ConvoStatusIndicator.js";
+import { ConvoStreamingMessageView } from "./ConvoStreamingMessageView.js";
 import { cn } from "./util.js";
 
 
@@ -52,18 +53,23 @@ export function ConvoMessageListView({
     const showResults=useSubject(ctrl.showResultsSubject);
     const showFunctions=useSubject(ctrl.showFunctionsSubject);
 
-    const mapped=!flat?[]:messages.map((m,i)=>{
+    const streamingMessages=useSubject(ctrl.streamingMessagesSubject);
+
+    const mapped=!flat?[]:(streamingMessages?.length?[...messages,...streamingMessages]:messages).map((m,i)=>{
 
         const ctrlRendered=ctrl.renderMessage(m,i);
-        if(ctrlRendered===false || (m.renderTarget??defaultConvoRenderTarget)!==renderTarget){
+        if( ctrlRendered===false ||
+            (m.renderTarget??defaultConvoRenderTarget)!==renderTarget ||
+            (m.streamingActive && m.streamingId && messages.length && messages.some(msg=>msg.streamingId===m.streamingId))
+        ){
             return null;
         }
 
         const props:ConvoMessageViewProps={
-            theme,
             message:m,
             messageIndex:i,
             flat,
+            theme,
             ctrl,
             showSystemMessages,
             showResults,
@@ -82,7 +88,10 @@ export function ConvoMessageListView({
             )
         }
 
-        const rendered=(
+
+        const rendered=(m.streamingId?
+            <ConvoStreamingMessageView {...props} key={m.streamingId}/>
+        :
             <ConvoMessageView {...props} key={i+'m'}/>
         )
 
@@ -99,7 +108,7 @@ export function ConvoMessageListView({
         )
 
 
-    })
+    });
 
     const body=(
         <div className={theme.messageListClassName}>

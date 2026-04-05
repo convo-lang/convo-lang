@@ -2,7 +2,7 @@ import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryR
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
-import { ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
+import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService } from "./convo.deps.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -104,20 +104,76 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         }
     }
 
-    public async completeConvoAsync(flat:FlatConvoConversationBase):Promise<ConvoCompletionMessage[]>
+    public async completeConvoAsync(flat:FlatConvoConversationBase,_:FlatConvoConversationBase,ctx:ConvoCompletionCtx<FlatConvoConversationBase,ConvoCompletionMessage[]>):Promise<ConvoCompletionMessage[]>
     {
-        const r=await httpClient().postAsync<ConvoCompletionMessage[]>(
-            joinPaths(this.getEndpoint(),'/completion'),
+        const options=await this.getRequestOptions?.();
+        const response=await httpClient().postAsync<Response|ConvoCompletionMessage[]>(
+            joinPaths(this.getEndpoint(),'/completion'+(flat.enableStreaming?'/stream':'')),
             getSerializableFlatConvoConversation(flat),
-            await this.getRequestOptions?.()
+            {
+                ...options,
+                returnFetchResponse:flat.enableStreaming??false,
+            }
         );
-        if(!r){
+        if(!response){
             throw new Error('convo-lang ai endpoint returned empty response');
         }
-        if(!Array.isArray(r) && (r as any).messages){
-            return (r as any).messages;
+
+        if(flat.enableStreaming){
+            const reader=(response as Response).body?.getReader();
+            if(!reader){
+                throw new Error('Unable to get response reader');
+            }
+            const decoder=new TextDecoder("utf-8");
+
+            let prev='';
+            while(true){
+                const {done,value}=await reader.read();
+                if(done){
+                    break;
+                }
+
+                const lines=decoder.decode(value).split('\n');
+                for(let i=0;i<lines.length;i++){
+                    let line=lines[i] as string;
+                    if(prev){
+                        line=prev+line;
+                        prev='';
+                    }
+                    if(line.startsWith('data:')){
+                        try{
+
+                            const c:ConvoCompletionChunk=JSON.parse(line.substring(5));
+                            if(ctx.onChunk){
+                                await ctx.onChunk(this,c,flat);
+                            }
+                            if(c.completion){
+                                return c.completion;
+                            }
+                        }catch(ex){
+                            prev=line;
+
+                        }
+                    }
+                }
+
+            }
+
+            if(prev){
+                const msg='Orphaned streaming chunk remaining';
+                console.error(msg);
+                throw new Error(msg);
+            }
+
+            throw new Error('No completion found in stream');
+
         }else{
-            return r;
+            const r=response as ConvoCompletionMessage[];
+            if(!Array.isArray(r) && (r as any).messages){
+                return (r as any).messages;
+            }else{
+                return r;
+            }
         }
     }
 

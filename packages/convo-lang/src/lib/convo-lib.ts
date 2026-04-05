@@ -2723,7 +2723,10 @@ export const escapeConvoTagValue=(value:string):string=>{
     return value.replace(/[\n\r\s]/g,' ');
 }
 
-export const convoMessageToStringSafe=(msg:ConvoMessage):string|undefined=>{
+export const convoMessageToStringSafe=(msg:ConvoMessage|null|undefined):string|undefined=>{
+    if(!msg){
+        return undefined;
+    }
     try{
         return convoMessageToString(msg);
     }catch{
@@ -2876,6 +2879,7 @@ export interface CreateTextConvoCompletionMessageOptions
     tokenPrice?:number;
     tags?:Record<string,string|undefined>;
     defaults?:ConvoCompletionMessage;
+    streamingId?:string;
 }
 export const createTextConvoCompletionMessage=({
     flat,
@@ -2888,6 +2892,7 @@ export const createTextConvoCompletionMessage=({
     tokenPrice,
     defaults,
     tags,
+    streamingId,
 }:CreateTextConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     const lastContentMessage=getLastConvoContentMessage(flat.messages);
     const jsonMode=lastContentMessage?.responseFormat==='json';
@@ -2901,6 +2906,7 @@ export const createTextConvoCompletionMessage=({
         assignTo:lastContentMessage?.responseAssignTo,
         endpoint:flat.responseEndpoint,
         model,
+        streamingId,
         tags,
         ...((models && tokenPrice===undefined)?calculateConvoTokenUsage(
             model,
@@ -2929,6 +2935,7 @@ export interface CreateFunctionCallConvoCompletionMessageOptions
     outputTokens?:number;
     tokenPrice?:number;
     defaults?:ConvoCompletionMessage;
+    streamingId?:string;
 }
 export const createFunctionCallConvoCompletionMessage=({
     flat,
@@ -2941,6 +2948,7 @@ export const createFunctionCallConvoCompletionMessage=({
     outputTokens,
     tokenPrice,
     defaults,
+    streamingId,
 }:CreateFunctionCallConvoCompletionMessageOptions):ConvoCompletionMessage=>{
     return {
         callFn,
@@ -2948,6 +2956,7 @@ export const createFunctionCallConvoCompletionMessage=({
         tags:toolId?{toolId}:undefined,
         endpoint:flat.responseEndpoint,
         model,
+        streamingId,
         ...((models && tokenPrice===undefined)?
             calculateConvoTokenUsage(
                 model,
@@ -3015,6 +3024,7 @@ export const flatConvoConversationToBase=(flat:FlatConvoConversation|FlatConvoCo
         ragTemplate:flat.ragTemplate,
         toolChoice:flat.toolChoice,
         responseModel:flat.responseModel,
+        enableStreaming:flat.enableStreaming,
         responseEndpoint:flat.responseEndpoint,
         userId:flat.userId,
         apiKey:flat.apiKey,
