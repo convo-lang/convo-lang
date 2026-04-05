@@ -1,11 +1,11 @@
 import { defineStringParam } from "@iyio/common";
 
-export const openAiApiKeyParam=defineStringParam('openAiApiKey');
-export const openAiBaseUrlParam=defineStringParam('openAiBaseUrl');
+export const openAiApiKeyParam=defineStringParam('openaiApiKey');
+export const openAiBaseUrlParam=defineStringParam('openaiBaseUrl');
 
-export const openAiChatModelParam=defineStringParam('openAiChatModel');
-export const openAiAudioModelParam=defineStringParam('openAiAudioModel');
-export const openAiImageModelParam=defineStringParam('openAiImageModel');
-export const openAiVisionModelParam=defineStringParam('openAiVisionModel');
+export const openAiChatModelParam=defineStringParam('openaiChatModel');
+export const openAiAudioModelParam=defineStringParam('openaiAudioModel');
+export const openAiImageModelParam=defineStringParam('openaiImageModel');
+export const openAiVisionModelParam=defineStringParam('openaiVisionModel');
 
-export const openAiSecretsParam=defineStringParam('openAiSecrets');
+export const openAiSecretsParam=defineStringParam('openaiSecrets');
