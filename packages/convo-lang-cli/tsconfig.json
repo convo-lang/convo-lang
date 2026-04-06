@@ -25,13 +25,13 @@
             "path": "../../packages/convo-lang-browser"
         },
         {
+            "path": "../../packages/convo-lang-hono"
+        },
+        {
             "path": "../../packages/convo-lang-make"
         },
         {
             "path": "../../packages/convo-lang-mcp-client"
-        },
-        {
-            "path": "../../packages/convo-lang-hono"
-        },
+        }
     ]
 }
