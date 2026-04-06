@@ -40,7 +40,7 @@ export default function IndexPage()
     const [showSystem,setShowSystem]=useState(true);
     const [enableStreaming,setEnableStreaming]=useState(true);
     const [enableMarkdown,setEnableMarkdown]=useState(true);
-    const [enabledSlashCommands,setEnabledSlashCommands]=useState(true);
+    const [enableSlashCommands,setEnableSlashCommands]=useState(true);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -152,7 +152,7 @@ export default function IndexPage()
                 </Label>
 
                 <Label label="enableSlashCommands" row>
-                    <input type="checkbox" id="enableSlashCommands" checked={enabledSlashCommands} onChange={e=>setEnabledSlashCommands(e.target.checked)}/>
+                    <input type="checkbox" id="enableSlashCommands" checked={enableSlashCommands} onChange={e=>setEnableSlashCommands(e.target.checked)}/>
                 </Label>
 
                 <Label label="enableMarkdown" row>
@@ -176,7 +176,7 @@ export default function IndexPage()
                     className="flex-1"
                     inputPlaceholder="Ask something cool"
                     enableMarkdown={enableMarkdown}
-                    enabledSlashCommands={enabledSlashCommands}
+                    enableSlashCommands={enableSlashCommands}
                     suggestionsLocation="before-input"
                     forceInlineSuggestionsLocation
                     showFunctions={showFunctions}
