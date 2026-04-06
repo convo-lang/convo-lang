@@ -189,7 +189,6 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
 
                 const decoder=new TextDecoder("utf-8");
                 const mid=shortUuid();
-                const patchedLines:number[]=[];
                 let prev='';
 
                 readLoop: while(true){
@@ -339,7 +338,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
                 const buf=argBuffers[i]??(argBuffers[i]=[]);
                 buf.push(d.function.arguments);
                 if(ctx.onChunk){
-                    await ctx.onChunk(this,{id:nextChunkId(),mid,type:'function',chunk:d.function.arguments},flat);
+                    await ctx.onChunk(this,{id:nextChunkId(),mid,type:'function',functionName:call.function.name,chunk:d.function.arguments},flat);
                 }
             }
 

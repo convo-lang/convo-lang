@@ -963,6 +963,8 @@ export interface FlatConvoMessage
 
     streamingActive?:boolean;
 
+    streamingFunction?:string;
+
     content?:string;
 
     /**
@@ -1222,6 +1224,7 @@ export interface ConvoCompletionChunk
     id:string;
     mid:string;
     type:ConvoCompletionChunkType;
+    functionName?:string;
     chunk?:string;
     completion?:ConvoCompletionMessage[];
 }

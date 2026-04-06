@@ -560,6 +560,7 @@ export class ConversationUiCtrl
             this._onAppend.next(v);
             for(const m of v.messages){
                 if(m.streamingId){
+                    const match=this._streamingMessages.value?.find(m=>m.streamingId===m.streamingId);
                     setTimeout(()=>{
                         if(!m){
                             return;
@@ -573,7 +574,7 @@ export class ConversationUiCtrl
                                 this._streamingMessages.next(null);
                             }
                         }
-                    },2000);
+                    },match?.streamingFunction?0:1000);
                 }
             }
 
@@ -586,8 +587,9 @@ export class ConversationUiCtrl
                 if(!current){
                     current={
                         isAssistant:true,
-                        role:'assistant',
+                        role:v.type==='function'?'result':'assistant',
                         content:'',
+                        streamingFunction:v.functionName,
                         streamingId:mid,
                         streamingActive:true,
                     }

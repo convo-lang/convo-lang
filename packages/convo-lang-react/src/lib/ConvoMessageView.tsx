@@ -1,5 +1,5 @@
 import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, convoFlatMessageSourceMessageKey, convoMessageToStringSafe, convoRoles, convoTags, isMdConvoEnabledFor } from "@convo-lang/convo-lang";
-import { aryRemoveWhere, containsMarkdownImage, objectToMarkdown, parseMarkdownImages } from "@iyio/common";
+import { aryRemoveWhere, containsMarkdownImage, parseMarkdownImages } from "@iyio/common";
 import { Fragment } from "react";
 import { Button } from "./Button.js";
 import { ConvoMarkdownViewer } from "./ConvoMarkdownViewer.js";
@@ -104,7 +104,23 @@ export function ConvoMessageView({
     }
 
 
-    if(message.role==='result'){
+    if(message.role==='result' && message.streamingActive){
+        const content=message.content??'';
+        return (
+            <div className={rowClassName}>
+                <ConvoThemeIcon theme={theme} icon="assignmentIcon" className={theme.assistantIconClassName}/>
+                <div className={cn(messageClassName,theme.assignmentMessageClassName)}>
+                    <div className={theme.assignmentStreamingFunctionCallClassName}>
+                        {message.streamingFunction}
+                        <span className={theme.assignmentStreamingFunctionTokenCountCallClassName}>( ~{Math.round(content.length/4)} tokens )</span>
+                    </div>
+                    <div className={theme.assignmentWindowClassName}>
+                        {content.substring(content.length-600)}
+                    </div>
+                </div>
+            </div>
+        )
+    }else if(message.role==='result' || message.setVars){
         if(!message.setVars || (!showResults && !showFunctions)){
             return null;
         }
@@ -114,10 +130,6 @@ export function ConvoMessageView({
         if(!keys.length){
             return null;
         }
-        let firstValue=message.setVars[keys[0]??''];
-        if(keys.length===1 && Array.isArray(firstValue) && firstValue.length===1){
-            firstValue=firstValue[0];
-        }
         return (
             <div className={rowClassName}>
                 <ConvoThemeIcon theme={theme} icon="assignmentIcon" className={theme.assistantIconClassName}/>
@@ -126,24 +138,15 @@ export function ConvoMessageView({
                         {called?.called && <div className={theme.assignmentFunctionCallClassName}>
                             {called.called.name}({JSON.stringify(called.calledParams,null,4)})
                         </div>}
-                        {keys.map((k,ki)=>{
-
-                            const value=ki===0?firstValue:(message.setVars?.[k]);
-
+                        {keys.map((k)=>{
+                            let value:string;
+                            try{
+                                value=JSON.stringify(message.setVars?.[k],null,4);
+                            }catch{
+                                value='[object]';
+                            }
                             return (
-                                <div className={theme.assignmentRowClassName} key={k+'r'}>
-                                    <div className={theme.assignmentNameClassName}>{k}</div>
-                                    {theme.assignmentOperatorIcon?
-                                        <ConvoThemeIcon theme={theme} icon="assignmentOperatorIcon"/>
-                                    :
-                                        <div className={cn(theme.iconClassName,theme.assignmentIconClassName)}>=</div>
-                                    }
-                                    <div className={theme.assignmentValueClassName}>{k[0]===k[0]?.toLowerCase()?
-                                        objectToMarkdown(value)
-                                    :
-                                        JSON.stringify(value,null,4)
-                                    }</div>
-                                </div>
+                                <div key={k+'r'} className={theme.assignmentValueClassName}>{k+' = '+value}</div>
                             )
                         })}
                     </div>
@@ -342,3 +345,5 @@ function BubbleMessageView({
     )
 
 }
+
+const nlReg=/[\n\r]/g;

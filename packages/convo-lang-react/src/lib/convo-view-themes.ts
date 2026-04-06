@@ -1,5 +1,5 @@
 import { ConvoViewTheme } from "@convo-lang/convo-lang";
-import { ArrowUpIcon, BrainIcon, DatabaseSearchIcon, Loader2Icon, MemoryStickIcon, MenuIcon, MoveRightIcon, UserIcon, VariableIcon } from 'lucide-react';
+import { ArrowUpIcon, BrainIcon, DatabaseSearchIcon, Loader2Icon, MemoryStickIcon, MenuIcon, UserIcon, VariableIcon } from 'lucide-react';
 import { mergeConvoViewThemes } from "../convo-theme-lib.js";
 
 export type ConvoViewThemeName='default'|'default-layout'|'default-icons'|'default-style';
@@ -13,7 +13,6 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 userIcon:UserIcon,
                 assistantIcon:BrainIcon,
                 systemIcon:MemoryStickIcon,
-                assignmentOperatorIcon:MoveRightIcon,
                 assignmentIcon:VariableIcon,
                 loaderIcon:Loader2Icon,
                 inputSubmitButtonIcon:ArrowUpIcon,
@@ -62,10 +61,10 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             componentRowClassName:'',
 
             assignmentListClassName:'flex flex-col gap-2',
-            assignmentRowClassName:'flex items-center gap-2',
-            assignmentNameClassName:'',
-            assignmentValueClassName:'',
+            assignmentValueClassName:'whitespace-pre-wrap',
             assignmentFunctionCallClassName:'whitespace-pre-wrap',
+            assignmentWindowClassName:'line-clamp-6 overflow-clip',
+            assignmentStreamingFunctionCallClassName:'flex items-center justify-between',
 
             imageClassName:'',
             userImageClassName:'',
@@ -143,6 +142,8 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             assignmentMessageClassName:'font-mono',
             suggestionButtonClassName:'border rounded-full bg-background hover:bg-foreground/30 transition-[background-color]',
             assignmentFunctionCallClassName:'border-b pb-2',
+            assignmentStreamingFunctionTokenCountCallClassName:'opacity-50 text-sm',
+            assignmentWindowClassName:'border rounded p-2 font-mono mt-2',
 
             sourceViewLineNumberClassName:'border-r',
             sourceViewErrorClassName:'color-destructive',

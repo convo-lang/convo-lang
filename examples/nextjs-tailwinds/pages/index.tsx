@@ -239,14 +239,114 @@ const getTools=():HtmlTool[]=>{
 
 const t3='```'
 
-const defaultValue2=/*convo*/`
+const defaultValue9=/*convo*/`
+> define
+Idea=struct(
+    name:string
+    description:string
+    category:string
+)
+
+ideas=[]
+
+@on user
+> extractThought()->(
+
+    ??? (+ ideas=json:Idea[] /m task:Extracting Ideas)
+        extract any ideas the user stated. If none expressed return an empty array
+    ???
+
+)
+
+> assistant
+Whats on your mind
+
+> user
+I think we need a new programming language for building AI application, let's call it Convo-Lang.
+
+
+@stdSystem moderatorTags
+@includeInTriggers
+@disableModifiers
+> system
+## Moderator messages
+Some messages will also include a moderator message wrapped in an XML tag with the a tag name
+of "moderator". Moderator messages should be followed as instructions. Moderator messages are not
+visible to the user.
+
+> thinking extractThought user
+I think we need a new programming language for building AI application, let's call it Convo-Lang.
+
+> thinking extractThought assistant
+{
+  "values": [
+    {
+      "name": "New programming language for AI applications",
+      "description": "The user suggests the creation of a new programming language specifically designed for building AI applications.",
+      "category": "Programming Language"
+    },
+    {
+      "name": "Convo-Lang (proposed name)",
+      "description": "The user proposes the name 'Convo-Lang' for the new AI-oriented programming language.",
+      "category": "Naming"
+    }
+  ]
+}
+
+> thinkingResult
+ideas=[
+    {
+        "name": "New programming language for AI applications",
+        "description": "The user suggests the creation of a new programming language specifically designed for building AI applications.",
+        "category": "Programming Language"
+    },
+    {
+        "name": "Convo-Lang (proposed name)",
+        "description": "The user proposes the name 'Convo-Lang' for the new AI-oriented programming language.",
+        "category": "Naming"
+    }
+]
+
+
+> assistant
+That’s an exciting idea! Creating a new programming language specifically for building AI applications—Convo-Lang—could address challenges in current workflows, such as code verbosity, deployment complexity, or lack of native support for conversational logic and ML model integration.
+
+Here are a few aspects we might consider for Convo-Lang:
+
+1. **Native Model Integration:**
+   Built-in primitives to import, orchestrate, and fine-tune models (like transformers, LLMs, etc.).
+
+2. **Conversational Constructs:**
+   First-class support for dialogue state, context management, turn-taking, and intent handling.
+
+3. **Declarative AI Pipelines:**
+   Ability to declaratively define data preprocessing, inference pipelines, and post-processing.
+
+4. **Safety & Evaluation:**
+   Language-level support for constraints (preventing disallowed outputs) and automatic evaluation metrics for responses.
+
+5. **Interoperability:**
+   Easy interop with Python and popular AI libraries.
+
+6. **Deployment Readiness:**
+   Simple compilation/packaging for production environments, including cloud-native deployment.
+
+What features or syntax were you envisioning for Convo-Lang? Would you want it to “feel” like Python, or be its own paradigm? Would you like to sketch out a sample “Hello, World!” or a simple bot in this language?
+
+
+> user
+
+
+`.trim()+'\n';
+
+const defaultValue5=/*convo*/`
 
 > user
 hi
 
 `.trim()+'\n'
 
-const defaultValue3=/*convo*/`
+const defaultValue=/*convo*/`
 
 > addNumber(a:number b:number)->(
     'The result is {{add(a b)}}'
@@ -270,7 +370,7 @@ Create me a retro style calculator with a VIC 20 look a feel
 
 `.trim()+'\n';
 
-const defaultValue=/*convo*/`
+const defaultValue4=/*convo*/`
 > define
 __model='gpt-4.1'
 

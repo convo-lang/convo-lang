@@ -68,13 +68,12 @@ export interface ConvoViewTheme
     assignmentMessageClassName?:string;
     assignmentListClassName?:string;
     assignmentFunctionCallClassName?:string;
-    assignmentRowClassName?:string;
-    assignmentNameClassName?:string;
+    assignmentStreamingFunctionCallClassName?:string;
+    assignmentStreamingFunctionTokenCountCallClassName?:string;
     assignmentValueClassName?:string;
-    assignmentOperatorIcon?:ConvoIconType;
-    assignmentOperatorIconClassName?:string;
     assignmentIconClassName?:string;
     assignmentIcon?:ConvoIconType;
+    assignmentWindowClassName?:string;
 
     imageClassName?:string;
     userImageClassName?:string;
