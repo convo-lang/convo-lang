@@ -1,6 +1,7 @@
 > define
 __trackModel=true
 __trackTokenUsage=true
+__model='gpt-4.1'
 
 > user
 Create an overview of the following document that focuses on the basic usage of `> system`, `> assistant`
@@ -133,73 +134,162 @@ This foundational structure lets you build robust conversational flows, blending
 
 
 
-@tokenUsage 31507 / 778 / $0.023245200000000004
-@model us.meta.llama3-3-70b-instruct-v1:0
+> user
+Include instructions on how to use extern functions
+
+@tokenUsage 33246 / 1015 / $0.068522
+@model gpt-4.1-2025-04-14
 > assistant
-Overview of Basic Usage of `> system`, `> assistant`, and `> user` Messages for Building Chat Interfaces
-====================================================================================
+Certainly! Here’s an updated overview focused on the use of `> system`, `> assistant`, and `> user` messages, **now with clear instructions for using extern functions** in Convo-Lang. The escaping section is also included for completeness.
 
-Convo-Lang is an open-source AI-native programming language and ecosystem designed for building powerful, structured prompts and agent workflows for large language models (LLMs). The language uses a simple syntax to define messages that can be used to build chat interfaces.
+---
 
-### Message Types
+# Convo-Lang Chat Interface Message Basics & Extern Functions
 
-There are three main types of messages in Convo-Lang:
+Convo-Lang lets you define structured conversations for LLMs using intuitive roles and extend capabilities through external (extern) functions.
 
-*   `> system`: This message type is used to control the behavior of the LLM and is hidden from the user. It can be used to define the persona, tone, and language of the agent.
-*   `> assistant`: This message type is used to define the response of the agent to the user's input. It can be used to provide information, answer questions, or engage in conversation.
-*   `> user`: This message type is used to define the input of the user. It can be used to simulate user interactions or to define the context of the conversation.
+---
 
-### Escaping `>` and `\{{` Characters
+## Message Types for Conversations
 
-To escape the `>` character, you can use a backslash (`\`) before the character. For example: `\>`
+### 1. `> system`
+* Used to configure the agent’s personality, behavior, and instruction context.
+* Not visible to the end user.
+  ```convo
+  \> system
+  You are a supportive coding tutor.
+  ```
 
-To escape the `\{{` characters, you can use a backslash (`\`) before the first `{` character. For example: `\{{`
+### 2. `> assistant`
+* Represents messages/responses from the AI/LLM.
+* Shown to the user.
+  ```convo
+  \> assistant
+  What coding question can I help you with?
+  ```
 
-### Example Usage
+### 3. `> user`
+* Represents the user’s queries and input.
+* Shown as a user message.
+  ```convo
+  \> user
+  How do I reverse a string in Python?
+  ```
 
-Here is an example of how to use these message types to build a simple chat interface:
+### Example Conversation Block
 ```convo
 \> system
-You are a customer support agent for a company that sells flooring products.
+You are a movie expert.
 
 \> assistant
-Hello! How can I help you today?
+What movie are you curious about?
 
 \> user
-I'm looking for a new floor for my living room. Can you recommend something?
-
-\> assistant
-We have a wide range of flooring products available. What type of flooring are you interested in? Hardwood, laminate, or tile?
-
-\> user
-I'm not sure. What are the pros and cons of each?
-
-\> assistant
-Hardwood flooring is durable and easy to clean, but it can be expensive. Laminate flooring is more affordable, but it may not be as durable. Tile flooring is easy to clean and maintain, but it can be cold and hard on joints.
-
-\> user
-That helps. Can you show me some examples of each?
-
-\> assistant
-Here are some examples of our flooring products: [insert images or links to products]
-
-\> user
-I like the look of the hardwood flooring. Can you tell me more about it?
-
-\> assistant
-Our hardwood flooring is made from high-quality wood and is available in a variety of styles and finishes. It's durable and easy to clean, and it can add value to your home.
-
-\> user
-That sounds great. How much does it cost?
-
-\> assistant
-The cost of our hardwood flooring varies depending on the style and finish you choose. However, we currently have a sale on our most popular style, which starts at $3.99 per square foot.
+Tell me about Interstellar.
 ```
-This example demonstrates how to use the `> system`, `> assistant`, and `> user` messages to build a simple chat interface for a customer support agent. The `> system` message is used to define the persona and tone of the agent, while the `> assistant` message is used to provide information and answer questions. The `> user` message is used to simulate user interactions and define the context of the conversation.
 
-### Conclusion
+---
 
-Convo-Lang provides a simple and powerful way to build chat interfaces using the `> system`, `> assistant`, and `> user` messages. By using these message types, you can create complex conversations that simulate real-world interactions. The language also provides a way to escape special characters, such as `>` and `\{{`, which can be useful when working with user input or output.
+## Using Extern Functions
+
+**Extern functions** let you call code written *outside* of Convo-Lang (such as JavaScript or Python), enabling interaction with external systems, APIs, or to delegate tasks too complex for LLMs.
+
+### How to Define an Extern Function
+
+- Start definition with the `extern` keyword after the `>` symbol.
+- Give it a function name, argument list, and (optionally) comments/docstrings for guidance.
+
+```convo
+# This function will be handled by external code
+\> extern setShapeColor(
+    # The shape to set the color of (circle, triangle, square)
+    shape: enum("circle" "triangle" "square")
+    # The color to set (hex or color name)
+    color: string
+)
+```
+*This tells the engine that when setShapeColor is called, the actual logic lives elsewhere (outside of Convo-Lang itself).*
+
+### How to Provide an Extern Function Implementation
+
+- In your integration code (Node.js, Python, etc.), you provide the function matching this signature.
+
+**Example (JavaScript):**
+```js
+// Exported function detected by your Convo-Lang environment
+export function setShapeColor(shape, color) {
+    // Example: update an SVG
+    const svgShape = document.querySelector(`#shapes .shape-${shape}`);
+    if(svgShape) svgShape.setAttribute('fill', color);
+    return 'Color set';
+}
+```
+
+### Extern Function Usage Flow
+
+1. **User gives input.**
+2. **LLM decides to call the extern function** (e.g., setShapeColor).
+3. **The external code runs.**
+4. **Result is returned** to the conversation in a `> result` message.
+5. **Assistant** gives feedback to the user.
+
+**Example Conversation:**
+```convo
+\> extern setShapeColor(
+    shape: enum("circle" "square")
+    color: string
+)
+
+\> user
+Change the square to blue.
+
+@toolId call_xyz
+\> call setShapeColor(
+    "shape": "square"
+    "color": "blue"
+)
+\> result
+__return="Color set"
+
+\> assistant
+The square is now blue!
+```
+
+---
+
+## Escaping Special Characters
+
+### Escaping `>` (for literal greater-than)
+If you want to show `>` (not start a message), use a backslash:
+```convo
+\> assistant
+Type \> help to see options.
+```
+
+### Escaping `\{{` (for literal curly braces)
+To write `\{{` without triggering an expression:
+- Use a backslash: `\{{`
+- Or in a string, sometimes double them: `\{{ "\{{" }}`
+```convo
+\> assistant
+To denote a variable, write it as \{{variableName\}}
+```
+
+---
+
+## Summary Checklist
+
+- Use `> system` for behind-the-scenes prompts.
+- Use `> assistant` for AI replies.
+- Use `> user` for user turns.
+- Use `> extern ...` to connect Convo-Lang conversations with real external code (systems, APIs, custom logic).
+- Escape special characters (`>`, `\{{`) using a backslash as shown above.
+
+**Extern functions** bridge the language with the outside world, so you can empower your conversational agents beyond the language’s built-in capabilities.
+
+---
+
+**For more details** and working code, refer to the official documentation or the "Extern Functions" and message type examples inside the Convo-Lang docs.
 
 
 > user
