@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { ButtonBaseProps, useBaseButton } from "./useButtonBase.js";
 
-export function Button(props:ButtonBaseProps){
+export type ButtonProps=ButtonBaseProps;
+export function Button(props:ButtonProps){
 
     const {elem,children,...buttonProps}=useBaseButton(props);
 
