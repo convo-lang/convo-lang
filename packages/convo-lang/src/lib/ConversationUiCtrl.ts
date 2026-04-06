@@ -185,18 +185,18 @@ export class ConversationUiCtrl
         this._showFunctions.next(value);
     }
 
-    private readonly _enabledSlashCommands:BehaviorSubject<boolean>;
-    public get enabledSlashCommandsSubject():ReadonlySubject<boolean>{return this._enabledSlashCommands}
+    private readonly _enableSlashCommands:BehaviorSubject<boolean>;
+    public get enableSlashCommandsSubject():ReadonlySubject<boolean>{return this._enableSlashCommands}
     /**
      * If messages appended to the conversation using the appendUiMessage will be checked for messages
      * starting with a forward slash and be interpreted as a command.
      */
-    public get enabledSlashCommands(){return this._enabledSlashCommands.value}
-    public set enabledSlashCommands(value:boolean){
-        if(value==this._enabledSlashCommands.value){
+    public get enableSlashCommands(){return this._enableSlashCommands.value}
+    public set enableSlashCommands(value:boolean){
+        if(value==this._enableSlashCommands.value){
             return;
         }
-        this._enabledSlashCommands.next(value);
+        this._enableSlashCommands.next(value);
     }
 
     private readonly _theme:BehaviorSubject<Record<string,any>>=new BehaviorSubject<Record<string,any>>({});
@@ -352,7 +352,7 @@ export class ConversationUiCtrl
         this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});
 
         this._removeDanglingUserMessages=new BehaviorSubject<boolean>(removeDanglingUserMessages);
-        this._enabledSlashCommands=new BehaviorSubject(enableSlashCommand);
+        this._enableSlashCommands=new BehaviorSubject(enableSlashCommand);
 
         this.convoOptions=convoOptions;
         this.initConvoCallback=initConvo;
@@ -700,7 +700,7 @@ export class ConversationUiCtrl
 
 
         if(cmdReg.test(message)){
-            if(!this._enabledSlashCommands.value){
+            if(!this._enableSlashCommands.value){
                 return false;
             }
             message=message.trim();
