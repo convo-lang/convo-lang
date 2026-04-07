@@ -63,7 +63,12 @@ export class ConvoMakeExtTarget extends ConvoMakeExtTreeItem<ConvoMakeTargetCtrl
 
     public getChildren():ProviderResult<any[]>
     {
-        return getConvoMakeExtJsonChildren(this.id??'',this.obj.target,this.getBaseParams())
+        const blockedBy=this.obj.target.in.filter(i=>!i.ready);
+
+        return getConvoMakeExtJsonChildren(this.id??'',{
+            ...this.obj.target,
+            blockedBy:blockedBy.length===1?blockedBy[0]?.path:blockedBy.length?blockedBy.map(b=>b.path):undefined,
+        },this.getBaseParams())
     }
 }
 

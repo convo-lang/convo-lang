@@ -3,7 +3,7 @@ import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultE
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, joinPaths, normalizePath } from '@iyio/common';
+import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, getFileName, joinPaths, normalizePath } from '@iyio/common';
 import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
 import { realpath } from 'fs/promises';
 import * as path from 'path';
@@ -431,6 +431,33 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         if(targetPath){
             const doc=await workspace.openTextDocument(Uri.file(targetPath));
             await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-delete-all', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        const confirm=await window.showWarningMessage(
+            `Delete outputs of ${getFileName(ctrl.filePath)}\n\nAre you sure you want to delete all outputs of "${ctrl.filePath}"?`,
+            {modal:true},
+            'Delete'
+        );
+        if(confirm === 'Delete'){
+            const targets=await target.getTargetsAsync(true);
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete ${targets.length} outputs?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm==='Delete'){
+                for(const t of targets){
+                    await workspace.fs.delete(Uri.file(t.obj.outPath),{useTrash:true});
+                }
+                await ext.scanMakeCtrlsAsync();
+            }
         }
     }));
 

@@ -1,11 +1,11 @@
 import { ConvoMakeCtrl } from "@convo-lang/convo-lang-make";
 import { normalizePath } from "@iyio/common";
 import { ProviderResult, workspace } from "vscode";
-import { createConvoExtIcon, getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib.js';
+import { createConvoExtIcon, getAllTargetsFromConvoMakeExtTreeItemAsync, getConvoExtMakeMetadataOrCreateValue } from './convo-make-ext-lib.js';
 import { ConvoMakeExtAppList } from "./ConvoMakeExtApp.js";
 import { ConvoMakeExtPassList } from "./ConvoMakeExtPass.js";
 import { ConvoMakeExtStageList } from "./ConvoMakeExtStage.js";
-import { ConvoMakeExtTargetList } from "./ConvoMakeExtTarget.js";
+import { ConvoMakeExtTarget, ConvoMakeExtTargetList } from "./ConvoMakeExtTarget.js";
 import { ConvoMakeExtTargetDecList } from "./ConvoMakeExtTargetDec.js";
 import { ConvoMakeExtTokenUsage } from "./ConvoMakeExtTokenUsage.js";
 import { ConvoMakeExtTreeItem, ConvoMakeExtTreeItemOptionsBase } from "./ConvoMakeExtTreeItem.js";
@@ -80,6 +80,10 @@ export class ConvoMakeExtBuild extends ConvoMakeExtTreeItem<ConvoMakeCtrl>
                 obj:this.obj,
             })),
         ].filter(v=>v) as ConvoMakeExtTreeItem<any>[];
+    }
+
+    public async getTargetsAsync(onlyExists:boolean):Promise<ConvoMakeExtTarget[]>{
+        return await getAllTargetsFromConvoMakeExtTreeItemAsync(this,onlyExists);
     }
 }
 

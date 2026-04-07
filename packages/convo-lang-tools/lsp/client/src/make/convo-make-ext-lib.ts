@@ -1,5 +1,7 @@
 import { ThemeColor, ThemeIcon } from "vscode";
 import { ConvoMakeExtItemMetadata } from "./convo-make-ext-types.js";
+import { ConvoMakeExtTarget } from "./ConvoMakeExtTarget.js";
+import { ConvoMakeExtTreeItem } from "./ConvoMakeExtTreeItem.js";
 
 const metadataKey=Symbol('ConvoExtMetadata');
 
@@ -28,4 +30,25 @@ export const createConvoExtIcon=(icon:string)=>{
         icon,
         icon==='check'?new ThemeColor('charts.green'):undefined
     )
+}
+
+
+export const getAllTargetsFromConvoMakeExtTreeItemAsync=async (item:ConvoMakeExtTreeItem<any>,onlyExists:boolean)=>{
+    const targets:ConvoMakeExtTarget[]=[];
+    await _getAllTargetsFromConvoMakeExtTreeItemAsync(item,onlyExists,targets);
+    return targets;
+}
+
+const _getAllTargetsFromConvoMakeExtTreeItemAsync=async (item:ConvoMakeExtTreeItem<any>,onlyExists:boolean,targets:ConvoMakeExtTarget[])=>{
+    if((item instanceof ConvoMakeExtTarget) && (onlyExists?item.obj.outExists:true)){
+        targets.push(item);
+    }
+
+    const children=await item.getChildren();
+
+    if(children){
+        for(const child of children){
+            await _getAllTargetsFromConvoMakeExtTreeItemAsync(child,onlyExists,targets);
+        }
+    }
 }
