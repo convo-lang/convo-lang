@@ -224,7 +224,7 @@ export function ConversationView({
 
     useEffect(()=>{
         if(enabledSlashCommands!==undefined){
-            ctrl.enabledSlashCommands=enabledSlashCommands;
+            ctrl.enableSlashCommands=enabledSlashCommands;
         }
     },[ctrl,enabledSlashCommands]);
 
