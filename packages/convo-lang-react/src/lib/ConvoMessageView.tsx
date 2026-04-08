@@ -231,7 +231,7 @@ export function ConvoMessageView({
 
         // add renderer here
 
-        return (<Fragment>{
+        return (<>{
             parts.map((p,pi)=>p.image?(
                 <div className={rowClassName} key={pi}>
                     {ctrl.imageRenderer?.(p.image,cn(theme.imageClassName,message.role==='user'?theme.userImageClassName:theme.assistantImageClassName),message)??
@@ -249,10 +249,11 @@ export function ConvoMessageView({
                     messageClassName={messageClassName}
                     theme={theme}
                     message={message}
+                    contentOverride={p.text??''}
                     enableMarkdown={enableMarkdown}
                 />
             ))
-        }</Fragment>)
+        }</>)
 
     }else if(message.isSuggestion){
         if(hideSuggestions){
@@ -320,6 +321,7 @@ interface BubbleMessageViewProps
     theme:ConvoViewTheme;
     message:FlatConvoMessage;
     enableMarkdown?:ConvoMarkdownEnableState;
+    contentOverride?:string;
 }
 
 function BubbleMessageView({
@@ -328,7 +330,10 @@ function BubbleMessageView({
     theme,
     message,
     enableMarkdown,
+    contentOverride
 }:BubbleMessageViewProps){
+
+    const content=contentOverride??message.content??'';
 
     return (
         <div className={rowClassName}>
@@ -336,9 +341,9 @@ function BubbleMessageView({
             {message.isAssistant && <ConvoThemeIcon theme={theme} icon="assistantIcon" />}
             <div className={cn(messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
                 (enableMarkdown && isMdConvoEnabledFor(message.isUser?'user':'assistant',enableMarkdown))?
-                    <ConvoMarkdownViewer markdown={message.content??''} className={theme.markdownClassName}/>
+                    <ConvoMarkdownViewer markdown={content} className={theme.markdownClassName}/>
                 :
-                    (message.content??'')
+                    content
             }</div>
             {message.isUser && <ConvoThemeIcon theme={theme} icon="userIcon" />}
         </div>

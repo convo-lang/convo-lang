@@ -41,6 +41,7 @@ export default function IndexPage()
     const [enableStreaming,setEnableStreaming]=useState(true);
     const [enableMarkdown,setEnableMarkdown]=useState(true);
     const [enableSlashCommands,setEnableSlashCommands]=useState(true);
+    const [enableAttachment,setEnableAttachment]=useState(true);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -159,6 +160,10 @@ export default function IndexPage()
                     <input type="checkbox" id="enableMarkdown" checked={enableMarkdown} onChange={e=>setEnableMarkdown(e.target.checked)}/>
                 </Label>
 
+                <Label label="enableAttachment" row>
+                    <input type="checkbox" id="enableAttachment" checked={enableAttachment} onChange={e=>setEnableAttachment(e.target.checked)}/>
+                </Label>
+
                 {!!htmlTools.length &&
                     <Label label="artifact">
                         {toolSelect(false)}
@@ -183,6 +188,7 @@ export default function IndexPage()
                     showResults={showResults}
                     showSystem={showSystem}
                     enableStreaming={enableStreaming}
+                    enableAttachment={enableAttachment}
                     defaultValue={defaultValue}
                     externFunctions={{
                         createHtmlTool(name:string,content:string){

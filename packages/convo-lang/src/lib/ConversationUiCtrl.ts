@@ -1,4 +1,4 @@
-import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, shortUuid, wSetProp, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, readBlobAsDataUrlAsync, shortUuid, wSetProp, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
@@ -852,6 +852,24 @@ ${t3} text
 /help       - Prints this help message
 ${t3}
         `)
+    }
+
+    public async queueMediaAsync(media:string|ConvoPromptMedia|Blob|File|null|undefined):Promise<boolean>{
+
+        if(!media){
+            return false;
+        }
+
+        if((media instanceof Blob) || (media instanceof File)){
+            const m=await readBlobAsDataUrlAsync(media);
+            if(!m){
+                return false;
+            }
+            media=m;
+        }
+
+        this.queueMedia(media);
+        return true;
     }
 
     public queueMedia(media:string|ConvoPromptMedia){

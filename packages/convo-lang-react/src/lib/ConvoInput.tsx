@@ -1,7 +1,10 @@
 import { ConversationUiCtrl, ConvoViewTheme } from "@convo-lang/convo-lang";
+import { PlusIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "./Button.js";
 import { ConversationInputChange, useConversationUiCtrl } from "./convo-lang-react.js";
+import { ConvoThemeIcon } from "./ConvoThemeIcon.js";
+import { resizeImageDataUrlAsync } from "./media-lib.js";
 import { cn } from "./util.js";
 
 export interface ConvoInputProps
@@ -11,14 +14,44 @@ export interface ConvoInputProps
     inputName?:string;
     placeholder?:string;
     submitTrigger?:any;
-    children?:any;
     noSubmitButton?:boolean;
     beforeInput?:any;
     afterInput?:any;
-    imageUrl?:string;
     autoFocus?:boolean|number;
     autoFocusDelayMs?:number;
     onInputChange?:(change:ConversationInputChange)=>void;
+
+    /**
+     * If true media will be allowed to be attached. Commonly used to attach images. Attachments
+     * are sent to the target LLM as a base64 string.
+     */
+    enableAttachment?:boolean;
+
+    /**
+     * Media types to accept passed to file input to limit what types of media can be attached.
+     * @default "image/*"
+     */
+    acceptAttachmentTypes?:string;
+
+    /**
+     * Can be used to replace the default behavior of using a file input to browse for files to
+     * attach. This can be used to integrated into custom media browser. If a string is returned
+     * it should be a base64 url.
+     */
+    browseAttachmentRequested?:(accept:string)=>Promise<File|Blob|string|null|undefined>;
+
+    /**
+     * Max image width. Larger images will be resized. It is recommended to only provided max width
+     * or max height.
+     * @default 1024
+     */
+    maxImageWidth?:number;
+
+    /**
+     * Max image height. Larger images will be resize.
+     */
+    maxImageHeight?:number;
+
     theme:ConvoViewTheme;
 }
 
@@ -28,14 +61,17 @@ export function ConvoInput({
     inputName='chat',
     placeholder='Enter message',
     submitTrigger,
-    children,
     noSubmitButton,
     beforeInput,
     afterInput,
-    imageUrl,
     autoFocus,
     autoFocusDelayMs=30,
     onInputChange,
+    enableAttachment,
+    acceptAttachmentTypes='image/*',
+    browseAttachmentRequested,
+    maxImageHeight,
+    maxImageWidth=1024,
     theme,
 }:ConvoInputProps){
 
@@ -75,30 +111,54 @@ export function ConvoInput({
         }
     },[submitTrigger]);
 
-    if(children===undefined && !noSubmitButton){
-        children=(
-            <Button className={cn(theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} type="submit">
-                {theme.inputSubmitButtonIcon?
-                    <theme.inputSubmitButtonIcon className={cn(theme.iconClassName,theme.inputSubmitButtonIconClassName)}/>
-                :
-                    'submit'
-                }
-            </Button>
-        )
-    }
-
     return (
         <form
-            className={cn(theme.inputContainerClassName,ready&&theme.inputContainerReadyClassName,className)}
+            className={cn(
+                theme.inputContainerClassName,
+                theme.inputContainerAttachmentEnabledClassName,
+                ready&&theme.inputContainerReadyClassName,
+                className
+            )}
             onSubmit={submit}
         >
 
-            {!!imageUrl && <div className={theme.inputImageClassName} style={{backgroundImage:`url(${imageUrl})`}}/>}
+            {enableAttachment &&
+                <Button
+                    className={theme.inputAttachmentButton}
+                    elem={browseAttachmentRequested?'button':'div'}
+                    onClick={browseAttachmentRequested?()=>browseAttachmentRequested(acceptAttachmentTypes):undefined}
+                >
+                    <ConvoThemeIcon theme={theme} icon="inputAttachmentButtonIcon" fallback={PlusIcon}/>
+                    {!browseAttachmentRequested &&
+                        <input
+                            accept={acceptAttachmentTypes}
+                            type="file"
+                            className={theme.inputAttachmentInputOverlay}
+                            onChange={async e=>{
+                                if(!e.target.files){
+                                    return;
+                                }
+                                for(let i=0;i<e.target.files.length;i++){
+                                    const file=e.target.files.item(i);
+                                    if(file){
+                                        ctrl.queueMediaAsync(await resizeImageDataUrlAsync({src:file,maxWidth:maxImageWidth,maxHeight:maxImageHeight}));
+                                    }
+                                }
+                            }}
+                        />
+                    }
+                </Button>
+            }
+
             {beforeInput}
 
             <textarea
                 ref={setInput}
-                className={cn(theme.inputClassName,ready&&theme.inputReadyClassName)}
+                className={cn(
+                    theme.inputClassName,
+                    theme.inputAttachmentEnabledClassName,
+                    ready&&theme.inputReadyClassName
+                )}
                 placeholder={placeholder}
                 name={inputName}
                 value={value}
@@ -118,7 +178,11 @@ export function ConvoInput({
 
             {afterInput}
 
-            {children}
+            {!noSubmitButton &&
+                <Button className={cn(theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} type="submit">
+                    {theme.inputSubmitButtonIcon?<ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" />:'submit'}
+                </Button>
+            }
 
         </form>
     )

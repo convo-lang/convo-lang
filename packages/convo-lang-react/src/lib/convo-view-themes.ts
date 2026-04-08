@@ -66,7 +66,7 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             assignmentWindowClassName:'line-clamp-6 overflow-clip',
             assignmentStreamingFunctionCallClassName:'flex items-center justify-between',
 
-            imageClassName:'',
+            imageClassName:'max-w-[50%] mx-4',
             userImageClassName:'',
             assistantImageClassName:'',
 
@@ -82,13 +82,18 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputContainerClassName:'relative flex items-center',
             inputContainerReadyClassName:'',
             inputClassName:'flex-1 py-2 pl-4 pr-8 resize-none min-h-0 max-h-80 field-sizing-content',
+            inputAttachmentEnabledClassName:'pl-8',
             inputReadyClassName:'',
             inputSubmitButtonClassName:'absolute right-1.5 size-7 flex justify-center items-center',
             inputSubmitReadyButtonClassName:'',
+            inputAttachmentButton:'absolute left-1.5 size-7 flex justify-center items-center cursor-pointer',
+            inputAttachmentInputOverlay:'absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer',
 
             inputSubmitButtonIconClassName:'',
 
-            inputImageClassName:'',
+            inputImageContainerClassName:'max-w-50',
+            inputImageClassName:'w-full',
+            inputImageRemoveButton:'absolute right-2 top-2 p-1 cursor-pointer',
 
             suggestionContainerClassName:'flex flex-col pl-6',
             suggestionMessageClassName:'flex flex-col gap-1 items-start p-0',
@@ -124,8 +129,6 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             systemMessageClassName:'font-mono',
             functionMessageClassName:'font-mono',
 
-            inputImageClassName:'rounded-lg',
-
             inputSuggestionButtonClassName:'border rounded-full flex bg-background hover:bg-foreground/30 transition-[background-color]',
 
             inputAreaClassName:'bg-gradient-to-t from-background/100 to-background/0 [&>*]:drop-shadow-sm',
@@ -136,6 +139,11 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 'rounded-full bg-primary text-primary-foreground '+
                 'transition-opacity opacity-50',
             inputSubmitReadyButtonClassName:'opacity-100',
+
+            inputImageClassName:'rounded-lg border',
+            inputImageRemoveButton:'rounded border bg-background/80',
+            imageClassName:'rounded-lg',
+
             suggestionMessageClassName:'border-none',
             suggestionTitleClassName:'text-foreground/50',
 

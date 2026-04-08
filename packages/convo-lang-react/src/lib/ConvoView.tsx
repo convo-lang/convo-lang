@@ -1,8 +1,10 @@
 import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, ConvoViewTheme, HttpConvoCompletionService, defaultConvoRenderTarget } from '@convo-lang/convo-lang';
 import { deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useSubject } from "@iyio/react-common";
+import { XIcon } from 'lucide-react';
 import { useContext, useEffect, useMemo, useRef } from "react";
 import { Subscription } from 'rxjs';
+import { Button } from './Button.js';
 import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react.js";
 import { getConvoViewTheme } from './convo-view-themes.js';
 import { ConvoInput, ConvoInputProps } from "./ConvoInput.js";
@@ -10,6 +12,7 @@ import { ConvoMessageListView } from './ConvoMessageListView.js';
 import { ConvoMessageViewProps } from './ConvoMessageView.js';
 import { ConvoSourceView } from './ConvoSourceView.js';
 import { ConvoSuggestionsView, ConvoSuggestionsViewProps } from './ConvoSuggestionsView.js';
+import { ConvoThemeIcon } from './ConvoThemeIcon.js';
 import { cn } from './util.js';
 
 
@@ -47,6 +50,25 @@ export interface ConvoViewProps
 
     /** @deprecated */
     enabledSlashCommands?:boolean;
+
+    /**
+     * If true media will be allowed to be attached. Commonly used to attach images. Attachments
+     * are sent to the target LLM as a base64 string.
+     */
+    enableAttachment?:boolean;
+
+    /**
+     * Media types to accept passed to file input to limit what types of media can be attached.
+     * @default "image/*"
+     */
+    acceptAttachmentTypes?:string;
+
+    /**
+     * Can be used to replace the default behavior of using a file input to browse for files to
+     * attach. This can be used to integrated into custom media browser. If a string is returned
+     * it should be a base64 url.
+     */
+    browseAttachmentRequested?:(accept:string)=>Promise<File|Blob|string|null|undefined>;
 
     /**
      * If provided renderInput will render an override for the input component of the ConvoView
@@ -265,6 +287,18 @@ export interface ConvoViewProps
      * If true streaming responses will be enabled.
      */
     enableStreaming?:boolean;
+
+    /**
+     * Max image width. Larger images will be resized. It is recommended to only provided max width
+     * or max height.
+     * @default 1024
+     */
+    maxImageWidth?:number;
+
+    /**
+     * Max image height. Larger images will be resize.
+     */
+    maxImageHeight?:number;
 }
 
 /**
@@ -316,6 +350,11 @@ export function ConvoView({
     sourceDarkMode,
     defaultValue,
     enableStreaming,
+    enableAttachment,
+    acceptAttachmentTypes,
+    browseAttachmentRequested,
+    maxImageHeight,
+    maxImageWidth,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -513,6 +552,11 @@ export function ConvoView({
     const sourceModeCtrl=useSubject(ctrl.editorModeSubject);
     const sourceMode=_sourceMode??sourceModeCtrl;
 
+
+    const mediaQueue=useSubject(ctrl.mediaQueueSubject);
+    const media=mediaQueue[0];
+    const imageUrl=media?.url??media?.getUrl?.('preview');
+
     const messagesView=(showSource?
         <ConvoSourceView
             ctrl={ctrl}
@@ -557,7 +601,18 @@ export function ConvoView({
                     (!showSource || showInputWithSource) &&
                     !noInput &&
                     <div className={theme.inputAreaClassName}>
-                        {suggestionsLocation==='before-input' && suggestions}
+                        {imageUrl?
+                            <div className={theme.inputImageContainerClassName}>
+                                <img className={theme.inputImageClassName} src={imageUrl}/>
+                                <Button className={theme.inputImageRemoveButton} onClick={media?()=>ctrl.dequeueMedia(media):undefined}>
+                                    <ConvoThemeIcon theme={theme} icon="inputImageRemoveButtonIcon" fallback={XIcon} />
+                                </Button>
+                            </div>
+                        :suggestionsLocation==='before-input'?
+                            suggestions
+                        :
+                            null
+                        }
                         {renderInput?
                             renderInput(ctrl)
                         :
@@ -566,6 +621,11 @@ export function ConvoView({
                                 ctrl={ctrl}
                                 onInputChange={onInputChange}
                                 placeholder={inputPlaceholder}
+                                enableAttachment={enableAttachment}
+                                acceptAttachmentTypes={acceptAttachmentTypes}
+                                browseAttachmentRequested={browseAttachmentRequested}
+                                maxImageHeight={maxImageHeight}
+                                maxImageWidth={maxImageWidth}
                                 {...inputProps}
                             />
                         }

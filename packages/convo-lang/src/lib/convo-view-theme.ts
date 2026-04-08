@@ -166,7 +166,19 @@ export interface ConvoViewTheme
     inputSubmitReadyButtonClassName?:string;
     inputSubmitButtonIcon?:ConvoIconType;
     inputSubmitButtonIconClassName?:string;
+    inputImageContainerClassName?:string;
     inputImageClassName?:string;
+    inputImageRemoveButton?:string;
+    inputImageRemoveButtonIcon?:ConvoIconType;
+    inputImageRemoveButtonIconClassName?:string;
+
+    inputAttachmentEnabledClassName?:string;
+    inputContainerAttachmentEnabledClassName?:string;
+    inputAttachmentButton?:string;
+    inputAttachmentButtonIcon?:ConvoIconType;
+    inputAttachmentButtonIconClassName?:string;
+    inputAttachmentInputOverlay?:string;
+
     /**
      * Class name give to the container that contains the input and any other related ui including
      * input suggestions.

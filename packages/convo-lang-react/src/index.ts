@@ -25,6 +25,7 @@ export * from './lib/gen/GenNode.js';
 export * from './lib/img/gen-img-lib.js';
 export * from './lib/img/GenImg.js';
 export * from './lib/MarkdownViewer.js';
+export * from './lib/media-lib.js';
 export * from './lib/MessageComponentRenderer.js';
 export * from './lib/MessagesSourceView.js';
 export * from './lib/MessagesView.js';
