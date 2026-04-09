@@ -352,6 +352,15 @@ hi
 
 `.trim()+'\n'
 
+const defaultValuex=/*convo*/`
+
+> define
+__model='open-router/anthropic/claude-opus-4.6-fast'
+
+> user
+Tell me story
+`
+
 const defaultValue=/*convo*/`
 
 > addNumber(a:number b:number)->(

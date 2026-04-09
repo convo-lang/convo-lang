@@ -113,73 +113,39 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
         const stream=(flat.enableStreaming && support?.streaming)??false;
 
         const options=await this.getRequestOptions?.();
-        const response=await httpClient().postAsync<Response|ConvoCompletionMessage[]>(
-            joinPaths(this.getEndpoint(),'/completion'+(stream?'/stream':'')),
-            getSerializableFlatConvoConversation(flat),
-            {
-                ...options,
-                returnFetchResponse:stream,
+        if(!stream){
+            const r=await httpClient().postAsync<ConvoCompletionMessage[]>(
+                joinPaths(this.getEndpoint(),'/completion'+(stream?'/stream':'')),
+                getSerializableFlatConvoConversation(flat),
+                options,
+            );
+            if(!r){
+                throw new Error('convo-lang API endpoint returned empty response');
             }
-        );
-        if(!response){
-            throw new Error('convo-lang API endpoint returned empty response');
-        }
-
-        if(stream){
-            const reader=(response as Response).body?.getReader();
-            if(!reader){
-                throw new Error('Unable to get response reader');
-            }
-            const decoder=new TextDecoder("utf-8");
-
-            let prev='';
-            while(true){
-                const {done,value}=await reader.read();
-                if(done){
-                    break;
-                }
-
-                const lines=decoder.decode(value).split('\n');
-                for(let i=0;i<lines.length;i++){
-                    let line=lines[i] as string;
-                    if(prev){
-                        line=prev+line;
-                        prev='';
-                    }
-                    if(line.startsWith('data:')){
-                        try{
-
-                            const c:ConvoCompletionChunk=JSON.parse(line.substring(5));
-                            if(ctx.onChunk){
-                                await ctx.onChunk(this,c,flat);
-                            }
-                            if(c.completion){
-                                return c.completion;
-                            }
-                        }catch(ex){
-                            prev=line;
-
-                        }
-                    }
-                }
-
-            }
-
-            if(prev){
-                const msg='Orphaned streaming chunk remaining';
-                console.error(msg);
-                throw new Error(msg);
-            }
-
-            throw new Error('No completion found in stream');
-
-        }else{
-            const r=response as ConvoCompletionMessage[];
             if(!Array.isArray(r) && (r as any).messages){
                 return (r as any).messages;
             }else{
                 return r;
             }
+        }else{
+            for await(const evt of httpClient().streamSseAsync<ConvoCompletionChunk>({
+                url:joinPaths(this.getEndpoint(),'/completion'+(stream?'/stream':'')),
+                body:getSerializableFlatConvoConversation(flat),
+                ...options,
+            })){
+                if(!evt.data){
+                    continue;
+                }
+                const chunk=evt.data;
+
+                if(ctx.onChunk){
+                    await ctx.onChunk(this,chunk,flat);
+                }
+                if(chunk.completion){
+                    return chunk.completion;
+                }
+            }
+            throw new Error('No completion found in stream');
         }
     }
 

@@ -149,29 +149,24 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
 
         await ctx.beforeComplete?.(this,input,flat);
 
-        let r:ChatCompletion|undefined;
+        let completion:ChatCompletion|undefined;
 
         if(this.completeAsync){
-            r=await this.completeAsync(input,flat,client.apiKey,client.url);
+            completion=await this.completeAsync(input,flat,client.apiKey,client.url);
         }else{
-            const response=await httpClient().postAsync<Response|ChatCompletion>(
-                client.url,
-                input,
-                {
-                    headers,
-                    readErrors:true,
-                    log:this.logRequests,
-                    returnFetchResponse:input.stream?true:false,
-                }
-            );
-            if(!input.stream){
-                r=response as ChatCompletion;
-            }else if(response){
-                const reader=(response as Response).body?.getReader();
-                if(!reader){
-                    throw new Error('Unable to get response reader');
-                }
 
+            if(!input.stream){
+                completion=await httpClient().postAsync<ChatCompletion>(
+                    client.url,
+                    input,
+                    {
+                        headers,
+                        readErrors:true,
+                        log:this.logRequests,
+                        returnFetchResponse:input.stream?true:false,
+                    }
+                );
+            }else{
                 const content:string[]=[];
                 const argBuffers:Record<number,string[]>={};
                 let model='';
@@ -187,98 +182,73 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
                     }
                 }
 
-                const decoder=new TextDecoder("utf-8");
                 const mid=shortUuid();
-                let prev='';
 
-                readLoop: while(true){
-                    const {done,value}=await reader.read();
-                    if(done){
-                        break;
+                for await(const evt of httpClient().streamSseAsync<ChatCompletionChunk>({
+                    url:client.url,
+                    body:input,
+                    headers,
+                    endDataFlag:'[DONE]',
+                    logStreamErrors:true,
+                    readErrors:true,
+                    log:this.logRequests,
+                })){
+                    if(!evt.data){
+                        continue;
                     }
-                    const lines=decoder.decode(value).split('\n');
-                    for(let i=0;i<lines.length;i++){
-                        let line=lines[i] as string;
-                        if(prev){
-                            line=prev+line;
-                            prev='';
-                        }
-                        const char=streamCharReg.exec(line)?.[1];
-                        if(char==='{'){
-                            let chunk:ChatCompletionChunk;
 
-                            try{
-                                chunk=JSON.parse(line.substring(5));
-                            }catch(ex){
-                                prev=line;
-                                continue;
-                            }
+                    const chunk=evt.data;
 
 
-                            if(chunk.model){
-                                model=chunk.model;
-                            }
+                    if(chunk.model){
+                        model=chunk.model;
+                    }
 
-                            if(chunk.usage){
-                                usage=chunk.usage;
-                            }
+                    if(chunk.usage){
+                        usage=chunk.usage;
+                    }
 
-                            const c=chunk.choices?.[0];
+                    const c=chunk.choices?.[0];
 
-                            if(!c){
-                                continue;
-                            }
-                            if(c.finish_reason){
-                                choice.finish_reason=c.finish_reason;
-                            }
-                            if(c.logprobs){
-                                choice.logprobs=c.logprobs;
-                            }
-                            if(c.delta){
-                                for(const e in c.delta){
-                                    switch(e as keyof typeof c.delta){
+                    if(!c){
+                        continue;
+                    }
+                    if(c.finish_reason){
+                        choice.finish_reason=c.finish_reason;
+                    }
+                    if(c.logprobs){
+                        choice.logprobs=c.logprobs;
+                    }
+                    if(c.delta){
+                        for(const e in c.delta){
+                            switch(e as keyof typeof c.delta){
 
-                                        case 'content':
-                                            if(c.delta.content!==null && c.delta.content!==undefined){
-                                                content.push(c.delta.content);
-                                                if(ctx.onChunk){
-                                                    await ctx.onChunk(this,{id:nextChunkId(),mid,type:'content',chunk:c.delta.content},flat);
-                                                }
-                                            }
-                                            break;
-
-                                        case 'tool_calls':
-                                            if(c.delta.tool_calls){
-                                                choice.message.tool_calls=await this.mergeToolCallsAsync(ctx,flat,mid,argBuffers,choice.message.tool_calls??[],c.delta.tool_calls);
-                                            }
-                                            break;
-
-                                        default:{
-                                            const v=c.delta[e as keyof typeof c.delta];
-                                            if(v!==undefined && v!==null){
-                                                (choice.message as any)[e]=v;
-                                            }
+                                case 'content':
+                                    if(c.delta.content!==null && c.delta.content!==undefined){
+                                        content.push(c.delta.content);
+                                        if(ctx.onChunk){
+                                            await ctx.onChunk(this,{id:nextChunkId(),mid,type:'content',chunk:c.delta.content},flat);
                                         }
+                                    }
+                                    break;
 
+                                case 'tool_calls':
+                                    if(c.delta.tool_calls){
+                                        choice.message.tool_calls=await this.mergeToolCallsAsync(ctx,flat,mid,argBuffers,choice.message.tool_calls??[],c.delta.tool_calls);
+                                    }
+                                    break;
+
+                                default:{
+                                    const v=c.delta[e as keyof typeof c.delta];
+                                    if(v!==undefined && v!==null){
+                                        (choice.message as any)[e]=v;
                                     }
                                 }
-                            }
 
-                        }else if(char==='['){
-                            const msg=line.substring(5).trim();
-                            if(msg==='[DONE]'){
-                                break readLoop;
                             }
-                        }else if(line.trim()){
-                            console.error(`Unexpected streaming chunk - ${line}`);
                         }
                     }
-                }
 
-                if(prev){
-                    const msg='Orphaned streaming chunk remaining';
-                    console.error(msg);
-                    throw new Error(msg);
                 }
 
                 for(const e in argBuffers){
@@ -297,7 +267,7 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
                     choice.message.content=content.join('');
                 }
 
-                r={
+                completion={
                     id:mid,
                     created:Date.now(),
                     model,
@@ -308,11 +278,11 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
             }
         }
 
-        if(!r){
+        if(!completion){
             throw new NotFoundError();
         }
 
-        return r;
+        return completion;
     }
 
     private async mergeToolCallsAsync(
