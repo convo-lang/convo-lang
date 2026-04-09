@@ -97,12 +97,14 @@ export default function IndexPage()
                 "cursor-pointer",
                 isHeader?'p-3 pr-5 flex-1':'field-sizing-content border rounded p-1'
             )}
-            value={htmlTool?.name??'**none!'}
-            onChange={e=>setHtmlTool(htmlTools.find(t=>t.name===e.target.value)??null)}
+            value={htmlTool?htmlTools.indexOf(htmlTool).toString():'-1'}
+            onChange={e=>{
+                setHtmlTool(htmlTools[Number(e.target.value)]??null)
+            }}
         >
-            {!isHeader && <option value="**none!">(none)</option>}
-            {htmlTools.map(t=>(
-                <option key={t.name} value={t.name}>{t.name}</option>
+            {!isHeader && <option value="-1">(none)</option>}
+            {htmlTools.map((t,i)=>(
+                <option key={i} value={i.toString()}>{t.name}</option>
             ))}
         </select>
     )
