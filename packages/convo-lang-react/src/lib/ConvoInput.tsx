@@ -1,5 +1,6 @@
 import { ConversationUiCtrl, ConvoViewTheme } from "@convo-lang/convo-lang";
-import { PlusIcon } from "lucide-react";
+import { useSubject } from "@iyio/react-common";
+import { PlusIcon, XIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "./Button.js";
 import { ConversationInputChange, useConversationUiCtrl } from "./convo-lang-react.js";
@@ -79,6 +80,10 @@ export function ConvoInput({
     const [value,setValue]=useState('');
     const ready=!!value;
 
+    const mediaQueue=useSubject(ctrl.mediaQueueSubject);
+    const media=mediaQueue[0];
+    const imageUrl=media?.url??media?.getUrl?.('preview');
+
     const submit=(e?:FormEvent)=>{
         e?.preventDefault();
         if(ctrl.currentTask){
@@ -121,68 +126,77 @@ export function ConvoInput({
             )}
             onSubmit={submit}
         >
-
-            {enableAttachment &&
-                <Button
-                    className={theme.inputAttachmentButton}
-                    elem={browseAttachmentRequested?'button':'div'}
-                    onClick={browseAttachmentRequested?()=>browseAttachmentRequested(acceptAttachmentTypes):undefined}
-                >
-                    <ConvoThemeIcon theme={theme} icon="inputAttachmentButtonIcon" fallback={PlusIcon}/>
-                    {!browseAttachmentRequested &&
-                        <input
-                            accept={acceptAttachmentTypes}
-                            type="file"
-                            className={theme.inputAttachmentInputOverlay}
-                            onChange={async e=>{
-                                if(!e.target.files){
-                                    return;
-                                }
-                                for(let i=0;i<e.target.files.length;i++){
-                                    const file=e.target.files.item(i);
-                                    if(file){
-                                        ctrl.queueMediaAsync(await resizeImageDataUrlAsync({src:file,maxWidth:maxImageWidth,maxHeight:maxImageHeight}));
+            {!!imageUrl && <div className={theme.inputAttachmentsContainer}>
+                <div className={theme.inputImageContainerClassName}>
+                    <img className={theme.inputImageClassName} src={imageUrl}/>
+                    <Button className={theme.inputImageRemoveButton} onClick={media?()=>ctrl.dequeueMedia(media):undefined}>
+                        <ConvoThemeIcon theme={theme} icon="inputImageRemoveButtonIcon" fallback={XIcon} />
+                    </Button>
+                </div>
+            </div>}
+            <div className={theme.inputMainContentClassName}>
+                {enableAttachment &&
+                    <Button
+                        className={theme.inputAttachmentButton}
+                        elem={browseAttachmentRequested?'button':'div'}
+                        onClick={browseAttachmentRequested?()=>browseAttachmentRequested(acceptAttachmentTypes):undefined}
+                    >
+                        <ConvoThemeIcon theme={theme} icon="inputAttachmentButtonIcon" fallback={PlusIcon}/>
+                        {!browseAttachmentRequested &&
+                            <input
+                                accept={acceptAttachmentTypes}
+                                type="file"
+                                className={theme.inputAttachmentInputOverlay}
+                                onChange={async e=>{
+                                    if(!e.target.files){
+                                        return;
                                     }
-                                }
-                            }}
-                        />
-                    }
-                </Button>
-            }
+                                    for(let i=0;i<e.target.files.length;i++){
+                                        const file=e.target.files.item(i);
+                                        if(file){
+                                            ctrl.queueMediaAsync(await resizeImageDataUrlAsync({src:file,maxWidth:maxImageWidth,maxHeight:maxImageHeight}));
+                                        }
+                                    }
+                                }}
+                            />
+                        }
+                    </Button>
+                }
 
-            {beforeInput}
+                {beforeInput}
 
-            <textarea
-                ref={setInput}
-                className={cn(
-                    theme.inputClassName,
-                    theme.inputAttachmentEnabledClassName,
-                    ready&&theme.inputReadyClassName
-                )}
-                placeholder={placeholder}
-                name={inputName}
-                value={value}
-                onChange={e=>{
-                    setValue(e.target.value);
-                    if(onInputChange){
-                        onInputChange({type:'chat',value:e.target.value});
-                    }
-                }}
-                onKeyDown={e=>{
-                    if(e.key==='Enter' && !e.shiftKey && !e.altKey && !e.metaKey){
-                        e.preventDefault();
-                        submit();
-                    }
-                }}
-            />
+                <textarea
+                    ref={setInput}
+                    className={cn(
+                        theme.inputClassName,
+                        theme.inputAttachmentEnabledClassName,
+                        ready&&theme.inputReadyClassName
+                    )}
+                    placeholder={placeholder}
+                    name={inputName}
+                    value={value}
+                    onChange={e=>{
+                        setValue(e.target.value);
+                        if(onInputChange){
+                            onInputChange({type:'chat',value:e.target.value});
+                        }
+                    }}
+                    onKeyDown={e=>{
+                        if(e.key==='Enter' && !e.shiftKey && !e.altKey && !e.metaKey){
+                            e.preventDefault();
+                            submit();
+                        }
+                    }}
+                />
 
-            {afterInput}
+                {afterInput}
 
-            {!noSubmitButton &&
-                <Button className={cn(theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} type="submit">
-                    {theme.inputSubmitButtonIcon?<ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" />:'submit'}
-                </Button>
-            }
+                {!noSubmitButton &&
+                    <Button className={cn(theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} type="submit">
+                        {theme.inputSubmitButtonIcon?<ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" />:'submit'}
+                    </Button>
+                }
+            </div>
 
         </form>
     )

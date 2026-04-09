@@ -361,7 +361,7 @@ __model='open-router/anthropic/claude-opus-4.6-fast'
 Tell me story
 `
 
-const defaultValue=/*convo*/`
+const defaultValuexx=/*convo*/`
 
 > addNumber(a:number b:number)->(
     'The result is {{add(a b)}}'
@@ -385,7 +385,7 @@ Create me a retro style calculator with a VIC 20 look a feel
 
 `.trim()+'\n';
 
-const defaultValue4=/*convo*/`
+const defaultValue=/*convo*/`
 > define
 __model='gpt-4.1'
 
@@ -421,6 +421,34 @@ Ask about the weather
 @suggestion
 > assistant
 Find a chicken
+
+@suggestion
+> assistant
+Find a cat
+
+@suggestion
+> assistant
+Find a dog
+
+@suggestion
+> assistant
+Find a fish
+
+@suggestion
+> assistant
+Find a hat
+
+@suggestion
+> assistant
+Find a car
+
+@suggestion
+> assistant
+Find a ball
+
+@suggestion
+> assistant
+Find a saw
 
 > user
 I don't know where to start

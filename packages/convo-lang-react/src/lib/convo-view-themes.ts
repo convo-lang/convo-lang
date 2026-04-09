@@ -74,24 +74,27 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
 
             loaderIconClassName:'animate-spin',
 
-            inputSuggestionsContainerClassName:'flex flex-wrap gap-2 items-center',
             inputSuggestionButtonClassName:'text-left py-1 px-2 text-sm cursor-pointer flex items-center gap-1',
 
             inputAreaClassName:'absolute left-0 bottom-0 right-0 flex flex-col gap-2 pl-4 pb-4 pr-4',
 
-            inputContainerClassName:'relative flex items-center',
+            beforeInputContainerClassName:'flex items-end gap-2 flex-wrap',
+            afterInputContainerClassName:'flex items-start gap-2 flex-wrap',
+
+            inputContainerClassName:'relative flex flex-col gap-2',
             inputContainerReadyClassName:'',
-            inputClassName:'flex-1 py-2 pl-4 pr-8 resize-none min-h-0 max-h-80 field-sizing-content',
-            inputAttachmentEnabledClassName:'pl-8',
+            inputMainContentClassName:'flex items-center px-2',
+            inputClassName:'flex-1 p-2 flex-1 resize-none min-h-0 max-h-80 field-sizing-content',
             inputReadyClassName:'',
-            inputSubmitButtonClassName:'absolute right-1.5 size-7 flex justify-center items-center',
+            inputSubmitButtonClassName:'size-7 flex justify-center items-center',
             inputSubmitReadyButtonClassName:'',
-            inputAttachmentButton:'absolute left-1.5 size-7 flex justify-center items-center cursor-pointer',
+            inputAttachmentsContainer:'flex items-end gap-2 pl-4 pr-4 pt-4',
+            inputAttachmentButton:'relative overflow-clip size-7 flex justify-center items-center cursor-pointer',
             inputAttachmentInputOverlay:'absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer',
 
             inputSubmitButtonIconClassName:'',
 
-            inputImageContainerClassName:'max-w-50',
+            inputImageContainerClassName:'max-w-50 relative',
             inputImageClassName:'w-full',
             inputImageRemoveButton:'absolute right-2 top-2 p-1 cursor-pointer',
 
@@ -132,8 +135,9 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputSuggestionButtonClassName:'border rounded-full flex bg-background hover:bg-foreground/30 transition-[background-color]',
 
             inputAreaClassName:'bg-gradient-to-t from-background/100 to-background/0 [&>*]:drop-shadow-sm',
+            inputContainerClassName:'rounded-3xl border border-border bg-background focus-within:shadow-[0_0_3px_oklch(from_var(--primary)_l_c_h_/_0.3)] focus-within:border-border transition-[border-color]',
             inputContainerReadyClassName:'border-border',
-            inputClassName:'rounded-3xl outline-none border border-border bg-background focus:shadow-[0_0_3px_oklch(from_var(--primary)_l_c_h_/_0.3)] focus:border-border transition-[border-color]',
+            inputClassName:'outline-none',
             inputReadyClassName:'',
             inputSubmitButtonClassName:
                 'rounded-full bg-primary text-primary-foreground '+

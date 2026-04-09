@@ -1,10 +1,8 @@
 import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, ConvoViewTheme, HttpConvoCompletionService, defaultConvoRenderTarget } from '@convo-lang/convo-lang';
 import { deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useSubject } from "@iyio/react-common";
-import { XIcon } from 'lucide-react';
 import { useContext, useEffect, useMemo, useRef } from "react";
 import { Subscription } from 'rxjs';
-import { Button } from './Button.js';
 import { ConversationInputChange, ConversationUiContext } from "./convo-lang-react.js";
 import { getConvoViewTheme } from './convo-view-themes.js';
 import { ConvoInput, ConvoInputProps } from "./ConvoInput.js";
@@ -12,7 +10,6 @@ import { ConvoMessageListView } from './ConvoMessageListView.js';
 import { ConvoMessageViewProps } from './ConvoMessageView.js';
 import { ConvoSourceView } from './ConvoSourceView.js';
 import { ConvoSuggestionsView, ConvoSuggestionsViewProps } from './ConvoSuggestionsView.js';
-import { ConvoThemeIcon } from './ConvoThemeIcon.js';
 import { cn } from './util.js';
 
 
@@ -299,6 +296,26 @@ export interface ConvoViewProps
      * Max image height. Larger images will be resize.
      */
     maxImageHeight?:number;
+
+    /**
+     * Content rendered before the input component at the start of the row above the input component.
+     */
+    beforeInputStart?:any;
+
+    /**
+     * Content rendered before the input component at the end of the row above the input component.
+     */
+    beforeInputEnd?:any;
+
+    /**
+     * Content rendered after the input component at the start of the row below the input component.
+     */
+    afterInputStart?:any;
+
+    /**
+     * Content rendered after the input component at the end of the row below the input component.
+     */
+    afterInputEnd?:any;
 }
 
 /**
@@ -355,6 +372,10 @@ export function ConvoView({
     browseAttachmentRequested,
     maxImageHeight,
     maxImageWidth,
+    beforeInputStart,
+    beforeInputEnd,
+    afterInputStart,
+    afterInputEnd,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -552,11 +573,6 @@ export function ConvoView({
     const sourceModeCtrl=useSubject(ctrl.editorModeSubject);
     const sourceMode=_sourceMode??sourceModeCtrl;
 
-
-    const mediaQueue=useSubject(ctrl.mediaQueueSubject);
-    const media=mediaQueue[0];
-    const imageUrl=media?.url??media?.getUrl?.('preview');
-
     const messagesView=(showSource?
         <ConvoSourceView
             ctrl={ctrl}
@@ -601,18 +617,11 @@ export function ConvoView({
                     (!showSource || showInputWithSource) &&
                     !noInput &&
                     <div className={theme.inputAreaClassName}>
-                        {imageUrl?
-                            <div className={theme.inputImageContainerClassName}>
-                                <img className={theme.inputImageClassName} src={imageUrl}/>
-                                <Button className={theme.inputImageRemoveButton} onClick={media?()=>ctrl.dequeueMedia(media):undefined}>
-                                    <ConvoThemeIcon theme={theme} icon="inputImageRemoveButtonIcon" fallback={XIcon} />
-                                </Button>
-                            </div>
-                        :suggestionsLocation==='before-input'?
-                            suggestions
-                        :
-                            null
-                        }
+                        <div className={theme.beforeInputContainerClassName}>
+                            {beforeInputStart}
+                            {suggestionsLocation==='before-input' && suggestions}
+                            {beforeInputEnd}
+                        </div>
                         {renderInput?
                             renderInput(ctrl)
                         :
@@ -629,7 +638,11 @@ export function ConvoView({
                                 {...inputProps}
                             />
                         }
-                        {suggestionsLocation==='after-input' && suggestions}
+                        <div className={theme.afterInputContainerClassName}>
+                            {afterInputStart}
+                            {suggestionsLocation==='after-input' && suggestions}
+                            {afterInputEnd}
+                        </div>
                     </div>
                 }
 

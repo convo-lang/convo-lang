@@ -1,7 +1,6 @@
 import { ConversationSuggestions, ConvoViewTheme, getLastConvoSuggestions } from "@convo-lang/convo-lang";
 import { SlimButton, useSubject } from "@iyio/react-common";
 import { useConversationUiCtrl } from "./convo-lang-react.js";
-import { cn } from "./util.js";
 
 export interface ConvoSuggestionsViewProps
 {
@@ -28,7 +27,7 @@ export function ConvoSuggestionsView({
 
 
     return (
-        <div className={cn(theme.inputSuggestionsContainerClassName,className)}>
+        <>
 
             {sug?.suggestions.map((v,i)=>i>=maxSuggestions?null:(
                 <SlimButton key={i} className={theme.inputSuggestionButtonClassName} onClick={()=>{
@@ -38,7 +37,7 @@ export function ConvoSuggestionsView({
                 </SlimButton>
             ))}
 
-        </div>
+        </>
     )
 
 }

@@ -144,12 +144,6 @@ export interface ConvoViewTheme
     // ------- Input Suggestions ------- //
 
     /**
-     * Class name of the container that contains suggestions buttons positioned above or below
-     * the chat text input. This container is often styled as a row of wrapping pills.
-     */
-    inputSuggestionsContainerClassName?:string;
-
-    /**
      * Class name give to each suggestion displayed above or below the chat text input. These
      * buttons are often styled as pills.
      */
@@ -162,6 +156,7 @@ export interface ConvoViewTheme
     inputClassName?:string;
     inputReadyClassName?:string;
     inputContainerReadyClassName?:string;
+    inputMainContentClassName?:string;
     inputSubmitButtonClassName?:string;
     inputSubmitReadyButtonClassName?:string;
     inputSubmitButtonIcon?:ConvoIconType;
@@ -173,11 +168,15 @@ export interface ConvoViewTheme
     inputImageRemoveButtonIconClassName?:string;
 
     inputAttachmentEnabledClassName?:string;
+    inputAttachmentsContainer?:string;
     inputContainerAttachmentEnabledClassName?:string;
     inputAttachmentButton?:string;
     inputAttachmentButtonIcon?:ConvoIconType;
     inputAttachmentButtonIconClassName?:string;
     inputAttachmentInputOverlay?:string;
+
+    beforeInputContainerClassName?:string;
+    afterInputContainerClassName?:string;
 
     /**
      * Class name give to the container that contains the input and any other related ui including
