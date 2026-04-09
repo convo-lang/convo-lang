@@ -639,6 +639,7 @@ export function ConvoView({
                         <div className={theme.beforeInputContainerClassName}>
                             {beforeInputStart}
                             {suggestionsLocation==='before-input' && suggestions}
+                            {enableModelSelector && <ConvoModelSelector selectableModels={selectableModels}/>}
                             {beforeInputEnd}
                         </div>
                         {renderInput?
@@ -656,12 +657,13 @@ export function ConvoView({
                                 {...inputProps}
                             />
                         }
-                        <div className={theme.afterInputContainerClassName}>
-                            {afterInputStart}
-                            {suggestionsLocation==='after-input' && suggestions}
-                            {enableModelSelector && <ConvoModelSelector selectableModels={selectableModels}/>}
-                            {afterInputEnd}
-                        </div>
+                        {!!(afterInputStart || afterInputEnd || (suggestionsLocation==='after-input' && suggestions)) &&
+                            <div className={theme.afterInputContainerClassName}>
+                                {afterInputStart}
+                                {suggestionsLocation==='after-input' && suggestions}
+                                {afterInputEnd}
+                            </div>
+                        }
                     </div>
                 }
 
