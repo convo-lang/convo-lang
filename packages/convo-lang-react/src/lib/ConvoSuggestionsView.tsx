@@ -1,12 +1,12 @@
 import { ConversationSuggestions, ConvoViewTheme, getLastConvoSuggestions } from "@convo-lang/convo-lang";
 import { SlimButton, useSubject } from "@iyio/react-common";
-import { useConversationUiCtrl } from "./convo-lang-react.js";
+import { useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 
 export interface ConvoSuggestionsViewProps
 {
     className?:string;
     maxSuggestions?:number;
-    theme:ConvoViewTheme;
+    theme?:ConvoViewTheme;
 }
 
 export function ConvoSuggestionsView({
@@ -14,6 +14,8 @@ export function ConvoSuggestionsView({
     maxSuggestions=Number.MAX_SAFE_INTEGER,
     theme,
 }:ConvoSuggestionsViewProps){
+
+    theme=useConvoTheme(theme);
 
     const ctrl=useConversationUiCtrl();
 

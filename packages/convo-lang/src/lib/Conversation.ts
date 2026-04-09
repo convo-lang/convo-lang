@@ -2236,7 +2236,7 @@ export class Conversation
         updateTaskCount=true,
         lastFnCall?:ConvoFnCallInfo,
         appendBeforeReturn:(ConvoMessagePart|string)[]=[],
-        completeBeforeReturn:(ConvoPostCompletionMessage|string)[]=[]
+        completeBeforeReturn:(ConvoPostCompletionMessage|string)[]=[],
     ):Promise<ConvoCompletion>{
 
         //@@complete
@@ -2255,7 +2255,7 @@ export class Conversation
 
         try{
             const append:string[]=[];
-            const flat=await this.flattenWithTriggersAsync(()=>this.createConvoExecutionContext(append),{
+            const createFlat=()=>this.flattenWithTriggersAsync(()=>this.createConvoExecutionContext(append),{
                 setCurrent:false,
                 task,
                 discardTemplates:!isDefaultTask || templates!==undefined,
@@ -2263,6 +2263,12 @@ export class Conversation
                 toolChoice:isSourceMessage?additionalOptions?.toolChoice:undefined,
                 excludeMessageSetters
             });
+            let initFlat=await createFlat();
+            if(additionalOptions?.modelOverride && initFlat.responseModel!==additionalOptions.modelOverride){
+                this.append(`@modelOverride\n> define\n__model=${JSON.stringify(additionalOptions.modelOverride)}`);
+                initFlat=await createFlat();
+            }
+            const flat=initFlat;
             const exe=flat.exe;
 
             const node=flat.currentNodeId?flat.nodeDescriptions?.find(n=>n.nodeId===flat.currentNodeId):undefined;

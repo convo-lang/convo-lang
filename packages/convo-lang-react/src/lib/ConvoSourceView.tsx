@@ -5,7 +5,7 @@ import { ScrollView, useSubject } from "@iyio/react-common";
 import { LazyCodeInput } from "@iyio/syn-taxi";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "./Button.js";
-import { ConversationInputChange, useConversation, useConversationUiCtrl } from "./convo-lang-react.js";
+import { ConversationInputChange, useConversation, useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 import { ConvoLoader } from "./ConvoLoader.js";
 import { cn } from "./util.js";
 
@@ -16,7 +16,7 @@ export interface ConvoSourceViewProps
     autoScrollBehavior?:ScrollBehavior;
     disableScroll?:boolean;
     onInputChange?:(change:ConversationInputChange)=>void;
-    theme:ConvoViewTheme;
+    theme?:ConvoViewTheme;
     darkMode?:boolean|'auto';
 }
 
@@ -30,6 +30,8 @@ export function ConvoSourceView({
     theme,
     darkMode='auto',
 }:ConvoSourceViewProps){
+
+    theme=useConvoTheme(theme);
 
     const refs=useRef({onInputChange,lastChange:null as string|null});
     refs.current.onInputChange=onInputChange;

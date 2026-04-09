@@ -4,6 +4,16 @@ import { mergeConvoViewThemes } from "../convo-theme-lib.js";
 
 export type ConvoViewThemeName='default'|'default-layout'|'default-icons'|'default-style';
 
+let defaultTheme:ConvoViewTheme|undefined;
+export const getDefaultConvoViewTheme=():ConvoViewTheme=>{
+    if(defaultTheme){
+        return defaultTheme;
+    }
+    defaultTheme=getConvoViewTheme('default');
+    Object.freeze(defaultTheme);
+    return defaultTheme;
+}
+
 export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
 
     switch(name){
@@ -97,6 +107,8 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputImageContainerClassName:'max-w-50 relative',
             inputImageClassName:'w-full',
             inputImageRemoveButton:'absolute right-2 top-2 p-1 cursor-pointer',
+
+            modelSelectorClassName:'ml-auto field-sizing-content text-sm',
 
             suggestionContainerClassName:'flex flex-col pl-6',
             suggestionMessageClassName:'flex flex-col gap-1 items-start p-0',

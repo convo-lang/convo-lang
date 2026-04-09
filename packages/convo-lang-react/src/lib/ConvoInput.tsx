@@ -3,7 +3,7 @@ import { useSubject } from "@iyio/react-common";
 import { PlusIcon, XIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "./Button.js";
-import { ConversationInputChange, useConversationUiCtrl } from "./convo-lang-react.js";
+import { ConversationInputChange, useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 import { ConvoThemeIcon } from "./ConvoThemeIcon.js";
 import { resizeImageDataUrlAsync } from "./media-lib.js";
 import { cn } from "./util.js";
@@ -53,7 +53,7 @@ export interface ConvoInputProps
      */
     maxImageHeight?:number;
 
-    theme:ConvoViewTheme;
+    theme?:ConvoViewTheme;
 }
 
 export function ConvoInput({
@@ -75,6 +75,8 @@ export function ConvoInput({
     maxImageWidth=1024,
     theme,
 }:ConvoInputProps){
+
+    theme=useConvoTheme(theme);
 
     const ctrl=useConversationUiCtrl(_ctrl);
     const [value,setValue]=useState('');

@@ -8,6 +8,7 @@ import { getConvoViewTheme } from './convo-view-themes.js';
 import { ConvoInput, ConvoInputProps } from "./ConvoInput.js";
 import { ConvoMessageListView } from './ConvoMessageListView.js';
 import { ConvoMessageViewProps } from './ConvoMessageView.js';
+import { ConvoModelSelector } from './ConvoModelSelector.js';
 import { ConvoSourceView } from './ConvoSourceView.js';
 import { ConvoSuggestionsView, ConvoSuggestionsViewProps } from './ConvoSuggestionsView.js';
 import { cn } from './util.js';
@@ -47,6 +48,16 @@ export interface ConvoViewProps
 
     /** @deprecated */
     enabledSlashCommands?:boolean;
+
+    /**
+     * When true the user will be allowed to select the target LLM.
+     */
+    enableModelSelector?:boolean;
+
+    /**
+     * If provided the models the user is allowed to select from is limited to the given list.
+     */
+    selectableModels?:string[];
 
     /**
      * If true media will be allowed to be attached. Commonly used to attach images. Attachments
@@ -349,6 +360,8 @@ export function ConvoView({
     template,
     appendTrigger,
     beforeCreateExeCtx,
+    enableModelSelector,
+    selectableModels,
     disableScroll,
     suggestionsLocation='inline',
     forceInlineSuggestionsLocation,
@@ -380,9 +393,10 @@ export function ConvoView({
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
 
-    const refs=useRef({modules,enableStreaming});
+    const refs=useRef({modules,enableStreaming,theme});
     refs.current.modules=modules;
     refs.current.enableStreaming=enableStreaming;
+    refs.current.theme=theme;
     const importStr=Array.isArray(imports)?imports.join(';'):imports;
 
     const compConvoAry:string[]=[];
@@ -404,6 +418,7 @@ export function ConvoView({
     const ctxCtrl=useContext(ConversationUiContext);
     const defaultCtrl=ctrlProp??ctxCtrl;
     const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl({
+        theme:refs.current.theme,
         ...ctrlOptions,
         template:(
             (templatePrefix?templatePrefix+'\n\n':'')+
@@ -428,13 +443,19 @@ export function ConvoView({
         if(defaultValue!==undefined){
             ctrl.replace(defaultValue);
         }
-    },[defaultValue]);
+    },[defaultValue,ctrl]);
+
+    useEffect(()=>{
+        if(theme!==undefined){
+            ctrl.theme=theme;
+        }
+    },[theme,ctrl]);
 
     useEffect(()=>{
         if(enableStreaming!==undefined){
             ctrl.enableStreaming=enableStreaming;
         }
-    },[enableStreaming]);
+    },[enableStreaming,ctrl]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){
@@ -580,7 +601,6 @@ export function ConvoView({
             mode={sourceMode}
             disableScroll={disableScroll}
             onInputChange={onInputChange}
-            theme={theme}
             darkMode={sourceDarkMode}
         />
     :
@@ -592,7 +612,6 @@ export function ConvoView({
             disableScroll={disableScroll}
             hideSuggestions={suggestionsLocation!=='inline' && !forceInlineSuggestionsLocation}
             enableMarkdown={enableMarkdown}
-            theme={theme}
             {...messageListProps}
          />
     )
@@ -602,7 +621,7 @@ export function ConvoView({
     },[redirectMessagesView,messagesView]);
 
     const suggestions=suggestionsLocation==='inline'?null:(
-        <ConvoSuggestionsView theme={theme} {...suggestionProps}/>
+        <ConvoSuggestionsView {...suggestionProps}/>
     )
 
     return (
@@ -626,7 +645,6 @@ export function ConvoView({
                             renderInput(ctrl)
                         :
                             <ConvoInput
-                                theme={theme}
                                 ctrl={ctrl}
                                 onInputChange={onInputChange}
                                 placeholder={inputPlaceholder}
@@ -641,6 +659,7 @@ export function ConvoView({
                         <div className={theme.afterInputContainerClassName}>
                             {afterInputStart}
                             {suggestionsLocation==='after-input' && suggestions}
+                            {enableModelSelector && <ConvoModelSelector selectableModels={selectableModels}/>}
                             {afterInputEnd}
                         </div>
                     </div>

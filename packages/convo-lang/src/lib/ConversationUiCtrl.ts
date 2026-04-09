@@ -8,6 +8,7 @@ import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
 import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { ConvoViewTheme } from "./convo-view-theme.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -36,6 +37,7 @@ export interface ConversationUiCtrlOptions
     externFunctions?:Record<string,(...args:any[])=>any>;
     imagePathConverter?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>string;
     imageRenderer?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>any;
+    theme?:ConvoViewTheme;
 }
 
 export class ConversationUiCtrl
@@ -199,13 +201,23 @@ export class ConversationUiCtrl
         this._enableSlashCommands.next(value);
     }
 
-    private readonly _theme:BehaviorSubject<Record<string,any>>=new BehaviorSubject<Record<string,any>>({});
+    private readonly _themeOld:BehaviorSubject<Record<string,any>>=new BehaviorSubject<Record<string,any>>({});
     /** @deprecated */
-    public get themeSubject():ReadonlySubject<Record<string,any>>{return this._theme}
+    public get themeOldSubject():ReadonlySubject<Record<string,any>>{return this._themeOld}
     /** @deprecated */
+    public get themeOld(){return this._themeOld.value}
+    /** @deprecated */
+    public set themeOld(value:Record<string,any>){
+        if(value==this._themeOld.value){
+            return;
+        }
+        this._themeOld.next(value);
+    }
+
+    private readonly _theme:BehaviorSubject<ConvoViewTheme|null>;
+    public get themeSubject():ReadonlySubject<ConvoViewTheme|null>{return this._theme}
     public get theme(){return this._theme.value}
-    /** @deprecated */
-    public set theme(value:Record<string,any>){
+    public set theme(value:ConvoViewTheme|null){
         if(value==this._theme.value){
             return;
         }
@@ -318,6 +330,19 @@ export class ConversationUiCtrl
         this._getStartOfConversation.next(value);
     }
 
+    private readonly _modelOverride:BehaviorSubject<string|null>=new BehaviorSubject<string|null>(null);
+    public get modelOverrideSubject():ReadonlySubject<string|null>{return this._modelOverride}
+    /**
+     * Will force the given LLM model to be used
+     */
+    public get modelOverride(){return this._modelOverride.value}
+    public set modelOverride(value:string|null){
+        if(value==this._modelOverride.value){
+            return;
+        }
+        this._modelOverride.next(value);
+    }
+
 
     public readonly componentRenderers:Record<string,ConvoComponentRenderer>={};
     public imagePathConverter?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>string;
@@ -339,6 +364,7 @@ export class ConversationUiCtrl
         externFunctions,
         imagePathConverter,
         imageRenderer,
+        theme,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
@@ -353,6 +379,8 @@ export class ConversationUiCtrl
 
         this._removeDanglingUserMessages=new BehaviorSubject<boolean>(removeDanglingUserMessages);
         this._enableSlashCommands=new BehaviorSubject(enableSlashCommand);
+
+        this._theme=new BehaviorSubject<ConvoViewTheme|null>(theme??null);
 
         this.convoOptions=convoOptions;
         this.initConvoCallback=initConvo;
@@ -809,7 +837,10 @@ export class ConversationUiCtrl
             convo.append(raw);
             await convo.flattenAsync();
         }
-        const r=await convo.completeAsync(completionOptions);
+        const r=await convo.completeAsync(this.modelOverride?{
+            modelOverride:this.modelOverride,
+            ...completionOptions,
+        }:completionOptions);
         this._lastCompletion.next(convo.convo??null);
         if(this.autoSave){
             this.queueAutoSave();
@@ -939,3 +970,4 @@ ${t3}
 }
 
 const cmdReg=/^\s*\//;
+

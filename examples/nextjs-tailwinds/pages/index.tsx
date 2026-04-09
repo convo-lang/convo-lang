@@ -42,6 +42,7 @@ export default function IndexPage()
     const [enableMarkdown,setEnableMarkdown]=useState(true);
     const [enableSlashCommands,setEnableSlashCommands]=useState(true);
     const [enableAttachment,setEnableAttachment]=useState(true);
+    const [enableModelSelector,setEnableModelSelector]=useState(true);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -166,6 +167,10 @@ export default function IndexPage()
                     <input type="checkbox" id="enableAttachment" checked={enableAttachment} onChange={e=>setEnableAttachment(e.target.checked)}/>
                 </Label>
 
+                <Label label="enableModelSelector" row>
+                    <input type="checkbox" id="enableModelSelector" checked={enableModelSelector} onChange={e=>setEnableModelSelector(e.target.checked)}/>
+                </Label>
+
                 {!!htmlTools.length &&
                     <Label label="artifact">
                         {toolSelect(false)}
@@ -191,6 +196,7 @@ export default function IndexPage()
                     showSystem={showSystem}
                     enableStreaming={enableStreaming}
                     enableAttachment={enableAttachment}
+                    enableModelSelector={enableModelSelector}
                     defaultValue={defaultValue}
                     externFunctions={{
                         createHtmlTool(name:string,content:string){

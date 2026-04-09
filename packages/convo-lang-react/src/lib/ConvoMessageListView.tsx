@@ -1,7 +1,7 @@
 import { ConversationUiCtrl, ConvoMarkdownEnableState, ConvoMessageRenderResult, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { ScrollView, useSubject } from "@iyio/react-common";
 import { Fragment } from "react";
-import { useConversationUiCtrl } from "./convo-lang-react.js";
+import { useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 import { ConvoMessageView, ConvoMessageViewProps } from "./ConvoMessageView.js";
 import { ConvoStatusIndicator, ConvoStatusIndicatorProps } from "./ConvoStatusIndicator.js";
 import { ConvoStreamingMessageView } from "./ConvoStreamingMessageView.js";
@@ -21,7 +21,7 @@ export interface ConvoMessageListViewProps
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
     enableMarkdown?:ConvoMarkdownEnableState;
     statusIndicatorRenderer?:(props:ConvoStatusIndicatorProps)=>any;
-    theme:ConvoViewTheme;
+    theme?:ConvoViewTheme;
 }
 
 
@@ -38,6 +38,8 @@ export function ConvoMessageListView({
     statusIndicatorRenderer=(props)=><ConvoStatusIndicator {...props}/>,
     theme,
 }:ConvoMessageListViewProps){
+
+    theme=useConvoTheme(theme);
 
     const ctrl=useConversationUiCtrl(_ctrl)
 

@@ -1719,6 +1719,12 @@ export interface ConvoCompletionOptions
      * When true and a node graph is completed a summary response will not be generated.
      */
     disableGraphSummary?:boolean;
+
+    /**
+     * If defined a `> define` message setting the model will be appended before the completion
+     * to set the model if the current model does not match the specified model.
+     */
+    modelOverride?:string;
 }
 
 export interface ConvoMessageTemplate

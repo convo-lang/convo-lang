@@ -178,6 +178,9 @@ export interface ConvoViewTheme
     beforeInputContainerClassName?:string;
     afterInputContainerClassName?:string;
 
+    // ------- modelSelector ------- //
+    modelSelectorClassName?:string;
+
     /**
      * Class name give to the container that contains the input and any other related ui including
      * input suggestions.

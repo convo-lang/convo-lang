@@ -269,7 +269,7 @@ export function ConversationView({
             if(typeof t === 'string'){
                 t=t==='dark'?defaultDarkConvoLangTheme:defaultLightConvoLangTheme;
             }
-            ctrl.theme=t;
+            ctrl.themeOld=t;
         }
     },[themeValue,ctrl]);
 
@@ -279,7 +279,7 @@ export function ConversationView({
         }
     },[ctrl,enabledInitMessage]);
 
-    const theme=useSubject(ctrl.themeSubject);
+    const theme=useSubject(ctrl.themeOldSubject);
 
     const showSourceCtrl=useSubject(ctrl.showSourceSubject);
     const showSource=_showSource??showSourceCtrl;

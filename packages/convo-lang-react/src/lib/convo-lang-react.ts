@@ -1,8 +1,9 @@
-import { Conversation, ConversationOptions, ConversationUiCtrl, ConvoObject, ConvoObjectCompletion, ConvoTask, FlatConvoMessage } from "@convo-lang/convo-lang";
+import { Conversation, ConversationOptions, ConversationUiCtrl, ConvoObject, ConvoObjectCompletion, ConvoTask, ConvoViewTheme, FlatConvoMessage } from "@convo-lang/convo-lang";
 import { AnyFunction, delayAsync, getErrorMessage, valueIsZodType, watchObjDeep, zodTypeToJsonScheme } from "@iyio/common";
 import { useSubject } from '@iyio/react-common';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ConvoLangTheme } from "./convo-lang-theme.js";
+import { getDefaultConvoViewTheme } from "./convo-view-themes.js";
 
 export type ConversationInputChangeType='chat'|'source'
 export interface ConversationInputChange
@@ -44,7 +45,13 @@ export const useConversationMessages=(ctrlOverride?:ConversationUiCtrl):FlatConv
 /** @deprecated */
 export const useConversationTheme=(ctrlOverride?:ConversationUiCtrl):Partial<ConvoLangTheme>=>{
     const ctrl=useConversationUiCtrl(ctrlOverride);
-    return useSubject(ctrl.themeSubject);
+    return useSubject(ctrl.themeOldSubject);
+}
+
+export const useConvoTheme=(themeOverride?:ConvoViewTheme):ConvoViewTheme=>{
+    const ctrl=useConversationUiCtrl();
+    const theme=useSubject(ctrl.themeSubject);
+    return themeOverride??theme??getDefaultConvoViewTheme();
 }
 
 export interface UseConvoOptions
