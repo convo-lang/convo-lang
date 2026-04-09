@@ -1,20 +1,10 @@
 import { useLazyRender } from "@iyio/react-common";
 import { useEffect, useState } from "react";
+import { getMdAsync, renderMd } from "./convo-markdown-lib.js";
+import { cn } from "./util.js";
 
-let md:{
-    render(markdown:string):string;
-};
-const getMdAsync=async ()=>{
-    if(md){
-        return md;
-    }
-    let markdownit:any=await import('markdown-it');
-    if(typeof markdownit.default === 'function'){
-        markdownit=markdownit.default;
-    }
-    md=markdownit();
-    return md;
-}
+
+
 
 export interface ConvoMarkdownViewerProps
 {
@@ -57,16 +47,7 @@ export function ConvoMarkdownViewer({
                 if(disableLinks){
                     renderer=(renderer as any).disable('link');
                 }
-                const match=mdBlock.exec(markdown);
-                if(match){
-                    let m=markdown.substring(match[0].length).trim();
-                    if(m.endsWith('```')){
-                        m=m.substring(0,m.length-3);
-                    }
-                    elem.innerHTML=renderer.render(m);
-                }else{
-                    elem.innerHTML=renderer.render(markdown);
-                }
+                elem.innerHTML=renderMd(markdown,md);
             }
         })
 
@@ -77,10 +58,7 @@ export function ConvoMarkdownViewer({
     },[markdown,elem,show,lazy,disableImages,disableLinks]);
 
     return (
-        <div ref={setElem} className={className}/>
-    )
-
+        <div ref={setElem} className={cn('__convo-message-content-md',className)}/>
+    );
 }
 
-
-const mdBlock=/[\s\n\r]*```\s*(md|markdown).*/

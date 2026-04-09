@@ -1,15 +1,60 @@
-import { useWProp } from "@iyio/react-common";
+import { FlatConvoMessage } from "@convo-lang/convo-lang";
+import { ObjWatchListener, stopWatchingObj, watchObj } from "@iyio/common";
+import { useEffect, useState } from "react";
 import { ConvoMessageView, ConvoMessageViewProps } from "./ConvoMessageView.js";
+import { renderMdToTarget } from "./convo-markdown-lib.js";
+
 
 export function ConvoStreamingMessageView({
     message,
     ...props
 }:ConvoMessageViewProps){
 
-    useWProp(message,'content',{disable:!message.streamingActive});
+    const [elem,setElem]=useState<HTMLElement|null>(null);
+
+    useEffect(()=>{
+        if(!message.streamingActive || !elem){
+            return;
+        }
+        const watcher=watchObj(message);
+        const renderRef={id:1}
+        const listener:ObjWatchListener<FlatConvoMessage>=(value,evt)=>{
+            if(evt.type==='set' && evt.prop==='content'){
+                renderRef.id++;
+                const fnElem=elem.querySelector('.__convo-message-content-fn');
+                const mdElem=fnElem?undefined:elem.querySelector('.__convo-message-content-md');
+                const contentElem=(mdElem||fnElem)?undefined:elem.querySelector('.__convo-message-content');
+                const content=value.content;
+                if(content===undefined){
+                    return;
+                }
+                if(mdElem instanceof HTMLElement){
+                    renderMdToTarget(content,mdElem,renderRef);
+                }else if(contentElem instanceof HTMLElement){
+                    contentElem.innerText=content;
+                }else if(fnElem instanceof HTMLElement){
+                    fnElem.innerText=content.substring(content.length-600);
+                }
+                const tokenElem=elem.querySelector('.__convo-message-tokens');
+                if(tokenElem instanceof HTMLElement){
+                    tokenElem.innerText=`( ~${Math.round(content.length/4)} tokens )`;
+                }
+            }
+        }
+        watcher.addListener(listener)
+
+        return ()=>{
+            watcher.removeListener(listener);
+            stopWatchingObj(message);
+        }
+    },[message,elem]);
 
     return (
-        <ConvoMessageView message={message} {...props}/>
+        <ConvoMessageView
+            message={message}
+            elemRef={message.streamingActive?setElem:undefined}
+            {...props}
+        />
     )
 
 }

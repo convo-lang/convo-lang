@@ -22,6 +22,7 @@ export interface ConvoMessageViewProps
     callRenderer?:(msg:FlatConvoMessage,flat:FlatConvoConversation,ctrl:ConversationUiCtrl)=>any;
     enableMarkdown?:ConvoMarkdownEnableState;
     theme:ConvoViewTheme;
+    elemRef?:(elem:HTMLElement|null)=>void;
 }
 
 export function ConvoMessageView({
@@ -37,7 +38,8 @@ export function ConvoMessageView({
     callRenderer,
     message,
     messageIndex,
-    theme
+    theme,
+    elemRef
 }:ConvoMessageViewProps){
 
     const messageClassName=cn(
@@ -107,14 +109,14 @@ export function ConvoMessageView({
     if(message.role==='result' && message.streamingActive){
         const content=message.content??'';
         return (
-            <div className={rowClassName}>
+            <div ref={elemRef} className={rowClassName}>
                 <ConvoThemeIcon theme={theme} icon="assignmentIcon" className={theme.assistantIconClassName}/>
                 <div className={cn(messageClassName,theme.assignmentMessageClassName)}>
                     <div className={theme.assignmentStreamingFunctionCallClassName}>
                         {message.streamingFunction}
-                        <span className={theme.assignmentStreamingFunctionTokenCountCallClassName}>( ~{Math.round(content.length/4)} tokens )</span>
+                        <span className={cn('__convo-message-tokens',theme.assignmentStreamingFunctionTokenCountCallClassName)}>( ~{Math.round(content.length/4)} tokens )</span>
                     </div>
-                    <div className={theme.assignmentWindowClassName}>
+                    <div className={cn('__convo-message-content-fn',theme.assignmentWindowClassName)}>
                         {content.substring(content.length-600)}
                     </div>
                 </div>
@@ -172,6 +174,7 @@ export function ConvoMessageView({
                     messageClassName={messageClassName}
                     theme={theme}
                     message={message}
+                    elemRef={elemRef}
                 />
             )
         }else if(showFunctions && ( message.fn || (message.called && !showResults))){
@@ -251,6 +254,7 @@ export function ConvoMessageView({
                     message={message}
                     contentOverride={p.text??''}
                     enableMarkdown={enableMarkdown}
+                    elemRef={elemRef}
                 />
             ))
         }</>)
@@ -307,6 +311,7 @@ export function ConvoMessageView({
                 theme={theme}
                 message={message}
                 enableMarkdown={enableMarkdown}
+                elemRef={elemRef}
             />
         )
     }
@@ -322,6 +327,7 @@ interface BubbleMessageViewProps
     message:FlatConvoMessage;
     enableMarkdown?:ConvoMarkdownEnableState;
     contentOverride?:string;
+    elemRef?:(elem:HTMLElement|null)=>void;
 }
 
 function BubbleMessageView({
@@ -330,16 +336,17 @@ function BubbleMessageView({
     theme,
     message,
     enableMarkdown,
-    contentOverride
+    contentOverride,
+    elemRef,
 }:BubbleMessageViewProps){
 
     const content=contentOverride??message.content??'';
 
     return (
-        <div className={rowClassName}>
+        <div className={rowClassName} ref={elemRef}>
             {message.role==='system' && <ConvoThemeIcon theme={theme} icon="systemIcon" className={theme.assistantIconClassName} />}
             {message.isAssistant && <ConvoThemeIcon theme={theme} icon="assistantIcon" />}
-            <div className={cn(messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
+            <div className={cn('__convo-message-content',messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
                 (enableMarkdown && isMdConvoEnabledFor(message.isUser?'user':'assistant',enableMarkdown))?
                     <ConvoMarkdownViewer markdown={content} className={theme.markdownClassName}/>
                 :
@@ -351,4 +358,3 @@ function BubbleMessageView({
 
 }
 
-const nlReg=/[\n\r]/g;
