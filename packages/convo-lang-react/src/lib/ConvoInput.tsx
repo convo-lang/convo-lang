@@ -1,6 +1,6 @@
 import { ConversationUiCtrl, ConvoViewTheme } from "@convo-lang/convo-lang";
 import { useSubject } from "@iyio/react-common";
-import { ArrowUpIcon, CheckIcon, MicIcon, PlusIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, AudioLinesIcon, CheckIcon, MicIcon, PlusIcon, XIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AudioVisualizer } from "./AudioVisualizer.js";
 import { Button } from "./Button.js";
@@ -60,6 +60,12 @@ export interface ConvoInputProps
      */
     enableAudioRecorder?:boolean;
 
+    /**
+     * If true the user will be able to enter into live mode where they speak directly to the LLM
+     * and the LLM speaks back.
+     */
+    enableLiveMode?:boolean;
+
     theme?:ConvoViewTheme;
 }
 
@@ -82,6 +88,7 @@ export function ConvoInput({
     maxImageWidth=1024,
     theme,
     enableAudioRecorder=false,
+    enableLiveMode=false,
 }:ConvoInputProps){
 
     theme=useConvoTheme(theme);
@@ -98,13 +105,10 @@ export function ConvoInput({
 
     useEffect(()=>{
          const recorder=new RecordingCtrl({
-            video:false,
-            audio:true,
             transcribe:true,
             transcriptionService:ctrl.transcriptionService,
             onTranscription:(t,r)=>{
                 setValue(t.text);
-                r.state='stopped';
             },
         });
         setRecorder(recorder);
@@ -114,13 +118,13 @@ export function ConvoInput({
     },[ctrl]);
 
 
-    const recordingState=useSubject(recorder?.stateSubject);
-    const audioStream=useSubject(recorder?.audioStreamSubject);
-    const transcribing=useSubject(recorder?.isTranscribingSubject);
+    const isRecording=useSubject(recorder?.isRecordingSubject);
+    const isTranscribing=useSubject(recorder?.isTranscribingSubject);
+    const audioStream=useSubject(recorder?.streamSubject);
     const [visualCanvas,setVisualCanvas]=useState<HTMLCanvasElement|null>(null);
 
     useEffect(()=>{
-        if(recordingState!=='recording' || !visualCanvas || !audioStream){
+        if(!isRecording || !visualCanvas || !audioStream){
             return;
         }
         const visualizer=new AudioVisualizer({
@@ -131,7 +135,7 @@ export function ConvoInput({
         return ()=>{
             visualizer.dispose();
         }
-    },[visualCanvas,recordingState,audioStream]);
+    },[visualCanvas,isRecording,audioStream]);
 
     const submit=(e?:FormEvent)=>{
         e?.preventDefault();
@@ -223,7 +227,7 @@ export function ConvoInput({
                             theme.inputAttachmentEnabledClassName,
                             ready&&theme.inputReadyClassName
                         )}
-                        style={recordingState!=='stopped'?{opacity:0,visibility:'hidden'}:undefined}
+                        style={(isRecording || isTranscribing)?{opacity:0,visibility:'hidden'}:undefined}
                         placeholder={placeholder}
                         name={inputName}
                         value={value}
@@ -240,14 +244,14 @@ export function ConvoInput({
                             }
                         }}
                     />
-                    {recordingState=='recording' &&
+                    {isRecording &&
                         <canvas
                             className={theme.inputRecordingVisualizerCanvasClassName}
                             ref={setVisualCanvas}
                         />
                     }
                     <div className={theme.inputMessageContainerClassName}>
-                        {transcribing&&<>
+                        {isTranscribing&&<>
                             Transcribing
                             <ConvoThemeIcon theme={theme} icon="inputTranscribeIcon"/>
                         </>}
@@ -258,29 +262,33 @@ export function ConvoInput({
 
                 {enableAudioRecorder &&
                     <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderButtonClassName)} onClick={()=>{
-                        if(recorder){
-                            recorder.state=(recorder.state==='stopped'?'recording':'done');
-                        }
+                        recorder?.toggle();
                     }}>
                         <ConvoThemeIcon
                             theme={theme}
-                            icon={recordingState!=='recording'?"inputAudioRecorderButtonIcon":"inputAudioRecorderSubmitButtonIcon"}
-                            fallback={recordingState!=='recording'?MicIcon:CheckIcon}
+                            icon={!isRecording?"inputAudioRecorderButtonIcon":"inputAudioRecorderSubmitButtonIcon"}
+                            fallback={!isRecording?MicIcon:CheckIcon}
                         />
                     </Button>
                 }
 
-                {recordingState==='recording'?
+                {isRecording?
                     <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderCancelButtonClassName)} onClick={()=>{
-                        if(recorder){
-                            recorder.state='stopped';
-                        }
+                        recorder?.cancel();
                     }}>
                         <ConvoThemeIcon theme={theme} icon="inputAudioRecorderCancelButtonIcon" fallback={XIcon} />
                     </Button>
                 :!noSubmitButton?
-                    <Button className={cn(theme.iconButtonClassName,theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} onClick={()=>submit()}>
-                        <ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" fallback={ArrowUpIcon} />
+                    <Button className={cn(
+                        theme.iconButtonClassName,
+                        theme.inputSubmitButtonClassName,
+                        (ready || enableLiveMode)&&theme.inputSubmitReadyButtonClassName
+                    )} onClick={()=>submit()}>
+                        <ConvoThemeIcon
+                            theme={theme}
+                            icon={(enableLiveMode && !ready)?"inputLiveModeButtonIcon":"inputSubmitButtonIcon"}
+                            fallback={(enableLiveMode && !ready)?AudioLinesIcon:ArrowUpIcon}
+                        />
                     </Button>
                 :
                     null

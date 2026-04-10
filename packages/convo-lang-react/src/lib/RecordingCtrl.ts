@@ -7,8 +7,7 @@ export type RecordingCtrlState='stopped'|'recording'|'done';
 
 export interface RecordingOptions
 {
-    audio:boolean;
-    video:boolean;
+    enableVideo?:boolean;
     transcribe?:boolean;
     transcriptionService?:ConvoTranscriptionService;
     onTranscription?:(transcription:ConvoTranscriptionResultBase,recorder:RecordingCtrl)=>void;
@@ -21,15 +20,13 @@ export class RecordingCtrl
     private readonly options:InternalOptions<RecordingOptions,'transcriptionService'|'onTranscription'>;
 
     public constructor({
-        audio,
-        video,
+        enableVideo=false,
         transcribe=false,
         transcriptionService,
         onTranscription,
-    }:RecordingOptions){
+    }:RecordingOptions={}){
         this.options={
-            audio,
-            video,
+            enableVideo,
             transcribe,
             transcriptionService,
             onTranscription,
@@ -44,51 +41,24 @@ export class RecordingCtrl
             return;
         }
         this._isDisposed=true;
-        this.recordingStopToken?.cancelNow();
+        this.stop();
     }
 
-    private readonly _state:BehaviorSubject<RecordingCtrlState>=new BehaviorSubject<RecordingCtrlState>('stopped');
-    public get stateSubject():ReadonlySubject<RecordingCtrlState>{return this._state}
-    public get state(){return this._state.value}
-    public set state(value:RecordingCtrlState){
-        if(value==this._state.value){
-            return;
-        }
-        this.recordingStopToken?.cancelNow();
-        this.recordingStopToken=undefined;
+    private readonly _isRecording:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get isRecordingSubject():ReadonlySubject<boolean>{return this._isRecording}
+    public get isRecording(){return this._isRecording.value}
 
-        this._state.next(value);
-        if(value!=='done'){
-            this.stateIndex++;
-        }
-        if(value==='recording'){
-            const token=new CancelToken();
-            this.recordingStopToken=token;
-            if(this.options.audio){
-                this.recordAsync(false,token,this.stateIndex);
-            }
-            if(this.options.video){
-                this.recordAsync(true,token,this.stateIndex);
-            }
-        }
-    }
-    private stateIndex=0;
+    private readonly _isRunning:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get isRunningSubject():ReadonlySubject<boolean>{return this._isRunning}
+    public get isRunning(){return this._isRunning.value}
 
-    private readonly _audioStream:BehaviorSubject<MediaStream|null>=new BehaviorSubject<MediaStream|null>(null);
-    public get audioStreamSubject():ReadonlySubject<MediaStream|null>{return this._audioStream}
-    public get audioStream(){return this._audioStream.value}
+    private readonly _stream:BehaviorSubject<MediaStream|null>=new BehaviorSubject<MediaStream|null>(null);
+    public get streamSubject():ReadonlySubject<MediaStream|null>{return this._stream}
+    public get stream(){return this._stream.value}
 
-    private readonly _videoStream:BehaviorSubject<MediaStream|null>=new BehaviorSubject<MediaStream|null>(null);
-    public get videoStreamSubject():ReadonlySubject<MediaStream|null>{return this._videoStream}
-    public get videoStream(){return this._videoStream.value}
-
-    private readonly _audioRecording:BehaviorSubject<File|null>=new BehaviorSubject<File|null>(null);
-    public get audioRecordingSubject():ReadonlySubject<File|null>{return this._audioRecording}
-    public get audioRecording(){return this._audioRecording.value}
-
-    private readonly _videoRecording:BehaviorSubject<File|null>=new BehaviorSubject<File|null>(null);
-    public get videoRecordingSubject():ReadonlySubject<File|null>{return this._videoRecording}
-    public get videoRecording(){return this._videoRecording.value}
+    private readonly _recording:BehaviorSubject<File|null>=new BehaviorSubject<File|null>(null);
+    public get recordingSubject():ReadonlySubject<File|null>{return this._recording}
+    public get recording(){return this._recording.value}
 
     private readonly _isTranscribing:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
     public get isTranscribingSubject():ReadonlySubject<boolean>{return this._isTranscribing}
@@ -98,16 +68,58 @@ export class RecordingCtrl
     public get audioTranscriptionSubject():ReadonlySubject<ConvoTranscriptionResultBase|null>{return this._audioTranscription}
     public get audioTranscription(){return this._audioTranscription.value}
 
-    private recordingStopToken?:CancelToken;
-    private async recordAsync(video:boolean,cancel:CancelToken,stateIndex:number)
+    public start()
     {
+        this.cancel();
+        if(this.isDisposed){
+            return;
+        }
+        const id=++this.currentRecordingId;
+        const cancel=new CancelToken();
+        this.recordingStopToken=cancel;
+        this.recordAsync(this.options.enableVideo,cancel,id);
+    }
+
+    public stop()
+    {
+        this.recordingStopToken?.cancelNow();
+    }
+
+    public cancel()
+    {
+        this.currentRecordingId++;
+        const token=this.recordingStopToken;
+        this.recordingStopToken=undefined;
+        token?.cancelNow();
+        this._isRecording.next(false);
+        this._isTranscribing.next(false);
+        this._isRunning.next(false);
+    }
+
+    public toggle(){
+        if(this.isRunning){
+            this.stop();
+        }else{
+            this.start();
+        }
+    }
+
+    private currentRecordingId=0;
+    private recordingStopToken?:CancelToken;
+    private async recordAsync(video:boolean,cancel:CancelToken,id:number)
+    {
+        if(cancel.isCanceled){
+            return;
+        }
+
         let stream:MediaStream|undefined;
         let mediaRecorder:MediaRecorder|undefined;
 
         try{
+            this._isRunning.next(true);
             const type=video?getVideoRecordingContentType():getAudioRecordingContentType();
 
-
+            this._isRecording.next(true);
             stream=await navigator.mediaDevices.getUserMedia({
                 audio:!video,
                 video,
@@ -116,11 +128,7 @@ export class RecordingCtrl
                 return;
             }
 
-            if(video){
-                this._videoStream.next(stream);
-            }else{
-                this._audioStream.next(stream);
-            }
+            this._stream.next(stream);
 
             const chunks:Blob[]=[];
             const stopPromise=createPromiseSource<void>();
@@ -133,27 +141,25 @@ export class RecordingCtrl
                 chunks.push(evt.data);
             }
             mediaRecorder.onstop=()=>{
-                if(!cancel.isCanceled){
-                    this.state='done';
-                    cancel.cancelNow();
-                }
                 stopPromise.resolve();
             }
-            mediaRecorder.onerror=evt=>{
-                if(!cancel.isCanceled){
-                    this.state='stopped';
-                    cancel.cancelNow();
-                }
+            mediaRecorder.onerror=()=>{
                 stopPromise.resolve();
             }
             mediaRecorder.start();
 
             await stopPromise.promise;
 
+            try{
+                mediaRecorder.stop();
+            }catch{}
 
-            if(this.isDisposed || stateIndex!==this.stateIndex){
+
+            if(this.isDisposed || id!==this.currentRecordingId){
                 return;
             }
+            this._isRecording.next(false);
+
             let recording:File|null;
             if(chunks.length){
                 recording=new File(
@@ -164,27 +170,30 @@ export class RecordingCtrl
             }else{
                 recording=null;
             }
-            if(video){
-                this._videoRecording.next(recording);
-            }else{
-                this._audioRecording.next(recording);
+            this._recording.next(recording);
+
+            if(this.isDisposed || id!==this.currentRecordingId){
+                return;
             }
 
-            if(this.options.transcribe && this.options.transcriptionService && !video && recording){
+            if(this.options.transcribe && this.options.transcriptionService && recording){
                 this._isTranscribing.next(true);
                 try{
                     const request:ConvoTranscriptionRequest={
                         audio:recording,
                     }
                     const can=await this.options.transcriptionService.canTranscribe(convoTranscriptionRequestToSupportRequest(request));
-                    if(stateIndex!==this.stateIndex || !can){
+                    if(id!==this.currentRecordingId || !can){
                         return;
                     }
                     const r=await this.options.transcriptionService.transcribeAsync(request);
-                    if(r.success && stateIndex===this.stateIndex){
-                        this._audioTranscription.next(r);
-                        this.options.onTranscription?.(r,this);
+                    if(!r.success || id!==this.currentRecordingId){
+                        return;
                     }
+
+                    this._audioTranscription.next(r);
+                    this.options.onTranscription?.(r,this);
+
                 }finally{
                     this._isTranscribing.next(false);
                 }
@@ -193,17 +202,16 @@ export class RecordingCtrl
 
         }catch(ex){
             console.error('Recording failed',ex);
-            if(!cancel.isCanceled){
-                this.state='stopped';
-            }
         }finally{
+            if(id===this.currentRecordingId){
+                this._isRunning.next(false);
+                this._isRecording.next(false);
+                this._isTranscribing.next(false);
+            }
             stopStream(stream);
             mediaRecorder?.stop();
-            if(this.audioStream===stream){
-                this._audioStream.next(null);
-            }
-            if(this.videoStream===stream){
-                this._videoStream.next(null);
+            if(this.stream===stream){
+                this._stream.next(null);
             }
         }
     }
