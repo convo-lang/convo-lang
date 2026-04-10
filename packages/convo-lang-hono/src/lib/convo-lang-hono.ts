@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { streamSSE } from 'hono/streaming';
@@ -49,7 +49,7 @@ export const getConvoHonoRoutes=({
         return c.json(models);
     });
 
-    routes.get('/support/:modelName',async (c)=>{
+    routes.get('/completion/support/:modelName',async (c)=>{
 
         await initConvoHonoAsync();
 
@@ -57,13 +57,17 @@ export const getConvoHonoRoutes=({
 
         const name=c.req.param('modelName');
 
-        const service=(await getConvoCompletionServicesForModelAsync(name,services,convoModelServiceMap))?.[0]?.service;
-
-        let support:ConvoCompletionServiceFeatureSupport;
-        if(service?.getSupportAsync){
-            support=await service.getSupportAsync(name);
-        }else{
-            support={};
+        const support:ConvoCompletionServiceFeatureSupport={};
+        for(const ser of services){
+            const s=await ser.getSupportAsync?.(name);
+            if(s){
+                for(const e in s){
+                    const v=(s as any)[e];
+                    if(v===true){
+                        (support as any)[e]=true;
+                    }
+                }
+            }
         }
 
         return c.json(support,200);
@@ -148,6 +152,56 @@ export const getConvoHonoRoutes=({
             return c.json('No conversion found',404);
         }
         return c.json(result);
+    });
+
+    routes.post('/transcribe',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const data=await c.req.formData();
+        const audio=data.get('audio');
+        const requestF=data.get('request');
+        if(typeof requestF !== 'string'){
+            return c.json('request param request',400);
+        }
+        if(!(audio instanceof Blob)){
+            return c.json('audio should be a blob',400);
+        }
+        const request=JSON.parse(requestF as string);
+        request.audio=audio;
+
+        const all=convoTranscriptionService.all();
+        const support=convoTranscriptionRequestToSupportRequest(request);
+        for(const s of all){
+            if(!await s.canTranscribe(support)){
+                continue;
+            }
+            const t=await s.transcribeAsync(request);
+            if(t.success){
+                delete t.file;
+            }
+            return c.json(t);
+        }
+
+        return c.json('No supported',400);
+    });
+
+    routes.post('/transcribe/support',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const services=convoTranscriptionService.all();
+
+        const request=await c.req.json();
+
+        for(const ser of services){
+            if(await ser.canTranscribe(request)){
+                return c.json(true);
+            }
+
+        }
+
+        return c.json(false);
     });
 
     return routes;

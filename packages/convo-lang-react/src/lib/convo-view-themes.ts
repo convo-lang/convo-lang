@@ -29,12 +29,13 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 suggestionTitleIcon:MenuIcon,
                 ragIcon:DatabaseSearchIcon,
                 functionIcon:VariableIcon,
+                inputTranscribeIcon:Loader2Icon,
             };
 
         case 'default-layout': return {
             convoViewClassName:'relative flex flex-col',
-            iconClassName:'size-4 shrink-0 opacity-50',
-
+            iconClassName:'size-4 shrink-0 opacity-50 group-disabled:opacity-25',
+            iconButtonClassName:'group cursor-pointer',
 
 
             userIconClassName:'mt-2 -mr-2',
@@ -94,15 +95,19 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputContainerClassName:'relative flex flex-col gap-2',
             inputContainerReadyClassName:'',
             inputMainContentClassName:'flex items-center px-2',
-            inputClassName:'flex-1 p-2 flex-1 resize-none min-h-0 max-h-80 field-sizing-content',
+            inputClassName:'flex-1 p-2 pl-0 flex-1 resize-none min-h-0 max-h-80 field-sizing-content',
+            inputClassWrapperName:'relative flex flex-1',
             inputReadyClassName:'',
             inputSubmitButtonClassName:'size-7 flex justify-center items-center',
             inputSubmitReadyButtonClassName:'',
             inputAttachmentsContainer:'flex items-end gap-2 pl-4 pr-4 pt-4',
             inputAttachmentButton:'relative overflow-clip size-7 flex justify-center items-center cursor-pointer',
             inputAttachmentInputOverlay:'absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer',
+            inputAudioRecorderButtonClassName:'p-2 cursor-pointer',
+            inputRecordingVisualizerCanvasClassName:'absolute left-0 top-0 w-full h-full',
+            inputAudioRecorderCancelButtonClassName:'size-7 flex justify-center items-center',
+            inputMessageContainerClassName:'pointer-events-none absolute left-0 top-0 w-full h-full flex items-center gap-2 justify-end',
 
-            inputSubmitButtonIconClassName:'',
 
             inputImageContainerClassName:'max-w-50 relative',
             inputImageClassName:'w-full',
@@ -155,6 +160,8 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 'rounded-full bg-primary text-primary-foreground '+
                 'transition-opacity opacity-50',
             inputSubmitReadyButtonClassName:'opacity-100',
+            inputMessageContainerClassName:'text-muted-foreground',
+            inputTranscribeIconClassName:'animate-spin',
 
             inputImageClassName:'rounded-lg border',
             inputImageRemoveButton:'rounded border bg-background/80',

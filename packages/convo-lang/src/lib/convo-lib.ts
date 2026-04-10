@@ -7,7 +7,7 @@ import { ConvoError } from "./ConvoError.js";
 import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoDocumentReference } from "./convo-rag-types.js";
 import { convoSystemMessages } from "./convo-system-messages.js";
-import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoScopeParentKey, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
+import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTranscriptionRequest, ConvoTranscriptionSupportRequest, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoScopeParentKey, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -3621,4 +3621,15 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
 
     }
     return {name,modifiers,templateName,role,assign}
+}
+
+export const convoTranscriptionRequestToSupportRequest=(request:ConvoTranscriptionRequest):ConvoTranscriptionSupportRequest=>{
+    return {
+        model:request.model,
+        audioType:request.audio.type,
+        audioSize:request.audio.length,
+        labelSpeakers:request.labelSpeakers,
+        includeSegments:request.includeSegments,
+        speakerRefsCount:request.speakerRefs?.length,
+    }
 }

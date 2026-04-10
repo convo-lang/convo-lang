@@ -43,6 +43,7 @@ export default function IndexPage()
     const [enableSlashCommands,setEnableSlashCommands]=useState(true);
     const [enableAttachment,setEnableAttachment]=useState(true);
     const [enableModelSelector,setEnableModelSelector]=useState(true);
+    const [enableAudioRecorder,setEnableAudioRecorder]=useState(true);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -171,6 +172,10 @@ export default function IndexPage()
                     <input type="checkbox" id="enableModelSelector" checked={enableModelSelector} onChange={e=>setEnableModelSelector(e.target.checked)}/>
                 </Label>
 
+                <Label label="enableAudioRecorder" row>
+                    <input type="checkbox" id="enableAudioRecorder" checked={enableAudioRecorder} onChange={e=>setEnableAudioRecorder(e.target.checked)}/>
+                </Label>
+
                 {!!htmlTools.length &&
                     <Label label="artifact">
                         {toolSelect(false)}
@@ -197,6 +202,7 @@ export default function IndexPage()
                     enableStreaming={enableStreaming}
                     enableAttachment={enableAttachment}
                     enableModelSelector={enableModelSelector}
+                    enableAudioRecorder={enableAudioRecorder}
                     defaultValue={defaultValue}
                     externFunctions={{
                         createHtmlTool(name:string,content:string){
@@ -430,33 +436,6 @@ Ask about the weather
 > assistant
 Find a chicken
 
-@suggestion
-> assistant
-Find a cat
-
-@suggestion
-> assistant
-Find a dog
-
-@suggestion
-> assistant
-Find a fish
-
-@suggestion
-> assistant
-Find a hat
-
-@suggestion
-> assistant
-Find a car
-
-@suggestion
-> assistant
-Find a ball
-
-@suggestion
-> assistant
-Find a saw
 
 > user
 I don't know where to start

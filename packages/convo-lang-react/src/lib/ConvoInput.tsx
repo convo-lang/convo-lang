@@ -1,11 +1,13 @@
 import { ConversationUiCtrl, ConvoViewTheme } from "@convo-lang/convo-lang";
 import { useSubject } from "@iyio/react-common";
-import { PlusIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, MicIcon, PlusIcon, XIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { AudioVisualizer } from "./AudioVisualizer.js";
 import { Button } from "./Button.js";
 import { ConversationInputChange, useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 import { ConvoThemeIcon } from "./ConvoThemeIcon.js";
 import { resizeImageDataUrlAsync } from "./media-lib.js";
+import { RecordingCtrl } from "./RecordingCtrl.js";
 import { cn } from "./util.js";
 
 export interface ConvoInputProps
@@ -53,6 +55,11 @@ export interface ConvoInputProps
      */
     maxImageHeight?:number;
 
+    /**
+     * If true the user will be able to use their microphone to record audio
+     */
+    enableAudioRecorder?:boolean;
+
     theme?:ConvoViewTheme;
 }
 
@@ -74,6 +81,7 @@ export function ConvoInput({
     maxImageHeight,
     maxImageWidth=1024,
     theme,
+    enableAudioRecorder=false,
 }:ConvoInputProps){
 
     theme=useConvoTheme(theme);
@@ -85,6 +93,45 @@ export function ConvoInput({
     const mediaQueue=useSubject(ctrl.mediaQueueSubject);
     const media=mediaQueue[0];
     const imageUrl=media?.url??media?.getUrl?.('preview');
+
+    const [recorder,setRecorder]=useState<RecordingCtrl|null>(null);
+
+    useEffect(()=>{
+         const recorder=new RecordingCtrl({
+            video:false,
+            audio:true,
+            transcribe:true,
+            transcriptionService:ctrl.transcriptionService,
+            onTranscription:(t,r)=>{
+                setValue(t.text);
+                r.state='stopped';
+            },
+        });
+        setRecorder(recorder);
+        return ()=>{
+            recorder.dispose();
+        }
+    },[ctrl]);
+
+
+    const recordingState=useSubject(recorder?.stateSubject);
+    const audioStream=useSubject(recorder?.audioStreamSubject);
+    const transcribing=useSubject(recorder?.isTranscribingSubject);
+    const [visualCanvas,setVisualCanvas]=useState<HTMLCanvasElement|null>(null);
+
+    useEffect(()=>{
+        if(recordingState!=='recording' || !visualCanvas || !audioStream){
+            return;
+        }
+        const visualizer=new AudioVisualizer({
+            stream:audioStream,
+            canvas:visualCanvas,
+        });
+        visualizer.run();
+        return ()=>{
+            visualizer.dispose();
+        }
+    },[visualCanvas,recordingState,audioStream]);
 
     const submit=(e?:FormEvent)=>{
         e?.preventDefault();
@@ -131,7 +178,7 @@ export function ConvoInput({
             {!!imageUrl && <div className={theme.inputAttachmentsContainer}>
                 <div className={theme.inputImageContainerClassName}>
                     <img className={theme.inputImageClassName} src={imageUrl}/>
-                    <Button className={theme.inputImageRemoveButton} onClick={media?()=>ctrl.dequeueMedia(media):undefined}>
+                    <Button className={cn(theme.iconButtonClassName,theme.inputImageRemoveButton)} onClick={media?()=>ctrl.dequeueMedia(media):undefined}>
                         <ConvoThemeIcon theme={theme} icon="inputImageRemoveButtonIcon" fallback={XIcon} />
                     </Button>
                 </div>
@@ -139,7 +186,7 @@ export function ConvoInput({
             <div className={theme.inputMainContentClassName}>
                 {enableAttachment &&
                     <Button
-                        className={theme.inputAttachmentButton}
+                        className={cn(theme.iconButtonClassName,theme.inputAttachmentButton)}
                         elem={browseAttachmentRequested?'button':'div'}
                         onClick={browseAttachmentRequested?()=>browseAttachmentRequested(acceptAttachmentTypes):undefined}
                     >
@@ -167,36 +214,76 @@ export function ConvoInput({
 
                 {beforeInput}
 
-                <textarea
-                    ref={setInput}
-                    className={cn(
-                        theme.inputClassName,
-                        theme.inputAttachmentEnabledClassName,
-                        ready&&theme.inputReadyClassName
-                    )}
-                    placeholder={placeholder}
-                    name={inputName}
-                    value={value}
-                    onChange={e=>{
-                        setValue(e.target.value);
-                        if(onInputChange){
-                            onInputChange({type:'chat',value:e.target.value});
-                        }
-                    }}
-                    onKeyDown={e=>{
-                        if(e.key==='Enter' && !e.shiftKey && !e.altKey && !e.metaKey){
-                            e.preventDefault();
-                            submit();
-                        }
-                    }}
-                />
+                <div className={theme.inputClassWrapperName}>
+
+                    <textarea
+                        ref={setInput}
+                        className={cn(
+                            theme.inputClassName,
+                            theme.inputAttachmentEnabledClassName,
+                            ready&&theme.inputReadyClassName
+                        )}
+                        style={recordingState!=='stopped'?{opacity:0,visibility:'hidden'}:undefined}
+                        placeholder={placeholder}
+                        name={inputName}
+                        value={value}
+                        onChange={e=>{
+                            setValue(e.target.value);
+                            if(onInputChange){
+                                onInputChange({type:'chat',value:e.target.value});
+                            }
+                        }}
+                        onKeyDown={e=>{
+                            if(e.key==='Enter' && !e.shiftKey && !e.altKey && !e.metaKey){
+                                e.preventDefault();
+                                submit();
+                            }
+                        }}
+                    />
+                    {recordingState=='recording' &&
+                        <canvas
+                            className={theme.inputRecordingVisualizerCanvasClassName}
+                            ref={setVisualCanvas}
+                        />
+                    }
+                    <div className={theme.inputMessageContainerClassName}>
+                        {transcribing&&<>
+                            Transcribing
+                            <ConvoThemeIcon theme={theme} icon="inputTranscribeIcon"/>
+                        </>}
+                    </div>
+                </div>
 
                 {afterInput}
 
-                {!noSubmitButton &&
-                    <Button className={cn(theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} type="submit">
-                        {theme.inputSubmitButtonIcon?<ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" />:'submit'}
+                {enableAudioRecorder &&
+                    <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderButtonClassName)} onClick={()=>{
+                        if(recorder){
+                            recorder.state=(recorder.state==='stopped'?'recording':'done');
+                        }
+                    }}>
+                        <ConvoThemeIcon
+                            theme={theme}
+                            icon={recordingState!=='recording'?"inputAudioRecorderButtonIcon":"inputAudioRecorderSubmitButtonIcon"}
+                            fallback={recordingState!=='recording'?MicIcon:CheckIcon}
+                        />
                     </Button>
+                }
+
+                {recordingState==='recording'?
+                    <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderCancelButtonClassName)} onClick={()=>{
+                        if(recorder){
+                            recorder.state='stopped';
+                        }
+                    }}>
+                        <ConvoThemeIcon theme={theme} icon="inputAudioRecorderCancelButtonIcon" fallback={XIcon} />
+                    </Button>
+                :!noSubmitButton?
+                    <Button className={cn(theme.iconButtonClassName,theme.inputSubmitButtonClassName,ready&&theme.inputSubmitReadyButtonClassName)} onClick={()=>submit()}>
+                        <ConvoThemeIcon theme={theme} icon="inputSubmitButtonIcon" fallback={ArrowUpIcon} />
+                    </Button>
+                :
+                    null
                 }
             </div>
 

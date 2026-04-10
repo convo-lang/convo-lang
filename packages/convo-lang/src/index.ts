@@ -34,6 +34,7 @@ export * from './lib/convo-rag-types.js';
 export * from './lib/convo-scene-lib.js';
 export * from './lib/convo-template-types.js';
 export * from './lib/convo-template.js';
+export * from './lib/convo-transcription-lib.js';
 export * from './lib/convo-types.js';
 export * from './lib/convo-url-opener.js';
 export * from './lib/convo-value-conditions.js';

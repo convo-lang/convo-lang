@@ -11,6 +11,11 @@ export interface ConvoViewTheme
     iconClassName?:string;
 
     /**
+     * Applied to all buttons that display an icon
+     */
+    iconButtonClassName?:string;
+
+    /**
      * Class name give to the root ConvoView element
      */
     convoViewClassName?:string;
@@ -154,6 +159,7 @@ export interface ConvoViewTheme
     // ------- Input ------- //
     inputContainerClassName?:string;
     inputClassName?:string;
+    inputClassWrapperName?:string;
     inputReadyClassName?:string;
     inputContainerReadyClassName?:string;
     inputMainContentClassName?:string;
@@ -166,6 +172,19 @@ export interface ConvoViewTheme
     inputImageRemoveButton?:string;
     inputImageRemoveButtonIcon?:ConvoIconType;
     inputImageRemoveButtonIconClassName?:string;
+    inputAudioRecorderButtonClassName?:string;
+    inputAudioRecorderCancelButtonClassName?:string;
+    inputAudioRecorderButtonIcon?:ConvoIconType;
+    inputAudioRecorderButtonIconClassName?:string;
+    inputAudioRecorderSubmitButtonIcon?:ConvoIconType;
+    inputAudioRecorderSubmitButtonIconClassName?:string;
+    inputAudioRecorderCancelButtonIcon?:ConvoIconType;
+    inputAudioRecorderCancelButtonIconClassName?:string;
+    inputRecordingVisualizerCanvasClassName?:string;
+    inputMessageContainerClassName?:string;
+    inputTranscribeIcon?:ConvoIconType;
+    inputTranscribeIconClassName?:string;
+
 
     inputAttachmentEnabledClassName?:string;
     inputAttachmentsContainer?:string;

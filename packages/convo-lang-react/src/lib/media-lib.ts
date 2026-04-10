@@ -133,3 +133,54 @@ export const resizeImageDataUrlAsync=async ({
     const canvas=await drawImageToCanvasAsync(options);
     return canvas.toDataURL(contentType,quality);
 }
+export interface ContentTypeAndExtension{
+    contentType:string;
+    extension:string;
+}
+export const getAudioRecordingContentType=():ContentTypeAndExtension|undefined=>{
+    const options:ContentTypeAndExtension[]=[
+        {contentType:"audio/mpeg",extension:"mp3"},
+        {contentType:"audio/mp3",extension:"mp3"},
+        {contentType:"audio/webm;codecs=opus",extension:"webm"},
+        {contentType:"audio/ogg;codecs=opus",extension:"ogg"},
+        {contentType:"audio/webm",extension:"webm"},
+        {contentType:"audio/ogg",extension:"ogg"},
+        {contentType:"audio/wav",extension:"wav"},
+    ];
+    for(const t of options){
+        if(globalThis.window?.MediaRecorder?.isTypeSupported?.(t.contentType)){
+            return t;
+        }
+    }
+    return undefined;
+}
+
+export const getVideoRecordingContentType=():ContentTypeAndExtension|undefined=>{
+    const options:ContentTypeAndExtension[]=[
+        {contentType:"video/mp4;codecs=hvc1",extension:"mp4"},
+        {contentType:"video/mp4;codecs=avc1",extension:"mp4"},
+        {contentType:"video/webm;codecs=vp9",extension:"webm"},
+        {contentType:"video/webm;codecs=vp8",extension:"webm"},
+        {contentType:"video/webm",extension:"webm"},
+        {contentType:"video/mp4",extension:"mp4"},
+        {contentType:"video/quicktime",extension:"mov"},
+    ];
+
+    for(const t of options){
+        if(globalThis.window?.MediaRecorder?.isTypeSupported?.(t.contentType)){
+            return t;
+        }
+    }
+    return undefined;
+};
+
+
+export const stopStream=(stream:MediaStream|null|undefined)=>{
+    if(!stream){
+        return;
+    }
+    const tracks=stream.getTracks();
+    for(const t of tracks){
+        t.stop();
+    }
+}

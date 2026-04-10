@@ -291,7 +291,7 @@ export function ConvoMessageView({
                     ))}
                     <div className={messageClassName}>
                         {group.map((msg,gi)=>(
-                            <Button className={theme.suggestionButtonClassName} key={gi} onClick={()=>{
+                            <Button className={cn(theme.iconButtonClassName,theme.suggestionButtonClassName)} key={gi} onClick={()=>{
                                 ctrl.appendWithFunctionCallAsync(msg.content??'',msg.tags?.[convoTags.suggestionCallback])
                             }}>
                                 <ConvoThemeIcon theme={theme} icon="suggestionButtonIcon"/>

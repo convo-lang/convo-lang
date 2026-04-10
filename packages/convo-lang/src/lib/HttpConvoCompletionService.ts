@@ -1,18 +1,24 @@
-import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, httpClient, joinPaths } from "@iyio/common";
+import { HttpClientRequestOptions, NotFoundError, NotImplementedError, Scope, ScopeRegistration, aryRandomize, defineStringParam, getErrorMessage, getSortedObjectHash, httpClient, joinPaths } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
-import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoHttpToInputRequest, ConvoModelInfo, FlatConvoConversationBase } from "./convo-types.js";
-import { convoCompletionService } from "./convo.deps.js";
+import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
+import { convoCompletionService, convoTranscriptionService } from "./convo.deps.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;
 
 export const httpConvoCompletionEndpointParam=defineStringParam('httpConvoCompletionEndpoint',defaultConvoHttpApiEndpointPrefix);
 
+const endpointCache:Record<string,HttpConvoCompletionService>={};
+export const getHttpConvoCompletionServiceForEndpoint=(endpoint:string):HttpConvoCompletionService=>{
+    return endpointCache[endpoint]??(endpointCache[endpoint]=new HttpConvoCompletionService({endpoint}));
+}
+
 export const convoHttpRelayModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,scope=>HttpConvoCompletionService.fromScope(scope));
     scope.implementService(convoRagService,scope=>HttpConvoCompletionService.fromScope(scope));
+    scope.implementService(convoTranscriptionService,scope=>HttpConvoCompletionService.fromScope(scope));
 }
 
 export interface HttpConvoCompletionServiceOptions
@@ -43,7 +49,11 @@ export interface HttpConvoCompletionServiceOptions
  * ### GET /models ()=>ConvoModelInfo[]
  * Returns all models known to the server
  */
-export class HttpConvoCompletionService implements ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>, ConvoRagService
+export class HttpConvoCompletionService implements
+    ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>,
+    ConvoRagService,
+    ConvoTranscriptionService,
+    ConvoTtsService
 {
 
     public readonly serviceId='http';
@@ -159,7 +169,7 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
     {
         const options=await this.getRequestOptions?.();
         const response=await httpClient().getAsync<Response>(
-            joinPaths(this.getEndpoint(),`/support/${encodeURIComponent(modelName)}`),
+            joinPaths(this.getEndpoint(),`/completion/support/${encodeURIComponent(modelName)}`),
             {
                 ...options,
                 returnFetchResponse:true,
@@ -209,5 +219,80 @@ export class HttpConvoCompletionService implements ConvoCompletionService<FlatCo
             throw new Error('convo-lang API endpoint returned empty response');
         }
         return r;
+    }
+
+    private transcribeSupportCache:Record<string,Promise<boolean>>={};
+
+    public async canTranscribe(request:ConvoTranscriptionSupportRequest):Promise<boolean>{
+        const key=getSortedObjectHash(request);
+        return await (this.transcribeSupportCache[key]??(this.transcribeSupportCache[key]=this._canTranscribe(request)));
+    }
+    private async _canTranscribe(request:ConvoTranscriptionSupportRequest):Promise<boolean>{
+        const options=await this.getRequestOptions?.();
+        const response=await httpClient().postAsync<Response>(
+            joinPaths(this.getEndpoint(),`/transcribe/support`),
+            request,
+            {
+                ...options,
+                returnFetchResponse:true,
+            }
+        );
+        if(!response){
+            throw new Error('convo-lang API endpoint returned empty response');
+        }
+        if(response.status===404){
+            return false;
+        }
+        return (await response.json())?true:false;
+    }
+
+    public async transcribeAsync(request:ConvoTranscriptionRequest):Promise<ConvoTranscriptionResult>{
+        try{
+            const r=await httpClient().postAsync<ConvoTranscriptionResult>(
+                joinPaths(this.getEndpoint(),'/transcribe'),
+                {
+                    audio:request.audio,
+                    request:{...request,audio:undefined}
+                },
+                {
+                    ...await this.getRequestOptions?.(),
+                    convertBodyToFormData:true,
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:{
+                        message:'transcribe endpoint returned empty result',
+                        error:null,
+                    }
+                }
+            }
+            if(r.success){
+                return {
+                    ...r,
+                    file:request.audio,
+                }
+            }else{
+                return r;
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:{
+                    message:getErrorMessage(ex),
+                    error:ex,
+                }
+            }
+        }
+    }
+
+    public async canConvertToSpeech(request:ConvoTtsRequest):Promise<boolean>
+    {
+        const support=await this.getSupportAsync(request.model??'default');
+        return support.tts??false;
+    }
+    public convertToSpeechAsync(request:ConvoTtsRequest):Promise<ConvoTtsResult>{
+        throw new NotImplementedError();
     }
 }

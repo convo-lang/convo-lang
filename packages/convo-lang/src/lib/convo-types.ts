@@ -1208,6 +1208,16 @@ export interface ConvoCompletionServiceFeatureSupport
      * If true the Completion Service support streaming
      */
     streaming?:boolean;
+
+    /**
+     * If true the service can transcribe audio
+     */
+    transcription?:boolean;
+
+    /**
+     * If true the service can convert text into speech
+     */
+    tts?:boolean;
 }
 
 export interface ConvoCompletionCtx<TInput=any,TOutput=any>
@@ -1261,6 +1271,119 @@ export interface ConvoConversion<T>
 }
 
 export type ConvoCompletionStatus='complete'|'busy'|'error'|'disposed';
+
+export interface ConvoSpeakerRef
+{
+    id:string;
+    name:string;
+    sampleBase64Url:string;
+    priority?:number;
+}
+
+export interface ConvoTranscriptionRequest{
+    model?:string;
+    audio:File;
+    labelSpeakers?:boolean;
+    includeSegments?:boolean;
+    speakerRefs?:ConvoSpeakerRef[];
+}
+
+export interface ConvoTranscriptionSupportRequest
+{
+    model?:string;
+    /**
+     * Content type of the audio to be transcribed
+     */
+    audioType:string;
+    /**
+     * Size of the audio file in bytes
+     */
+    audioSize:number;
+    labelSpeakers?:boolean;
+    includeSegments?:boolean;
+    speakerRefsCount?:number;
+}
+
+export type ConvoTranscriptionResultProviderBase={
+    text:string;
+    segments?:ConvoTranscriptionSegment[];
+    usage:ConvoTranscriptionUsage;
+}
+
+export type ConvoTranscriptionResultBase=ConvoTranscriptionResultProviderBase & {
+    file?:File;
+    startTime:number;
+    endTime:number;
+    requestTime:number;
+    index:number;
+}
+
+export type ConvoTranscriptionResult=
+(ConvoTranscriptionResultBase & {
+    success:true;
+}) | {
+    success:false;
+    error:{
+        message:string;
+        error:any;
+    };
+}
+
+
+export interface ConvoTranscriptionSegment{
+    type:string;
+    text:string;
+    speaker:string;
+    start:number;
+    end:number;
+    id:string;
+}
+
+export interface ConvoTranscriptionUsage{
+    type:string;
+    total_tokens:number;
+    input_tokens:number;
+    input_token_details:InputTokenDetails;
+    output_tokens:number;
+}
+
+export interface InputTokenDetails{
+    text_tokens:number;
+    audio_tokens:number;
+}
+
+export interface ConvoTranscriptionService
+{
+    canTranscribe:(request:ConvoTranscriptionSupportRequest)=>boolean|Promise<boolean>;
+    transcribeAsync:(request:ConvoTranscriptionRequest)=>Promise<ConvoTranscriptionResult>;
+}
+
+export interface ConvoTtsRequest
+{
+    model?:string;
+    voice?:string;
+    text:string;
+}
+
+export interface ConvoTts
+{
+    audio:Blob;
+}
+
+export type ConvoTtsResult=
+{
+    success:true;
+    tts:ConvoTts;
+} | {
+    success:false;
+    error:string;
+}
+
+export interface ConvoTtsService
+{
+    canConvertToSpeech:(request:ConvoTtsRequest)=>boolean|Promise<boolean>;
+    convertToSpeechAsync:(request:ConvoTtsRequest)=>Promise<ConvoTtsResult>;
+}
 
 export type ConvoRagMode=boolean|number;
 export const isConvoRagMode=(value:any):value is ConvoRagMode=>(

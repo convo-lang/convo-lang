@@ -1,4 +1,4 @@
-import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, ConvoViewTheme, HttpConvoCompletionService, defaultConvoRenderTarget } from '@convo-lang/convo-lang';
+import { BeforeCreateConversationExeCtx, ConversationUiCtrl, ConversationUiCtrlOptions, ConvoComponentRenderer, ConvoEditorMode, ConvoMarkdownEnableState, ConvoModule, ConvoRagRenderer, ConvoUiAppendTrigger, ConvoViewTheme, defaultConvoRenderTarget, getHttpConvoCompletionServiceForEndpoint } from '@convo-lang/convo-lang';
 import { deepCompare } from '@iyio/common';
 import { useDeepCompareItem, useSubject } from "@iyio/react-common";
 import { useContext, useEffect, useMemo, useRef } from "react";
@@ -327,6 +327,11 @@ export interface ConvoViewProps
      * Content rendered after the input component at the end of the row below the input component.
      */
     afterInputEnd?:any;
+
+    /**
+     * If true the user will be able to use their microphone to record audio
+     */
+    enableAudioRecorder?:boolean;
 }
 
 /**
@@ -389,6 +394,7 @@ export function ConvoView({
     beforeInputEnd,
     afterInputStart,
     afterInputEnd,
+    enableAudioRecorder,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -419,6 +425,8 @@ export function ConvoView({
     const defaultCtrl=ctrlProp??ctxCtrl;
     const ctrl=useMemo(()=>defaultCtrl??new ConversationUiCtrl({
         theme:refs.current.theme,
+        transcriptionService:httpEndpoint?getHttpConvoCompletionServiceForEndpoint(httpEndpoint):undefined,
+        ttsService:httpEndpoint?getHttpConvoCompletionServiceForEndpoint(httpEndpoint):undefined,
         ...ctrlOptions,
         template:(
             (templatePrefix?templatePrefix+'\n\n':'')+
@@ -434,7 +442,7 @@ export function ConvoView({
                 ...(refs.current.modules??[]),
             ],
             completionService:httpEndpoint?(
-                new HttpConvoCompletionService({endpoint:httpEndpoint})
+                getHttpConvoCompletionServiceForEndpoint(httpEndpoint)
             ):ctrlOptions?.convoOptions?.completionService
         }
     }),[defaultCtrl,ctrlOptions,httpEndpoint,template,compConvo,templatePrefix,modulesRefreshKey,importStr]);
@@ -654,6 +662,7 @@ export function ConvoView({
                                 browseAttachmentRequested={browseAttachmentRequested}
                                 maxImageHeight={maxImageHeight}
                                 maxImageWidth={maxImageWidth}
+                                enableAudioRecorder={enableAudioRecorder}
                                 {...inputProps}
                             />
                         }

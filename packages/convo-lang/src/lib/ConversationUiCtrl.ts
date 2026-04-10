@@ -7,7 +7,7 @@ import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoStartOfConversationCallback, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoViewTheme } from "./convo-view-theme.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
@@ -38,6 +38,8 @@ export interface ConversationUiCtrlOptions
     imagePathConverter?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>string;
     imageRenderer?:(img:MarkdownImage,className:string,msg:FlatConvoMessage)=>any;
     theme?:ConvoViewTheme;
+    transcriptionService?:ConvoTranscriptionService;
+    ttsService?:ConvoTtsService;
 }
 
 export class ConversationUiCtrl
@@ -48,6 +50,9 @@ export class ConversationUiCtrl
     public readonly autoSave:boolean;
 
     private readonly store:null|ConvoDataStore;
+
+    public readonly transcriptionService?:ConvoTranscriptionService;
+    public readonly ttsService?:ConvoTtsService;
 
     private readonly convoOptions?:ConversationOptions;
     private readonly initConvoCallback?:(convo:Conversation)=>void;
@@ -365,6 +370,8 @@ export class ConversationUiCtrl
         imagePathConverter,
         imageRenderer,
         theme,
+        transcriptionService,
+        ttsService,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
@@ -373,6 +380,9 @@ export class ConversationUiCtrl
 
         this.imagePathConverter=imagePathConverter;
         this.imageRenderer=imageRenderer;
+
+        this.transcriptionService=transcriptionService;
+        this.ttsService=ttsService;
 
         this._defaultVars=new BehaviorSubject<Record<string,any>>(defaultVars?{...defaultVars}:{});
         this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});
