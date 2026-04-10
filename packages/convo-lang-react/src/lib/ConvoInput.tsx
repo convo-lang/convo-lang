@@ -1,6 +1,6 @@
 import { ConversationUiCtrl, ConvoViewTheme } from "@convo-lang/convo-lang";
 import { useSubject } from "@iyio/react-common";
-import { ArrowUpIcon, AudioLinesIcon, CheckIcon, MicIcon, PlusIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, AudioLinesIcon, CheckIcon, MicIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AudioVisualizer } from "./AudioVisualizer.js";
 import { Button } from "./Button.js";
@@ -93,6 +93,7 @@ export function ConvoInput({
 
     theme=useConvoTheme(theme);
 
+
     const ctrl=useConversationUiCtrl(_ctrl);
     const [value,setValue]=useState('');
     const ready=!!value;
@@ -102,13 +103,37 @@ export function ConvoInput({
     const imageUrl=media?.url??media?.getUrl?.('preview');
 
     const [recorder,setRecorder]=useState<RecordingCtrl|null>(null);
+    const [input,setInput]=useState<HTMLTextAreaElement|null>(null);
+
+    const submit=(e?:FormEvent)=>{
+        e?.preventDefault();
+        if(ctrl.currentTask){
+            return;
+        }
+        setValue('');
+        ctrl.appendUiMessageAsync(value);
+    }
+
+    const refs=useRef({submit,theme,ctrl,input});
+    refs.current.submit=submit;
+    refs.current.theme=theme;
+    refs.current.ctrl=ctrl;
+    refs.current.input=input;
 
     useEffect(()=>{
          const recorder=new RecordingCtrl({
             transcribe:true,
             transcriptionService:ctrl.transcriptionService,
-            onTranscription:(t,r)=>{
-                setValue(t.text);
+            onTranscription:(t,liveMode)=>{
+                if(liveMode){
+                    refs.current.ctrl.appendUiMessageAsync(t.text);
+                }else{
+                    setValue(t.text);
+                    refs.current.input?.focus();
+                    setTimeout(()=>{
+                        refs.current.input?.focus();
+                    },100);
+                }
             },
         });
         setRecorder(recorder);
@@ -119,6 +144,7 @@ export function ConvoInput({
 
 
     const isRecording=useSubject(recorder?.isRecordingSubject);
+    const liveModeActive=useSubject(recorder?.liveModeActiveSubject);
     const isTranscribing=useSubject(recorder?.isTranscribingSubject);
     const audioStream=useSubject(recorder?.streamSubject);
     const [visualCanvas,setVisualCanvas]=useState<HTMLCanvasElement|null>(null);
@@ -130,26 +156,18 @@ export function ConvoInput({
         const visualizer=new AudioVisualizer({
             stream:audioStream,
             canvas:visualCanvas,
+            activeColorCssVarName:refs.current.theme.inputLiveModeVisualizerActiveVarName,
         });
+        const sub=recorder?.speechActiveSubject.subscribe(v=>{
+            visualizer.active=v??false;
+        })
         visualizer.run();
         return ()=>{
+            sub?.unsubscribe();
             visualizer.dispose();
         }
-    },[visualCanvas,isRecording,audioStream]);
+    },[visualCanvas,isRecording,audioStream,recorder]);
 
-    const submit=(e?:FormEvent)=>{
-        e?.preventDefault();
-        if(ctrl.currentTask){
-            return;
-        }
-        setValue('');
-        ctrl.appendUiMessageAsync(value);
-    }
-
-    const refs=useRef({submit});
-    refs.current.submit=submit;
-
-    const [input,setInput]=useState<HTMLTextAreaElement|null>(null);
     useEffect(()=>{
         if(!input || !autoFocus){
             return;
@@ -251,7 +269,7 @@ export function ConvoInput({
                         />
                     }
                     <div className={theme.inputMessageContainerClassName}>
-                        {isTranscribing&&<>
+                        {(isTranscribing && !liveModeActive)&&<>
                             Transcribing
                             <ConvoThemeIcon theme={theme} icon="inputTranscribeIcon"/>
                         </>}
@@ -260,7 +278,7 @@ export function ConvoInput({
 
                 {afterInput}
 
-                {enableAudioRecorder &&
+                {enableAudioRecorder && !(liveModeActive && isRecording) &&
                     <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderButtonClassName)} onClick={()=>{
                         recorder?.toggle();
                     }}>
@@ -276,14 +294,29 @@ export function ConvoInput({
                     <Button className={cn(theme.iconButtonClassName,theme.inputAudioRecorderCancelButtonClassName)} onClick={()=>{
                         recorder?.cancel();
                     }}>
-                        <ConvoThemeIcon theme={theme} icon="inputAudioRecorderCancelButtonIcon" fallback={XIcon} />
+                        <ConvoThemeIcon
+                            theme={theme}
+                            icon={enableLiveMode?"inputAudioRecorderStopLiveButtonIcon":"inputAudioRecorderCancelButtonIcon"}
+                            fallback={enableLiveMode?SquareIcon:XIcon}
+                        />
+                        {isTranscribing && enableLiveMode &&
+                            <div className={theme.inputAudioRecorderLiveTranscribeIconContainerClassName}>
+                                <ConvoThemeIcon theme={theme} icon="inputAudioRecorderLiveTranscribeIcon"/>
+                            </div>
+                        }
                     </Button>
                 :!noSubmitButton?
                     <Button className={cn(
                         theme.iconButtonClassName,
                         theme.inputSubmitButtonClassName,
                         (ready || enableLiveMode)&&theme.inputSubmitReadyButtonClassName
-                    )} onClick={()=>submit()}>
+                    )} onClick={()=>{
+                        if(!ready && enableLiveMode){
+                            recorder?.start({enableLiveMode:true})
+                        }else{
+                            submit();
+                        }
+                    }}>
                         <ConvoThemeIcon
                             theme={theme}
                             icon={(enableLiveMode && !ready)?"inputLiveModeButtonIcon":"inputSubmitButtonIcon"}

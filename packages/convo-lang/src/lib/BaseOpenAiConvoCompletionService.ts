@@ -351,7 +351,6 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
     {
         const startTime=Date.now();
         const index=++nextTransIndex;
-        const file=new File([audio],`audio.${audio.type.endsWith('/wav')?'wav':'webm'}`,{type:audio.type});
         const getDefaults=()=>{
             const now=Date.now();
             return {
@@ -359,14 +358,14 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
                 endTime:now,
                 requestTime:now-startTime,
                 index,
-                file,
+                file:audio,
             }
         }
         try{
             const form=new FormData();
             form.append('model',model);
             form.append('chunking_strategy','auto');
-            form.append('file',file);
+            form.append('file',audio);
             form.append('response_format',includeSegments?'diarized_json':'json');
             if(labelSpeakers && speakerRefs){
                 speakerRefs.sort((a,b)=>(b.priority??0)-(a.priority??0));

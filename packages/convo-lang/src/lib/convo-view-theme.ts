@@ -180,10 +180,18 @@ export interface ConvoViewTheme
     inputAudioRecorderSubmitButtonIconClassName?:string;
     inputAudioRecorderCancelButtonIcon?:ConvoIconType;
     inputAudioRecorderCancelButtonIconClassName?:string;
+    inputAudioRecorderStopLiveButtonIcon?:ConvoIconType;
+    inputAudioRecorderStopLiveButtonIconClassName?:string;
+    inputAudioRecorderLiveTranscribeIcon?:ConvoIconType;
+    inputAudioRecorderLiveTranscribeIconClassName?:string;
+    inputAudioRecorderLiveTranscribeIconContainerClassName?:string;
+    inputLiveModeButtonIcon?:ConvoIconType;
+    inputLiveModeButtonClassName?:string;
     inputRecordingVisualizerCanvasClassName?:string;
     inputMessageContainerClassName?:string;
     inputTranscribeIcon?:ConvoIconType;
     inputTranscribeIconClassName?:string;
+    inputLiveModeVisualizerActiveVarName?:string;
 
 
     inputAttachmentEnabledClassName?:string;

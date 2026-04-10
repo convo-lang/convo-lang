@@ -2,6 +2,7 @@ import { DisposeCallback } from "@iyio/common";
 
 export interface AudioVisualizerOptions
 {
+    activeColorCssVarName?:string;
     canvas:HTMLCanvasElement;
     stream:MediaStream;
 }
@@ -27,13 +28,26 @@ export class AudioVisualizer
     }
     private cleanUp?:DisposeCallback;
 
+    public getColor():string{
+        const style=globalThis.window?.getComputedStyle(this.options.canvas);
+        return style?.color??'#999999';
+    }
+
+    public getActiveColor():string{
+        const varName=this.options.activeColorCssVarName||'--primary';
+        const style=globalThis.window?.getComputedStyle(this.options.canvas);
+        return style?.getPropertyValue(varName)||this.getColor();
+    }
+
+
+    public active=false;
     public run(){
         if(this.isDisposed || this.cleanUp){
             return;
         }
+        const color=this.getColor();
+        const activeColor=this.getActiveColor();
         const canvas=this.options.canvas;
-        const style=globalThis.window?.getComputedStyle(canvas);
-        const color=style.color;
         const ctx=canvas.getContext('2d');
         const audioContext=new (globalThis.window?.AudioContext || (globalThis.window as any)?.webkitAudioContext)();
         if(!audioContext || !ctx){
@@ -108,7 +122,7 @@ export class AudioVisualizer
                 const y=(canvas.height-height)/2;
 
                 ctx.beginPath();
-                ctx.fillStyle=color;
+                ctx.fillStyle=this.active?activeColor:color;
                 ctx.roundRect(x,y,pillWidth,height,pillWidth/2);
                 ctx.fill();
             }

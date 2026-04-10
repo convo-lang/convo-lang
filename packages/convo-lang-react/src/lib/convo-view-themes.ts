@@ -30,12 +30,13 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 ragIcon:DatabaseSearchIcon,
                 functionIcon:VariableIcon,
                 inputTranscribeIcon:Loader2Icon,
+                inputAudioRecorderLiveTranscribeIcon:Loader2Icon,
             };
 
         case 'default-layout': return {
             convoViewClassName:'relative flex flex-col',
             iconClassName:'size-4 shrink-0 opacity-50 group-disabled:opacity-25',
-            iconButtonClassName:'group cursor-pointer',
+            iconButtonClassName:'group cursor-pointer relative',
 
 
             userIconClassName:'mt-2 -mr-2',
@@ -107,6 +108,8 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputRecordingVisualizerCanvasClassName:'absolute left-0 top-0 w-full h-full',
             inputAudioRecorderCancelButtonClassName:'size-7 flex justify-center items-center',
             inputMessageContainerClassName:'pointer-events-none absolute left-0 top-0 w-full h-full flex items-center gap-2 justify-end',
+            inputAudioRecorderLiveTranscribeIconClassName:'w-full h-full animate-spin',
+            inputAudioRecorderLiveTranscribeIconContainerClassName:'absolute size-10 left-[50%] top-[50%] transform-[translate(-50%,-50%)]',
 
 
             inputImageContainerClassName:'max-w-50 relative',
@@ -162,6 +165,8 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputSubmitReadyButtonClassName:'opacity-100',
             inputMessageContainerClassName:'text-muted-foreground',
             inputTranscribeIconClassName:'animate-spin',
+            inputLiveModeVisualizerActiveVarName:'--primary',
+            inputAudioRecorderLiveTranscribeIconClassName:'stroke-[0.3px]',
 
             inputImageClassName:'rounded-lg border',
             inputImageRemoveButton:'rounded border bg-background/80',

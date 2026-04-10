@@ -44,6 +44,7 @@ export default function IndexPage()
     const [enableAttachment,setEnableAttachment]=useState(true);
     const [enableModelSelector,setEnableModelSelector]=useState(true);
     const [enableAudioRecorder,setEnableAudioRecorder]=useState(true);
+    const [enableLiveMode,setEnableLiveMode]=useState(true);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -176,6 +177,10 @@ export default function IndexPage()
                     <input type="checkbox" id="enableAudioRecorder" checked={enableAudioRecorder} onChange={e=>setEnableAudioRecorder(e.target.checked)}/>
                 </Label>
 
+                <Label label="enableLiveMode" row>
+                    <input type="checkbox" id="enableLiveMode" checked={enableLiveMode} onChange={e=>setEnableLiveMode(e.target.checked)}/>
+                </Label>
+
                 {!!htmlTools.length &&
                     <Label label="artifact">
                         {toolSelect(false)}
@@ -203,6 +208,7 @@ export default function IndexPage()
                     enableAttachment={enableAttachment}
                     enableModelSelector={enableModelSelector}
                     enableAudioRecorder={enableAudioRecorder}
+                    enableLiveMode={enableLiveMode}
                     defaultValue={defaultValue}
                     externFunctions={{
                         createHtmlTool(name:string,content:string){

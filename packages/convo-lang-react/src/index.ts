@@ -32,4 +32,5 @@ export * from './lib/MessagesView.js';
 export * from './lib/SuggestionsView.js';
 export * from './lib/useButtonBase.js';
 export * from './lib/util.js';
+export * from './lib/VadCtrl.js';
 

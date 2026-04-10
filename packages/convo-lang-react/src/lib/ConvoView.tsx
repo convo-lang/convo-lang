@@ -332,6 +332,12 @@ export interface ConvoViewProps
      * If true the user will be able to use their microphone to record audio
      */
     enableAudioRecorder?:boolean;
+
+    /**
+     * If true the user will be able to enter into live mode where they speak directly to the LLM
+     * and the LLM speaks back.
+     */
+    enableLiveMode?:boolean;
 }
 
 /**
@@ -395,6 +401,7 @@ export function ConvoView({
     afterInputStart,
     afterInputEnd,
     enableAudioRecorder,
+    enableLiveMode,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -663,6 +670,7 @@ export function ConvoView({
                                 maxImageHeight={maxImageHeight}
                                 maxImageWidth={maxImageWidth}
                                 enableAudioRecorder={enableAudioRecorder}
+                                enableLiveMode={enableLiveMode}
                                 {...inputProps}
                             />
                         }
