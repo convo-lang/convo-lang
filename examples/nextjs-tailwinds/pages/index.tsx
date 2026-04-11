@@ -16,8 +16,12 @@ const themes=[
     'amber',
     'amethyst',
     'bubblegum',
+    'caffeine',
     'claude',
+    'cyberpunk',
     'mono',
+    'moss',
+    'neo-brutalism',
     'notebook',
 ] as const;
 
