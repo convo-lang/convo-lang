@@ -1,6 +1,6 @@
 import { ConversationUiCtrl, ConvoMarkdownEnableState, ConvoMessageRenderResult, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, defaultConvoRenderTarget, shouldDisableConvoAutoScroll } from "@convo-lang/convo-lang";
 import { ScrollView, useSubject } from "@iyio/react-common";
-import { Fragment } from "react";
+import { Fragment, useRef } from "react";
 import { useConversationUiCtrl, useConvoTheme } from "./convo-lang-react.js";
 import { ConvoMessageView, ConvoMessageViewProps } from "./ConvoMessageView.js";
 import { ConvoStatusIndicator, ConvoStatusIndicatorProps } from "./ConvoStatusIndicator.js";
@@ -120,8 +120,10 @@ export function ConvoMessageListView({
 
     });
 
+    const refs=useRef({lastMouseEvent:0})
+
     const body=(
-        <div className={theme.messageListClassName}>
+        <div className={theme.messageListClassName} onMouseDown={()=>refs.current.lastMouseEvent=Date.now()} onMouseUp={()=>refs.current.lastMouseEvent=Date.now()}>
 
             {mapped}
 
@@ -145,7 +147,7 @@ export function ConvoMessageListView({
                 <ScrollView
                     flex1
                     autoScrollEnd
-                    autoScrollEndFilter={()=>!shouldDisableConvoAutoScroll(messages)}
+                    autoScrollEndFilter={()=>!shouldDisableConvoAutoScroll(messages) && Date.now()-refs.current.lastMouseEvent>500}
                     className={theme.scrollViewClassName}
                     containerClassName={theme.scrollContentClassName}
                 >
