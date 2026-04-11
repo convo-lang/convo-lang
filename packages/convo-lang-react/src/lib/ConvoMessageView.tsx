@@ -1,8 +1,9 @@
-import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, convoFlatMessageSourceMessageKey, convoMessageToStringSafe, convoRoles, convoTags, isMdConvoEnabledFor } from "@convo-lang/convo-lang";
+import { ConversationUiCtrl, ConvoComponent, ConvoComponentRendererContext, ConvoMarkdownEnableState, ConvoRagRenderer, ConvoViewTheme, FlatConvoConversation, FlatConvoMessage, convoFlatMessageSourceMessageKey, convoMessageToStringSafe, convoRoles, convoTags } from "@convo-lang/convo-lang";
 import { aryRemoveWhere, containsMarkdownImage, parseMarkdownImages } from "@iyio/common";
 import { Fragment } from "react";
 import { Button } from "./Button.js";
-import { ConvoMarkdownViewer } from "./ConvoMarkdownViewer.js";
+import { ConvoContentMessageView } from "./ConvoContentMessageView.js";
+import { ConvoFunctionCallMessageView } from "./ConvoFunctionCallMessageView.js";
 import { ConvoThemeIcon } from "./ConvoThemeIcon.js";
 import { MessageComponentRenderer } from "./MessageComponentRenderer.js";
 import { cn } from "./util.js";
@@ -23,6 +24,12 @@ export interface ConvoMessageViewProps
     enableMarkdown?:ConvoMarkdownEnableState;
     theme:ConvoViewTheme;
     elemRef?:(elem:HTMLElement|null)=>void;
+
+    /**
+     * If true the default function call renderer will be disabled. This includes the streaming
+     * call renderer.
+     */
+    disableDefaultFunctionCallRender?:boolean;
 }
 
 export function ConvoMessageView({
@@ -39,7 +46,8 @@ export function ConvoMessageView({
     message,
     messageIndex,
     theme,
-    elemRef
+    elemRef,
+    disableDefaultFunctionCallRender
 }:ConvoMessageViewProps){
 
     const messageClassName=cn(
@@ -106,21 +114,23 @@ export function ConvoMessageView({
     }
 
 
+    if(message.role==='result'){
+
+    }
     if(message.role==='result' && message.streamingActive){
-        const content=message.content??'';
+        if(disableDefaultFunctionCallRender){
+            return null;
+        }
         return (
-            <div ref={elemRef} className={rowClassName}>
-                <ConvoThemeIcon theme={theme} icon="assignmentIcon" className={theme.assistantIconClassName}/>
-                <div className={cn(messageClassName,theme.assignmentMessageClassName)}>
-                    <div className={theme.assignmentStreamingFunctionCallClassName}>
-                        {message.streamingFunction}
-                        <span className={cn('__convo-message-tokens',theme.assignmentStreamingFunctionTokenCountCallClassName)}>( ~{Math.round(content.length/4)} tokens )</span>
-                    </div>
-                    <div className={cn('__convo-message-content-fn',theme.assignmentWindowClassName)}>
-                        {content.substring(content.length-600)}
-                    </div>
-                </div>
-            </div>
+            <ConvoFunctionCallMessageView
+                theme={theme}
+                rowClassName={rowClassName}
+                messageClassName={messageClassName}
+                fnName={message.streamingFunction??'function'}
+                calledParams={message.content}
+                isStreaming
+                elemRef={elemRef}
+            />
         )
     }else if(message.role==='result' || message.setVars){
         if(!message.setVars || (!showResults && !showFunctions)){
@@ -169,7 +179,7 @@ export function ConvoMessageView({
     }else if(message.fn || (message.role!=='user' && message.role!=='assistant')){
         if(showSystemMessages && message.role==='system'){
             return (
-                <BubbleMessageView
+                <ConvoContentMessageView
                     rowClassName={rowClassName}
                     messageClassName={messageClassName}
                     theme={theme}
@@ -191,9 +201,6 @@ export function ConvoMessageView({
             if(callRendered===undefined || callRendered===null){
                 const compName=flat.messages.find(fm=>fm.fn && fm.fn.name===message.called?.name && !fm.called)?.tags?.[convoTags.renderer];
                 const compRenderer=compName?ctrl.componentRenderers[compName]??ctrl.convo?.components[compName]?.renderer:undefined;
-                if(!compRenderer){
-                    return null;
-                }
                 const ctx:ConvoComponentRendererContext={// todo - merge with component renderer above, MAYBE?
                     id:messageIndex+'comp',
                     ctrl,
@@ -206,6 +213,19 @@ export function ConvoMessageView({
                     rowClassName:theme.rowClassName,
                     theme,
                 }
+                const defaultView=(disableDefaultFunctionCallRender?null:
+                    <ConvoFunctionCallMessageView
+                        theme={theme}
+                        rowClassName={rowClassName}
+                        messageClassName={cn(messageClassName,theme.functionCallClassName)}
+                        fnName={message.called.name}
+                        calledParams={message.calledParams}
+                        elemRef={elemRef}
+                    />
+                )
+                if(!compRenderer){
+                    return defaultView;
+                }
 
                 const comp:ConvoComponent={
                     name:'renderer',
@@ -215,7 +235,7 @@ export function ConvoMessageView({
                 callRendered=(typeof compRenderer === 'function')?compRenderer(comp,ctx):compRenderer.render(comp,ctx);
 
                 if(callRendered===undefined || callRendered===null){
-                    return null;
+                    return defaultView;
                 }
             }
             return (
@@ -246,7 +266,7 @@ export function ConvoMessageView({
                     }
                 </div>
             ):(
-                <BubbleMessageView
+                <ConvoContentMessageView
                     key={pi}
                     rowClassName={rowClassName}
                     messageClassName={messageClassName}
@@ -305,7 +325,7 @@ export function ConvoMessageView({
         )
     }else{
         return (
-            <BubbleMessageView
+            <ConvoContentMessageView
                 rowClassName={rowClassName}
                 messageClassName={messageClassName}
                 theme={theme}
@@ -319,42 +339,5 @@ export function ConvoMessageView({
 }
 
 
-interface BubbleMessageViewProps
-{
-    rowClassName:string;
-    messageClassName:string;
-    theme:ConvoViewTheme;
-    message:FlatConvoMessage;
-    enableMarkdown?:ConvoMarkdownEnableState;
-    contentOverride?:string;
-    elemRef?:(elem:HTMLElement|null)=>void;
-}
 
-function BubbleMessageView({
-    rowClassName,
-    messageClassName,
-    theme,
-    message,
-    enableMarkdown,
-    contentOverride,
-    elemRef,
-}:BubbleMessageViewProps){
-
-    const content=contentOverride??message.content??'';
-
-    return (
-        <div className={rowClassName} ref={elemRef}>
-            {message.role==='system' && <ConvoThemeIcon theme={theme} icon="systemIcon" className={theme.assistantIconClassName} />}
-            {message.isAssistant && <ConvoThemeIcon theme={theme} icon="assistantIcon" />}
-            <div className={cn('__convo-message-content',messageClassName,!enableMarkdown&&theme.plainTextClassName)}>{
-                (enableMarkdown && isMdConvoEnabledFor(message.isUser?'user':'assistant',enableMarkdown))?
-                    <ConvoMarkdownViewer markdown={content} className={theme.markdownClassName}/>
-                :
-                    content
-            }</div>
-            {message.isUser && <ConvoThemeIcon theme={theme} icon="userIcon" />}
-        </div>
-    )
-
-}
 

@@ -1,6 +1,7 @@
 import { ConvoViewTheme } from "@convo-lang/convo-lang";
-import { cn } from "./lib/util.js";
+import { cn } from "./util.js";
 
+export const defaultConvoFunctionCallMaxArgsCharLength=26;
 export type ConvoThemeMergeMode='merge'|'replace';
 export const mergeConvoViewThemes=(baseTheme:ConvoViewTheme,mode:ConvoThemeMergeMode,...overrides:ConvoViewTheme[]):ConvoViewTheme=>{
     const theme={...baseTheme};
@@ -33,3 +34,15 @@ export const mergeConvoViewThemes=(baseTheme:ConvoViewTheme,mode:ConvoThemeMerge
 
     return theme;
 }
+
+
+export const formatConvoArgsString=(content:string,theme:ConvoViewTheme,trimStart:boolean):string=>{
+    const len=theme.functionCallMaxArgsCharLength??defaultConvoFunctionCallMaxArgsCharLength;
+    content=content.replace(ws,' ');
+    if(content.length>len){
+        content=trimStart?'\u2026'+content.substring(content.length-len):content.substring(0,len)+'\u2026';
+    }
+    return content;
+}
+
+const ws=/\s\r\n/g;

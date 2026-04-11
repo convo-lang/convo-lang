@@ -22,6 +22,12 @@ export interface ConvoMessageListViewProps
     enableMarkdown?:ConvoMarkdownEnableState;
     statusIndicatorRenderer?:(props:ConvoStatusIndicatorProps)=>any;
     theme?:ConvoViewTheme;
+
+    /**
+     * If true the default function call renderer will be disabled. This includes the streaming
+     * call renderer.
+     */
+    disableDefaultFunctionCallRender?:boolean;
 }
 
 
@@ -36,6 +42,7 @@ export function ConvoMessageListView({
     callRenderer,
     enableMarkdown,
     statusIndicatorRenderer=(props)=><ConvoStatusIndicator {...props}/>,
+    disableDefaultFunctionCallRender,
     theme,
 }:ConvoMessageListViewProps){
 
@@ -80,6 +87,7 @@ export function ConvoMessageListView({
             callRenderer,
             enableMarkdown,
             hideSuggestions,
+            disableDefaultFunctionCallRender,
         }
 
         if(ctrlRendered?.position==='replace'){

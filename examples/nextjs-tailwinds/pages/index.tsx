@@ -39,9 +39,9 @@ export default function IndexPage()
     const [dark,setDark]=useState(true);
     const [theme,setTheme]=useState<Theme>('default');
 
-    const [showFunctions,setShowFunctions]=useState(true);
-    const [showResults,setShowResults]=useState(true);
-    const [showSystem,setShowSystem]=useState(true);
+    const [showFunctions,setShowFunctions]=useState(false);
+    const [showResults,setShowResults]=useState(false);
+    const [showSystem,setShowSystem]=useState(false);
     const [enableStreaming,setEnableStreaming]=useState(true);
     const [enableMarkdown,setEnableMarkdown]=useState(true);
     const [enableSlashCommands,setEnableSlashCommands]=useState(true);
@@ -276,9 +276,63 @@ const getTools=():HtmlTool[]=>{
 const t3='```'
 
 const defaultValue=/*convo*/`
+
+> addNumber(a:number b:number)->(
+    'The result is {{add(a b)}}'
+)
+
+# Creates an HTML tool the user can interact with. The value passed to this function should be a
+# standalone HTML page.
+> extern createHtmlTool(
+    # Display name of the tool
+    name:string
+
+    # Value use to set the srcDoc value of an iframe.
+    iframeContent:string
+)
+
 > assistant
 Hello, how can I help you?
-`
+
+
+> user
+add 5 plus 55
+
+@toolId call_rUiWuAbyCkmzcr1mDNVe9SHf
+> call addNumber(
+    "a": 5,
+    "b": 55
+)
+> result
+__return="The result is 60"
+
+
+> assistant
+5 plus 55 is 60.
+
+
+
+
+> user
+Create a todo list app
+
+@toolId call_q7GMfmMdbEfG9qrHkS8vsh7u
+> call createHtmlTool(
+    "name": "Todo List App",
+    "iframeContent": "<!DOCTYPE html>\\n<html lang=\\"en\\">\\n<head>\\n<meta charset=\\"UTF-8\\">\\n<meta name=\\"viewport\\" content=\\"width=device-width, initial-scale=1.0\\">\\n<title>ToDo List App</title>\\n<style>\\n  body {\\n    font-family: Arial, sans-serif;\\n    margin: 40px;\\n  }\\n  h1 {\\n    color: #2c3e50;\\n  }\\n  #todoForm {\\n    margin-bottom: 20px;\\n  }\\n  input[type=\\"text\\"] {\\n    padding: 8px;\\n    width: 70%;\\n    border: 1px solid #ccc;\\n    border-radius: 4px;\\n  }\\n  button {\\n    padding: 8px 16px;\\n    margin-left: 10px;\\n    background: #3498db;\\n    color: white;\\n    border: none;\\n    border-radius: 4px;\\n    cursor: pointer;\\n  }\\n  ul {\\n    list-style-type: none;\\n    padding: 0;\\n  }\\n  li {\\n    padding: 10px 0;\\n    border-bottom: 1px solid #eee;\\n    display: flex;\\n    align-items: center;\\n    justify-content: space-between;\\n  }\\n  .completed {\\n    text-decoration: line-through;\\n    color: #888;\\n  }\\n</style>\\n</head>\\n<body>\\n  <h1>ToDo List App</h1>\\n  <form id=\\"todoForm\\">\\n    <input type=\\"text\\" id=\\"todoInput\\" placeholder=\\"What needs to be done?\\" required />\\n    <button type=\\"submit\\">Add</button>\\n  </form>\\n  <ul id=\\"todoList\\"></ul>\\n<script>\\n  const form = document.getElementById('todoForm');\\n  const input = document.getElementById('todoInput');\\n  const list = document.getElementById('todoList');\\n\\n  // Function to create a new todo item\\n  function createTodoItem(text) {\\n    const li = document.createElement('li');\\n    const span = document.createElement('span');\\n    span.textContent = text;\\n    span.onclick = () => {\\n      span.classList.toggle('completed');\\n    };\\n    li.appendChild(span);\\n    const delBtn = document.createElement('button');\\n    delBtn.textContent = 'Delete';\\n    delBtn.onclick = () => {\\n      list.removeChild(li);\\n    };\\n    li.appendChild(delBtn);\\n    return li;\\n  }\\n\\n  // Add todo event\\n  form.onsubmit = function(event) {\\n    event.preventDefault();\\n    const value = input.value.trim();\\n    if (value) {\\n      const todoItem = createTodoItem(value);\\n      list.appendChild(todoItem);\\n      input.value = '';\\n    }\\n  };\\n</script>\\n</body>\\n</html>"
+)
+> result
+__return="created"
+
+
+> assistant
+I have created a simple Todo List App for you. You can use it to add, mark as completed, and delete tasks as needed.
+
+Would you like to open and use the app now?
+
+
+
+`.trim()+'\n';
 
 const defaultValue9=/*convo*/`
 > define

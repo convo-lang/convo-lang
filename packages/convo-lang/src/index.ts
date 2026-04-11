@@ -10,6 +10,7 @@ export * from './lib/convo-component-lib.js';
 export * from './lib/convo-component-types.js';
 export * from './lib/convo-default-models.js';
 export * from './lib/convo-default-vars.js';
+export * from './lib/convo-formatting-lib.js';
 export * from './lib/convo-forms-lib.js';
 export * from './lib/convo-forms-types.js';
 export * from './lib/convo-from-scope.js';

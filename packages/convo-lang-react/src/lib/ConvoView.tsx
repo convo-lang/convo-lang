@@ -200,6 +200,12 @@ export interface ConvoViewProps
     beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined;
 
     /**
+     * If true the default function call renderer will be disabled. This includes the streaming
+     * call renderer.
+     */
+    disableDefaultFunctionCallRender?:boolean;
+
+    /**
      * Disable scrolling of the rendered message list
      */
     disableScroll?:boolean;
@@ -408,6 +414,7 @@ export function ConvoView({
     enableAudioRecorder,
     enableLiveMode,
     readResponses,
+    disableDefaultFunctionCallRender,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -640,6 +647,7 @@ export function ConvoView({
             disableScroll={disableScroll}
             hideSuggestions={suggestionsLocation!=='inline' && !forceInlineSuggestionsLocation}
             enableMarkdown={enableMarkdown}
+            disableDefaultFunctionCallRender={disableDefaultFunctionCallRender}
             {...messageListProps}
          />
     )

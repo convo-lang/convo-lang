@@ -1,6 +1,6 @@
 import { ConvoViewTheme } from "@convo-lang/convo-lang";
 import { ArrowUpIcon, BrainIcon, DatabaseSearchIcon, Loader2Icon, MemoryStickIcon, MenuIcon, UserIcon, VariableIcon } from 'lucide-react';
-import { mergeConvoViewThemes } from "../convo-theme-lib.js";
+import { mergeConvoViewThemes } from "./convo-theme-lib.js";
 
 export type ConvoViewThemeName='default'|'default-layout'|'default-icons'|'default-style';
 
@@ -24,6 +24,7 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
                 assistantIcon:BrainIcon,
                 systemIcon:MemoryStickIcon,
                 assignmentIcon:VariableIcon,
+                //functionCallIcon:VariableIcon,
                 loaderIcon:Loader2Icon,
                 inputSubmitButtonIcon:ArrowUpIcon,
                 suggestionTitleIcon:MenuIcon,
@@ -171,6 +172,14 @@ export const getConvoViewTheme=(name:ConvoViewThemeName):ConvoViewTheme=>{
             inputImageClassName:'rounded-lg border',
             inputImageRemoveButton:'rounded border bg-background/80',
             imageClassName:'rounded-lg',
+
+            functionCallClassName:'py-2 mx-1 relative font-mono bg-muted text-muted-foreground text-sm flex items-center mb-5',
+            functionCallOpenClassName:'flex-col items-start',
+            functionCallOpenHeaderClassName:'flex items-start gap-2 self-stretch mt-1',
+            functionCallArgsClassName:'border rounded cursor-pointer p-1 max-w-70 whitespace-pre overflow-clip text-ellipsis',
+            functionCallArgsOpenClassName:'p-1 pl-4 whitespace-pre-wrap',
+            functionCallTokensClassName:'absolute text-muted-foreground text-xs right-0 bottom-0 transform-[translateY(calc(100%+0.5rem))]',
+            functionCallJsonButtonClassName:'ml-auto',
 
             suggestionMessageClassName:'border-none',
             suggestionTitleClassName:'text-foreground/50',

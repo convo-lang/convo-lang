@@ -222,6 +222,23 @@ export interface ConvoViewTheme
     taskStatusClassName?:string;
     taskRowClassName?:string;
 
+    // ------- Function call ------- //
+    functionCallClassName?:string;
+    functionCallOpenClassName?:string;
+    functionCallArgsClassName?:string;
+    functionCallArgsOpenClassName?:string;
+    functionCallTokensClassName?:string;
+    functionCallIcon?:ConvoIconType;
+    functionCallIconClassName?:string;
+    functionCallMaxArgsCharLength?:number;
+    functionCallOpenHeaderClassName?:string;
+    functionCallCollapseButtonClassName?:string;
+    functionCallCollapseIcon?:ConvoIconType;
+    functionCallCollapseIconClassName?:string;
+    functionCallJsonButtonClassName?:string;
+    functionCallJsonIcon?:ConvoIconType;
+    functionCallJsonIconClassName?:string;
+
 
     // ------- Rag ------- //
     ragIcon?:ConvoIconType;
