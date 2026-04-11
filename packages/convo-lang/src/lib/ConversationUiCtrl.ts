@@ -1,14 +1,15 @@
-import { AnyFunction, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, readBlobAsDataUrlAsync, shortUuid, wSetProp, zodTypeToJsonScheme } from "@iyio/common";
+import { AnyFunction, CancelToken, DisposeCallback, MarkdownImage, ReadonlySubject, Scene, SceneCtrl, aryDuplicateRemoveItem, findSceneAction, readBlobAsDataUrlAsync, shortUuid, wSetProp, zodTypeToJsonScheme } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
 import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
-import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
 import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
-import { convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { convoRoles, convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoMessage, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoViewTheme } from "./convo-view-theme.js";
+import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
+import { ConvoQueuedTextToSpeech, TtsCtrl } from "./TtsCtrl.js";
 
 export type ConversationUiCtrlTask='completing'|'loading'|'clearing'|'disposed';
 
@@ -50,6 +51,8 @@ export class ConversationUiCtrl
     public readonly autoSave:boolean;
 
     private readonly store:null|ConvoDataStore;
+
+    public readonly tts:TtsCtrl;
 
     public readonly transcriptionService?:ConvoTranscriptionService;
     public readonly ttsService?:ConvoTtsService;
@@ -378,6 +381,8 @@ export class ConversationUiCtrl
 
         this.sceneCtrl=sceneCtrl;
 
+        this.tts=new TtsCtrl(ttsService);
+
         this.imagePathConverter=imagePathConverter;
         this.imageRenderer=imageRenderer;
 
@@ -425,6 +430,7 @@ export class ConversationUiCtrl
         const cleanup=this.convoCleanup;
         this.convoCleanup=null;
         cleanup?.();
+        this.tts.dispose();
     }
 
     protected initConvo(convo:Conversation,options:InitConversationUiCtrlConvoOptions){
@@ -613,6 +619,10 @@ export class ConversationUiCtrl
                             }
                         }
                     },match?.streamingFunction?0:1000);
+                }
+
+                if(this.readResponses && m.role===convoRoles.assistant){
+                    this.readMessage(m);
                 }
             }
 
@@ -976,6 +986,42 @@ ${t3}
     }
 
     public readonly messageRenderers:ConvoMessageRenderer[]=[];
+
+
+    private readonly _readResponses:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
+    public get readResponsesSubject():ReadonlySubject<boolean>{return this._readResponses}
+    public get readResponses(){return this._readResponses.value}
+    public set readResponses(value:boolean){
+        if(value==this._readResponses.value){
+            return;
+        }
+        this._readResponses.next(value);
+    }
+
+    private requestResponseResponsesCount=0;
+    public requestResponseResponses():DisposeCallback{
+        this.requestResponseResponsesCount++;
+        if(this.requestResponseResponsesCount){
+            this.readResponses=true;
+        }
+        return ()=>{
+            this.requestResponseResponsesCount--;
+            if(this.requestResponseResponsesCount===0){
+                this.readResponses=false;
+            }
+        }
+    }
+
+    public readMessage(message:FlatConvoMessage|ConvoMessage|string|null|undefined,cancel?:CancelToken):ConvoQueuedTextToSpeech|null{
+        if(typeof message !== 'string'){
+            message=message?.content;
+        }
+
+        if(!message?.trim()){
+            return null;
+        }
+        return this.tts.textToSpeech({text:message});
+    }
 
 }
 

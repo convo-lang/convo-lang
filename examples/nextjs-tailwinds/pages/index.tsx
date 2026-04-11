@@ -49,6 +49,7 @@ export default function IndexPage()
     const [enableModelSelector,setEnableModelSelector]=useState(true);
     const [enableAudioRecorder,setEnableAudioRecorder]=useState(true);
     const [enableLiveMode,setEnableLiveMode]=useState(true);
+    const [readResponses,setReadResponses]=useState(false);
 
     const [htmlTool,setHtmlTool]=useState<HtmlTool|null>(null);
     const [htmlTools,setHtmlTools]=useState<HtmlTool[]>([]);
@@ -185,6 +186,10 @@ export default function IndexPage()
                     <input type="checkbox" id="enableLiveMode" checked={enableLiveMode} onChange={e=>setEnableLiveMode(e.target.checked)}/>
                 </Label>
 
+                <Label label="readResponses" row>
+                    <input type="checkbox" id="readResponses" checked={readResponses} onChange={e=>setReadResponses(e.target.checked)}/>
+                </Label>
+
                 {!!htmlTools.length &&
                     <Label label="artifact">
                         {toolSelect(false)}
@@ -214,6 +219,7 @@ export default function IndexPage()
                     enableAudioRecorder={enableAudioRecorder}
                     enableLiveMode={enableLiveMode}
                     defaultValue={defaultValue}
+                    readResponses={readResponses}
                     externFunctions={{
                         createHtmlTool(name:string,content:string){
                             const tool:HtmlTool={
@@ -268,6 +274,11 @@ const getTools=():HtmlTool[]=>{
 }
 
 const t3='```'
+
+const defaultValue=/*convo*/`
+> assistant
+Hello, how can I help you?
+`
 
 const defaultValue9=/*convo*/`
 > define
@@ -409,7 +420,7 @@ Create me a retro style calculator with a VIC 20 look a feel
 
 `.trim()+'\n';
 
-const defaultValue=/*convo*/`
+const defaultValueff=/*convo*/`
 > define
 __model='gpt-4.1'
 

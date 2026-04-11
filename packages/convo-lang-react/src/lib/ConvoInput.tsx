@@ -150,6 +150,13 @@ export function ConvoInput({
     const [visualCanvas,setVisualCanvas]=useState<HTMLCanvasElement|null>(null);
 
     useEffect(()=>{
+        if(!liveModeActive!){
+            return;
+        }
+        return ctrl.requestResponseResponses();
+    },[liveModeActive,ctrl]);
+
+    useEffect(()=>{
         if(!isRecording || !visualCanvas || !audioStream){
             return;
         }

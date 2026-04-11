@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { streamSSE } from 'hono/streaming';
@@ -180,7 +180,7 @@ export const getConvoHonoRoutes=({
             if(t.success){
                 delete t.file;
             }
-            return c.json(t);
+            return c.json(t,t.success?200:500);
         }
 
         return c.json('No supported',400);
@@ -196,6 +196,51 @@ export const getConvoHonoRoutes=({
 
         for(const ser of services){
             if(await ser.canTranscribe(request)){
+                return c.json(true);
+            }
+
+        }
+
+        return c.json(false);
+    });
+
+    routes.post('/tts',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const request=await c.req.json() as ConvoTtsRequest;
+
+        const all=convoTtsService.all();
+        for(const s of all){
+            if(!await s.canConvertToSpeech(request)){
+                continue;
+            }
+            const t=await s.convertToSpeechAsync(request);
+            if(t.success){
+                return new Response(
+                    t.tts.audio,
+                    {headers:{
+                        'Content-Type':t.tts.audio.type,
+                    }}
+                )
+            }else{
+                return c.json(t.error,500);
+            }
+        }
+
+        return c.json('No supported',400);
+    });
+
+    routes.post('/tts/support',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const services=convoTtsService.all();
+
+        const request=await c.req.json();
+
+        for(const ser of services){
+            if(await ser.canConvertToSpeech(request)){
                 return c.json(true);
             }
 

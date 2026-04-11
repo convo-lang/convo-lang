@@ -338,6 +338,11 @@ export interface ConvoViewProps
      * and the LLM speaks back.
      */
     enableLiveMode?:boolean;
+
+    /**
+     * If true assistant responses will be read using text-to-speech
+     */
+    readResponses?:boolean;
 }
 
 /**
@@ -402,6 +407,7 @@ export function ConvoView({
     afterInputEnd,
     enableAudioRecorder,
     enableLiveMode,
+    readResponses,
 }:ConvoViewProps){
 
     theme=useMemo(()=>theme??getConvoViewTheme('default'),[theme]);
@@ -471,6 +477,13 @@ export function ConvoView({
             ctrl.enableStreaming=enableStreaming;
         }
     },[enableStreaming,ctrl]);
+
+    useEffect(()=>{
+        if(!readResponses){
+            return;
+        }
+        return ctrl.requestResponseResponses();
+    },[readResponses,ctrl]);
 
     useEffect(()=>{
         if(!ctrl || !onVarsChange){

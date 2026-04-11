@@ -1,4 +1,4 @@
-import { NotFoundError, NotImplementedError, SecretManager, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
+import { NotFoundError, SecretManager, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
 import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionResultProviderBase, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessageToolCall } from './open-ai/resources/chat/index.js';
@@ -425,12 +425,70 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
 
 
 
-    public canConvertToSpeech(request:ConvoTtsRequest):boolean
+    public canConvertToSpeech(request:ConvoTtsRequest):Promise<boolean>
     {
-        return true;
+        return this.canConvertToSpeechAsync(request);
     }
-    public convertToSpeechAsync(request:ConvoTtsRequest):Promise<ConvoTtsResult>{
-        throw new NotImplementedError();
+    protected canConvertToSpeechAsync(request:ConvoTtsRequest):Promise<boolean>{
+        return Promise.resolve(this.supportsTts);
+    }
+    public async convertToSpeechAsync(request:ConvoTtsRequest):Promise<ConvoTtsResult>{
+
+        const client=await this.getApiClientAsync(undefined,undefined,'/v1/audio/speech');
+
+        const headers:Record<string,string|undefined>={
+            [this.apiKeyHeader]:client.apiKey?((this.apiKeyHeaderValuePrefix??'')+client.apiKey):undefined,
+            ...this.headers
+        };
+
+        const r=await httpClient().postAsync<Response>(
+            client.url,
+            {
+                model:request.model??'tts-1',
+                input:request.text,
+                voice:request.voice||'ash'
+            },
+            {
+                headers,
+                readErrors:true,
+                log:this.logRequests,
+                returnFetchResponse:true,
+            }
+        );
+
+        if(!r){
+            return {
+                success:false,
+                error:'No response return from API',
+            };
+        }
+        if(!r.ok){
+            try{
+                const text=await r.text();
+                return {
+                    success:false,
+                    error:text,
+                }
+            }catch{
+                return {
+                    success:false,
+                    error:`API error response - ${r.status}`,
+                }
+            }
+        }else{
+            try{
+                return {
+                    success:true,
+                    tts:{audio:await r.blob()},
+                }
+            }catch(ex){
+                return {
+                    success:false,
+                    error:`Failed to read audio from API - ${getErrorMessage(ex)}`,
+                }
+            }
+        }
+
     }
 }
 

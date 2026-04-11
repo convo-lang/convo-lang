@@ -1,9 +1,9 @@
-import { HttpClientRequestOptions, NotFoundError, NotImplementedError, Scope, ScopeRegistration, aryRandomize, defineStringParam, getErrorMessage, getSortedObjectHash, httpClient, joinPaths } from "@iyio/common";
+import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, getErrorMessage, getSortedObjectHash, httpClient, joinPaths } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
-import { convoCompletionService, convoTranscriptionService } from "./convo.deps.js";
+import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;
@@ -19,6 +19,7 @@ export const convoHttpRelayModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,scope=>HttpConvoCompletionService.fromScope(scope));
     scope.implementService(convoRagService,scope=>HttpConvoCompletionService.fromScope(scope));
     scope.implementService(convoTranscriptionService,scope=>HttpConvoCompletionService.fromScope(scope));
+    scope.implementService(convoTtsService,scope=>HttpConvoCompletionService.fromScope(scope));
 }
 
 export interface HttpConvoCompletionServiceOptions
@@ -289,10 +290,63 @@ export class HttpConvoCompletionService implements
 
     public async canConvertToSpeech(request:ConvoTtsRequest):Promise<boolean>
     {
-        const support=await this.getSupportAsync(request.model??'default');
-        return support.tts??false;
+        const key=getSortedObjectHash(request);
+        return await (this.transcribeSupportCache[key]??(this.transcribeSupportCache[key]=this._canConvertToSpeech(request)));
     }
-    public convertToSpeechAsync(request:ConvoTtsRequest):Promise<ConvoTtsResult>{
-        throw new NotImplementedError();
+    private async _canConvertToSpeech(request:ConvoTtsRequest):Promise<boolean>{
+        const options=await this.getRequestOptions?.();
+        const response=await httpClient().postAsync<Response>(
+            joinPaths(this.getEndpoint(),`/tts/support`),
+            request,
+            {
+                ...options,
+                returnFetchResponse:true,
+            }
+        );
+        if(!response){
+            throw new Error('convo-lang API endpoint returned empty response');
+        }
+        if(response.status===404){
+            return false;
+        }
+        return (await response.json())?true:false;
+    }
+    public async convertToSpeechAsync(request:ConvoTtsRequest):Promise<ConvoTtsResult>{
+        try{
+            const r=await httpClient().postAsync<Response>(
+                joinPaths(this.getEndpoint(),'/tts'),
+                request,
+                {
+                    ...await this.getRequestOptions?.(),
+                    returnFetchResponse:true,
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:'tts endpoint returned empty result',
+                }
+            }
+            if(r.ok){
+                const blob=await r.blob();
+                return {
+                    success:true,
+                    tts:{
+                        audio:blob,
+                    }
+                }
+            }else{
+                const text=await r.text();
+                return {
+                    success:false,
+                    error:`Error returned from API - ${text}`
+                }
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+            }
+        }
     }
 }

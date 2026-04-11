@@ -1281,6 +1281,7 @@ export interface ConvoSpeakerRef
 }
 
 export interface ConvoTranscriptionRequest{
+    provider?:string;
     model?:string;
     audio:File;
     labelSpeakers?:boolean;
@@ -1290,6 +1291,7 @@ export interface ConvoTranscriptionRequest{
 
 export interface ConvoTranscriptionSupportRequest
 {
+    provider?:string;
     model?:string;
     /**
      * Content type of the audio to be transcribed
@@ -1360,6 +1362,7 @@ export interface ConvoTranscriptionService
 
 export interface ConvoTtsRequest
 {
+    provider?:string;
     model?:string;
     voice?:string;
     text:string;

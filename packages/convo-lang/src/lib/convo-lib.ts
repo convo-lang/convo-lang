@@ -3626,6 +3626,7 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
 export const convoTranscriptionRequestToSupportRequest=(request:ConvoTranscriptionRequest):ConvoTranscriptionSupportRequest=>{
     return {
         model:request.model,
+        provider:request.provider,
         audioType:request.audio.type,
         audioSize:request.audio.length,
         labelSpeakers:request.labelSpeakers,
