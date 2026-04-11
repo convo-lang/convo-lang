@@ -1,5 +1,6 @@
 import { CancelToken, InternalOptions, type ReadonlySubject } from "@iyio/common";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { importVadWebAsync } from "./bundled-packages/vad-web.js";
 
 export interface VadOptions
 {
@@ -48,11 +49,11 @@ export class VadCtrl
 
     public async runAsync(stream:MediaStream,cancel:CancelToken):Promise<void>{
         let index=0;
-        const micVad=await import('@ricky0123/vad-web');
+        const micVad=await importVadWebAsync();
 
         let currentRecorder:MediaRecorder|undefined;
 
-        const mic=await micVad.MicVAD.new({
+        const mic=await micVad.new({
             redemptionMs:this.options.endDelayMs,
             getStream:async ()=>stream,
             onSpeechStart:()=>{
