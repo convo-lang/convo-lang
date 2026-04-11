@@ -1,0 +1,14 @@
+{
+    "extends": "../tsconfig.base.json",
+    "include": [
+        "*.ts",
+        "*.tsx"
+    ],
+    "exclude": [
+    ],
+    "compilerOptions": {
+        "composite": true
+    },
+    "references": [
+    ]
+}
