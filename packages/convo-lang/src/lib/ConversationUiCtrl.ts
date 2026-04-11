@@ -575,7 +575,6 @@ export class ConversationUiCtrl
         }
     }
 
-    private convoTaskCount=0;
     private convoCleanup:DisposeCallback|null=null;
     private setConvo(convo:Conversation)
     {
