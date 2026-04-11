@@ -1,5 +1,5 @@
 import { delayAsync } from '@iyio/common';
-import type { MicVAD, RealTimeVADOptions } from '@ricky0123/vad-web/dist/real-time-vad.js';
+import type { MicVAD, RealTimeVADOptions } from './vad/real-time-vad.js';
 
 type ExportType={
     new:(options?: Partial<RealTimeVADOptions>)=>Promise<MicVAD>
