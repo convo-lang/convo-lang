@@ -297,6 +297,13 @@ export type ConvoNodeKeyOrAll=ConvoNodeKey|'*';
  */
 export type ConvoNodeKeySelection=ConvoNodeKeyOrAll|null|undefined|(ConvoNodeKeyOrAll|null|undefined)[]
 
+type ConvoNodeQueryKeysToSelection<T extends ConvoNodeKeySelection> =
+    T extends null|undefined ? keyof ConvoNode :
+    T extends '*' ? keyof ConvoNode :
+    T extends keyof ConvoNode ? T :
+    T extends (infer U)[] ? Exclude<U, null|undefined|'*'> & keyof ConvoNode :
+    keyof ConvoNode;
+
 export interface ConvoEmbeddingSearch
 {
     type?:string;
@@ -440,12 +447,12 @@ export interface ConvoNodeQueryStep
 
 }
 
-export interface ConvoNodeQuery
+export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
 {
     /**
      * The keys of the returned nodes to return. If a falsy value is given all properties are returned.
      */
-    keys?:ConvoNodeKeySelection;
+    keys?:TKeys;
 
     /**
      * The steps to evaluate to select nodes.
@@ -482,13 +489,13 @@ export interface ConvoNodeQuery
     orderBy?:ConvoNodeOrderBy|ConvoNodeOrderBy[];
 }
 
-export interface ConvoNodeQueryResult
+export interface ConvoNodeQueryResult<T extends keyof ConvoNode>
 {
     
     /**
      * The matching nodes
      */
-    nodes:Partial<ConvoNode>[];
+    nodes:Pick<ConvoNode,T>[];
 
     /**
      * A token that can be passed to the next query to resume scanning from. If no nodes remain
@@ -666,12 +673,12 @@ export interface ConvoNodeStore
     /**
      * Queries the store for nodes
      */
-    queryNodesAsync(query:ConvoNodeQuery):PromiseResultType<ConvoNodeQueryResult>;
+    queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>):PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>>;
 
     /**
      * Convenience function for calling `queryNodesAsync({steps:[{path}],permissionFrom})`
      */
-    getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult>;
+    getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>;
 
     /**
      * Checks if the node at `fromPath` has the given permission `type` to the node at `toPath`.
