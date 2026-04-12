@@ -1,7 +1,7 @@
 import { CancelToken, getErrorMessage } from "@iyio/common";
 import z from "zod";
 import { PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode } from "../result-type.js";
-import { defaultConvoNodeQueryLimit } from "./convo-node-const.js";
+import { defaultConvoNodeQueryLimit, maxConvoNodeQueryLimit } from "./convo-node-const.js";
 import { normalizeConvoNodePath, validateConvoNodeQuery } from "./convo-node-lib.js";
 import { allConvoStepStages, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./convo-node-types.js";
 
@@ -166,7 +166,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
      * @param keys The properties / keys of the nodes to be returned. Similar to select columns in SQL.
      * @param paths Array of paths the selected nodes path should be in.
      */
-    protected abstract _selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[]):PromiseResultType<Partial<ConvoNode>[]>;
+    protected abstract _selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>;
     
     protected abstract _selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
     protected abstract _selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
@@ -210,7 +210,12 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
 
         const nodes:any[]=[];
 
-        for await(const item of this._streamNodesAsync<TKeys>(query,stateResult)){
+        const limitedQuery:ConvoNodeQuery<TKeys>={
+            ...query,
+            limit:Math.min(query.limit??defaultConvoNodeQueryLimit,maxConvoNodeQueryLimit),
+        };
+
+        for await(const item of this._streamNodesAsync<TKeys>(limitedQuery,stateResult)){
             switch(item.type){
 
                 case 'node':
@@ -233,11 +238,14 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             }
         }
 
+        const state=stateResult.result;
+        const isComplete=state.error!==undefined || (!query.steps[state.step] && state.flushIndex===undefined);
+
         return {
             success:true,
             result:{
                 nodes,
-                nextToken:JSON.stringify(stateResult.result),
+                nextToken:isComplete?undefined:JSON.stringify(state),
             }
         }
     }
@@ -297,21 +305,23 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 error:state.error,
                 statusCode:(state.errorCode??500) as StatusCode,
             }
+            return;
         }
 
         const queryValidationError=validateConvoNodeQuery(query);
         if(queryValidationError){
-            return {
+            yield {
                 type:'error',
                 error:queryValidationError,
                 statusCode:400,
             }
+            return;
         }
 
         const ob=query.orderBy??{prop:'path',direction:'asc'};
         const orderBy=Array.isArray(ob)?ob:[ob];
         const batchSize=Math.max(1,query.readBatchSize??this.getBatchSize(query));
-        const limit=Number.MAX_SAFE_INTEGER;
+        const limit=query.limit===undefined?Number.MAX_SAFE_INTEGER:Math.max(0,query.limit);
         let skip=query.skip??0;
         const keys=convoNodeKeySelectionToKeys(query.keys);
         
@@ -338,6 +348,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                     }
                     paths.push(np);
                 }
+                offset+=r.result.length;
                 if(r.result.length<batchSize){
                     break;
                 }
@@ -357,7 +368,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                     if(!loadPaths.length){
                         break;
                     }
-                    const r=await this._selectNodesByPathsAsync(keys,loadPaths);
+                    const r=await this._selectNodesByPathsAsync(keys,loadPaths,orderBy);
                     if(cancel.isCanceled){return;}
                     
                     if(!r.success){
@@ -566,8 +577,19 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 statusCode:400,
             }
         }
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
         if(options?.permissionFrom){
-            if(await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'Permission denied',
@@ -587,8 +609,19 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 statusCode:400,
             }
         }
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
         if(options?.permissionFrom){
-            if(await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'Permission denied',
@@ -608,8 +641,19 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 statusCode:400,
             }
         }
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
         if(options?.permissionFrom){
-            if(await this.checkNodePermissionAsync(options.permissionFrom,path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'Permission denied',
@@ -626,6 +670,13 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     public abstract queryEdgesAsync(query: ConvoNodeEdgeQuery): PromiseResultType<ConvoNodeEdgeQueryResult>;
 
     public async getEdgeByIdAsync(id: string, permissionFrom?: string): PromiseResultType<ConvoNodeEdge>{
+        if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${permissionFrom}`,
+                statusCode:400,
+            }
+        }
         const r=await this.queryEdgesAsync({id,permissionFrom,limit:1});
         if(!r.success){
             return r;
@@ -661,12 +712,25 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 statusCode:400,
             }
         }
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
         if(options?.permissionFrom){
             const [from,to]=await Promise.all([
                 this.checkNodePermissionAsync(options.permissionFrom,edge.from,ConvoNodePermissionType.write),
                 this.checkNodePermissionAsync(options.permissionFrom,edge.to,ConvoNodePermissionType.readWrite,true),
-            ])
-            if(!from || !to){
+            ]);
+            if(!from.success){
+                return from;
+            }
+            if(!to.success){
+                return to;
+            }
+            if(!from.result || !to.result){
                 return {
                     success:false,
                     error:'permission denied',
@@ -678,6 +742,13 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 
     public async updateEdgeAsync(update: ConvoNodeEdgeUpdate, options?: UpdateConvoNodeEdgeOptions): PromiseResultTypeVoid{
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
 
         const edgeResult=await this.getEdgeByIdAsync(update.id);
         if(!edgeResult.success){
@@ -688,8 +759,14 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             const [from,to]=await Promise.all([
                 this.checkNodePermissionAsync(options.permissionFrom,current.from,ConvoNodePermissionType.write),
                 this.checkNodePermissionAsync(options.permissionFrom,current.to,ConvoNodePermissionType.readWrite,true),
-            ])
-            if(!from || !to){
+            ]);
+            if(!from.success){
+                return from;
+            }
+            if(!to.success){
+                return to;
+            }
+            if(!from.result || !to.result){
                 return {
                     success:false,
                     error:'permission denied',
@@ -701,6 +778,14 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 
     public async deleteEdgeAsync(id: string, options?: DeleteConvoNodeEdgeOptions): PromiseResultTypeVoid{
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
+
         const edgeResult=await this.getEdgeByIdAsync(id);
         if(!edgeResult.success){
             return edgeResult;
@@ -710,8 +795,14 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             const [from,to]=await Promise.all([
                 this.checkNodePermissionAsync(options.permissionFrom,current.from,ConvoNodePermissionType.write),
                 this.checkNodePermissionAsync(options.permissionFrom,current.to,ConvoNodePermissionType.readWrite,true),
-            ])
-            if(!from || !to){
+            ]);
+            if(!from.success){
+                return from;
+            }
+            if(!to.success){
+                return to;
+            }
+            if(!from.result || !to.result){
                 return {
                     success:false,
                     error:'permission denied',
@@ -725,7 +816,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     public abstract queryEmbeddingsAsync(query: ConvoNodeEmbeddingQuery): PromiseResultType<ConvoNodeEmbeddingQueryResult>;
 
     public async getEmbeddingByIdAsync(id: string, permissionFrom?: string): PromiseResultType<ConvoNodeEmbedding>{
-        if(permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
+        if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
             return {
                 success:false,
                 error:`Invalid node path. Permission paths should be normalized - ${permissionFrom}`,
@@ -759,8 +850,19 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                 statusCode:400,
             }
         }
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
         if(options?.permissionFrom){
-            if(!await this.checkNodePermissionAsync(options.permissionFrom,embedding.path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,embedding.path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'permission denied',
@@ -772,13 +874,25 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 
     public async updateEmbeddingAsync(update: ConvoNodeEmbeddingUpdate, options?: UpdateConvoNodeEmbeddingOptions): PromiseResultTypeVoid{
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
+
         const embeddingResult=await this.getEmbeddingByIdAsync(update.id);
         if(!embeddingResult.success){
             return embeddingResult;
         }
         const current=embeddingResult.result;
         if(options?.permissionFrom){
-            if(!await this.checkNodePermissionAsync(options.permissionFrom,current.path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,current.path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'permission denied',
@@ -790,13 +904,25 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 
     public async deleteEmbeddingAsync(id: string, options?: DeleteConvoNodeEmbeddingOptions): PromiseResultTypeVoid{
+        if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
+            return {
+                success:false,
+                error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
+                statusCode:400,
+            }
+        }
+
         const embeddingResult=await this.getEmbeddingByIdAsync(id);
         if(!embeddingResult.success){
             return embeddingResult;
         }
         const current=embeddingResult.result;
         if(options?.permissionFrom){
-            if(!await this.checkNodePermissionAsync(options.permissionFrom,current.path,ConvoNodePermissionType.write)){
+            const permission=await this.checkNodePermissionAsync(options.permissionFrom,current.path,ConvoNodePermissionType.write);
+            if(!permission.success){
+                return permission;
+            }
+            if(!permission.result){
                 return {
                     success:false,
                     error:'permission denied',
