@@ -36,6 +36,11 @@ const QueryTraversalStateSchema=z.object({
      */
     paths:z.string().array(),
 
+    /**
+     * Remaining number of nodes to skip
+     */
+    skip:z.number().optional(),
+
     error:z.string().optional(),
 
     errorCode:z.number().optional(),
@@ -314,19 +319,23 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
         if(!stateResult.success){
             return stateResult;
         }
+        const state=stateResult.result;
 
         const nodes:any[]=[];
-
+        const limit=Math.min(query.limit??defaultConvoNodeQueryLimit,maxConvoNodeQueryLimit)+state.returnedCount;
         const limitedQuery:ConvoNodeQuery<TKeys>={
             ...query,
-            limit:Math.min(query.limit??defaultConvoNodeQueryLimit,maxConvoNodeQueryLimit),
+            limit,
         };
 
-        for await(const item of this._streamNodesAsync<TKeys>(limitedQuery,stateResult)){
+        streamLoop: for await(const item of this._streamNodesAsync<TKeys>(limitedQuery,stateResult)){
             switch(item.type){
 
                 case 'node':
                     nodes.push(item.node);
+                    if(nodes.length>=limit){
+                        break streamLoop;
+                    }
                     break;
                     
                 case 'error':
@@ -345,7 +354,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             }
         }
 
-        const state=stateResult.result;
         const isComplete=state.error!==undefined || (!query.steps[state.step] && state.flushIndex===undefined);
 
         return {
@@ -425,12 +433,17 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             return;
         }
 
+        if(query.skip!==undefined && state.skip===undefined){
+            state.skip=Math.max(0,query.skip);
+        }
         const ob=query.orderBy??{prop:'path',direction:'asc'};
         const orderBy=Array.isArray(ob)?ob:[ob];
         const batchSize=Math.max(1,query.readBatchSize??this.getBatchSize(query));
         const limit=query.limit===undefined?Number.MAX_SAFE_INTEGER:Math.max(0,query.limit);
-        let skip=query.skip??0;
         const keys=convoNodeKeySelectionToKeys(query.keys);
+        if(keys!=='*' && !keys.includes('path')){
+            keys.push('path');
+        }
         
         if(state.returnedCount>=limit){
             return;
@@ -488,9 +501,25 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
                     const nodes=r.result;
                     for(const node of nodes){
                         state.flushIndex++;
-                        if(skip>0){
-                            skip--;
+                        if(state.skip){
+                            state.skip--;
                         }else{
+                            if(query.permissionFrom){
+                                if(!node.path){
+                                    continue;
+                                }
+                                const permission=await this.checkNodePermissionAsync(
+                                    query.permissionFrom,
+                                    node.path,
+                                    query.permissionRequired??ConvoNodePermissionType.all,
+                                );
+                                if(!permission.success){
+                                    if(permission.statusCode!==401){
+                                        yield errorResultToConvoNodeStreamItem(permission,state);
+                                        return;
+                                    }
+                                }
+                            }
                             state.returnedCount++;
                             yield {type:'node',node:node as any};
                             if(state.returnedCount>=limit){
@@ -608,7 +637,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             if(nextStage===undefined){
                 state.step++;
                 state.stepStage=allConvoStepStages[0];
-                const scan=(step.edge || !query.steps[state.step])?true:false;
+                const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
                 if(scan){
                     state.scanCount+=state.paths.length;
                 }

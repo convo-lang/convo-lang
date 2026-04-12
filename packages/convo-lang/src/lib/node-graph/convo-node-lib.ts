@@ -97,7 +97,7 @@ export const validateConvoNodeCondition=(condition:ConvoNodeCondition):string|un
     return undefined;
 }
 export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined=>{
-    if(query.permissionFrom!==undefined && normalizeConvoNodePath(query.permissionFrom,'none')){
+    if(query.permissionFrom!==undefined && normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom){
         return `Invalid query permissionFrom. permissionFrom:${query.permissionFrom}`
     }
     for(let i=0;i<query.steps.length;i++){
@@ -105,10 +105,10 @@ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined
         if(!step){
             return `Undefined step at index ${i}`;
         }
-        if(step.path!==undefined && normalizeConvoNodePath(step.path,'end')){
+        if(step.path!==undefined && normalizeConvoNodePath(step.path,'end')!==step.path){
             return `Invalid step path. stepIndex: ${i}, path:${step.path}`
         }
-        if(step.permissionFrom!==undefined && normalizeConvoNodePath(step.permissionFrom,'none')){
+        if(step.permissionFrom!==undefined && normalizeConvoNodePath(step.permissionFrom,'none')!==step.permissionFrom){
             return `Invalid step permissionFrom. stepIndex: ${i}, permissionFrom:${step.permissionFrom}`
         }
 
