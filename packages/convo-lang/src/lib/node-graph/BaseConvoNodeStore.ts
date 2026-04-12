@@ -48,37 +48,249 @@ type QueryTraversalState=z.infer<typeof QueryTraversalStateSchema>;
 export abstract class BaseConvoNodeStore implements ConvoNodeStore{
 
     /**
-     * Returns edges where their `fromPath` is in `fromPathsIn` and `toPath` is in `toPathsIn`.
-     * @param keys The properties / keys of the edges to be returned. Similar to select columns in SQL.
-     * @param fromPathsIn Array of paths that selected nodes fromPath should be in.
-     * @param toPathsIn Array of paths that selected nodes toPath should be in.
-     * @param hasGrant If true the edge should have grant value defined and not be `none`.
+     * Returns edges whose `from` path is contained in `fromPathsIn` and whose `to` path is contained
+     * in `toPathsIn`.
+     *
+     * This is primarily used by the base implementation to evaluate permissions by loading grant
+     * edges between known path sets.
+     *
+     * Implementation requirements:
+     * - if `keys` is `"*"`, all edge properties should be returned
+     * - otherwise only the requested properties should be returned when practical
+     * - matching is by exact equality on `from` and `to`
+     * - if `hasGrant` is true, only edges with a defined non-`none` grant should be returned
+     * - returned paths should be normalized
+     *
+     * @param keys The edge properties to return, similar to a SQL select column list.
+     * @param fromPathsIn Allowed `edge.from` values.
+     * @param toPathsIn Allowed `edge.to` values.
+     * @param hasGrant If true, require `grant` to be defined and not `ConvoNodePermissionType.none`.
      */
     protected abstract _selectEdgesByPathsAsync(keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>;
 
     /**
-     * Returns nodes by path
-     * @param keys The properties / keys of the nodes to be returned. Similar to select columns in SQL.
-     * @param paths Array of paths the selected nodes path should be in.
+     * Returns nodes whose `path` is contained in `paths`.
+     *
+     * This is used during the flush phase of query traversal after the base class has already
+     * determined the final ordered path list to load.
+     *
+     * Implementation requirements:
+     * - if `keys` is `"*"`, all node properties should be returned
+     * - otherwise only the requested properties should be returned when practical
+     * - only nodes whose path is in `paths` should be returned
+     * - returned node paths should be normalized
+     * - results should respect the supplied `orderBy`
+     *
+     * @param keys The node properties to return, similar to a SQL select column list.
+     * @param paths Exact node paths to load.
+     * @param orderBy Ordering to apply to returned nodes.
      */
     protected abstract _selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>;
     
+    /**
+     * Selects node paths matching a query step path filter.
+     *
+     * This method is called during traversal stage 1 and may be invoked repeatedly with increasing
+     * offsets until fewer than `limit` results are returned.
+     *
+     * Implementation requirements:
+     * - if `currentNodePaths` is `null`, search across the full node store
+     * - otherwise only return matches whose path is within `currentNodePaths`
+     * - support exact paths and valid wildcard paths as defined by `ConvoNodeQueryStep.path`
+     * - return normalized node paths
+     * - apply `orderBy`, `limit`, and `offset`
+     *
+     * @param step The path portion of the current query step.
+     * @param currentNodePaths Current candidate node paths, or `null` for all nodes.
+     * @param orderBy Ordering to apply.
+     * @param limit Max number of paths to return for this batch.
+     * @param offset Offset for paged scanning within this traversal stage.
+     */
     protected abstract _selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+
+    /**
+     * Selects node paths matching a query step property or grouped condition filter.
+     *
+     * This method is called during traversal stage 2 and may be invoked repeatedly with increasing
+     * offsets until fewer than `limit` results are returned.
+     *
+     * Implementation requirements:
+     * - if `currentNodePaths` is `null`, evaluate against the full node store
+     * - otherwise only evaluate nodes whose path is within `currentNodePaths`
+     * - condition semantics should match the documented `ConvoNodeCondition` rules
+     * - return normalized node paths
+     * - apply `orderBy`, `limit`, and `offset`
+     *
+     * @param step The condition portion of the current query step.
+     * @param currentNodePaths Current candidate node paths, or `null` for all nodes.
+     * @param orderBy Ordering to apply.
+     * @param limit Max number of paths to return for this batch.
+     * @param offset Offset for paged scanning within this traversal stage.
+     */
     protected abstract _selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+
+    /**
+     * Selects node paths that satisfy a permission check for the current query step.
+     *
+     * This method is called during traversal stage 3 and may be invoked repeatedly with increasing
+     * offsets until fewer than `limit` results are returned.
+     *
+     * Implementation requirements:
+     * - if `currentNodePaths` is `null`, evaluate permissions across the full node store
+     * - otherwise only evaluate nodes whose path is within `currentNodePaths`
+     * - determine whether `step.permissionFrom` has `step.permissionRequired` for each candidate node
+     * - permission semantics should match `checkNodePermissionAsync`
+     * - return normalized node paths
+     * - apply `orderBy`, `limit`, and `offset`
+     *
+     * @param step The permission portion of the current query step.
+     * @param currentNodePaths Current candidate node paths, or `null` for all nodes.
+     * @param orderBy Ordering to apply.
+     * @param limit Max number of paths to return for this batch.
+     * @param offset Offset for paged scanning within this traversal stage.
+     */
     protected abstract _selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+
+    /**
+     * Selects node paths matching an embedding search filter for the current query step.
+     *
+     * This method is called during traversal stage 4 and may be invoked repeatedly with increasing
+     * offsets until fewer than `limit` results are returned.
+     *
+     * Implementation requirements:
+     * - if `currentNodePaths` is `null`, search across the full node store
+     * - otherwise only return matches whose path is within `currentNodePaths`
+     * - embedding search semantics should match the supplied `ConvoEmbeddingSearch`
+     * - return normalized node paths
+     * - apply `orderBy`, `limit`, and `offset`
+     *
+     * @param step The embedding portion of the current query step.
+     * @param currentNodePaths Current candidate node paths, or `null` for all nodes.
+     * @param orderBy Ordering to apply.
+     * @param limit Max number of paths to return for this batch.
+     * @param offset Offset for paged scanning within this traversal stage.
+     */
     protected abstract _selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+
+    /**
+     * Selects destination node paths by traversing edges from the current query step.
+     *
+     * This method is called during traversal stage 5 and may be invoked repeatedly with increasing
+     * offsets until fewer than `limit` results are returned.
+     *
+     * Implementation requirements:
+     * - if `currentNodePaths` is `null`, traversal starts from the full node set
+     * - otherwise only traverse from the supplied current nodes
+     * - edge filtering semantics should match `ConvoNodeQueryStep.edge`
+     * - traversal direction should match `edgeDirection`
+     * - destination node paths should be deduplicated
+     * - if `edgeLimit` is defined it limits destination nodes after deduplication
+     * - return normalized node paths
+     * - apply `orderBy`, `limit`, and `offset`
+     *
+     * @param step The edge traversal portion of the current query step.
+     * @param currentNodePaths Current candidate node paths, or `null` for all nodes.
+     * @param orderBy Ordering to apply to destination nodes.
+     * @param limit Max number of paths to return for this batch.
+     * @param offset Offset for paged scanning within this traversal stage.
+     */
     protected abstract _selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
 
+    /**
+     * Inserts a node into the backing store.
+     *
+     * The base class validates normalization and permissions before calling this method.
+     * Implementations should enforce any remaining datastore-specific constraints.
+     *
+     * @param node Node to insert.
+     * @param options Insert options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _insertNodeAsync(node:ConvoNode,options:Omit<InsertConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>;
+
+    /**
+     * Updates an existing node in the backing store.
+     *
+     * The base class validates path normalization and permissions before calling this method.
+     * Implementations should apply documented update semantics and enforce immutable fields.
+     *
+     * @param node Node update payload.
+     * @param options Update options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
+
+    /**
+     * Deletes a node from the backing store.
+     *
+     * The base class validates path normalization and permissions before calling this method.
+     * Implementations should also delete all connected edges and embeddings pointing to the node.
+     *
+     * @param path Normalized path of the node to delete.
+     * @param options Delete options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _deleteNodeAsync(path:string,options:Omit<DeleteConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
 
+    /**
+     * Inserts an edge into the backing store.
+     *
+     * The base class validates path normalization and permissions before calling this method.
+     * Implementations should generate the edge id and enforce immutable field rules for future updates.
+     *
+     * @param edge Edge to insert without an id.
+     * @param options Insert options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _insertEdgeAsync(edge:Omit<ConvoNodeEdge,"id">,options:Omit<InsertConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEdge>;
+
+    /**
+     * Updates an existing edge in the backing store.
+     *
+     * The base class loads the current edge and validates permissions before calling this method.
+     * Implementations should apply documented update semantics and enforce immutable fields.
+     *
+     * @param update Edge update payload.
+     * @param options Update options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _updateEdgeAsync(update:ConvoNodeEdgeUpdate,options:Omit<UpdateConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
+
+    /**
+     * Deletes an edge from the backing store.
+     *
+     * The base class loads the current edge and validates permissions before calling this method.
+     *
+     * @param id Id of the edge to delete.
+     * @param options Delete options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _deleteEdgeAsync(id:string,options:Omit<DeleteConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
 
+    /**
+     * Inserts an embedding into the backing store.
+     *
+     * The base class validates path normalization and permissions before calling this method.
+     * Implementations should generate the embedding id and handle vector generation behavior as needed.
+     *
+     * @param embedding Embedding to insert without an id.
+     * @param options Insert options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,"id">,options:Omit<InsertConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEmbedding>;
+
+    /**
+     * Deletes an embedding from the backing store.
+     *
+     * The base class loads the current embedding and validates permissions before calling this method.
+     *
+     * @param id Id of the embedding to delete.
+     * @param options Delete options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _deleteEmbeddingAsync(id:string,options:Omit<DeleteConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
+
+    /**
+     * Updates an existing embedding in the backing store.
+     *
+     * The base class loads the current embedding and validates permissions before calling this method.
+     * Implementations should apply documented update semantics and enforce immutable fields.
+     *
+     * @param update Embedding update payload.
+     * @param options Update options with `permissionFrom` removed because permission checks were already handled.
+     */
     protected abstract _updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options:Omit<UpdateConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
     
     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
@@ -770,11 +982,29 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 }
 
+/**
+ * Returns the next traversal stage in the fixed query evaluation order.
+ *
+ * The stage order is defined by `allConvoStepStages`. If `stage` is the final stage,
+ * `undefined` is returned.
+ *
+ * @param stage Current traversal stage.
+ */
 const getNextStepStage=(stage:ConvoStepStage):ConvoStepStage|undefined=>{
     const i=allConvoStepStages.indexOf(stage);
     return (allConvoStepStages as any)[i+1];
 }
 
+/**
+ * Converts a node key selection into a concrete key list or `"*"`.
+ *
+ * Selection rules:
+ * - `null`, `undefined`, or `"*"` become `"*"`
+ * - arrays containing `"*"`, `null`, or `undefined` become `"*"`
+ * - otherwise the selected keys are returned as an array
+ *
+ * @param sourceKeys Requested node key selection.
+ */
 const convoNodeKeySelectionToKeys=(sourceKeys:ConvoNodeKeySelection):(keyof ConvoNode)[]|'*'=>{
 
     if(!Array.isArray(sourceKeys)){
@@ -791,6 +1021,14 @@ const convoNodeKeySelectionToKeys=(sourceKeys:ConvoNodeKeySelection):(keyof Conv
     return keys;
 }
 
+/**
+ * Parses a serialized query traversal token into traversal state.
+ *
+ * If `token` is empty, a new initial traversal state is returned.
+ * Parsed state is validated against the schema and all stored paths are normalized in place.
+ *
+ * @param token Token previously returned by `queryNodesAsync`.
+ */
 const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>{
     if(!token){
         return {
@@ -840,7 +1078,10 @@ const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>
 }
 
 /**
- * Normalizes the paths in place and returns the first invalid path if one is found
+ * Normalizes the provided paths array in place.
+ *
+ * @param paths Paths to normalize.
+ * @returns The first invalid original path if one is found; otherwise `undefined`.
  */
 const normalizationPaths=(paths:string[]):string|undefined=>{
     for(let i=0;i<paths.length;i++){
@@ -853,6 +1094,15 @@ const normalizationPaths=(paths:string[]):string|undefined=>{
     return undefined;
 }
 
+/**
+ * Converts a failed result into a `ConvoNodeStreamItem` error and optionally persists the
+ * error information onto the traversal state so pagination can resume with the same failure.
+ *
+ * If a success result is mistakenly passed in, a generic internal error item is returned.
+ *
+ * @param result Result to convert.
+ * @param state Optional traversal state to update with error details.
+ */
 const errorResultToConvoNodeStreamItem=<T extends keyof ConvoNode>(result:ResultType<any>,state:QueryTraversalState|undefined):ConvoNodeStreamItem<T>=>{
     const r=(result.success?
         {
