@@ -953,12 +953,13 @@ export interface ConvoNodeStore
 
     /**
      * Checks if the node at `fromPath` has the given permission `type` to the node at `toPath`.
+     * If permission is denied an error result with a status code of 401 will be returned.
      * Permission checking is evaluated using direct grant edges where `edge.from===fromPath`
      * and `edge.to` equals `toPath` or an ancestor of `toPath`.
      * If `matchAny` is true, permission is granted if any bit in `type` is present in the
      * found permission. Otherwise all bits in `type` must be present.
      */
-    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultType<boolean>;
+    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid;
 
     /**
      * Inserts a new node

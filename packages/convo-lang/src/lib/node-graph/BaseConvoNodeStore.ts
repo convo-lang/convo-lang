@@ -551,7 +551,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
     }
 
 
-    public async checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultType<boolean>
+    public async checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid
     {
         const r=await this.getNodePermissionAsync(fromPath,toPath);
         if(!r.success){
@@ -559,13 +559,17 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
         }
 
         const grant=r.result;
-        return {
+        const success=(matchAny?
+            (grant&type)?true:false
+        :
+            (grant&type)===type
+        );
+        return success?{
             success:true,
-            result:(matchAny?
-                (grant&type)?true:false
-            :
-                (grant&type)===type
-            )
+        }:{
+            success:false,
+            error:'Permission denied',
+            statusCode:401,
         }
     }
 
@@ -588,13 +592,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             const permission=await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write);
             if(!permission.success){
                 return permission;
-            }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'Permission denied',
-                    statusCode:401,
-                }
             }
         }
         return await this._insertNodeAsync(node,options);
@@ -621,13 +618,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             if(!permission.success){
                 return permission;
             }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'Permission denied',
-                    statusCode:401,
-                }
-            }
         }
         return await this._updateNodeAsync(node,options);
     }
@@ -652,13 +642,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             const permission=await this.checkNodePermissionAsync(options.permissionFrom,path,ConvoNodePermissionType.write);
             if(!permission.success){
                 return permission;
-            }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'Permission denied',
-                    statusCode:401,
-                }
             }
         }
         return this._deleteNodeAsync(path,options);
@@ -720,22 +703,15 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             }
         }
         if(options?.permissionFrom){
-            const [from,to]=await Promise.all([
+            const [fromPermission,toPermission]=await Promise.all([
                 this.checkNodePermissionAsync(options.permissionFrom,edge.from,ConvoNodePermissionType.write),
                 this.checkNodePermissionAsync(options.permissionFrom,edge.to,ConvoNodePermissionType.readWrite,true),
             ]);
-            if(!from.success){
-                return from;
+            if(!fromPermission.success){
+                return fromPermission;
             }
-            if(!to.success){
-                return to;
-            }
-            if(!from.result || !to.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
+            if(!toPermission.success){
+                return toPermission;
             }
         }
         return this._insertEdgeAsync(edge,options);
@@ -766,13 +742,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             if(!to.success){
                 return to;
             }
-            if(!from.result || !to.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
-            }
         }
         return await this._updateEdgeAsync(update,options);
     }
@@ -801,13 +770,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             }
             if(!to.success){
                 return to;
-            }
-            if(!from.result || !to.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
             }
         }
         return await this._deleteEdgeAsync(id,options);
@@ -862,13 +824,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             if(!permission.success){
                 return permission;
             }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
-            }
         }
         return await this._insertEmbeddingAsync(embedding,options);
     }
@@ -892,13 +847,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             if(!permission.success){
                 return permission;
             }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
-            }
         }
         return await this._updateEmbeddingAsync(update,options);
     }
@@ -921,13 +869,6 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             const permission=await this.checkNodePermissionAsync(options.permissionFrom,current.path,ConvoNodePermissionType.write);
             if(!permission.success){
                 return permission;
-            }
-            if(!permission.result){
-                return {
-                    success:false,
-                    error:'permission denied',
-                    statusCode:401,
-                }
             }
         }
         return await this._deleteEmbeddingAsync(id,options);
