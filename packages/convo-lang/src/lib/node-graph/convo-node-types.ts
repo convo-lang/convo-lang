@@ -1,4 +1,5 @@
-import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
+import { CancelToken } from "@iyio/common";
+import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
 
 /**
  * A unique node within a collection or graph of nodes.
@@ -500,10 +501,14 @@ export enum ConvoNodePermissionType{
     readExecute=read|execute, // 5
     writeExecute=write|execute, // 3
     readWriteExecute=read|write|execute, // 7
+    all=readWriteExecute // 7
 }
 
 export type ConvoNodeEdgeDirection='forward'|'reverse'|'bi';
 
+export const allConvoStepStages=['path','condition','permissions','embedding','edge'] as const;
+
+export type ConvoStepStage=typeof allConvoStepStages[number];
 
 /**
  * Represents a single step in a node query. The first step is run against the full store of nodes.
@@ -542,32 +547,33 @@ export interface ConvoNodeQueryStep
      * - examples of valid wildcard paths: `/users/*`, `/a/b/*`
      * - examples of invalid wildcard paths: `*`, `/users*`, `/a/*\/b`, `/a/**`
      * 
-     * @evalOrder 1
+     * @stepStage 1 - path
      */
     path?:string;
 
     /**
      * Conditions to be tested against the current node.
      * Use `ConvoNodeGroupCondition` to explicitly combine nested conditions with `and` and `or`.
-     * @evalOrder 2
+     * @stepStage 2 - condition
      */
     condition?:ConvoNodeCondition;
 
     /**
      * Normalized path of node where permissions are evaluated for the current nodes of this step.
-     * @evalOrder 3
+     * @stepStage 3 - permissions
      */
     permissionFrom?:string;
 
     /**
-     * Permission type required for the current nodes of this step.
-     * @evalOrder 3
+     * Permission type required for the current nodes of this step. If undefined ConvoNodePermissionType.all
+     * will be used.
+     * @stepStage 3 - permissions
      */
     permissionRequired?:ConvoNodePermissionType;
 
     /**
      * An embedding to filter by.
-     * @evalOrder 4
+     * @stepStage 4 - embedding
      */
     embedding?:ConvoEmbeddingSearch;
 
@@ -580,7 +586,7 @@ export interface ConvoNodeQueryStep
      * to express nested `and` and `or` logic.
      * 
      * Traversal direction is controlled by `edgeDirection`.
-     * @evalOrder 5
+     * @stepStage 5 - edge
      */
     edge?:string|ConvoNodeCondition;
 
@@ -591,14 +597,14 @@ export interface ConvoNodeQueryStep
      * - `bi` traverses in both directions
      * 
      * @default "bi"
-     * @evalOrder 5
+     * @stepStage 5 - edge
      */
     edgeDirection?:ConvoNodeEdgeDirection;
 
     /**
      * Controls the max number of matching destination nodes to move through after destination nodes
      * have been deduplicated. If undefined all matching nodes will be traversed.
-     * @evalOrder 5
+     * @stepStage 5 - edge
      */
     edgeLimit?:number;
 
@@ -623,6 +629,23 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
      * @default 20
      */
     limit?:number;
+
+    /**
+     * If true all scanned nodes will be returned, not just the final nodes at the end of traversal.
+     */
+    returnAllScanned?:boolean;
+
+    /**
+     * The number of items read from the backing datastore at a time. By default this value is
+     * determined by the backing store and should be left undefined unless you know what you are doing.
+     */
+    readBatchSize?:number;
+
+    /**
+     * Can be used to skip pass a number of nodes. In almost all cases you want to use nextToken 
+     * instead. When using skip all skipped nodes are still traversed leading to poor performance.
+     */
+    skip?:number;
 
     /**
      * Token used to resume querying from. Tokens are stable across concurrent writes.
@@ -663,6 +686,18 @@ export interface ConvoNodeQueryResult<T extends keyof ConvoNode>
      * nextToken will be undefined.
      */
     nextToken?:string;
+}
+
+/**
+ * An item within a stream of ConvoNodes returned by `ConvoNodeStore.streamNodesAsync`
+ */
+export type ConvoNodeStreamItem<T extends keyof ConvoNode>={
+    type:'node';
+    node:Pick<ConvoNode,T>;
+}|{
+    type:'error';
+    error:string;
+    statusCode:StatusCode;
 }
 
 export interface ConvoNodeEmbeddingQueryResult
@@ -900,10 +935,21 @@ export interface ConvoNodeStore
     queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>):PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>>;
 
     /**
+     * Queries the store for nodes and returns the nodes as an async iterable stream
+     */
+    streamNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>,cancel?:CancelToken):AsyncIterableIterator<ConvoNodeStreamItem<ConvoNodeQueryKeysToSelection<TKeys>>>;
+
+    /**
      * Convenience function for calling `queryNodesAsync({steps:[{path}],permissionFrom})`.
      * `path` may be an exact path or a supported wildcard path.
      */
     getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>;
+
+    /**
+     * Returns the permissions granted from the node at `fromPath` to the node at `toPath`.
+     * @see {@link checkNodePermissionAsync} for more details.
+     */
+    getNodePermissionAsync(fromPath:string,toPath:string):PromiseResultType<ConvoNodePermissionType>;
 
     /**
      * Checks if the node at `fromPath` has the given permission `type` to the node at `toPath`.
@@ -912,7 +958,7 @@ export interface ConvoNodeStore
      * If `matchAny` is true, permission is granted if any bit in `type` is present in the
      * found permission. Otherwise all bits in `type` must be present.
      */
-    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid;
+    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultType<boolean>;
 
     /**
      * Inserts a new node
