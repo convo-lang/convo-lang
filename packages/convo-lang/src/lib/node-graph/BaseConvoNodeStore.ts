@@ -43,111 +43,6 @@ const QueryTraversalStateSchema=z.object({
 
 type QueryTraversalState=z.infer<typeof QueryTraversalStateSchema>;
 
-const getNextStepStage=(stage:ConvoStepStage):ConvoStepStage|undefined=>{
-    const i=allConvoStepStages.indexOf(stage);
-    return (allConvoStepStages as any)[i+1];
-}
-
-const convoNodeKeySelectionToKeys=(sourceKeys:ConvoNodeKeySelection):(keyof ConvoNode)[]|'*'=>{
-
-    if(!Array.isArray(sourceKeys)){
-        return sourceKeys==='*' || sourceKeys===null || sourceKeys===undefined?'*':[sourceKeys];
-    }
-    const keys:(keyof ConvoNode)[]=[];
-    for(const k of sourceKeys){
-        if(k==='*' || k===null || k===undefined){
-            return '*';
-        }
-        keys.push(k);
-    }
-
-    return keys;
-}
-
-const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>{
-    if(!token){
-        return {
-            success:true,
-            result:{
-                step:0,
-                stepStage:allConvoStepStages[0],
-                returnedCount:0,
-                scanCount:0,
-                paths:[],
-            }
-        }
-    }
-    try{
-        const parsed=QueryTraversalStateSchema.safeParse(JSON.parse(token));
-        if(parsed.error){
-            return {
-                success:false,
-                error:parsed.error.message,
-                statusCode:400,
-            }
-        }
-
-        const state=parsed.data;
-        const badPath=normalizationPaths(state.paths);
-        if(badPath){
-            return {
-                success:false,
-                error:`Invalid path - ${badPath}`,
-                statusCode:400,
-            }
-
-        }
-
-        return {
-            success:true,
-            result:state,
-        }
-            
-    }catch(ex){
-        return {
-            success:false,
-            error:`Invalid token format - ${getErrorMessage(ex)}`,
-            statusCode:400,
-        }
-    }
-}
-
-/**
- * Normalizes the paths in place and returns the first invalid path if one is found
- */
-const normalizationPaths=(paths:string[]):string|undefined=>{
-    for(let i=0;i<paths.length;i++){
-        const n=normalizeConvoNodePath(paths[i],'none');
-        if(!n){
-            return paths[i]??'(empty)';
-        }
-        paths[i]=n;
-    }
-    return undefined;
-}
-
-const errorResultToConvoNodeStreamItem=<T extends keyof ConvoNode>(result:ResultType<any>,state:QueryTraversalState|undefined):ConvoNodeStreamItem<T>=>{
-    const r=(result.success?
-        {
-            type:'error',
-            error:'Success passed as error',
-            statusCode:500,
-        } as const
-    :
-        {
-            type:'error',
-            error:result.error,
-            statusCode:result.statusCode,
-        } as const
-    );
-
-    if(state){
-        state.error=r.error;
-        state.errorCode=r.statusCode;
-    }
-
-    return r;
-}
 
 
 export abstract class BaseConvoNodeStore implements ConvoNodeStore{
@@ -873,4 +768,110 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
         }
         return await this._deleteEmbeddingAsync(id,options);
     }
+}
+
+const getNextStepStage=(stage:ConvoStepStage):ConvoStepStage|undefined=>{
+    const i=allConvoStepStages.indexOf(stage);
+    return (allConvoStepStages as any)[i+1];
+}
+
+const convoNodeKeySelectionToKeys=(sourceKeys:ConvoNodeKeySelection):(keyof ConvoNode)[]|'*'=>{
+
+    if(!Array.isArray(sourceKeys)){
+        return sourceKeys==='*' || sourceKeys===null || sourceKeys===undefined?'*':[sourceKeys];
+    }
+    const keys:(keyof ConvoNode)[]=[];
+    for(const k of sourceKeys){
+        if(k==='*' || k===null || k===undefined){
+            return '*';
+        }
+        keys.push(k);
+    }
+
+    return keys;
+}
+
+const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>{
+    if(!token){
+        return {
+            success:true,
+            result:{
+                step:0,
+                stepStage:allConvoStepStages[0],
+                returnedCount:0,
+                scanCount:0,
+                paths:[],
+            }
+        }
+    }
+    try{
+        const parsed=QueryTraversalStateSchema.safeParse(JSON.parse(token));
+        if(parsed.error){
+            return {
+                success:false,
+                error:parsed.error.message,
+                statusCode:400,
+            }
+        }
+
+        const state=parsed.data;
+        const badPath=normalizationPaths(state.paths);
+        if(badPath){
+            return {
+                success:false,
+                error:`Invalid path - ${badPath}`,
+                statusCode:400,
+            }
+
+        }
+
+        return {
+            success:true,
+            result:state,
+        }
+            
+    }catch(ex){
+        return {
+            success:false,
+            error:`Invalid token format - ${getErrorMessage(ex)}`,
+            statusCode:400,
+        }
+    }
+}
+
+/**
+ * Normalizes the paths in place and returns the first invalid path if one is found
+ */
+const normalizationPaths=(paths:string[]):string|undefined=>{
+    for(let i=0;i<paths.length;i++){
+        const n=normalizeConvoNodePath(paths[i],'none');
+        if(!n){
+            return paths[i]??'(empty)';
+        }
+        paths[i]=n;
+    }
+    return undefined;
+}
+
+const errorResultToConvoNodeStreamItem=<T extends keyof ConvoNode>(result:ResultType<any>,state:QueryTraversalState|undefined):ConvoNodeStreamItem<T>=>{
+    const r=(result.success?
+        {
+            type:'error',
+            error:'Success passed as error',
+            statusCode:500,
+        } as const
+    :
+        {
+            type:'error',
+            error:result.error,
+            statusCode:result.statusCode,
+        } as const
+    );
+
+    if(state){
+        state.error=r.error;
+        state.errorCode=r.statusCode;
+    }
+
+    return r;
 }
