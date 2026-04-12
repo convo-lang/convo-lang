@@ -708,9 +708,9 @@ export interface ConvoNodeEmbeddingQueryResult
     embeddings:ConvoNodeEmbedding[];
 
     /**
-     * Total number of embeddings
+     * Total number of embeddings that can be selected by the given query ignoring offset and limit
      */
-    total:number;
+    total?:number;
 }
 
 export interface ConvoNodeEdgeQueryResult
@@ -721,9 +721,9 @@ export interface ConvoNodeEdgeQueryResult
     edges:ConvoNodeEdge[];
 
     /**
-     * Total number of edges
+     * Total number of edges that can be selected by the given query ignoring offset and limit
      */
-    total:number;
+    total?:number;
 }
 
 
@@ -871,6 +871,12 @@ export interface ConvoNodeEdgeQuery
      * to both the `to` and `from` of selected edges. If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
+
+    /**
+     * If true the total number of edges that that match the query ignoring limit and offset should
+     * be returned.
+     */
+    includeTotal?:boolean;
 }
 
 export interface ConvoNodeEmbeddingQuery
@@ -922,6 +928,12 @@ export interface ConvoNodeEmbeddingQuery
      * to the `path` of selected embeddings. If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
+
+    /**
+     * If true the total number of embeddings that that match the query ignoring limit and offset should
+     * be returned.
+     */
+    includeTotal?:boolean;
 }
 
 /**

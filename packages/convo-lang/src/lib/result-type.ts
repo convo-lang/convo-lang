@@ -31,7 +31,7 @@ export type ResultTypeError={
 /**
  * Status codes that align with HTTP status code.
  */
-export type StatusCode=200|201|301|400|401|404|500;
+export type StatusCode=200|201|301|400|401|404|409|500;
 
 /**
  * An alias for `Promise<ResultType<T>>`
