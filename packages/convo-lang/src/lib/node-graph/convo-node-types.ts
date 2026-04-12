@@ -119,7 +119,7 @@ export interface ConvoNodeUpdate
  * using the grant properties of the edge.
  * 
  * Edge behavior:
- * - edges are bi-directional when traversing node query steps
+ * - node query step traversal direction is controlled by `ConvoNodeQueryStep.edgeDirection`
  * - raw edge queries are directional and match `from` and `to` by equality
  * - edges are directional when evaluating permissions
  */
@@ -422,6 +422,8 @@ export enum ConvoNodePermissionType{
     readWriteExecute=read|write|execute, // 7
 }
 
+export type ConvoNodeEdgeDirection='forward'|'reverse'|'bi';
+
 
 /**
  * Represents a single step in a node query. The first step is run against the full store of nodes.
@@ -433,6 +435,7 @@ export enum ConvoNodePermissionType{
  * - permissions defined on a step are checked for current set of nodes
  * - embedding filters are applied to the current set of nodes
  * - edge filtering is evaluated against edges
+ * - edge traversal direction is controlled by `edgeDirection`
  * - traversed and final nodes are deduplicated
  * 
  * Evaluation Order:
@@ -502,10 +505,21 @@ export interface ConvoNodeQueryStep
      * Edge conditions are evaluated against edge properties. If multiple edge conditions are given
      * they are "or"ed together by default.
      * 
-     * During traversal edges are treated as bi-directional connections between nodes.
+     * Traversal direction is controlled by `edgeDirection`.
      * @evalOrder 5
      */
     edge?:string|ConvoNodePropertyCondition|(string|ConvoNodePropertyCondition)[];
+
+    /**
+     * Controls the direction in which edges are used to select destination nodes.
+     * - `forward` traverses edges where the current node matches `edge.from` and selects `edge.to`
+     * - `reverse` traverses edges where the current node matches `edge.to` and selects `edge.from`
+     * - `bi` traverses in both directions
+     * 
+     * @default "bi"
+     * @evalOrder 5
+     */
+    edgeDirection?:ConvoNodeEdgeDirection;
 
     /**
      * If true and multiple edge conditions are given they are "and"ed together.
