@@ -358,15 +358,42 @@ export interface ConvoEmbeddingSearch
 }
 
 /**
+ * Array of all node condition operators
+ */
+export const allConvoNodeConditionOps=[
+    '=','!=','>','<','>=','<=',
+    'in','all-in','any-in',
+    'contains','contains-all','contains-any',
+    'like','ilike'
+] as const;
+
+/**
  * The allowed query condition operators.
- * - `=` Equals
- * - `!=` Not equals
- * - `>` Greater than
- * - `<` Less than
- * - `>=` Greater than or equal to
- * - `<=` Less than or equal to
+ * Condition operators are evaluated with the target queried entity on the left of the operator
+ * and supplied value on the right: `node.path like /user/jeff/*`.
+ *
+ * Comparison semantics:
+ * - datastores should make a best effort to coerce types when evaluating comparisons
+ *
+ * - `=` Target equal to value
+ * - `!=` Target not equal to value
+ * - `>` Target greater than value
+ * - `<` Target less than value
+ * - `>=` Target greater than or equal to value
+ * - `<=` Target less than or equal to value
+ * - `in` Target in value where value is an array
+ * - `all-in` Target and value are arrays and value contains all the items in target
+ * - `any-in` Target and value are arrays and value contains any of the items in target
+ * - `contains` Target is an array and value is in the array
+ * - `contains-all` Target and value are arrays and target contains all the items in value 
+ * - `contains-any` Target and value are arrays and target contains any of the items in value 
  * - `like` A case sensitive wildcard comparison. `*` is the wildcard character.
  * - `ilike` A case insensitive wildcard comparison. `*` is the wildcard character.
+ * 
+ * Array operator rules:
+ * - `in` returns false if `value` is not an array
+ * - `all-in`, `any-in`, `contains-all`, and `contains-any` return false if either target or value is not an array
+ * - `contains` returns false if the target is not an array
  * 
  * Wildcard comparison rules:
  * - `*` matches any sequence of characters
@@ -374,7 +401,8 @@ export interface ConvoEmbeddingSearch
  * - matching is against the full pattern, similar to SQL `LIKE`
  * - for substring style matching the caller should include leading and trailing `*`
  */
-export type ConvoNodeConditionOp='='|'!='|'>'|'<'|'>='|'<='|'like'|'ilike';
+export type ConvoNodeConditionOp=typeof allConvoNodeConditionOps[number];
+
 
 export interface ConvoNodePropertyCondition
 {
@@ -382,7 +410,7 @@ export interface ConvoNodePropertyCondition
      * The property of the target object to evaluate the condition against.
      * Nested properties may be accessed using dot notation, including nested properties in `data`.
      */
-    prop:string;
+    target:string;
 
     /**
      * The condition operator to evaluate
@@ -394,6 +422,58 @@ export interface ConvoNodePropertyCondition
      */
     value:any;
 }
+
+/**
+ * Array of all node condition group operators.
+ */
+export const allConvoNodeGroupConditionOps=['and','or'] as const;
+
+/**
+ * The allowed condition group operators.
+ * - `and` All nested conditions must match
+ * - `or` At least one nested condition must match
+ * 
+ * Empty group rules:
+ * - empty groups return false
+ */
+export type ConvoNodeGroupConditionOp=typeof allConvoNodeGroupConditionOps[number];
+
+/**
+ * Groups node conditions to control nested boolean logic.
+ * This allows callers to explicitly combine conditions using `and` and `or`.
+ * 
+ * Group rules:
+ * - `conditions` may contain property conditions and nested group conditions
+ * - groups may be nested to any depth
+ * - empty groups return false
+ */
+export interface ConvoNodeGroupCondition
+{
+    /**
+     * Boolean operator used to combine `conditions`.
+     */
+    groupOp:ConvoNodeGroupConditionOp;
+
+    /**
+     * Conditions to evaluate as part of the group.
+     */
+    conditions:ConvoNodeCondition[];
+}
+
+/**
+ * A node condition that may be either a property condition or a grouped condition.
+ */
+export type ConvoNodeCondition=ConvoNodePropertyCondition|ConvoNodeGroupCondition;
+
+/**
+ * Type guard that returns true if the given condition is a property condition.
+ */
+export const isConvoNodePropertyCondition=(condition:ConvoNodeCondition):condition is ConvoNodePropertyCondition=>'op' in condition;
+
+/**
+ * Type guard that returns true if the given condition is a grouped condition.
+ */
+export const isConvoNodeGroupCondition=(condition:ConvoNodeCondition):condition is ConvoNodeGroupCondition=>'groupOp' in condition;
 
 export interface ConvoNodeOrderBy
 {
@@ -467,17 +547,11 @@ export interface ConvoNodeQueryStep
     path?:string;
 
     /**
-     * Conditions to be tested against the current node. If multiple conditions are given they are "or"ed
-     * together by default.
+     * Conditions to be tested against the current node.
+     * Use `ConvoNodeGroupCondition` to explicitly combine nested conditions with `and` and `or`.
      * @evalOrder 2
      */
-    condition?:ConvoNodePropertyCondition|ConvoNodePropertyCondition[];
-
-    /**
-     * If true and multiple conditions are given they are "and"ed together.
-     * @evalOrder 2
-     */
-    andConditions?:boolean;
+    condition?:ConvoNodeCondition;
 
     /**
      * Normalized path of node where permissions are evaluated for the current nodes of this step.
@@ -499,16 +573,16 @@ export interface ConvoNodeQueryStep
 
     /**
      * Selects the next node or nodes to move to by selecting connected edges.
-     * String values will be treated as type equal comparisons equivalent to
-     * `{prop:"type",op:"=",value:edgeStringValue}`.
+     * A string value will be treated as type equal comparisons equivalent to
+     * `{target:"type",op:"=",value:edgeStringValue}`.
      * 
-     * Edge conditions are evaluated against edge properties. If multiple edge conditions are given
-     * they are "or"ed together by default.
+     * Edge conditions are evaluated against edge properties and may use grouped conditions
+     * to express nested `and` and `or` logic.
      * 
      * Traversal direction is controlled by `edgeDirection`.
      * @evalOrder 5
      */
-    edge?:string|ConvoNodePropertyCondition|(string|ConvoNodePropertyCondition)[];
+    edge?:string|ConvoNodeCondition;
 
     /**
      * Controls the direction in which edges are used to select destination nodes.
@@ -520,12 +594,6 @@ export interface ConvoNodeQueryStep
      * @evalOrder 5
      */
     edgeDirection?:ConvoNodeEdgeDirection;
-
-    /**
-     * If true and multiple edge conditions are given they are "and"ed together.
-     * @evalOrder 5
-     */
-    andEdgeConditions?:boolean;
 
     /**
      * Controls the max number of matching destination nodes to move through after destination nodes
@@ -550,7 +618,8 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
     steps:ConvoNodeQueryStep[];
 
     /**
-     * Max number of nodes to return
+     * Max number of nodes to return. This value may be exceeded since node queries select and return
+     * nodes in batches.
      * @default 20
      */
     limit?:number;
@@ -840,8 +909,10 @@ export interface ConvoNodeStore
      * Checks if the node at `fromPath` has the given permission `type` to the node at `toPath`.
      * Permission checking is evaluated using direct grant edges where `edge.from===fromPath`
      * and `edge.to` equals `toPath` or an ancestor of `toPath`.
+     * If `matchAny` is true, permission is granted if any bit in `type` is present in the
+     * found permission. Otherwise all bits in `type` must be present.
      */
-    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType):PromiseResultTypeVoid;
+    checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid;
 
     /**
      * Inserts a new node
@@ -869,7 +940,7 @@ export interface ConvoNodeStore
     /**
      * Convenience function for calling `queryEdgesAsync({id,permissionFrom,limit:1})`
      */
-    getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge|undefined>;
+    getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge>;
 
     /**
      * Inserts a new edge and returns the inserted edge. The store generates the edge id.
@@ -899,7 +970,7 @@ export interface ConvoNodeStore
     /**
      * Convenience function for calling `queryEmbeddingsAsync({id,permissionFrom,limit:1})`
      */
-    getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding|undefined>;
+    getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding>;
 
     /**
      * Inserts an embedding and returns the inserted embedding. The store generates the embedding id.
