@@ -4,11 +4,12 @@ import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
  * A unique node within a collection or graph of nodes.
  * 
  * Path rules:
- * - `path` is an absolute file system like path that starts with `/`
+ * - `path` is a normalized absolute file system like path that starts with `/`
  * - trailing slashes are removed during normalization except for `/`
  * - duplicate slashes are converted to a single slash during normalization
  * - paths are case-sensitive
  * - `.` and `..` are not allowed
+ * - `*` is not allowed in stored node paths
  * - `/` is a valid node path
  * - a node may exist without its parent path existing
  */
@@ -16,7 +17,7 @@ export interface ConvoNode
 {
 
     /**
-     * Absolute file system like path that starts with a (/). `path` should be unique in a
+     * Normalized absolute file system like path that starts with a (/). `path` should be unique in a
      * collection or graph of nodes and should be treated as a unique id.
      * 
      * Path rules:
@@ -24,6 +25,7 @@ export interface ConvoNode
      * - duplicate slashes are converted to a single slash during normalization
      * - paths are case-sensitive
      * - `.` and `..` are not allowed
+     * - `*` is not allowed in stored node paths
      */
     path:string;
 
@@ -33,17 +35,17 @@ export interface ConvoNode
     displayName?:string;
 
     /**
-     * Name of the node
+     * Stable name of the node. Immutable after insert.
      */
     name?:string;
 
     /**
-     * Optional date and time the node was created
+     * Optional ISO-8601 date and time the node was created. Immutable after insert.
      */
     created?:string;
 
     /**
-     * Optional date and time the node was modified
+     * Optional ISO-8601 date and time the node was modified
      */
     modified?:string;
 
@@ -70,12 +72,17 @@ export interface ConvoNode
 
 /**
  * A node update where `path` is required, optional fields may be updated or unset with `null`,
- * `name` and `type` are immutable, and `data` is replaced as a whole.
+ * `name`, `type`, and `created` are immutable, and `data` is replaced as a whole.
+ * 
+ * Update semantics:
+ * - omitted or `undefined` properties are treated as no update
+ * - properties documented as unsettable may be unset by assigning `null`
+ * - `data` is replaced as a whole and `null` is a valid replacement value
  */
 export interface ConvoNodeUpdate
 {
     /**
-     * Path of the node to update
+     * Normalized absolute path of the node to update
      */
     path:string;
 
@@ -85,7 +92,7 @@ export interface ConvoNodeUpdate
     displayName?:string|null;
 
     /**
-     * Updated modified date and time. If null modified will be unset.
+     * Updated ISO-8601 modified date and time. If null modified will be unset.
      */
     modified?:string|null;
 
@@ -100,7 +107,8 @@ export interface ConvoNodeUpdate
     instructions?:string|null;
 
     /**
-     * Updated data. Data is replaced as a whole.
+     * Updated data. Data is replaced as a whole. If `null`, data will be replaced with `null`.
+     * If omitted or `undefined`, data will not be updated.
      */
     data?:any;
 }
@@ -111,7 +119,8 @@ export interface ConvoNodeUpdate
  * using the grant properties of the edge.
  * 
  * Edge behavior:
- * - edges are bi-directional when querying and traversing
+ * - edges are bi-directional when traversing node query steps
+ * - raw edge queries are directional and match `from` and `to` by equality
  * - edges are directional when evaluating permissions
  */
 export interface ConvoNodeEdge
@@ -127,7 +136,7 @@ export interface ConvoNodeEdge
     displayName?:string;
 
     /**
-     * Name of the edge
+     * Stable name of the edge. Immutable after insert.
      */
     name?:string;
 
@@ -137,12 +146,12 @@ export interface ConvoNodeEdge
     description?:string;
 
     /**
-     * Optional date and time the edge was created
+     * Optional ISO-8601 date and time the edge was created. Immutable after insert.
      */
     created?:string;
 
     /**
-     * Optional date and time the edge was modified
+     * Optional ISO-8601 date and time the edge was modified
      */
     modified?:string;
 
@@ -152,13 +161,13 @@ export interface ConvoNodeEdge
     type:string;
 
     /**
-     * Path of the node the edge is connecting from.
+     * Normalized path of the node the edge is connecting from.
      * Must reference an existing node path.
      */
     from:string;
 
     /**
-     * Path of the node the edge is connecting to.
+     * Normalized path of the node the edge is connecting to.
      * Must reference an existing node path.
      */
     to:string;
@@ -173,7 +182,9 @@ export interface ConvoNodeEdge
      * 
      * Permission evaluation rules:
      * - permission is directional from `from` to `to`
-     * - when checking if `fromPath` has permission to `toPath`, only `toPath` and its ancestors are checked
+     * - when checking if `fromPath` has permission to `toPath`, only direct edges with `edge.from===fromPath`
+     *   are checked
+     * - only matching edges whose `edge.to` equals `toPath` or an ancestor of `toPath` are considered
      * - grants from multiple matching edges are unioned using bitwise OR
      * - `none` may be stored on an edge but has the same effect as being undefined
      * - write does not imply read
@@ -183,7 +194,11 @@ export interface ConvoNodeEdge
 
 /**
  * An edge update where `id` is required, optional fields may be updated or unset with `null`,
- * and `name`, `type`, `from`, and `to` are immutable.
+ * and `name`, `type`, `from`, `to`, and `created` are immutable.
+ * 
+ * Update semantics:
+ * - omitted or `undefined` properties are treated as no update
+ * - properties documented as unsettable may be unset by assigning `null`
  */
 export interface ConvoNodeEdgeUpdate
 {
@@ -198,7 +213,7 @@ export interface ConvoNodeEdgeUpdate
     displayName?:string|null;
 
     /**
-     * Updated modified date and time. If null modified will be unset.
+     * Updated ISO-8601 modified date and time. If null modified will be unset.
      */
     modified?:string|null;
 
@@ -231,13 +246,14 @@ export interface ConvoNodeEmbedding
     id:string;
 
     /**
-     * The property the embedding is being applied to. In most cases this will be "data"
+     * The property the embedding is being applied to. In most cases this will be "data".
+     * Immutable after insert.
      */
     prop:string;
 
 
     /**
-     * Optional name
+     * Stable name of the embedding. Immutable after insert.
      */
     name?:string;
 
@@ -247,7 +263,7 @@ export interface ConvoNodeEmbedding
     type:string;
 
     /**
-     * Path of the node the embedding points to.
+     * Normalized path of the node the embedding points to.
      * Must reference an existing node path.
      */
     path:string;
@@ -258,12 +274,12 @@ export interface ConvoNodeEmbedding
     description?:string;
 
     /**
-     * Optional date and time the embedding was created
+     * Optional ISO-8601 date and time the embedding was created. Immutable after insert.
      */
     created?:string;
 
     /**
-     * Optional date and time the embedding was modified
+     * Optional ISO-8601 date and time the embedding was modified
      */
     modified?:string;
 
@@ -275,7 +291,7 @@ export interface ConvoNodeEmbedding
 
     /**
      * Embedding vector data. The actual data type of the vector is specific to the datastore the
-     * embedding is stored in. It is often a long number array of some type.
+     * embedding is stored in and is intentionally opaque at this interface layer.
      */
     vector?:any;
 
@@ -285,6 +301,10 @@ export interface ConvoNodeEmbedding
  * An embedding update where `id` is required, optional fields may be updated or unset with `null`,
  * and `name`, `type`, `prop`, `path`, `created`, and `vector` are immutable through this update type.
  * `vector` regeneration may be requested asynchronously using `generateVector`.
+ * 
+ * Update semantics:
+ * - omitted or `undefined` properties are treated as no update
+ * - properties documented as unsettable may be unset by assigning `null`
  */
 export interface ConvoNodeEmbeddingUpdate{
     /**
@@ -293,7 +313,7 @@ export interface ConvoNodeEmbeddingUpdate{
     id:string;
 
     /**
-     * Updated modified date and time. If null modified will be unset.
+     * Updated ISO-8601 modified date and time. If null modified will be unset.
      */
     modified?:string|null;
 
@@ -341,12 +361,18 @@ export interface ConvoEmbeddingSearch
  * The allowed query condition operators.
  * - `=` Equals
  * - `!=` Not equals
- * - `>` More than
+ * - `>` Greater than
  * - `<` Less than
- * - `>=` More than equal to
- * - `<=` Less than equal to
- * - `like` A like or wildcard case sensitive comparison. `%` is the wildcard character.
- * - `ilike` A like or wildcard case insensitive comparison. `%` is the wildcard character.
+ * - `>=` Greater than or equal to
+ * - `<=` Less than or equal to
+ * - `like` A case sensitive wildcard comparison. `*` is the wildcard character.
+ * - `ilike` A case insensitive wildcard comparison. `*` is the wildcard character.
+ * 
+ * Wildcard comparison rules:
+ * - `*` matches any sequence of characters
+ * - the wildcard can not be escaped
+ * - matching is against the full pattern, similar to SQL `LIKE`
+ * - for substring style matching the caller should include leading and trailing `*`
  */
 export type ConvoNodeConditionOp='='|'!='|'>'|'<'|'>='|'<='|'like'|'ilike';
 
@@ -354,6 +380,7 @@ export interface ConvoNodePropertyCondition
 {
     /**
      * The property of the target object to evaluate the condition against.
+     * Nested properties may be accessed using dot notation, including nested properties in `data`.
      */
     prop:string;
 
@@ -419,13 +446,16 @@ export interface ConvoNodeQueryStep
 {
 
     /**
-     * Full path of node to select or a wildcard path that will select all nodes matching the wildcard.
+     * Full normalized path of node to select or a wildcard path that will select all nodes matching the wildcard.
      * 
      * Wildcard path rules:
      * - the wildcard character is `*`
      * - only one wildcard character may be used
      * - the wildcard matches all characters including directory separators
      * - the wildcard may only appear at the end of a path immediately after a `/` directory separator
+     * - the non-wildcard portion of the path follows the same normalization rules as stored node paths
+     * - `/users/*` matches `/users/a` and `/users/a/b`
+     * - `/users/*` does not match `/users`
      * - examples of valid wildcard paths: `/users/*`, `/a/b/*`
      * - examples of invalid wildcard paths: `*`, `/users*`, `/a/*\/b`, `/a/**`
      * 
@@ -447,7 +477,7 @@ export interface ConvoNodeQueryStep
     andConditions?:boolean;
 
     /**
-     * Path of node where permissions are evaluated for the current nodes of this step.
+     * Normalized path of node where permissions are evaluated for the current nodes of this step.
      * @evalOrder 3
      */
     permissionFrom?:string;
@@ -471,6 +501,8 @@ export interface ConvoNodeQueryStep
      * 
      * Edge conditions are evaluated against edge properties. If multiple edge conditions are given
      * they are "or"ed together by default.
+     * 
+     * During traversal edges are treated as bi-directional connections between nodes.
      * @evalOrder 5
      */
     edge?:string|ConvoNodePropertyCondition|(string|ConvoNodePropertyCondition)[];
@@ -517,7 +549,7 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
     nextToken?:string;
 
     /**
-     * Path of node where permissions are evaluated on the final set of nodes resulting from traversal.
+     * Normalized path of node where permissions are evaluated on the final set of nodes resulting from traversal.
      * It is common to use the path of a user node.
      */
     permissionFrom?:string;
@@ -581,7 +613,7 @@ export interface InsertConvoNodeOptions
 {
 
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write
      * permission to `path` of the node being inserted.
      * If undefined permissions are not evaluated.
      */
@@ -592,8 +624,9 @@ export interface InsertConvoNodeEdgeOptions
 {
 
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write
-     * permission to both the `to` and `from` paths of the edge being inserted.
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write
+     * permission to the `from` path of the edge and read or write permission to the `to` path of the edge
+     * being inserted.
      * If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
@@ -608,7 +641,7 @@ export interface InsertConvoNodeEmbeddingOptions
     generateVector?:boolean;
 
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write
      * permission to `path` of the embedding being inserted.
      * If undefined permissions are not evaluated.
      */
@@ -618,7 +651,7 @@ export interface InsertConvoNodeEmbeddingOptions
 export interface UpdateConvoNodeOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
      * path of the node being updated.
      * If undefined permissions are not evaluated.
      */
@@ -628,7 +661,7 @@ export interface UpdateConvoNodeOptions
 export interface DeleteConvoNodeOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
      * path of the node being deleted.
      * If undefined permissions are not evaluated.
      * 
@@ -640,8 +673,8 @@ export interface DeleteConvoNodeOptions
 export interface UpdateConvoNodeEdgeOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access
-     * to either the `to` or `from` path of the edge being updated.
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access
+     * to the `from` path of the edge and read or write access to the `to` path of the edge being updated.
      * If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
@@ -650,8 +683,8 @@ export interface UpdateConvoNodeEdgeOptions
 export interface DeleteConvoNodeEdgeOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access
-     * to either the `to` or `from` path of the edge being deleted.
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access
+     * to the `from` path of the edge and read or write access to the `to` path of the edge being deleted.
      * If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
@@ -660,7 +693,7 @@ export interface DeleteConvoNodeEdgeOptions
 export interface UpdateConvoNodeEmbeddingOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
      * path of the embedding being updated.
      * If undefined permissions are not evaluated.
      */
@@ -670,7 +703,7 @@ export interface UpdateConvoNodeEmbeddingOptions
 export interface DeleteConvoNodeEmbeddingOptions
 {
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have write access to the
      * path of the embedding being deleted.
      * If undefined permissions are not evaluated.
      */
@@ -685,12 +718,12 @@ export interface ConvoNodeEdgeQuery
     id?:string;
 
     /**
-     * From path to match
+     * From path to match by equality
      */
     from?:string;
     
     /**
-     * To path to match
+     * To path to match by equality
      */
     to?:string;
 
@@ -716,7 +749,7 @@ export interface ConvoNodeEdgeQuery
     offset?:number;
 
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have read permission
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have read permission
      * to both the `to` and `from` of selected edges. If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
@@ -764,10 +797,10 @@ export interface ConvoNodeEmbeddingQuery
      * If true the vector property of the embedding will be returned. By default the vector will not
      * be returned to save bandwidth.
      */
-    includeVector?:boolean
+    includeVector?:boolean;
 
     /**
-     * Path of node where permissions are evaluated. The `permissionFrom` path must have read permission
+     * Normalized path of node where permissions are evaluated. The `permissionFrom` path must have read permission
      * to the `path` of selected embeddings. If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
@@ -784,12 +817,15 @@ export interface ConvoNodeStore
     queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>):PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>>;
 
     /**
-     * Convenience function for calling `queryNodesAsync({steps:[{path}],permissionFrom})`
+     * Convenience function for calling `queryNodesAsync({steps:[{path}],permissionFrom})`.
+     * `path` may be an exact path or a supported wildcard path.
      */
     getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>;
 
     /**
      * Checks if the node at `fromPath` has the given permission `type` to the node at `toPath`.
+     * Permission checking is evaluated using direct grant edges where `edge.from===fromPath`
+     * and `edge.to` equals `toPath` or an ancestor of `toPath`.
      */
     checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType):PromiseResultTypeVoid;
 
@@ -799,7 +835,7 @@ export interface ConvoNodeStore
     insertNodeAsync(node:ConvoNode,options?:InsertConvoNodeOptions):PromiseResultType<ConvoNode>;
 
     /**
-     * Updates a node. `name` and `type` are immutable.
+     * Updates a node. `name`, `type`, and `created` are immutable.
      */
     updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid;
 
@@ -812,7 +848,7 @@ export interface ConvoNodeStore
 
 
     /**
-     * Returns matching edges
+     * Returns matching edges. Raw edge queries are directional and match `from` and `to` by equality.
      */
     queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>;
 
@@ -822,13 +858,14 @@ export interface ConvoNodeStore
     getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge|undefined>;
 
     /**
-     * Inserts a new edge. `type` is immutable after insert.
+     * Inserts a new edge and returns the inserted edge. The store generates the edge id.
+     * `name`, `type`, and `created` are immutable after insert.
      * `from` and `to` must reference existing nodes.
      */
     insertEdgeAsync(edge:Omit<ConvoNodeEdge,'id'>,options?:InsertConvoNodeEdgeOptions):PromiseResultType<ConvoNodeEdge>;
 
     /**
-     * Updates an edge. `name`, `type`, `from`, and `to` are immutable.
+     * Updates an edge. `name`, `type`, `from`, `to`, and `created` are immutable.
      */
     updateEdgeAsync(update:ConvoNodeEdgeUpdate,options?:UpdateConvoNodeEdgeOptions):PromiseResultTypeVoid;
 
@@ -851,8 +888,9 @@ export interface ConvoNodeStore
     getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding|undefined>;
 
     /**
-     * Inserts an embedding and returns the inserted embedding. By default the vector property will not
-     * be returned to save bandwidth. `type` is immutable after insert and `path` must reference an existing node.
+     * Inserts an embedding and returns the inserted embedding. The store generates the embedding id.
+     * By default the vector property will not be returned to save bandwidth.
+     * `name`, `type`, `prop`, `path`, and `created` are immutable after insert and `path` must reference an existing node.
      */
     insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,'id'>,options?:InsertConvoNodeEmbeddingOptions):PromiseResultType<ConvoNodeEmbedding>;
 
