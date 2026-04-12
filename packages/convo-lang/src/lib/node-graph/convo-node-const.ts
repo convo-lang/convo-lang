@@ -1,0 +1,2 @@
+export const defaultConvoNodeQueryLimit=20;
+export const defaultConvoNodeEdgeQueryLimit=50;
