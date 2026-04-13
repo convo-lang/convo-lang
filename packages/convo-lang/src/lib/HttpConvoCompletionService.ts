@@ -4,7 +4,7 @@ import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
-import type { ConvoDbCommand, ConvoDbCommandResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./node-graph/convo-node-types.js";
+import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
 import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -38,7 +38,7 @@ export interface HttpConvoCompletionServiceOptions
     getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
 
     /**
-     * Name of the database the ConvoNodeStore functions use.
+     * Name of the database the ConvoDb functions use.
      * @default 'default'
      */
     dbName?:string;
@@ -64,7 +64,7 @@ export class HttpConvoCompletionService implements
     ConvoTranscriptionService,
     ConvoTtsService,
     ConvoEmbeddingsService,
-    ConvoNodeStore
+    ConvoDb
 {
 
     public readonly serviceId='http';

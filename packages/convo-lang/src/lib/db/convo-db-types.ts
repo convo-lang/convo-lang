@@ -692,7 +692,7 @@ export interface ConvoNodeQueryResult<T extends keyof ConvoNode>
 }
 
 /**
- * An item within a stream of ConvoNodes returned by `ConvoNodeStore.streamNodesAsync`
+ * An item within a stream of ConvoNodes returned by `ConvoDb.streamNodesAsync`
  */
 export type ConvoNodeStreamItem<T extends keyof ConvoNode>={
     type:'node';
@@ -940,9 +940,9 @@ export interface ConvoNodeEmbeddingQuery
 }
 
 /**
- * An export of a ConvoNodeStores data
+ * An export of a ConvoDbs data
  */
-export interface ConvoNodeStoreExport
+export interface ConvoDbExport
 {
     nodes:ConvoNode[];
     edges:ConvoNodeEdge[];
@@ -952,7 +952,7 @@ export interface ConvoNodeStoreExport
 /**
  * Stores and retrieves nodes.
  */
-export interface ConvoNodeStore
+export interface ConvoDb
 {
     /**
      * Queries the store for nodes
@@ -1075,102 +1075,102 @@ export interface ConvoNodeStore
 
 
 /**
- * ConvoDbCommands represent function calls to the ConvoNodeStore interface.
+ * ConvoDbCommands represent function calls to the ConvoDb interface.
  *
  * Exactly one property should be defined per command object.
- * Each property maps to a ConvoNodeStore method and contains the arguments
+ * Each property maps to a ConvoDb method and contains the arguments
  * that would be passed to that method.
  */
 export interface ConvoDbCommand<TKeys extends ConvoNodeKeySelection='*'>
 {
     /**
-     * Calls `ConvoNodeStore.queryNodesAsync`
+     * Calls `ConvoDb.queryNodesAsync`
      */
     queryNodes?:ConvoDbActionQueryNodes<TKeys>;
 
     /**
-     * Calls `ConvoNodeStore.getNodesByPathAsync`
+     * Calls `ConvoDb.getNodesByPathAsync`
      */
     getNodesByPath?:ConvoDbActionGetNodesByPath;
 
     /**
-     * Calls `ConvoNodeStore.getNodePermissionAsync`
+     * Calls `ConvoDb.getNodePermissionAsync`
      */
     getNodePermission?:ConvoDbActionGetNodePermission;
 
     /**
-     * Calls `ConvoNodeStore.checkNodePermissionAsync`
+     * Calls `ConvoDb.checkNodePermissionAsync`
      */
     checkNodePermission?:ConvoDbActionCheckNodePermission;
 
     /**
-     * Calls `ConvoNodeStore.insertNodeAsync`
+     * Calls `ConvoDb.insertNodeAsync`
      */
     insertNode?:ConvoDbActionInsertNode;
 
     /**
-     * Calls `ConvoNodeStore.updateNodeAsync`
+     * Calls `ConvoDb.updateNodeAsync`
      */
     updateNode?:ConvoDbActionUpdateNode;
 
     /**
-     * Calls `ConvoNodeStore.deleteNodeAsync`
+     * Calls `ConvoDb.deleteNodeAsync`
      */
     deleteNode?:ConvoDbActionDeleteNode;
 
     /**
-     * Calls `ConvoNodeStore.queryEdgesAsync`
+     * Calls `ConvoDb.queryEdgesAsync`
      */
     queryEdges?:ConvoDbActionQueryEdges;
 
     /**
-     * Calls `ConvoNodeStore.getEdgeByIdAsync`
+     * Calls `ConvoDb.getEdgeByIdAsync`
      */
     getEdgeById?:ConvoDbActionGetEdgeById;
 
     /**
-     * Calls `ConvoNodeStore.insertEdgeAsync`
+     * Calls `ConvoDb.insertEdgeAsync`
      */
     insertEdge?:ConvoDbActionInsertEdge;
 
     /**
-     * Calls `ConvoNodeStore.updateEdgeAsync`
+     * Calls `ConvoDb.updateEdgeAsync`
      */
     updateEdge?:ConvoDbActionUpdateEdge;
 
     /**
-     * Calls `ConvoNodeStore.deleteEdgeAsync`
+     * Calls `ConvoDb.deleteEdgeAsync`
      */
     deleteEdge?:ConvoDbActionDeleteEdge;
 
     /**
-     * Calls `ConvoNodeStore.queryEmbeddingsAsync`
+     * Calls `ConvoDb.queryEmbeddingsAsync`
      */
     queryEmbeddings?:ConvoDbActionQueryEmbeddings;
 
     /**
-     * Calls `ConvoNodeStore.getEmbeddingByIdAsync`
+     * Calls `ConvoDb.getEmbeddingByIdAsync`
      */
     getEmbeddingById?:ConvoDbActionGetEmbeddingById;
 
     /**
-     * Calls `ConvoNodeStore.insertEmbeddingAsync`
+     * Calls `ConvoDb.insertEmbeddingAsync`
      */
     insertEmbedding?:ConvoDbActionInsertEmbedding;
 
     /**
-     * Calls `ConvoNodeStore.updateEmbeddingAsync`
+     * Calls `ConvoDb.updateEmbeddingAsync`
      */
     updateEmbedding?:ConvoDbActionUpdateEmbedding;
 
     /**
-     * Calls `ConvoNodeStore.deleteEmbeddingAsync`
+     * Calls `ConvoDb.deleteEmbeddingAsync`
      */
     deleteEmbedding?:ConvoDbActionDeleteEmbedding;
 }
 
 /**
- * Arguments for `ConvoNodeStore.queryNodesAsync`
+ * Arguments for `ConvoDb.queryNodesAsync`
  */
 export interface ConvoDbActionQueryNodes<TKeys extends ConvoNodeKeySelection='*'>
 {
@@ -1181,7 +1181,7 @@ export interface ConvoDbActionQueryNodes<TKeys extends ConvoNodeKeySelection='*'
 }
 
 /**
- * Arguments for `ConvoNodeStore.getNodesByPathAsync`
+ * Arguments for `ConvoDb.getNodesByPathAsync`
  */
 export interface ConvoDbActionGetNodesByPath
 {
@@ -1197,7 +1197,7 @@ export interface ConvoDbActionGetNodesByPath
 }
 
 /**
- * Arguments for `ConvoNodeStore.getNodePermissionAsync`
+ * Arguments for `ConvoDb.getNodePermissionAsync`
  */
 export interface ConvoDbActionGetNodePermission
 {
@@ -1213,7 +1213,7 @@ export interface ConvoDbActionGetNodePermission
 }
 
 /**
- * Arguments for `ConvoNodeStore.checkNodePermissionAsync`
+ * Arguments for `ConvoDb.checkNodePermissionAsync`
  */
 export interface ConvoDbActionCheckNodePermission
 {
@@ -1239,7 +1239,7 @@ export interface ConvoDbActionCheckNodePermission
 }
 
 /**
- * Arguments for `ConvoNodeStore.insertNodeAsync`
+ * Arguments for `ConvoDb.insertNodeAsync`
  */
 export interface ConvoDbActionInsertNode
 {
@@ -1255,7 +1255,7 @@ export interface ConvoDbActionInsertNode
 }
 
 /**
- * Arguments for `ConvoNodeStore.updateNodeAsync`
+ * Arguments for `ConvoDb.updateNodeAsync`
  */
 export interface ConvoDbActionUpdateNode
 {
@@ -1271,7 +1271,7 @@ export interface ConvoDbActionUpdateNode
 }
 
 /**
- * Arguments for `ConvoNodeStore.deleteNodeAsync`
+ * Arguments for `ConvoDb.deleteNodeAsync`
  */
 export interface ConvoDbActionDeleteNode
 {
@@ -1287,7 +1287,7 @@ export interface ConvoDbActionDeleteNode
 }
 
 /**
- * Arguments for `ConvoNodeStore.queryEdgesAsync`
+ * Arguments for `ConvoDb.queryEdgesAsync`
  */
 export interface ConvoDbActionQueryEdges
 {
@@ -1298,7 +1298,7 @@ export interface ConvoDbActionQueryEdges
 }
 
 /**
- * Arguments for `ConvoNodeStore.getEdgeByIdAsync`
+ * Arguments for `ConvoDb.getEdgeByIdAsync`
  */
 export interface ConvoDbActionGetEdgeById
 {
@@ -1314,7 +1314,7 @@ export interface ConvoDbActionGetEdgeById
 }
 
 /**
- * Arguments for `ConvoNodeStore.insertEdgeAsync`
+ * Arguments for `ConvoDb.insertEdgeAsync`
  */
 export interface ConvoDbActionInsertEdge
 {
@@ -1330,7 +1330,7 @@ export interface ConvoDbActionInsertEdge
 }
 
 /**
- * Arguments for `ConvoNodeStore.updateEdgeAsync`
+ * Arguments for `ConvoDb.updateEdgeAsync`
  */
 export interface ConvoDbActionUpdateEdge
 {
@@ -1346,7 +1346,7 @@ export interface ConvoDbActionUpdateEdge
 }
 
 /**
- * Arguments for `ConvoNodeStore.deleteEdgeAsync`
+ * Arguments for `ConvoDb.deleteEdgeAsync`
  */
 export interface ConvoDbActionDeleteEdge
 {
@@ -1362,7 +1362,7 @@ export interface ConvoDbActionDeleteEdge
 }
 
 /**
- * Arguments for `ConvoNodeStore.queryEmbeddingsAsync`
+ * Arguments for `ConvoDb.queryEmbeddingsAsync`
  */
 export interface ConvoDbActionQueryEmbeddings
 {
@@ -1373,7 +1373,7 @@ export interface ConvoDbActionQueryEmbeddings
 }
 
 /**
- * Arguments for `ConvoNodeStore.getEmbeddingByIdAsync`
+ * Arguments for `ConvoDb.getEmbeddingByIdAsync`
  */
 export interface ConvoDbActionGetEmbeddingById
 {
@@ -1389,7 +1389,7 @@ export interface ConvoDbActionGetEmbeddingById
 }
 
 /**
- * Arguments for `ConvoNodeStore.insertEmbeddingAsync`
+ * Arguments for `ConvoDb.insertEmbeddingAsync`
  */
 export interface ConvoDbActionInsertEmbedding
 {
@@ -1405,7 +1405,7 @@ export interface ConvoDbActionInsertEmbedding
 }
 
 /**
- * Arguments for `ConvoNodeStore.updateEmbeddingAsync`
+ * Arguments for `ConvoDb.updateEmbeddingAsync`
  */
 export interface ConvoDbActionUpdateEmbedding
 {
@@ -1421,7 +1421,7 @@ export interface ConvoDbActionUpdateEmbedding
 }
 
 /**
- * Arguments for `ConvoNodeStore.deleteEmbeddingAsync`
+ * Arguments for `ConvoDb.deleteEmbeddingAsync`
  */
 export interface ConvoDbActionDeleteEmbedding
 {
@@ -1443,101 +1443,101 @@ export interface ConvoDbActionDeleteEmbedding
  * Exactly one property should typically be defined per result object.
  *
  * Result mapping rules:
- * - properties map to the unwrapped successful result type of the corresponding `ConvoNodeStore` method
+ * - properties map to the unwrapped successful result type of the corresponding `ConvoDb` method
  * - methods returning `PromiseResultTypeVoid` map to `true`
  * - `checkNodePermissionAsync` maps to `boolean`
  */
 export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
 {
     /**
-     * Result of `ConvoNodeStore.queryNodesAsync`
+     * Result of `ConvoDb.queryNodesAsync`
      */
     queryNodes?:ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>;
 
     /**
-     * Result of `ConvoNodeStore.getNodesByPathAsync`
+     * Result of `ConvoDb.getNodesByPathAsync`
      */
     getNodesByPath?:ConvoNodeQueryResult<keyof ConvoNode>;
 
     /**
-     * Result of `ConvoNodeStore.getNodePermissionAsync`
+     * Result of `ConvoDb.getNodePermissionAsync`
      */
     getNodePermission?:ConvoNodePermissionType;
 
     /**
-     * Result of `ConvoNodeStore.checkNodePermissionAsync`
+     * Result of `ConvoDb.checkNodePermissionAsync`
      */
     checkNodePermission?:boolean;
 
     /**
-     * Result of `ConvoNodeStore.insertNodeAsync`
+     * Result of `ConvoDb.insertNodeAsync`
      */
     insertNode?:ConvoNode;
 
     /**
-     * Result of `ConvoNodeStore.updateNodeAsync`
+     * Result of `ConvoDb.updateNodeAsync`
      */
     updateNode?:true;
 
     /**
-     * Result of `ConvoNodeStore.deleteNodeAsync`
+     * Result of `ConvoDb.deleteNodeAsync`
      */
     deleteNode?:true;
 
     /**
-     * Result of `ConvoNodeStore.queryEdgesAsync`
+     * Result of `ConvoDb.queryEdgesAsync`
      */
     queryEdges?:ConvoNodeEdgeQueryResult;
 
     /**
-     * Result of `ConvoNodeStore.getEdgeByIdAsync`
+     * Result of `ConvoDb.getEdgeByIdAsync`
      */
     getEdgeById?:ConvoNodeEdge;
 
     /**
-     * Result of `ConvoNodeStore.insertEdgeAsync`
+     * Result of `ConvoDb.insertEdgeAsync`
      */
     insertEdge?:ConvoNodeEdge;
 
     /**
-     * Result of `ConvoNodeStore.updateEdgeAsync`
+     * Result of `ConvoDb.updateEdgeAsync`
      */
     updateEdge?:true;
 
     /**
-     * Result of `ConvoNodeStore.deleteEdgeAsync`
+     * Result of `ConvoDb.deleteEdgeAsync`
      */
     deleteEdge?:true;
 
     /**
-     * Result of `ConvoNodeStore.queryEmbeddingsAsync`
+     * Result of `ConvoDb.queryEmbeddingsAsync`
      */
     queryEmbeddings?:ConvoNodeEmbeddingQueryResult;
 
     /**
-     * Result of `ConvoNodeStore.getEmbeddingByIdAsync`
+     * Result of `ConvoDb.getEmbeddingByIdAsync`
      */
     getEmbeddingById?:ConvoNodeEmbedding;
 
     /**
-     * Result of `ConvoNodeStore.insertEmbeddingAsync`
+     * Result of `ConvoDb.insertEmbeddingAsync`
      */
     insertEmbedding?:ConvoNodeEmbedding;
 
     /**
-     * Result of `ConvoNodeStore.updateEmbeddingAsync`
+     * Result of `ConvoDb.updateEmbeddingAsync`
      */
     updateEmbedding?:true;
 
     /**
-     * Result of `ConvoNodeStore.deleteEmbeddingAsync`
+     * Result of `ConvoDb.deleteEmbeddingAsync`
      */
     deleteEmbedding?:true;
 }
 
 /**
- * Maps names to functions that return ConvoNodeStores. Each function in the map should return
+ * Maps names to functions that return ConvoDbs. Each function in the map should return
  * the same cached db after called the first name. There is one exception to the caching rule.
  * '*' should return a new store every time called.
  */
-export type ConvoDbMap=Record<string,()=>ConvoNodeStore>;
+export type ConvoDbMap=Record<string,()=>ConvoDb>;

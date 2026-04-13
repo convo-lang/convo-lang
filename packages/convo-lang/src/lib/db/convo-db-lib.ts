@@ -1,4 +1,4 @@
-import { ConvoNodeCondition, ConvoNodeQuery, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-node-types.js";
+import { ConvoNodeCondition, ConvoNodeQuery, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
 /**
  * Normalizes a convo node path.

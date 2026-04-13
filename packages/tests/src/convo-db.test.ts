@@ -1,6 +1,6 @@
 import { ConvoNodePermissionType, HttpConvoCompletionService, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
-import { BunSqliteConvoNodeStore } from "@convo-lang/db/BunSqliteConvoNodeStore.js";
-import { InMemoryConvoNodeStore } from "@convo-lang/db/InMemoryConvoNodeStore.js";
+import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
+import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
 import { uuid } from "@iyio/common";
 import { expect, test } from "bun:test";
 
@@ -11,9 +11,9 @@ const createStore=()=>(
     type==='http'?
         new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
     :type==='bun'?
-        new BunSqliteConvoNodeStore({})
+        new BunSqliteConvoDb({})
     :
-        new InMemoryConvoNodeStore({})
+        new InMemoryConvoDb({})
 );
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({

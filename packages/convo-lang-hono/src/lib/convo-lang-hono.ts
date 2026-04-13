@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoDbMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, convoNodeStoreService, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
@@ -304,7 +304,7 @@ export const getConvoHonoRoutes=({
 
     const getDb=(name:string)=>{
         if(!dbMap){
-            return name==='default'?convoNodeStoreService.get():undefined;
+            return name==='default'?convoDbService.get():undefined;
         }
         const named=dbMap[name];
         if(named){

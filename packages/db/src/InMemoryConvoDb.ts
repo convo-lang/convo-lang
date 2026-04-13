@@ -1,14 +1,14 @@
-import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeStoreExport, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
+import { ConvoDbExport, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
 import { deepClone, starStringToRegex, uuid } from "@iyio/common";
-import { BaseConvoNodeStore } from "./BaseConvoNodeStore.js";
+import { BaseConvoDb } from "./BaseConvoDb.js";
 
-export class InMemoryConvoNodeStore extends BaseConvoNodeStore
+export class InMemoryConvoDb extends BaseConvoDb
 {
     private readonly nodes=new Map<string,ConvoNode>();
     private readonly edges=new Map<string,ConvoNodeEdge>();
     private readonly embeddings=new Map<string,ConvoNodeEmbedding>();
 
-    public exportData():ConvoNodeStoreExport{
+    public exportData():ConvoDbExport{
         return {
             nodes:[...this.nodes.values()].map(v=>deepClone(v)),
             edges:[...this.edges.values()].map(v=>deepClone(v)),
@@ -16,7 +16,7 @@ export class InMemoryConvoNodeStore extends BaseConvoNodeStore
         };
     }
 
-    public importData(data:ConvoNodeStoreExport):void{
+    public importData(data:ConvoDbExport):void{
         this.nodes.clear();
         this.edges.clear();
         this.embeddings.clear();

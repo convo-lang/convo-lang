@@ -1,9 +1,9 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoAnthropicModule, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoNodeStoreService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
+import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoAnthropicModule, convoCapabilitiesParams, convoDbService, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
 import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
-import { BunSqliteConvoNodeStore } from "@convo-lang/db/BunSqliteConvoNodeStore.js";
+import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
 import { CancelToken, DisposeContainer, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
@@ -197,7 +197,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         reg.use(convoMcpClientModule);
         reg.use(convoOpenRouterModule);
         reg.use(convoAnthropicModule);
-        reg.implementService(convoNodeStoreService,()=>new BunSqliteConvoNodeStore({
+        reg.implementService(convoDbService,()=>new BunSqliteConvoDb({
             //dbPath:'convo-api.db',initSchema:true
         }))
 

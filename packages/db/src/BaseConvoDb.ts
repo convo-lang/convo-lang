@@ -1,4 +1,4 @@
-import { allConvoStepStages, Conversation, ConversationOptions, ConvoDbCommand, ConvoDbCommandResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+import { allConvoStepStages, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { CancelToken, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
 
@@ -45,7 +45,7 @@ const QueryTraversalStateSchema=z.object({
 
 type QueryTraversalState=z.infer<typeof QueryTraversalStateSchema>;
 
-export interface BaseConvoNodeStoreOptions
+export interface BaseConvoDbOptions
 {
     /**
      * embeddings service to use for generating embeddings
@@ -65,7 +65,7 @@ export interface BaseConvoNodeStoreOptions
 
 
 
-export abstract class BaseConvoNodeStore implements ConvoNodeStore{
+export abstract class BaseConvoDb implements ConvoDb{
 
     protected embeddingsService?:ConvoEmbeddingsService;
     protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
@@ -75,7 +75,7 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
         embeddingsService,
         embeddingOptions,
         convoOptions,
-    }:BaseConvoNodeStoreOptions={}){
+    }:BaseConvoDbOptions={}){
         this.embeddingsService=embeddingsService;
         this.embeddingOptions=embeddingOptions;
         this.convoOptions=convoOptions;

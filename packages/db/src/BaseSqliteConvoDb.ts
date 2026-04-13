@@ -1,15 +1,15 @@
 import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "@convo-lang/convo-lang";
 import { createPromiseSource, deepClone, getErrorMessage, PromiseSource, uuid } from "@iyio/common";
-import { BaseConvoNodeStore, BaseConvoNodeStoreOptions } from "./BaseConvoNodeStore.js";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 
-export interface BaseSqliteConvoNodeStoreOptions extends BaseConvoNodeStoreOptions
+export interface BaseSqliteConvoDbOptions extends BaseConvoDbOptions
 {
     nodeTableName?:string;
     edgeTableName?:string;
     embeddingTableName?:string;
 }
 
-export abstract class BaseSqliteConvoNodeStore extends BaseConvoNodeStore
+export abstract class BaseSqliteConvoDb extends BaseConvoDb
 {
 
     public nodeTableName:string;
@@ -21,7 +21,7 @@ export abstract class BaseSqliteConvoNodeStore extends BaseConvoNodeStore
         edgeTableName='edge',
         embeddingTableName='embedding',
         ...baseOptions
-    }:BaseSqliteConvoNodeStoreOptions){
+    }:BaseSqliteConvoDbOptions){
         super(baseOptions);
         validateTableName(nodeTableName,'nodeTableName');
         validateTableName(edgeTableName,'edgeTableName');

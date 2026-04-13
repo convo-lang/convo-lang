@@ -1,9 +1,9 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
 import { getErrorMessage } from "@iyio/common";
 import type { Database } from "bun:sqlite";
-import { BaseSqliteConvoNodeStore, BaseSqliteConvoNodeStoreOptions } from "./BaseSqliteConvoNodeStore.js";
+import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
 
-export interface BunSqliteConvoNodeStoreOptions extends BaseSqliteConvoNodeStoreOptions
+export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
 {
     /**
      * Path to database on disk. If not defined in memory db will be used
@@ -11,7 +11,7 @@ export interface BunSqliteConvoNodeStoreOptions extends BaseSqliteConvoNodeStore
     dbPath?:string;
 }
 
-export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
+export class BunSqliteConvoDb extends BaseSqliteConvoDb
 {
 
     private readonly dbPath?:string;
@@ -21,7 +21,7 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
     public constructor({
         dbPath,
         ...baseProps
-    }:BunSqliteConvoNodeStoreOptions){
+    }:BunSqliteConvoDbOptions){
         super(baseProps);
         this.dbPath=dbPath;
     }
