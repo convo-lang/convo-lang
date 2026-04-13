@@ -1,5 +1,5 @@
-import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
-import { deepClone, uuid } from "@iyio/common";
+import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "@convo-lang/convo-lang";
+import { createPromiseSource, deepClone, getErrorMessage, PromiseSource, uuid } from "@iyio/common";
 import { BaseConvoNodeStore, BaseConvoNodeStoreOptions } from "./BaseConvoNodeStore.js";
 
 export interface BaseSqliteConvoNodeStoreOptions extends BaseConvoNodeStoreOptions
@@ -31,7 +31,90 @@ export abstract class BaseSqliteConvoNodeStore extends BaseConvoNodeStore
         this.embeddingTableName=embeddingTableName;
     }
 
-    protected abstract execSqlAsync(sql:string,bind?:any[]):PromiseResultType<any[]>;
+    protected initing=false;
+    protected inited=false;
+    private initPromise:Promise<void>|undefined;
+    private initError?:string;
+    private initErrorCode?:StatusCode;
+    protected waitPromise:PromiseSource<void>|undefined=createPromiseSource<void>();
+    private async initAsync()
+    {
+        this.initing=true;
+        try{
+            await (this.initPromise??(this.initPromise=this._initAsync()));
+        }catch(ex){
+            this.initError=getErrorMessage(ex);
+        }
+    }
+
+    protected async _initAsync()
+    {
+
+        await this._execSqlAsync("PRAGMA foreign_keys = ON;");
+        await this._execSqlAsync("PRAGMA journal_mode = WAL;");
+
+        const r=await this._execSqlAsync(
+            `SELECT name count FROM sqlite_master WHERE type='table' AND name='${this.nodeTableName}' limit 1`
+        );
+
+        if(!r.success){
+            this.initError=r.error;
+            this.initErrorCode=r.statusCode;
+            return;
+        }
+
+        const hasNodeTable=r.result.length>0;
+
+        if(!hasNodeTable){
+            const r=await this.createSchemaAsync();
+            if(!r.success){
+                this.initError=r.error;
+                this.initErrorCode=r.statusCode;
+                return;
+            }
+        }
+        this.inited=true;
+    }
+
+    protected async createSchemaAsync():PromiseResultTypeVoid
+    {
+        const sql=this.getSchemaStatements();
+        for(const s of sql){
+            const r=await this._execSqlAsync(s);
+            if(!r.success){
+                return r;
+            }
+        }
+
+        return {success:true}
+    }
+
+    protected async execSqlAsync(sql:string,bind?:any[]):PromiseResultType<any[]>
+    {
+        await this.initAsync();
+        if(this.initError){
+            return {
+                success:false,
+                error:this.initError,
+                statusCode:this.initErrorCode??500,
+            }
+        }
+
+        try{
+            const r=await this._execSqlAsync(sql,bind);
+            if(!r.success){
+                console.error('SQLite error',r,new Error().stack);
+            }
+            return r;
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500,
+            }
+        }
+    }
+    protected abstract _execSqlAsync(sql:string,bind?:any[]):PromiseResultType<any[]>;
 
     public getSchemaStatements():string[]{
         const n=this.nodeTableName;

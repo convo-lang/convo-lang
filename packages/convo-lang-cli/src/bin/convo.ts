@@ -1,3 +1,4 @@
+import { getConvoDbMapFromStrings } from "@convo-lang/db/db-map.js";
 import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumber, safeParseNumberOrUndefined } from "@iyio/common";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
@@ -87,6 +88,7 @@ const args=parseCliArgsT<Args>({
         embeddingFormat:args=>args[0],
         embeddingProvider:args=>args[0],
         embeddingDimensions:args=>safeParseNumberOrUndefined(args[0]),
+        dbMap:args=>args,
     }
 }).parsed as Args;
 
@@ -156,11 +158,17 @@ const main=async()=>{
 
     if(args.api){
         await initConvoCliAsync(args);
+        const r=args.dbMap?getConvoDbMapFromStrings(args.dbMap):undefined;
+        if(r?.success===false){
+            console.error(r.error);
+            process.exit(1);
+        }
         toolPromises.push(runConvoCliApiAsync({
             port:args.apiPort,
             reusePort:args.apiReusePort,
             cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
             enableLogging:args.apiLogging,
+            dbMap:r?.success?r.result:undefined,
         },cancel));
     }
 

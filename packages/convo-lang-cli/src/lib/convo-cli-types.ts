@@ -314,6 +314,16 @@ export interface ConvoCliOptions
      * Number of dimensions embeddings should be generated with
      */
     embeddingDimensions?:number;
+
+    /**
+     * Maps database name and layers to backing store types. The default maps to an in-memory sqlite database.
+     * Examples:
+     * - `dev:mem` - Maps the `dev` db to an in-memory database, not SQLite in-memory
+     * - `stg:sqlite` - Maps the `stg` db to an SQLite in-memory db
+     * - `prd:sqlite:./prd.db` Maps the `prd` db to an SQLite database with a db file saved to ./prd.db
+     * @default 'default:sqlite'
+     */
+    dbMap?:string[];
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

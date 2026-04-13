@@ -9,8 +9,6 @@ export interface BunSqliteConvoNodeStoreOptions extends BaseSqliteConvoNodeStore
      * Path to database on disk. If not defined in memory db will be used
      */
     dbPath?:string;
-
-    initSchema?:boolean;
 }
 
 export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
@@ -22,34 +20,22 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
 
     public constructor({
         dbPath,
-        initSchema,
         ...baseProps
     }:BunSqliteConvoNodeStoreOptions){
         super(baseProps);
         this.dbPath=dbPath;
-        this.initSchema=initSchema;
     }
 
     
-    private initPromise:Promise<void>|undefined;
-    private initAsync()
-    {
-        return this.initPromise??(this.initPromise=this._initAsync());
-    }
-    private async _initAsync()
+    
+    protected override async _initAsync()
     {
         const sqliteMod=await import('bun:sqlite');
-
         this.db=new sqliteMod.Database(this.dbPath||'');
-        this.db.run("PRAGMA foreign_keys = ON;");
-        this.db.run("PRAGMA journal_mode = WAL;");
-        if(!this.dbPath || this.initSchema){
-            this.createSchema();
-        }
+        await super._initAsync();
     }
 
-    protected override async execSqlAsync(sql: string, bind:any[]=[]): PromiseResultType<any[]> {
-        await this.initAsync();
+    protected override async _execSqlAsync(sql:string,bind:any[]=[]):PromiseResultType<any[]>{
         try{
             const results=this.execSql(sql,bind);
             return {
@@ -80,14 +66,6 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
             console.log('SQL Result:',results);
         }
         return results;
-    }
-
-    private createSchema()
-    {
-        const sql=this.getSchemaStatements();
-        for(const s of sql){
-            this.execSql(s);
-        }
     }
 
 }

@@ -1534,3 +1534,10 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
      */
     deleteEmbedding?:true;
 }
+
+/**
+ * Maps names to functions that return ConvoNodeStores. Each function in the map should return
+ * the same cached db after called the first name. There is one exception to the caching rule.
+ * '*' should return a new store every time called.
+ */
+export type ConvoDbMap=Record<string,()=>ConvoNodeStore>;

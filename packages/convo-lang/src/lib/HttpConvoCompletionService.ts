@@ -36,6 +36,12 @@ export interface HttpConvoCompletionServiceOptions
      * Allows http request options to be customize
      */
     getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
+
+    /**
+     * Name of the database the ConvoNodeStore functions use.
+     * @default 'default'
+     */
+    dbName?:string;
 }
 
 /**
@@ -83,11 +89,14 @@ export class HttpConvoCompletionService implements
 
     private readonly endpoint:string|string[];
 
+    private readonly dbName:string;
+
     private readonly getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
 
     public constructor({
         endpoint,
-        getRequestOptions
+        getRequestOptions,
+        dbName='default',
     }:HttpConvoCompletionServiceOptions){
         if(Array.isArray(endpoint)){
             endpoint=[...endpoint];
@@ -95,6 +104,7 @@ export class HttpConvoCompletionService implements
         }
         this.endpoint=endpoint;
         this.getRequestOptions=getRequestOptions;
+        this.dbName=dbName;
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -526,7 +536,7 @@ export class HttpConvoCompletionService implements
         const options=await this.getRequestOptions?.();
         
         for await(const evt of httpClient().streamSseAsync<ConvoNodeStreamItem<any>>({
-            url:joinPaths(this.getEndpoint(),'/db/default/stream'),
+            url:joinPaths(this.getEndpoint(),`/db/${this.dbName}/stream`),
             body:query,
             ...options,
         })){
@@ -563,7 +573,7 @@ export class HttpConvoCompletionService implements
 
     public async executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>
     {
-        return await this.requestAsync('POST','/db/default',commands);
+        return await this.requestAsync('POST',`/db/${this.dbName}`,commands);
     }
 
     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(

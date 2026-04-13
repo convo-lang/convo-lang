@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, convoNodeStoreService, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoDbMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, convoNodeStoreService, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
@@ -10,11 +10,13 @@ export interface ConvoHonoRoutesOptions
 {
     completionTimeoutMs?:number;
     enableLogging?:boolean;
+    dbMap?:ConvoDbMap;
 }
 
 export const getConvoHonoRoutes=({
     completionTimeoutMs=minuteMs*30,
     enableLogging,
+    dbMap
 }:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
@@ -300,13 +302,30 @@ export const getConvoHonoRoutes=({
         return c.json(false);
     });
 
+    const getDb=(name:string)=>{
+        if(!dbMap){
+            return name==='default'?convoNodeStoreService.get():undefined;
+        }
+        const named=dbMap[name];
+        if(named){
+            return named();
+        }
+        const fallback=dbMap['*'];
+        if(fallback){
+            let db=fallback();
+            dbMap[name]=()=>db;
+            return db;
+        }
+        return undefined;
+    }
+
     routes.post('/db/:dbName',async (c)=>{
 
         await initConvoHonoAsync();
 
-        const store=convoNodeStoreService.get();
+        const store=getDb(c.req.param('dbName'));
         if(!store){
-            return c.json('Not supported',501);
+            return c.json('No database found by name',404);
         }
 
         const commands=await c.req.json<ConvoDbCommand[]>();
@@ -328,12 +347,12 @@ export const getConvoHonoRoutes=({
 
             let id=0;
 
-            const store=convoNodeStoreService.get();
+            const store=getDb(c.req.param('dbName'));
             if(!store){
                 const item:ConvoNodeStreamItem<any>={
                     type:'error',
-                    error:'Not supported',
-                    statusCode:501
+                    error:'Database not found by name',
+                    statusCode:404
                 }
                 await stream.writeSSE({
                     event:'node',
