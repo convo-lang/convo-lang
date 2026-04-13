@@ -377,7 +377,7 @@ export const allConvoNodeConditionOps=[
  * and supplied value on the right: `node.path like /user/jeff/*`.
  *
  * Comparison semantics:
- * - datastores should make a best effort to coerce types when evaluating comparisons
+ * - databases should make a best effort to coerce types when evaluating comparisons
  *
  * - `=` Target equal to value
  * - `!=` Target not equal to value
@@ -514,7 +514,7 @@ export const allConvoStepStages=['path','condition','permissions','embedding','e
 export type ConvoStepStage=typeof allConvoStepStages[number];
 
 /**
- * Represents a single step in a node query. The first step is run against the full store of nodes.
+ * Represents a single step in a node query. The first step is run against the full database of nodes.
  * A query step runs in 2 phases: the first phase filters nodes and the second phase selects
  * nodes to move to by selecting connected edges.
  * 
@@ -640,7 +640,7 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
 
     /**
      * The number of items read from the backing datastore at a time. By default this value is
-     * determined by the backing store and should be left undefined unless you know what you are doing.
+     * determined by the backing datastore and should be left undefined unless you know what you are doing.
      */
     readBatchSize?:number;
 
@@ -940,7 +940,7 @@ export interface ConvoNodeEmbeddingQuery
 }
 
 /**
- * An export of a ConvoDbs data
+ * An export of a ConvoDb's data
  */
 export interface ConvoDbExport
 {
@@ -955,12 +955,12 @@ export interface ConvoDbExport
 export interface ConvoDb
 {
     /**
-     * Queries the store for nodes
+     * Queries the database for nodes
      */
     queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>):PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>>;
 
     /**
-     * Queries the store for nodes and returns the nodes as an async iterable stream
+     * Queries the database for nodes and returns the nodes as an async iterable stream
      */
     streamNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(query:ConvoNodeQuery<TKeys>,cancel?:CancelToken):AsyncIterableIterator<ConvoNodeStreamItem<ConvoNodeQueryKeysToSelection<TKeys>>>;
 
@@ -1015,7 +1015,7 @@ export interface ConvoDb
     getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge>;
 
     /**
-     * Inserts a new edge and returns the inserted edge. The store generates the edge id.
+     * Inserts a new edge and returns the inserted edge. The database generates the edge id.
      * `name`, `type`, and `created` are immutable after insert.
      * `from` and `to` must reference existing nodes.
      */
@@ -1045,7 +1045,7 @@ export interface ConvoDb
     getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding>;
 
     /**
-     * Inserts an embedding and returns the inserted embedding. The store generates the embedding id.
+     * Inserts an embedding and returns the inserted embedding. The database generates the embedding id.
      * By default the vector property will not be returned to save bandwidth.
      * `name`, `type`, `prop`, `path`, and `created` are immutable after insert and `path` must reference an existing node.
      */
@@ -1063,7 +1063,7 @@ export interface ConvoDb
     deleteEmbeddingAsync(id:string,options?:DeleteConvoNodeEmbeddingOptions):PromiseResultTypeVoid;
 
     /**
-     * Calls a of the functions of this interface based on the action of the command
+     * Calls one of the functions of this interface based on the action of the command
      */
     executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>):PromiseResultType<ConvoDbCommandResult<TKeys>>;
 
@@ -1538,6 +1538,6 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
 /**
  * Maps names to functions that return ConvoDbs. Each function in the map should return
  * the same cached db after called the first name. There is one exception to the caching rule.
- * '*' should return a new store every time called.
+ * '*' should return a new database every time called.
  */
 export type ConvoDbMap=Record<string,()=>ConvoDb>;
