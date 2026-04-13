@@ -284,6 +284,31 @@ export interface ConvoCliOptions
      * List of allowed origins for API CORS
      */
     apiCorsOrigins?:string[];
+
+    /**
+     * Generates an embedding for the give text
+     */
+    generateEmbedding?:string;
+
+    /**
+     * The model to use for generating embeddings
+     */
+    embeddingModel?:string;
+
+    /**
+     * The provider to use for generating embeddings
+     */
+    embeddingProvider?:string;
+
+    /**
+     * The format to return embedding in
+     */
+    embeddingFormat?:string;
+
+    /**
+     * Number of dimensions embeddings should be generated with
+     */
+    embeddingDimensions?:number;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

@@ -2,8 +2,9 @@ import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryR
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
-import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
+import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
+import { PromiseResultType, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;
@@ -54,7 +55,8 @@ export class HttpConvoCompletionService implements
     ConvoCompletionService<FlatConvoConversationBase,ConvoCompletionMessage[]>,
     ConvoRagService,
     ConvoTranscriptionService,
-    ConvoTtsService
+    ConvoTtsService,
+    ConvoEmbeddingsService
 {
 
     public readonly serviceId='http';
@@ -346,6 +348,92 @@ export class HttpConvoCompletionService implements
             return {
                 success:false,
                 error:getErrorMessage(ex),
+            }
+        }
+    }
+
+    private readonly embeddingsSupportCache:Record<string,PromiseResultType<boolean>>={};
+    public canGenerateEmbeddings(request:ConvoEmbeddingsGenerationSupportRequest):PromiseResultType<boolean>
+    {
+        const key=`${request.provider??'.'}::${request.model??'.'}::${request.format??'.'}::${request.dimensions??'.'}`;
+        return this.embeddingsSupportCache[key]??(this.embeddingsSupportCache[key]=this._canGenerateEmbeddings(request));
+    }
+    private async _canGenerateEmbeddings(request:ConvoEmbeddingsGenerationSupportRequest):PromiseResultType<boolean>{
+        const options=await this.getRequestOptions?.();
+        const response=await httpClient().postAsync<Response>(
+            joinPaths(this.getEndpoint(),`/embeddings/support`),
+            request,
+            {
+                ...options,
+                returnFetchResponse:true,
+            }
+        );
+        if(!response){
+            return {
+                success:false,
+                error:'Request failed',
+                statusCode:500,
+            }
+        }
+        if(!response?.ok){
+            try{
+                const text=await response.text();
+                return {
+                    success:false,
+                    error:text,
+                    statusCode:response.status as StatusCode,
+                }
+            }catch(ex){
+                return {
+                    success:false,
+                    error:'Error',
+                    statusCode:response.status as StatusCode,
+                }
+            }
+        }
+        try{
+            return {
+                success:true,
+                result:(await response.json())?true:false,
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:'Failed to ready response from server',
+                statusCode:500,
+            }
+        }
+    }
+
+    public async generateEmbeddingsAsync(request:ConvoEmbeddingsGenerationRequest):PromiseResultType<ConvoEmbeddingsGenerationResult>
+    {
+        try{
+            const r=await httpClient().postAsync<Response>(
+                joinPaths(this.getEndpoint(),'/embeddings'),
+                request,
+                {
+                    ...await this.getRequestOptions?.(),
+                    returnFetchResponse:true,
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:'Empty response from server',
+                    statusCode:500,
+                }
+            }
+            const result=await r.json() as ConvoEmbeddingsGenerationResult;
+            return {
+                success:true,
+                result,
+            }
+            
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500
             }
         }
     }

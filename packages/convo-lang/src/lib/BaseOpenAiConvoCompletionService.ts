@@ -1,8 +1,9 @@
 import { NotFoundError, SecretManager, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
-import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionResultProviderBase, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
+import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionResultProviderBase, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessageToolCall } from './open-ai/resources/chat/index.js';
 import { CompletionUsage } from "./open-ai/resources/completions.js";
+import { PromiseResultType, ResultType, StatusCode } from "./result-type.js";
 
 export interface BaseOpenAiConvoCompletionServiceOptions
 {
@@ -29,7 +30,11 @@ export interface BaseOpenAiConvoCompletionServiceOptions
     supportsTts?:boolean;
 }
 
-export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<ChatCompletionRequest,ChatCompletion>, ConvoTranscriptionService, ConvoTtsService
+export class BaseOpenAiConvoCompletionService implements
+    ConvoCompletionService<ChatCompletionRequest,ChatCompletion>,
+    ConvoTranscriptionService,
+    ConvoTtsService,
+    ConvoEmbeddingsService
 {
     public readonly serviceId:string;
     public readonly inputType:string;
@@ -490,6 +495,87 @@ export class BaseOpenAiConvoCompletionService implements ConvoCompletionService<
         }
 
     }
+
+    public canGenerateEmbeddings(request:ConvoEmbeddingsGenerationSupportRequest):ResultType<boolean>
+    {
+        return {success:true,result:true};    
+    }
+
+    public async generateEmbeddingsAsync(request:ConvoEmbeddingsGenerationRequest):PromiseResultType<ConvoEmbeddingsGenerationResult>
+    {
+        const client=await this.getApiClientAsync(undefined,undefined,'/v1/embeddings');
+
+        const headers:Record<string,string|undefined>={
+            [this.apiKeyHeader]:client.apiKey?((this.apiKeyHeaderValuePrefix??'')+client.apiKey):undefined,
+            ...this.headers
+        };
+        const model=request.model??'text-embedding-3-small';
+
+        const r=await httpClient().postAsync<Response>(
+            client.url,
+            {
+                model,
+                input:request.text,
+                encoding_format:request.format,
+                dimensions:request.dimensions,
+            },
+            {
+                headers,
+                readErrors:true,
+                log:this.logRequests,
+                returnFetchResponse:true,
+            }
+        );
+
+        if(!r){
+            return {
+                success:false,
+                error:'No response return from API',
+                statusCode:500,
+            };
+        }
+        if(!r.ok){
+            try{
+                const text=await r.text();
+                return {
+                    success:false,
+                    error:text,
+                    statusCode:r.status as StatusCode,
+                }
+            }catch{
+                return {
+                    success:false,
+                    error:`API error response - ${r.status}`,
+                    statusCode:r.status as StatusCode,
+                }
+            }
+        }else{
+            try{
+                const data=await r.json() as OpenAIEmbeddingsResponse;
+                return {
+                    success:true,
+                    result:{
+                        model,
+                        provider:this.serviceId,
+                        format:request.format,
+                        text:request.text,
+                        embedding:data?.data?.[0]?.embedding,
+                        usage:data?.usage?{
+                            inputTokens:data.usage.prompt_tokens,
+                            outputTokens:data.usage.total_tokens,
+                            tokenPrice:0,
+                        }:undefined
+                    }
+                }
+            }catch(ex){
+                return {
+                    success:false,
+                    error:`Failed to read audio from API - ${getErrorMessage(ex)}`,
+                    statusCode:500,
+                }
+            }
+        }
+    }
 }
 
 
@@ -511,4 +597,22 @@ const nextChunkId=()=>{
         chunkId=1;
     }
     return prefix+chunkId;
+}
+
+export interface OpenAIEmbeddingsResponse {
+    object: string;
+    data:   Datum[];
+    model:  string;
+    usage:  Usage;
+}
+
+export interface Datum {
+    object:    string;
+    index:     number;
+    embedding: number[];
+}
+
+export interface Usage {
+    prompt_tokens: number;
+    total_tokens:  number;
 }

@@ -1,5 +1,8 @@
-import { CancelToken, getErrorMessage } from "@iyio/common";
+import { CancelToken, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
+import { Conversation, ConversationOptions } from "../Conversation.js";
+import { ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService } from "../convo-types.js";
+import { getDefaultMockConvoEmbeddingsService } from "../MockConvoEmbeddingsService.js";
 import { PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode } from "../result-type.js";
 import { defaultConvoNodeQueryLimit, maxConvoNodeQueryLimit } from "./convo-node-const.js";
 import { normalizeConvoNodePath, validateConvoNodeQuery } from "./convo-node-lib.js";
@@ -48,9 +51,41 @@ const QueryTraversalStateSchema=z.object({
 
 type QueryTraversalState=z.infer<typeof QueryTraversalStateSchema>;
 
+export interface BaseConvoNodeStoreOptions
+{
+    /**
+     * embeddings service to use for generating embeddings
+     */
+    embeddingsService?:ConvoEmbeddingsService;
+
+    /**
+     * Default options for generating embeddings
+     */
+    embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
+
+    /**
+     * Options used to create Conversation instances for natural language processing
+     */
+    convoOptions?:ConversationOptions;
+}
+
 
 
 export abstract class BaseConvoNodeStore implements ConvoNodeStore{
+
+    protected embeddingsService?:ConvoEmbeddingsService;
+    protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
+    protected convoOptions?:ConversationOptions;
+
+    public constructor({
+        embeddingsService,
+        embeddingOptions,
+        convoOptions,
+    }:BaseConvoNodeStoreOptions={}){
+        this.embeddingsService=embeddingsService;
+        this.embeddingOptions=embeddingOptions;
+        this.convoOptions=convoOptions;
+    }
 
     /**
      * Returns edges whose `from` path is contained in `fromPathsIn` and whose `to` path is contained
@@ -1008,6 +1043,99 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
             }
         }
         return await this._deleteEmbeddingAsync(id,options);
+    }
+
+    protected async selectNodeByPathAsync(path:string,keys:(keyof ConvoNode)[]|'*'):PromiseResultType<Partial<ConvoNode>|undefined>
+    {
+        const r=await this._selectNodesByPathsAsync(keys,[path],[{prop:'path'}]);
+        if(!r.success){
+            return r;
+        }
+        return {
+            success:true,
+            result:r.result[0]
+        }
+    }
+
+    /**
+     * Generates a vector for the given embedding.
+     * Steps:
+     * - Get node with matching path
+     * - Extract value pointed to by the `prop` property of the embedding
+     * - If the embedding includes instructions the instructions are evaluated as raw convo-lang
+     *   and the result is used as the text value to generate embeddings for.
+     * - Generate embeddings using the configured ConvoEmbeddingsService or use the MockConvoEmbeddingsService
+     *   if one is not configured.
+     */
+    public async generateEmbeddingVectorAsync(embedding:ConvoNodeEmbedding):PromiseResultType<any>
+    {
+        const nodeResult=await this.selectNodeByPathAsync(embedding.path,'*');
+        if(!nodeResult.success){
+            return nodeResult;
+        }
+        const node=nodeResult.result;
+        if(!node){
+            return {
+                success:false,
+                error:'Target node not found',
+                statusCode:404,
+            }
+        }
+
+        let value:any=getValueByPath(node,embedding.prop);
+        if(embedding.instructions){
+            const conversation=this.createConversation();
+            conversation.defaultVars['node']=node;
+            conversation.defaultVars['embedding']=embedding;
+            conversation.defaultVars['value']=value;
+            try{
+                conversation.append(embedding.instructions);
+            }catch(ex){
+                return {
+                    success:false,
+                    error:`Invalid embedding.instructions - ${getErrorMessage(ex)}`,
+                    statusCode:400
+                }
+            }
+            try{
+                const r=await conversation.completeAsync();
+                value=r.message?.content?.trim()||value;
+            }catch(ex){
+                return {
+                    success:false,
+                    error:`Embeddings natural language content generation failed - ${getErrorMessage(ex)}`,
+                    statusCode:500
+                }
+            }
+        }
+
+        const embeddingResult=await this.generateEmbeddingsAsync({
+            ...this.embeddingOptions,
+            text:String(value),
+        });
+
+        if(!embeddingResult.success){
+            return embeddingResult;
+        }
+
+        return {
+            success:true,
+            result:embeddingResult.result.embedding
+        }
+
+    }
+
+    protected async generateEmbeddingsAsync(request:ConvoEmbeddingsGenerationRequest):PromiseResultType<ConvoEmbeddingsGenerationResult>
+    {
+        const service=this.embeddingsService??getDefaultMockConvoEmbeddingsService();
+        return await service.generateEmbeddingsAsync(request);
+    }
+
+    /**
+     * Creates a Convo-Lang conversation that can be used for natural language processing.
+     */
+    protected createConversation(){
+        return new Conversation(this.convoOptions);
     }
 }
 

@@ -3,6 +3,7 @@ import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
 import { createConvoCliAsync, initConvoCliAsync } from "../lib/ConvoCli.js";
 import { runConvoCliApiAsync } from "../lib/convo-cli-api-server.js";
+import { generateEmbeddingAsync } from "../lib/convo-cli-embeddings.js";
 import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
@@ -80,6 +81,11 @@ const args=parseCliArgsT<Args>({
         apiCors:args=>args.length?true:false,
         apiCorsOrigins:args=>args,
         env:args=>args,
+        generateEmbedding:args=>args[0],
+        embeddingModel:args=>args[0],
+        embeddingFormat:args=>args[0],
+        embeddingProvider:args=>args[0],
+        embeddingDimensions:args=>safeParseNumberOrUndefined(args[0]),
     }
 }).parsed as Args;
 
@@ -140,6 +146,11 @@ const main=async()=>{
             cwd:args.spawnDir,
             cancel,
         }));
+    }
+
+    if(args.generateEmbedding){
+        await initConvoCliAsync(args);
+        toolPromises.push(generateEmbeddingAsync(args.generateEmbedding,args));
     }
 
     if(args.api){

@@ -1,7 +1,7 @@
 import { Scope, ScopeRegistration, secretManager } from "@iyio/common";
 import { BaseOpenAiConvoCompletionService } from "../BaseOpenAiConvoCompletionService.js";
 import { BaseOpenAiConvoConverter } from "../BaseOpenAiConvoConverter.js";
-import { convoCompletionService, convoConversationConverterProvider, convoTranscriptionService, convoTtsService } from "../convo.deps.js";
+import { convoCompletionService, convoConversationConverterProvider, convoEmbeddingsService, convoTranscriptionService, convoTtsService } from "../convo.deps.js";
 import { convoOpenAiInputType, convoOpenAiOutputType } from "./openai-lib.js";
 import { defaultOpenAiChatModel, openAiModels } from "./openai-models.js";
 import { openAiApiKeyParam, openAiBaseUrlParam, openAiChatModelParam, openAiSecretsParam, openAiVisionModelParam } from "./openai-params.js";
@@ -10,6 +10,7 @@ export const convoOpenAiModule=(scope:ScopeRegistration)=>{
     scope.implementService(convoCompletionService,createOpenAiConvoServiceFromScope);
     scope.implementService(convoTranscriptionService,createOpenAiConvoServiceFromScope);
     scope.implementService(convoTtsService,createOpenAiConvoServiceFromScope);
+    scope.implementService(convoEmbeddingsService,createOpenAiConvoServiceFromScope);
     scope.addProvider(convoConversationConverterProvider,createOpenAiConvoConverterFromScope);
 }
 

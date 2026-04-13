@@ -6,7 +6,7 @@ import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
 import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoRoles, convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
-import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoMessage, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
+import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoEmbeddingsService, ConvoMessage, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoViewTheme } from "./convo-view-theme.js";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
 import { ConvoQueuedTextToSpeech, TtsCtrl } from "./TtsCtrl.js";
@@ -41,6 +41,7 @@ export interface ConversationUiCtrlOptions
     theme?:ConvoViewTheme;
     transcriptionService?:ConvoTranscriptionService;
     ttsService?:ConvoTtsService;
+    embeddingsService?:ConvoEmbeddingsService;
 }
 
 export class ConversationUiCtrl
@@ -56,6 +57,7 @@ export class ConversationUiCtrl
 
     public readonly transcriptionService?:ConvoTranscriptionService;
     public readonly ttsService?:ConvoTtsService;
+    public readonly embeddingsService?:ConvoEmbeddingsService;
 
     private readonly convoOptions?:ConversationOptions;
     private readonly initConvoCallback?:(convo:Conversation)=>void;
@@ -375,6 +377,7 @@ export class ConversationUiCtrl
         theme,
         transcriptionService,
         ttsService,
+        embeddingsService,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
@@ -388,6 +391,7 @@ export class ConversationUiCtrl
 
         this.transcriptionService=transcriptionService;
         this.ttsService=ttsService;
+        this.embeddingsService=embeddingsService;
 
         this._defaultVars=new BehaviorSubject<Record<string,any>>(defaultVars?{...defaultVars}:{});
         this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});

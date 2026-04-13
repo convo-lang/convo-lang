@@ -7,6 +7,7 @@ import type { convoReservedRoles } from './convo-lib.js';
 import { ConvoNodeDescription, ConvoNodeGraphResult, ConvoNodeGraphSource, ConvoNodeResult, ConvoNodeRoute, ConvoRuntimeNodeInfo } from './convo-node-graph-types.js';
 import { ConvoDocumentReference } from './convo-rag-types.js';
 import type { convoSystemMessages } from './convo-system-messages.js';
+import { PromiseResultType, ResultType } from './result-type.js';
 
 export type ConvoMessageType='text'|'function';
 
@@ -1386,6 +1387,31 @@ export interface ConvoTtsService
 {
     canConvertToSpeech:(request:ConvoTtsRequest)=>boolean|Promise<boolean>;
     convertToSpeechAsync:(request:ConvoTtsRequest)=>Promise<ConvoTtsResult>;
+}
+
+export interface ConvoEmbeddingsGenerationRequest
+{
+    model?:string;
+    provider?:string;
+    format?:string;
+    dimensions?:number;
+    text:string;
+}
+export type ConvoEmbeddingsGenerationSupportRequest=Omit<ConvoEmbeddingsGenerationRequest,'text'>;
+export interface ConvoEmbeddingsGenerationResult
+{
+    embedding:any;
+    text:string;
+    format?:string;
+    model:string;
+    provider:string;
+    usage?:ConvoTokenUsage;
+}
+
+export interface ConvoEmbeddingsService
+{
+    canGenerateEmbeddings(request:ConvoEmbeddingsGenerationSupportRequest):PromiseResultType<boolean>|ResultType<boolean>;
+    generateEmbeddingsAsync(request:ConvoEmbeddingsGenerationRequest):PromiseResultType<ConvoEmbeddingsGenerationResult>;
 }
 
 export type ConvoRagMode=boolean|number;

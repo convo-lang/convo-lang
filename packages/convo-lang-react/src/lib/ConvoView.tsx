@@ -447,6 +447,7 @@ export function ConvoView({
         theme:refs.current.theme,
         transcriptionService:httpEndpoint?getHttpConvoCompletionServiceForEndpoint(httpEndpoint):undefined,
         ttsService:httpEndpoint?getHttpConvoCompletionServiceForEndpoint(httpEndpoint):undefined,
+        embeddingsService:httpEndpoint?getHttpConvoCompletionServiceForEndpoint(httpEndpoint):undefined,
         ...ctrlOptions,
         template:(
             (templatePrefix?templatePrefix+'\n\n':'')+

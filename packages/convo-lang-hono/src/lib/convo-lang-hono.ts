@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { streamSSE } from 'hono/streaming';
@@ -241,6 +241,48 @@ export const getConvoHonoRoutes=({
 
         for(const ser of services){
             if(await ser.canConvertToSpeech(request)){
+                return c.json(true);
+            }
+
+        }
+
+        return c.json(false);
+    });
+
+    routes.post('/embeddings',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const request=await c.req.json();
+        const supportRequest={...request} as ConvoEmbeddingsGenerationSupportRequest;
+        delete (supportRequest as any).text;
+
+        const all=convoEmbeddingsService.all();
+        for(const s of all){
+            if(!await s.canGenerateEmbeddings(supportRequest)){
+                continue;
+            }
+            const t=await s.generateEmbeddingsAsync(request);
+            if(t.success){
+                return c.json(t.result,200);
+            }else{
+                return c.json(t.error,t.statusCode);
+            }
+        }
+
+        return c.json('No supported',400);
+    });
+
+    routes.post('/embeddings/support',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const services=convoEmbeddingsService.all();
+
+        const request=await c.req.json();
+
+        for(const ser of services){
+            if(await ser.canGenerateEmbeddings(request)){
                 return c.json(true);
             }
 

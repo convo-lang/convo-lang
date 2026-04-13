@@ -431,6 +431,14 @@ export class InMemoryConvoNodeStore extends BaseConvoNodeStore
             id:uuid(),
         };
 
+        if(options?.generateVector){
+            const vectorResult=await this.generateEmbeddingVectorAsync(inserted);
+            if(!vectorResult.success){
+                return vectorResult;
+            }
+            inserted.vector=vectorResult.result;
+        }
+
         this.embeddings.set(inserted.id,inserted);
 
         return {
@@ -487,6 +495,14 @@ export class InMemoryConvoNodeStore extends BaseConvoNodeStore
             }else{
                 updated.instructions=update.instructions;
             }
+        }
+
+        if(update.generateVector){
+            const vectorResult=await this.generateEmbeddingVectorAsync(updated);
+            if(!vectorResult.success){
+                return vectorResult;
+            }
+            updated.vector=vectorResult.result;
         }
 
         this.embeddings.set(updated.id,updated);

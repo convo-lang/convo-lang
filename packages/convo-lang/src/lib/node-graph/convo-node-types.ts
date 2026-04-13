@@ -56,7 +56,7 @@ export interface ConvoNode
     description?:string;
 
     /**
-     * Optional instructions on how to use the node
+     * Optional instructions on how to use the node.
      */
     instructions?:string;
 
@@ -286,7 +286,10 @@ export interface ConvoNodeEmbedding
 
     /**
      * Optional instructions on how the data of the pointed to node should be processed to
-     * generate the embedding.
+     * generate the embedding. Instructions are evaluated as raw Convo-Lang and the response is
+     * used a the value to generate embeddings from. The instructions convo will have access to
+     * 3 predefined variables: node, embedding and value. The value variable will contain the 
+     * value of the property of the node pointed to by the embedding.
      */
     instructions?:string;
 
