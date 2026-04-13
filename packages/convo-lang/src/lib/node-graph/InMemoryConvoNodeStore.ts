@@ -2,13 +2,42 @@ import { deepClone, starStringToRegex, uuid } from "@iyio/common";
 import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
 import { BaseConvoNodeStore } from "./BaseConvoNodeStore.js";
 import { defaultConvoNodeQueryLimit } from "./convo-node-const.js";
-import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-node-types.js";
+import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeStoreExport, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-node-types.js";
 
 export class InMemoryConvoNodeStore extends BaseConvoNodeStore
 {
     private readonly nodes=new Map<string,ConvoNode>();
     private readonly edges=new Map<string,ConvoNodeEdge>();
     private readonly embeddings=new Map<string,ConvoNodeEmbedding>();
+
+    public exportData():ConvoNodeStoreExport{
+        return {
+            nodes:[...this.nodes.values()].map(v=>deepClone(v)),
+            edges:[...this.edges.values()].map(v=>deepClone(v)),
+            embeddings:[...this.embeddings.values()].map(v=>deepClone(v)),
+        };
+    }
+
+    public importData(data:ConvoNodeStoreExport):void{
+        this.nodes.clear();
+        this.edges.clear();
+        this.embeddings.clear();
+
+        for(const node of data.nodes){
+            const clone=deepClone(node);
+            this.nodes.set(clone.path,clone);
+        }
+
+        for(const edge of data.edges){
+            const clone=deepClone(edge);
+            this.edges.set(clone.id,clone);
+        }
+
+        for(const embedding of data.embeddings){
+            const clone=deepClone(embedding);
+            this.embeddings.set(clone.id,clone);
+        }
+    }
 
     protected async _selectEdgesByPathsAsync(keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>{
         const fromSet=new Set(fromPathsIn);

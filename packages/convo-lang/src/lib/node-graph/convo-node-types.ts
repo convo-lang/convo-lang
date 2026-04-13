@@ -937,6 +937,16 @@ export interface ConvoNodeEmbeddingQuery
 }
 
 /**
+ * An export of a ConvoNodeStores data
+ */
+export interface ConvoNodeStoreExport
+{
+    nodes:ConvoNode[];
+    edges:ConvoNodeEdge[];
+    embeddings:ConvoNodeEmbedding[];
+}
+
+/**
  * Stores and retrieves nodes.
  */
 export interface ConvoNodeStore
