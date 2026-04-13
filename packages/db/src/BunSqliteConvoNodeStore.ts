@@ -1,6 +1,6 @@
+import { PromiseResultType } from "@convo-lang/convo-lang";
 import { getErrorMessage } from "@iyio/common";
-import { Database } from "bun:sqlite";
-import { PromiseResultType } from "../result-type.js";
+import type { Database } from "bun:sqlite";
 import { BaseSqliteConvoNodeStore, BaseSqliteConvoNodeStoreOptions } from "./BaseSqliteConvoNodeStore.js";
 
 export interface BunSqliteConvoNodeStoreOptions extends BaseSqliteConvoNodeStoreOptions
@@ -17,7 +17,8 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
 {
 
     private readonly dbPath?:string;
-    private readonly db:Database;
+    private readonly initSchema?:boolean;
+    private db?:Database;
 
     public constructor({
         dbPath,
@@ -26,15 +27,29 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
     }:BunSqliteConvoNodeStoreOptions){
         super(baseProps);
         this.dbPath=dbPath;
-        this.db=new Database(dbPath||'');
+        this.initSchema=initSchema;
+    }
+
+    
+    private initPromise:Promise<void>|undefined;
+    private initAsync()
+    {
+        return this.initPromise??(this.initPromise=this._initAsync());
+    }
+    private async _initAsync()
+    {
+        const sqliteMod=await import('bun:sqlite');
+
+        this.db=new sqliteMod.Database(this.dbPath||'');
         this.db.run("PRAGMA foreign_keys = ON;");
         this.db.run("PRAGMA journal_mode = WAL;");
-        if(!dbPath || !initSchema){
+        if(!this.dbPath || this.initSchema){
             this.createSchema();
         }
     }
 
     protected override async execSqlAsync(sql: string, bind:any[]=[]): PromiseResultType<any[]> {
+        await this.initAsync();
         try{
             const results=this.execSql(sql,bind);
             return {
@@ -53,6 +68,9 @@ export class BunSqliteConvoNodeStore extends BaseSqliteConvoNodeStore
 
     private execSql(sql: string, bind:any[]=[]):any[]
     {
+        if(!this.db){
+            throw new Error('BunSqliteNodeStore not inited');
+        }
         if(this.loggingEnabled){
             console.log('SQL:',sql,bind);
         }

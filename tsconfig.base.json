@@ -73,6 +73,9 @@
             ],
             "@convo-lang/convo-lang-hono": [
                 "packages/convo-lang-hono/src/index.ts"
+            ],
+            "@convo-lang/db/*": [
+                "packages/db/src/*"
             ]
         }
     },

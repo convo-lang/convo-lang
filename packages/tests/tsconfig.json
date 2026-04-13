@@ -1,0 +1,18 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx"
+    ],
+    "compilerOptions": {
+        "composite": true
+    },
+    "references": [
+        {
+            "path": "../../packages/convo-lang"
+        },
+        {
+            "path": "../../packages/db"
+        }
+    ]
+}

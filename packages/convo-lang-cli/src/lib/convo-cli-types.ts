@@ -286,6 +286,11 @@ export interface ConvoCliOptions
     apiCorsOrigins?:string[];
 
     /**
+     * Enables API request logging
+     */
+    apiLogging?:boolean;
+
+    /**
      * Generates an embedding for the give text
      */
     generateEmbedding?:string;

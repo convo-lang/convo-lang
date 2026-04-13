@@ -1,0 +1,10 @@
+{
+    "name": "@convo-lang/db",
+    "version": "0.8.18",
+    "type": "module",
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
+}

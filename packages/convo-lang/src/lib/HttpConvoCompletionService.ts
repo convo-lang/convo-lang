@@ -1,10 +1,11 @@
-import { HttpClientRequestOptions, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, getErrorMessage, getSortedObjectHash, httpClient, joinPaths } from "@iyio/common";
+import { CancelToken, HttpClientRequestOptions, HttpMethod, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, deleteUndefined, getErrorMessage, getObjKeyCount, getSortedObjectHash, httpClient, joinPaths, objectToQueryParams } from "@iyio/common";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
-import { PromiseResultType, StatusCode } from "./result-type.js";
+import type { ConvoDbCommand, ConvoDbCommandResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./node-graph/convo-node-types.js";
+import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;
@@ -56,7 +57,8 @@ export class HttpConvoCompletionService implements
     ConvoRagService,
     ConvoTranscriptionService,
     ConvoTtsService,
-    ConvoEmbeddingsService
+    ConvoEmbeddingsService,
+    ConvoNodeStore
 {
 
     public readonly serviceId='http';
@@ -423,6 +425,21 @@ export class HttpConvoCompletionService implements
                     statusCode:500,
                 }
             }
+            if(!r.ok){
+                try{
+                    return {
+                        success:false,
+                        error:await r.text(),
+                        statusCode:r.status as StatusCode,
+                    }
+                }catch{
+                    return {
+                        success:false,
+                        error:r.statusText,
+                        statusCode:r.status as StatusCode,
+                    }
+                }
+            }
             const result=await r.json() as ConvoEmbeddingsGenerationResult;
             return {
                 success:true,
@@ -436,5 +453,231 @@ export class HttpConvoCompletionService implements
                 statusCode:500
             }
         }
+    }
+
+    private async requestAsync<R,T>(method:HttpMethod,path:string,body:T):PromiseResultType<R>{
+        try{
+            if(method==='GET' && body){
+                deleteUndefined(body);
+                if(getObjKeyCount(body)){
+                    path+='?'+objectToQueryParams(body);
+                }
+                body=undefined as any;
+            }
+            const r=await httpClient().requestAsync<Response>(
+                method,
+                joinPaths(this.getEndpoint(),path),
+                body,
+                {
+                    ...await this.getRequestOptions?.(),
+                    returnFetchResponse:true,
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:'Empty response from server',
+                    statusCode:500,
+                }
+            }
+            if(!r.ok){
+                try{
+                    return {
+                        success:false,
+                        error:await r.text(),
+                        statusCode:r.status as StatusCode,
+                    }
+                }catch{
+                    return {
+                        success:false,
+                        error:r.statusText,
+                        statusCode:r.status as StatusCode,
+                    }
+                }
+            }
+
+            return {
+                success:true,
+                result:await r.json(),
+            }
+
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500
+            }
+        }
+    }
+
+    public async *streamNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
+        query:ConvoNodeQuery<TKeys>,
+        cancel?:CancelToken
+    ):AsyncIterableIterator<ConvoNodeStreamItem<
+        TKeys extends null|undefined ? keyof ConvoNode :
+        TKeys extends "*" ? keyof ConvoNode :
+        TKeys extends keyof ConvoNode ? TKeys :
+        TKeys extends (infer U)[] ?
+            "*" extends U ? keyof ConvoNode :
+            Exclude<U, "*"|null|undefined>&keyof ConvoNode :
+        keyof ConvoNode
+    >>
+    {
+        const options=await this.getRequestOptions?.();
+        
+        for await(const evt of httpClient().streamSseAsync<ConvoNodeStreamItem<any>>({
+            url:joinPaths(this.getEndpoint(),'/db/default/stream'),
+            body:query,
+            ...options,
+        })){
+            if(cancel?.isCanceled){
+                break;
+            }
+            if(!evt.data){
+                continue;
+            }
+            yield evt.data;
+        }
+    }
+
+
+    public async executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>):PromiseResultType<ConvoDbCommandResult<TKeys>>
+    {
+        const r=await this.executeCommandsAsync([command]);
+        if(!r.success){
+            return r;
+        }
+        const first=r.result[0];
+        if(!first){
+            return {
+                success:false,
+                error:'No command result returned',
+                statusCode:500
+            }
+        }
+        return {
+            success:true,
+            result:first,
+        }
+    }
+
+    public async executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>
+    {
+        return await this.requestAsync('POST','/db/default',commands);
+    }
+
+    public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
+        query:ConvoNodeQuery<TKeys>
+    ):PromiseResultType<ConvoNodeQueryResult<
+        TKeys extends null|undefined ? keyof ConvoNode :
+        TKeys extends "*" ? keyof ConvoNode :
+        TKeys extends keyof ConvoNode ? TKeys :
+        TKeys extends (infer U)[] ?
+            "*" extends U ? keyof ConvoNode :
+            Exclude<U, "*"|null|undefined>&keyof ConvoNode :
+        keyof ConvoNode
+    >>
+    {
+        const r=await this.executeCommandAsync<TKeys>({queryNodes:{query}});
+        return r.success?{success:true,result:r.result.queryNodes!}:r;
+    }
+
+    public async getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>
+    {
+        const r=await this.executeCommandAsync({getNodesByPath:{path,permissionFrom}});
+        return r.success?{success:true,result:r.result.getNodesByPath!}:r;
+    }
+
+    public async getNodePermissionAsync(fromPath:string,toPath:string):PromiseResultType<ConvoNodePermissionType>
+    {
+        const r=await this.executeCommandAsync({getNodePermission:{fromPath,toPath}});
+        return r.success?{success:true,result:r.result.getNodePermission!}:r;
+    }
+
+    public async checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({checkNodePermission:{fromPath,toPath,type,matchAny}});
+        if(r.success && r.result.checkNodePermission===false){
+            return {success:false,error:'permission denied',statusCode:401};
+        }
+        return r.success?{success:true}:r;
+    }
+
+    public async insertNodeAsync(node:ConvoNode,options?:InsertConvoNodeOptions):PromiseResultType<ConvoNode>
+    {
+        const r=await this.executeCommandAsync({insertNode:{node,options}});
+        return r.success?{success:true,result:r.result.insertNode!}:r;
+    }
+
+    public async updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({updateNode:{node,options}});
+        return r.success?{success:true}:r;
+    }
+
+    public async deleteNodeAsync(path:string,options?:DeleteConvoNodeOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({deleteNode:{path,options}});
+        return r.success?{success:true}:r;
+    }
+
+    public async queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>
+    {
+        const r=await this.executeCommandAsync({queryEdges:{query}});
+        return r.success?{success:true,result:r.result.queryEdges!}:r;
+    }
+
+    public async getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge>
+    {
+        const r=await this.executeCommandAsync({getEdgeById:{id,permissionFrom}});
+        return r.success?{success:true,result:r.result.getEdgeById!}:r;
+    }
+
+    public async insertEdgeAsync(edge:Omit<ConvoNodeEdge,'id'>,options?:InsertConvoNodeEdgeOptions):PromiseResultType<ConvoNodeEdge>
+    {
+        const r=await this.executeCommandAsync({insertEdge:{edge,options}});
+        return r.success?{success:true,result:r.result.insertEdge!}:r;
+    }
+
+    public async updateEdgeAsync(update:ConvoNodeEdgeUpdate,options?:UpdateConvoNodeEdgeOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({updateEdge:{update,options}});
+        return r.success?{success:true}:r;
+    }
+
+    public async deleteEdgeAsync(id:string,options?:DeleteConvoNodeEdgeOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({deleteEdge:{id,options}});
+        return r.success?{success:true}:r;
+    }
+
+    public async queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>
+    {
+        const r=await this.executeCommandAsync({queryEmbeddings:{query}});
+        return r.success?{success:true,result:r.result.queryEmbeddings!}:r;
+    }
+
+    public async getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding>
+    {
+        const r=await this.executeCommandAsync({getEmbeddingById:{id,permissionFrom}});
+        return r.success?{success:true,result:r.result.getEmbeddingById!}:r;
+    }
+
+    public async insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,'id'>,options?:InsertConvoNodeEmbeddingOptions):PromiseResultType<ConvoNodeEmbedding>
+    {
+        const r=await this.executeCommandAsync({insertEmbedding:{embedding,options}});
+        return r.success?{success:true,result:r.result.insertEmbedding!}:r;
+    }
+
+    public async updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options?:UpdateConvoNodeEmbeddingOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({updateEmbedding:{update,options}});
+        return r.success?{success:true}:r;
+    }
+
+    public async deleteEmbeddingAsync(id:string,options?:DeleteConvoNodeEmbeddingOptions):PromiseResultTypeVoid
+    {
+        const r=await this.executeCommandAsync({deleteEmbedding:{id,options}});
+        return r.success?{success:true}:r;
     }
 }

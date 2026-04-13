@@ -1,12 +1,6 @@
+import { allConvoStepStages, Conversation, ConversationOptions, ConvoDbCommand, ConvoDbCommandResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { CancelToken, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
-import { Conversation, ConversationOptions } from "../Conversation.js";
-import { ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService } from "../convo-types.js";
-import { getDefaultMockConvoEmbeddingsService } from "../MockConvoEmbeddingsService.js";
-import { PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode } from "../result-type.js";
-import { defaultConvoNodeQueryLimit, maxConvoNodeQueryLimit } from "./convo-node-const.js";
-import { normalizeConvoNodePath, validateConvoNodeQuery } from "./convo-node-lib.js";
-import { allConvoStepStages, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStore, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./convo-node-types.js";
 
 
 
@@ -1142,6 +1136,221 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
      */
     protected createConversation(){
         return new Conversation(this.convoOptions);
+    }
+
+    public async executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(
+        command:ConvoDbCommand<TKeys>
+    ):PromiseResultType<ConvoDbCommandResult<TKeys>>
+    {
+        const actionNames=Object.keys(command);
+        const action=actionNames[0] as keyof ConvoDbCommand<TKeys>;
+        if(actionNames.length!==1 || !action){
+            return {
+                success:false,
+                error:'Exactly one action should be defined for a ConvoDbCommand',
+                statusCode:400,
+            };
+        }
+
+        let result:ResultType<any>;
+
+        switch(action){
+
+            case 'queryNodes':
+                result=await this.queryNodesAsync(command.queryNodes!.query);
+                break;
+
+            case 'getNodesByPath':
+                result=await this.getNodesByPathAsync(
+                    command.getNodesByPath!.path,
+                    command.getNodesByPath!.permissionFrom,
+                );
+                break;
+
+            case 'getNodePermission':
+                result=await this.getNodePermissionAsync(
+                    command.getNodePermission!.fromPath,
+                    command.getNodePermission!.toPath,
+                );
+                break;
+
+            case 'checkNodePermission':{
+                const r=await this.checkNodePermissionAsync(
+                    command.checkNodePermission!.fromPath,
+                    command.checkNodePermission!.toPath,
+                    command.checkNodePermission!.type,
+                    command.checkNodePermission!.matchAny,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else if(r.statusCode===401){
+                    result={success:true,result:false};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'insertNode':
+                result=await this.insertNodeAsync(
+                    command.insertNode!.node,
+                    command.insertNode!.options,
+                );
+                break;
+
+            case 'updateNode':{
+                const r=await this.updateNodeAsync(
+                    command.updateNode!.node,
+                    command.updateNode!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'deleteNode':{
+                const r=await this.deleteNodeAsync(
+                    command.deleteNode!.path,
+                    command.deleteNode!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'queryEdges':
+                result=await this.queryEdgesAsync(command.queryEdges!.query);
+                break;
+
+            case 'getEdgeById':
+                result=await this.getEdgeByIdAsync(
+                    command.getEdgeById!.id,
+                    command.getEdgeById!.permissionFrom,
+                );
+                break;
+
+            case 'insertEdge':
+                result=await this.insertEdgeAsync(
+                    command.insertEdge!.edge,
+                    command.insertEdge!.options,
+                );
+                break;
+
+            case 'updateEdge':{
+                const r=await this.updateEdgeAsync(
+                    command.updateEdge!.update,
+                    command.updateEdge!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'deleteEdge':{
+                const r=await this.deleteEdgeAsync(
+                    command.deleteEdge!.id,
+                    command.deleteEdge!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'queryEmbeddings':
+                result=await this.queryEmbeddingsAsync(command.queryEmbeddings!.query);
+                break;
+
+            case 'getEmbeddingById':
+                result=await this.getEmbeddingByIdAsync(
+                    command.getEmbeddingById!.id,
+                    command.getEmbeddingById!.permissionFrom,
+                );
+                break;
+
+            case 'insertEmbedding':
+                result=await this.insertEmbeddingAsync(
+                    command.insertEmbedding!.embedding,
+                    command.insertEmbedding!.options,
+                );
+                break;
+
+            case 'updateEmbedding':{
+                const r=await this.updateEmbeddingAsync(
+                    command.updateEmbedding!.update,
+                    command.updateEmbedding!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'deleteEmbedding':{
+                const r=await this.deleteEmbeddingAsync(
+                    command.deleteEmbedding!.id,
+                    command.deleteEmbedding!.options,
+                );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            default:
+                return {
+                    success:false,
+                    error:`Unknown command action - ${action as string}`,
+                    statusCode:400,
+                };
+        }
+
+        return (result.success?
+            {
+                success:true,
+                result:{[action]:result.result},
+            }
+        :
+            result
+        );
+    }
+
+    public async executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>
+    {
+        const results:ConvoDbCommandResult<any>[]=[];
+        for(let i=0;i<commands.length;i++){
+            const cmd=commands[i];
+            if(!cmd){
+                continue;
+            }
+            const r=await this.executeCommandAsync(cmd);
+            if(!r.success){
+                return {
+                    metadata:{successfulResults:results},
+                    success:false,
+                    error:`Command error at index: ${i}, error: ${r.error}`,
+                    statusCode:r.statusCode,
+                }
+            }
+            results.push(r.result);
+        }
+
+        return {success:true,result:results};
     }
 }
 

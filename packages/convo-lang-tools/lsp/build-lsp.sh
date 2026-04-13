@@ -19,6 +19,8 @@ npx esbuild \
     --format=cjs \
     --bundle \
     --external:'vscode' \
+    --external:'bun' \
+    --external:'bun:sqlite' \
     --external:'path' \
     --external:'vscode-languageserver-textdocument' \
     --external:'vscode-languageserver' \
@@ -33,6 +35,8 @@ npx esbuild \
     --tree-shaking=true\
     --bundle \
     --external:'vscode' \
+    --external:'bun' \
+    --external:'bun:sqlite' \
     --external:'path' \
     --external:'vscode-languageserver-textdocument' \
     --external:'vscode-languageserver' \

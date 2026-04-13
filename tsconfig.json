@@ -23,10 +23,10 @@
             "path": "./packages/convo-lang-cli"
         },
         {
-            "path": "./packages/convo-lang-hono"
+            "path": "./packages/db"
         },
         {
-            "path": "./packages/convo-lang-legacy-graph"
+            "path": "./packages/convo-lang-hono"
         },
         {
             "path": "./packages/convo-lang-make"

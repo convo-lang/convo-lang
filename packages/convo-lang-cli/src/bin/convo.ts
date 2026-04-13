@@ -80,6 +80,7 @@ const args=parseCliArgsT<Args>({
         apiReusePort:args=>args.length?true:false,
         apiCors:args=>args.length?true:false,
         apiCorsOrigins:args=>args,
+        apiLogging:args=>args.length?true:false,
         env:args=>args,
         generateEmbedding:args=>args[0],
         embeddingModel:args=>args[0],
@@ -159,6 +160,7 @@ const main=async()=>{
             port:args.apiPort,
             reusePort:args.apiReusePort,
             cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
+            enableLogging:args.apiLogging,
         },cancel));
     }
 

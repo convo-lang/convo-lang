@@ -1,6 +1,7 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, convoNodeStoreService, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
+import { logger } from 'hono/logger';
 import { streamSSE } from 'hono/streaming';
 import { timeout } from 'hono/timeout';
 import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
@@ -8,17 +9,25 @@ import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
 export interface ConvoHonoRoutesOptions
 {
     completionTimeoutMs?:number;
+    enableLogging?:boolean;
 }
 
 export const getConvoHonoRoutes=({
     completionTimeoutMs=minuteMs*30,
-}={})=>{
+    enableLogging,
+}:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
     const routes=new Hono();
 
     let modelCache:ConvoModelInfo[]|undefined;
 
+    if(enableLogging){
+        const customLogger=(message:string,...rest:string[])=>{
+            console.log(message,...rest)
+        }
+        routes.use(logger(customLogger));
+    }
 
     routes.get('/models',async (c)=>{
 
@@ -291,7 +300,61 @@ export const getConvoHonoRoutes=({
         return c.json(false);
     });
 
+    routes.post('/db/:dbName',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=convoNodeStoreService.get();
+        if(!store){
+            return c.json('Not supported',501);
+        }
+
+        const commands=await c.req.json<ConvoDbCommand[]>();
+
+        const result=await store.executeCommandsAsync(commands);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.post('/db/:dbName/stream',timeout(completionTimeoutMs),async (c)=>{
+
+        return streamSSE(c,async stream=>{
+
+            await initConvoHonoAsync();
+
+            let id=0;
+
+            const store=convoNodeStoreService.get();
+            if(!store){
+                const item:ConvoNodeStreamItem<any>={
+                    type:'error',
+                    error:'Not supported',
+                    statusCode:501
+                }
+                await stream.writeSSE({
+                    event:'node',
+                    id:(id++).toString(),
+                    data:JSON.stringify(item),
+                });
+                return;
+            }
+
+            const query=await c.req.json<ConvoNodeQuery>();
+
+            for await(const node of store.streamNodesAsync(query)){
+                await stream.writeSSE({
+                    event:'node',
+                    id:(id++).toString(),
+                    data:JSON.stringify(node)
+                })
+            }
+
+        });
+    });
+
     return routes;
 }
-
-

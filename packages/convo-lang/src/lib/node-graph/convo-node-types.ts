@@ -1061,4 +1061,476 @@ export interface ConvoNodeStore
      * Deletes an embedding by id.
      */
     deleteEmbeddingAsync(id:string,options?:DeleteConvoNodeEmbeddingOptions):PromiseResultTypeVoid;
+
+    /**
+     * Calls a of the functions of this interface based on the action of the command
+     */
+    executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>):PromiseResultType<ConvoDbCommandResult<TKeys>>;
+
+    /**
+     * Calls an array of the functions of this interface based on the action of the command
+     */
+    executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>;
+}
+
+
+/**
+ * ConvoDbCommands represent function calls to the ConvoNodeStore interface.
+ *
+ * Exactly one property should be defined per command object.
+ * Each property maps to a ConvoNodeStore method and contains the arguments
+ * that would be passed to that method.
+ */
+export interface ConvoDbCommand<TKeys extends ConvoNodeKeySelection='*'>
+{
+    /**
+     * Calls `ConvoNodeStore.queryNodesAsync`
+     */
+    queryNodes?:ConvoDbActionQueryNodes<TKeys>;
+
+    /**
+     * Calls `ConvoNodeStore.getNodesByPathAsync`
+     */
+    getNodesByPath?:ConvoDbActionGetNodesByPath;
+
+    /**
+     * Calls `ConvoNodeStore.getNodePermissionAsync`
+     */
+    getNodePermission?:ConvoDbActionGetNodePermission;
+
+    /**
+     * Calls `ConvoNodeStore.checkNodePermissionAsync`
+     */
+    checkNodePermission?:ConvoDbActionCheckNodePermission;
+
+    /**
+     * Calls `ConvoNodeStore.insertNodeAsync`
+     */
+    insertNode?:ConvoDbActionInsertNode;
+
+    /**
+     * Calls `ConvoNodeStore.updateNodeAsync`
+     */
+    updateNode?:ConvoDbActionUpdateNode;
+
+    /**
+     * Calls `ConvoNodeStore.deleteNodeAsync`
+     */
+    deleteNode?:ConvoDbActionDeleteNode;
+
+    /**
+     * Calls `ConvoNodeStore.queryEdgesAsync`
+     */
+    queryEdges?:ConvoDbActionQueryEdges;
+
+    /**
+     * Calls `ConvoNodeStore.getEdgeByIdAsync`
+     */
+    getEdgeById?:ConvoDbActionGetEdgeById;
+
+    /**
+     * Calls `ConvoNodeStore.insertEdgeAsync`
+     */
+    insertEdge?:ConvoDbActionInsertEdge;
+
+    /**
+     * Calls `ConvoNodeStore.updateEdgeAsync`
+     */
+    updateEdge?:ConvoDbActionUpdateEdge;
+
+    /**
+     * Calls `ConvoNodeStore.deleteEdgeAsync`
+     */
+    deleteEdge?:ConvoDbActionDeleteEdge;
+
+    /**
+     * Calls `ConvoNodeStore.queryEmbeddingsAsync`
+     */
+    queryEmbeddings?:ConvoDbActionQueryEmbeddings;
+
+    /**
+     * Calls `ConvoNodeStore.getEmbeddingByIdAsync`
+     */
+    getEmbeddingById?:ConvoDbActionGetEmbeddingById;
+
+    /**
+     * Calls `ConvoNodeStore.insertEmbeddingAsync`
+     */
+    insertEmbedding?:ConvoDbActionInsertEmbedding;
+
+    /**
+     * Calls `ConvoNodeStore.updateEmbeddingAsync`
+     */
+    updateEmbedding?:ConvoDbActionUpdateEmbedding;
+
+    /**
+     * Calls `ConvoNodeStore.deleteEmbeddingAsync`
+     */
+    deleteEmbedding?:ConvoDbActionDeleteEmbedding;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.queryNodesAsync`
+ */
+export interface ConvoDbActionQueryNodes<TKeys extends ConvoNodeKeySelection='*'>
+{
+    /**
+     * Node query definition
+     */
+    query:ConvoNodeQuery<TKeys>;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.getNodesByPathAsync`
+ */
+export interface ConvoDbActionGetNodesByPath
+{
+    /**
+     * Exact node path or supported wildcard path
+     */
+    path:string;
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.getNodePermissionAsync`
+ */
+export interface ConvoDbActionGetNodePermission
+{
+    /**
+     * Path permissions are granted from
+     */
+    fromPath:string;
+
+    /**
+     * Path permissions are granted to
+     */
+    toPath:string;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.checkNodePermissionAsync`
+ */
+export interface ConvoDbActionCheckNodePermission
+{
+    /**
+     * Path permissions are checked from
+     */
+    fromPath:string;
+
+    /**
+     * Path permissions are checked to
+     */
+    toPath:string;
+
+    /**
+     * Required permission type
+     */
+    type:ConvoNodePermissionType;
+
+    /**
+     * If true any permission bit match will pass
+     */
+    matchAny?:boolean;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.insertNodeAsync`
+ */
+export interface ConvoDbActionInsertNode
+{
+    /**
+     * Node to insert
+     */
+    node:ConvoNode;
+
+    /**
+     * Optional insert options
+     */
+    options?:InsertConvoNodeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.updateNodeAsync`
+ */
+export interface ConvoDbActionUpdateNode
+{
+    /**
+     * Node update payload
+     */
+    node:ConvoNodeUpdate;
+
+    /**
+     * Optional update options
+     */
+    options?:UpdateConvoNodeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.deleteNodeAsync`
+ */
+export interface ConvoDbActionDeleteNode
+{
+    /**
+     * Path of the node to delete
+     */
+    path:string;
+
+    /**
+     * Optional delete options
+     */
+    options?:DeleteConvoNodeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.queryEdgesAsync`
+ */
+export interface ConvoDbActionQueryEdges
+{
+    /**
+     * Edge query definition
+     */
+    query:ConvoNodeEdgeQuery;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.getEdgeByIdAsync`
+ */
+export interface ConvoDbActionGetEdgeById
+{
+    /**
+     * Edge id
+     */
+    id:string;
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.insertEdgeAsync`
+ */
+export interface ConvoDbActionInsertEdge
+{
+    /**
+     * Edge to insert without id
+     */
+    edge:Omit<ConvoNodeEdge,'id'>;
+
+    /**
+     * Optional insert options
+     */
+    options?:InsertConvoNodeEdgeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.updateEdgeAsync`
+ */
+export interface ConvoDbActionUpdateEdge
+{
+    /**
+     * Edge update payload
+     */
+    update:ConvoNodeEdgeUpdate;
+
+    /**
+     * Optional update options
+     */
+    options?:UpdateConvoNodeEdgeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.deleteEdgeAsync`
+ */
+export interface ConvoDbActionDeleteEdge
+{
+    /**
+     * Edge id
+     */
+    id:string;
+
+    /**
+     * Optional delete options
+     */
+    options?:DeleteConvoNodeEdgeOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.queryEmbeddingsAsync`
+ */
+export interface ConvoDbActionQueryEmbeddings
+{
+    /**
+     * Embedding query definition
+     */
+    query:ConvoNodeEmbeddingQuery;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.getEmbeddingByIdAsync`
+ */
+export interface ConvoDbActionGetEmbeddingById
+{
+    /**
+     * Embedding id
+     */
+    id:string;
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.insertEmbeddingAsync`
+ */
+export interface ConvoDbActionInsertEmbedding
+{
+    /**
+     * Embedding to insert without id
+     */
+    embedding:Omit<ConvoNodeEmbedding,'id'>;
+
+    /**
+     * Optional insert options
+     */
+    options?:InsertConvoNodeEmbeddingOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.updateEmbeddingAsync`
+ */
+export interface ConvoDbActionUpdateEmbedding
+{
+    /**
+     * Embedding update payload
+     */
+    update:ConvoNodeEmbeddingUpdate;
+
+    /**
+     * Optional update options
+     */
+    options?:UpdateConvoNodeEmbeddingOptions;
+}
+
+/**
+ * Arguments for `ConvoNodeStore.deleteEmbeddingAsync`
+ */
+export interface ConvoDbActionDeleteEmbedding
+{
+    /**
+     * Embedding id
+     */
+    id:string;
+
+    /**
+     * Optional delete options
+     */
+    options?:DeleteConvoNodeEmbeddingOptions;
+}
+
+/**
+ * Result values for `ConvoDbCommand`.
+ *
+ * Property names mirror `ConvoDbCommand`.
+ * Exactly one property should typically be defined per result object.
+ *
+ * Result mapping rules:
+ * - properties map to the unwrapped successful result type of the corresponding `ConvoNodeStore` method
+ * - methods returning `PromiseResultTypeVoid` map to `true`
+ * - `checkNodePermissionAsync` maps to `boolean`
+ */
+export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
+{
+    /**
+     * Result of `ConvoNodeStore.queryNodesAsync`
+     */
+    queryNodes?:ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>;
+
+    /**
+     * Result of `ConvoNodeStore.getNodesByPathAsync`
+     */
+    getNodesByPath?:ConvoNodeQueryResult<keyof ConvoNode>;
+
+    /**
+     * Result of `ConvoNodeStore.getNodePermissionAsync`
+     */
+    getNodePermission?:ConvoNodePermissionType;
+
+    /**
+     * Result of `ConvoNodeStore.checkNodePermissionAsync`
+     */
+    checkNodePermission?:boolean;
+
+    /**
+     * Result of `ConvoNodeStore.insertNodeAsync`
+     */
+    insertNode?:ConvoNode;
+
+    /**
+     * Result of `ConvoNodeStore.updateNodeAsync`
+     */
+    updateNode?:true;
+
+    /**
+     * Result of `ConvoNodeStore.deleteNodeAsync`
+     */
+    deleteNode?:true;
+
+    /**
+     * Result of `ConvoNodeStore.queryEdgesAsync`
+     */
+    queryEdges?:ConvoNodeEdgeQueryResult;
+
+    /**
+     * Result of `ConvoNodeStore.getEdgeByIdAsync`
+     */
+    getEdgeById?:ConvoNodeEdge;
+
+    /**
+     * Result of `ConvoNodeStore.insertEdgeAsync`
+     */
+    insertEdge?:ConvoNodeEdge;
+
+    /**
+     * Result of `ConvoNodeStore.updateEdgeAsync`
+     */
+    updateEdge?:true;
+
+    /**
+     * Result of `ConvoNodeStore.deleteEdgeAsync`
+     */
+    deleteEdge?:true;
+
+    /**
+     * Result of `ConvoNodeStore.queryEmbeddingsAsync`
+     */
+    queryEmbeddings?:ConvoNodeEmbeddingQueryResult;
+
+    /**
+     * Result of `ConvoNodeStore.getEmbeddingByIdAsync`
+     */
+    getEmbeddingById?:ConvoNodeEmbedding;
+
+    /**
+     * Result of `ConvoNodeStore.insertEmbeddingAsync`
+     */
+    insertEmbedding?:ConvoNodeEmbedding;
+
+    /**
+     * Result of `ConvoNodeStore.updateEmbeddingAsync`
+     */
+    updateEmbedding?:true;
+
+    /**
+     * Result of `ConvoNodeStore.deleteEmbeddingAsync`
+     */
+    deleteEmbedding?:true;
 }

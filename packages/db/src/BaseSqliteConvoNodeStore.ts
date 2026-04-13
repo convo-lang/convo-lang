@@ -1,7 +1,6 @@
+import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
 import { deepClone, uuid } from "@iyio/common";
-import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
 import { BaseConvoNodeStore, BaseConvoNodeStoreOptions } from "./BaseConvoNodeStore.js";
-import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition } from "./convo-node-types.js";
 
 export interface BaseSqliteConvoNodeStoreOptions extends BaseConvoNodeStoreOptions
 {

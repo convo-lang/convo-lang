@@ -1,8 +1,12 @@
+import { ConvoNodePermissionType, HttpConvoCompletionService, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
+import { BunSqliteConvoNodeStore } from "@convo-lang/db/BunSqliteConvoNodeStore.js";
+import { InMemoryConvoNodeStore } from "@convo-lang/db/InMemoryConvoNodeStore.js";
 import { expect, test } from "bun:test";
-import { InMemoryConvoNodeStore } from "./InMemoryConvoNodeStore.js";
-import { ConvoNodePermissionType, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "./convo-node-types.js";
 
-const createStore=()=>new InMemoryConvoNodeStore();
+type Type='bun'|'mem'|'http';
+const type:Type='http' as Type;
+
+const createStore=()=>type==='http'?new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang"}):type==='bun'?new BunSqliteConvoNodeStore({}):new InMemoryConvoNodeStore({});
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
     path,
@@ -43,6 +47,7 @@ test("queryNodesAsync returns validation error for invalid query",async ()=>{
             }
         ]
     });
+
 
     expect(result.success).toBe(false);
     if(result.success){
@@ -261,7 +266,7 @@ test("queryNodesAsync returns all props when keys is omitted, null, or contains 
     if(!starKeys.success){
         throw new Error('expected success');
     }
-    expect(starKeys.result.nodes[0]?.instructions).toBe('inst');
+    expect(starKeys.result.nodes[0]?.['instructions']).toBe('inst');
 });
 
 test("streamNodesAsync returns nodes and respects limit zero",async ()=>{
@@ -465,7 +470,6 @@ test("queryNodesAsync supports step permission filtering and final query permiss
         type:'grant',
         grant:ConvoNodePermissionType.read,
     }));
-
     const stepPermission=await store.queryNodesAsync({
         steps:[
             {path:'/perm/*'},
@@ -823,7 +827,6 @@ test("deleteNodeAsync cascades to edges and embeddings",async ()=>{
 
     const deleted=await store.deleteNodeAsync('/cascade/a');
     expect(deleted.success).toBe(true);
-
     const edgeAfter=await store.getEdgeByIdAsync(edge.result.id);
     expect(edgeAfter.success).toBe(false);
     if(edgeAfter.success){

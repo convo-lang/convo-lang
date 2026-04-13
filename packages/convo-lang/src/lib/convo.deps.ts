@@ -1,7 +1,8 @@
 import { defineProvider, defineService, defineStringParam } from "@iyio/common";
-import { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoEmbeddingsService, ConvoImportService, ConvoProjectConfig, ConvoTranscriptionService, ConvoTtsService } from "./convo-types.js";
+import type { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoEmbeddingsService, ConvoImportService, ConvoProjectConfig, ConvoTranscriptionService, ConvoTtsService } from "./convo-types.js";
 import { ConvoLocalStorageCache } from "./ConvoLocalStorageCache.js";
 import { ConvoVfsCache } from "./ConvoVfsCache.js";
+import type { ConvoNodeStore } from "./node-graph/convo-node-types.js";
 import { PassthroughConvoConversationConverter } from "./PassthroughConvoConversationConverter.js";
 
 export const convoCompletionService=defineService<ConvoCompletionService<any,any>>('ConvoCompletionService');
@@ -21,3 +22,4 @@ export const convoProjectConfig=defineService<ConvoProjectConfig>('convoProjectC
 export const convoTranscriptionService=defineService<ConvoTranscriptionService>('ConvoTranscriptionService');
 export const convoTtsService=defineService<ConvoTtsService>('ConvoTtsService');
 export const convoEmbeddingsService=defineService<ConvoEmbeddingsService>('ConvoEmbeddingsService');
+export const convoNodeStoreService=defineService<ConvoNodeStore>('ConvoNodeStore');

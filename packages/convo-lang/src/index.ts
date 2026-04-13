@@ -62,11 +62,9 @@ export * from './lib/make/convo-make-common-lib.js';
 export * from './lib/make/convo-make-common-types.js';
 export * from './lib/make/convo-make-scope-functions.js';
 export * from './lib/MockConvoEmbeddingsService.js';
-export * from './lib/node-graph/BaseConvoNodeStore.js';
 export * from './lib/node-graph/convo-node-const.js';
 export * from './lib/node-graph/convo-node-lib.js';
 export * from './lib/node-graph/convo-node-types.js';
-export * from './lib/node-graph/InMemoryConvoNodeStore.js';
 export * from './lib/providers/anthropic-lib.js';
 export * from './lib/providers/anthropic-models.js';
 export * from './lib/providers/anthropic-params.js';
@@ -88,3 +86,4 @@ export * from './lib/testing/ConvoModelTestManager.js';
 export * from './lib/worker/convo-worker-types.js';
 export * from './lib/worker/ConvoWorker.js';
 export * from './lib/worker/ConvoWorkerCtx.js';
+

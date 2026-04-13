@@ -11,18 +11,20 @@ export interface ConvoCliApiServerOptions
     reusePort?:boolean;
     baseRoute?:string;
     cors?:boolean|string[];
+    enableLogging?:boolean;
 }
 
 export const runConvoCliApiAsync=async ({
     port=defaultConvoCliApiPort,
     reusePort=false,
     baseRoute='/api/convo-lang',
-    cors
+    cors,
+    enableLogging
 }:ConvoCliApiServerOptions,cancel?:CancelToken)=>{
 
     const app=new Hono();
 
-    const routes=getConvoHonoRoutes();
+    const routes=getConvoHonoRoutes({enableLogging});
 
     if(cors){
         app.use('/*',_cors({
