@@ -333,6 +333,12 @@ export abstract class BaseConvoNodeStore implements ConvoNodeStore{
      */
     protected abstract _updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options:Omit<UpdateConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
     
+    protected loggingEnabled=false;
+    public enableLogging()
+    {
+        this.loggingEnabled=true;
+    }
+    
     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
         query:ConvoNodeQuery<TKeys>
     ):PromiseResultType<ConvoNodeQueryResult<
