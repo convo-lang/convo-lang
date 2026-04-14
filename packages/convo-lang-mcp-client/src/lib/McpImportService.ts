@@ -42,7 +42,6 @@ export class McpImportService implements ConvoImportService
 
     public canImport(path:string,importTest:ConvoImportTest):boolean
     {
-        console.log('hio 👋 👋 👋 CAN TEST',importTest);
         return importTest.modifierMap['mcp']!==undefined;
     }
 }
