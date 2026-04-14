@@ -23,9 +23,6 @@
             "path": "./packages/convo-lang-cli"
         },
         {
-            "path": "./packages/db"
-        },
-        {
             "path": "./packages/convo-lang-hono"
         },
         {
@@ -45,6 +42,12 @@
         },
         {
             "path": "./packages/convo-lang-react"
+        },
+        {
+            "path": "./packages/db"
+        },
+        {
+            "path": "./packages/tests"
         }
     ]
 }

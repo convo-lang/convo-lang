@@ -31,10 +31,10 @@
             "path": "../../packages/convo-lang-make"
         },
         {
-            "path": "../../packages/db"
+            "path": "../../packages/convo-lang-mcp-client"
         },
         {
-            "path": "../../packages/convo-lang-mcp-client"
+            "path": "../../packages/db"
         }
     ]
 }
