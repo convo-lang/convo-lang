@@ -1,0 +1,290 @@
+// std://db.convo imports all of the database functions such as dbInsertNode and adds a system prompt 
+// that explains how to use the functions
+@import std://db.convo
+
+> define
+dbConfig('sqlite:./jake.db')
+
+> system
+You are taking notes for the user. Store notes in the /jake/notes folder. Ask follow up questions for clarification.
+
+Current Date and time: {{dateTime()}}
+
+> user
+I'll speaking with the founder of JobiAi to tomorrow about investing 2 to 3 million in his company
+
+
+> assistant
+Noted. You’re meeting with the founder of JobiAi tomorrow to discuss a possible investment of $2 to $3 million in the company.
+
+Would you like to add any specific talking points, questions, details about JobiAi, or objectives for your meeting to this note? Or do you want it just as a straightforward meeting reminder?
+
+
+> user
+I need to get an min investment amount and understand the ROI
+
+
+@toolId call_WMtCfXYLEYPzPoJlwAUK4ttt
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment",
+        "displayName": "JobiAi Investment Discussion",
+        "type": "note",
+        "data": {
+            "meeting": "Founder of JobiAi",
+            "date": "2026-04-15",
+            "investment_range": "$2M - $3M",
+            "objectives": [
+                "Get minimum investment amount",
+                "Understand expected ROI"
+            ]
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment"
+}
+
+
+> assistant
+I've made a note for your meeting with the founder of JobiAi, including these objectives:
+
+- Get the minimum investment amount.
+- Understand the expected ROI (return on investment).
+
+Would you like to prepare any specific questions about JobiAi’s business model, current financials, or growth plans? Or should I assist with drafting questions for ROI evaluation?
+
+
+> user
+Add a list of questions you think will help guide the meeting best. Store the questions as connected nodes
+
+
+@toolId call_Ql1CAijwuRewtjnbqS1BmusD
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/1",
+        "displayName": "What is the minimum investment amount required?",
+        "type": "question",
+        "data": {
+            "topic": "investment terms"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/1"
+}
+
+
+@toolId call_SPZYvxvcViqCDjp6Fegxjr0m
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/2",
+        "displayName": "What is the expected ROI, and over what timeframe?",
+        "type": "question",
+        "data": {
+            "topic": "ROI"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/2"
+}
+
+
+@toolId call_lobjiFT5xEHGhaBXxXQ70m61
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/3",
+        "displayName": "How will the new funds be used within the company?",
+        "type": "question",
+        "data": {
+            "topic": "use of funds"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/3"
+}
+
+
+@toolId call_qRmssf0NwjrXh43tiEbos3Y7
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/4",
+        "displayName": "What are the company's current revenue and user growth metrics?",
+        "type": "question",
+        "data": {
+            "topic": "traction"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/4"
+}
+
+
+@toolId call_8Hl2jNbJliL2wBihPpZAy7AT
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/5",
+        "displayName": "Who are your main competitors, and what is your differentiation?",
+        "type": "question",
+        "data": {
+            "topic": "competitive landscape"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/5"
+}
+
+
+@toolId call_Dp7d3XlW0iOH3vwIonirJihn
+> call dbInsertNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/6",
+        "displayName": "What is the company’s long-term vision and exit strategy?",
+        "type": "question",
+        "data": {
+            "topic": "vision/exit"
+        }
+    }
+)
+> result
+__return={
+    "newNodePath": "/jake/notes/jobi-ai-investment/questions/6"
+}
+
+
+@toolId call_PBfQN4MVSpmwpHaOivvEiqGD
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-1",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/1"
+    },
+    "options": {}
+)
+> result
+__return={
+    "newEdgeId": "0df85f3f-a923-4cc5-ac93-ffda2a49e3a0"
+}
+
+
+@toolId call_93mBE3GZvT0Iy0zuh7ZVfVat
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-2",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/2"
+    }
+)
+> result
+__return={
+    "newEdgeId": "35145397-8944-40d2-af9a-1be740332b43"
+}
+
+
+@toolId call_8dbacstciCLSQNf9wJgqZgjj
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-3",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/3"
+    }
+)
+> result
+__return={
+    "newEdgeId": "22dcbc62-b63a-4c8d-8f4c-e9c7f8b58c1f"
+}
+
+
+@toolId call_FH6bCZQS9yXEzMz2HjaJSWuw
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-4",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/4"
+    }
+)
+> result
+__return={
+    "newEdgeId": "a634272d-f68e-4200-9263-d67f69490db3"
+}
+
+
+@toolId call_QPrkR8Hgw4fEOzruY3B0JgKA
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-5",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/5"
+    }
+)
+> result
+__return={
+    "newEdgeId": "22d9e3a7-769a-4e71-b2d6-abfec5fed7fb"
+}
+
+
+@toolId call_ZrvWpxjYfjga3Mcc0Jsvo6Y6
+> call dbInsertEdge(
+    "edge": {
+        "id": "jobi-ai-investment-guides-6",
+        "type": "guides",
+        "from": "/jake/notes/jobi-ai-investment",
+        "to": "/jake/notes/jobi-ai-investment/questions/6"
+    }
+)
+> result
+__return={
+    "newEdgeId": "0754553a-0640-4526-aa59-784ab478e511"
+}
+
+
+> assistant
+Here are some key questions stored and connected to your JobiAi investment note to help guide your meeting:
+
+1. What is the minimum investment amount required?
+2. What is the expected ROI, and over what timeframe?
+3. How will the new funds be used within the company?
+4. What are the company's current revenue and user growth metrics?
+5. Who are your main competitors, and what is your differentiation?
+6. What is the company’s long-term vision and exit strategy?
+
+Would you like to add any specific questions about the founding team, technology, or risk factors? Or should I suggest a few more along those lines?
+
+
+> user
+Answer question 3 with: 'Grow adoption'. This is a requirement of mine
+
+@toolId call_nXbjHP9ADVxSieaNeMVUpgxU
+> call dbUpdateNode(
+    "node": {
+        "path": "/jake/notes/jobi-ai-investment/questions/3",
+        "data": {
+            "answer": "Grow adoption",
+            "requirement": true
+        }
+    }
+)
+> result
+__return="Operation complete"
+
+
+> assistant
+Question 3 ("How will the new funds be used within the company?") has been answered and marked as a requirement: "Grow adoption."
+
+Would you like to specify or clarify what “grow adoption” means in your context (e.g., user acquisition, marketing, distribution partnerships), or is this phrasing sufficient for your note and the meeting?
+

@@ -1,0 +1,891 @@
+@import ./base.convo
+@import ../packages/convo-lang/src/lib/db/convo-db-types.ts as types
+@import ../packages/db/src/BaseConvoDb.ts as baseDb
+@import ../docs/learn-convo-lang.md as learnConvo
+
+> system
+
+`packages/convo-lang/src/lib/db/convo-db-types.ts`
+``` ts
+{{types}}
+```
+
+`docs/learn-convo-lang.md`
+<CONVO_LANG_DOCS>
+{{learnConvo}}
+<CONVO_LANG_DOCS>
+
+
+> user
+Finish writing the following function name definitions: The function definitions should include
+all the methods of the `ConvoDb` interface excluding the Command and stream functions
+
+``` ts
+{
+    /**
+     * Queries the ConvoDb
+     */
+    dbQueryNodes:'dbQueryNodes',
+    /**
+     * Returns nodes matching a given path. A wildcard path (path ending with /*) can return multiple
+     * nodes
+     */
+    dbGetNodesByPath:'dbGetNodesByPath',
+    /**
+     * Gets the permissions from one node to another
+     */
+    dbGetNodePermission:'dbGetNodePermission',
+}
+```
+
+@time 2026-04-13T23:36:55-04:00
+@tokenUsage 10897 / 32 / $0.027322500000000003
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate it: do you want me to return just the completed object literal, or update a specific file and return the full file contents?
+
+
+> user
+Return the complete object literal
+
+@time 2026-04-13T23:37:32-04:00
+@tokenUsage 10941 / 384 / $0.0283125
+@model gpt-5.4-2026-03-05
+> assistant
+```ts
+{
+    /**
+     * Queries the ConvoDb
+     */
+    dbQueryNodes:'dbQueryNodes',
+    /**
+     * Returns nodes matching a given path. A wildcard path (path ending with /*) can return multiple
+     * nodes
+     */
+    dbGetNodesByPath:'dbGetNodesByPath',
+    /**
+     * Gets the permissions from one node to another
+     */
+    dbGetNodePermission:'dbGetNodePermission',
+    /**
+     * Checks if one node has permission to another
+     */
+    dbCheckNodePermission:'dbCheckNodePermission',
+    /**
+     * Inserts a node
+     */
+    dbInsertNode:'dbInsertNode',
+    /**
+     * Updates a node
+     */
+    dbUpdateNode:'dbUpdateNode',
+    /**
+     * Deletes a node
+     */
+    dbDeleteNode:'dbDeleteNode',
+    /**
+     * Queries edges
+     */
+    dbQueryEdges:'dbQueryEdges',
+    /**
+     * Gets an edge by id
+     */
+    dbGetEdgeById:'dbGetEdgeById',
+    /**
+     * Inserts an edge
+     */
+    dbInsertEdge:'dbInsertEdge',
+    /**
+     * Updates an edge
+     */
+    dbUpdateEdge:'dbUpdateEdge',
+    /**
+     * Deletes an edge
+     */
+    dbDeleteEdge:'dbDeleteEdge',
+    /**
+     * Queries embeddings
+     */
+    dbQueryEmbeddings:'dbQueryEmbeddings',
+    /**
+     * Gets an embedding by id
+     */
+    dbGetEmbeddingById:'dbGetEmbeddingById',
+    /**
+     * Inserts an embedding
+     */
+    dbInsertEmbedding:'dbInsertEmbedding',
+    /**
+     * Updates an embedding
+     */
+    dbUpdateEmbedding:'dbUpdateEmbedding',
+    /**
+     * Deletes an embedding
+     */
+    dbDeleteEmbedding:'dbDeleteEmbedding',
+}
+```
+
+
+> user
+
+Complete the following mapping in the same fashion.
+
+``` ts
+{
+    [convoFunctions.dbQueryNodes]:convoDbQueryNodesScopeFunction,
+}
+```
+
+@time 2026-04-13T23:42:40-04:00
+@tokenUsage 11364 / 316 / $0.0292
+@model gpt-5.4-2026-03-05
+> assistant
+```ts
+{
+    [convoFunctions.dbQueryNodes]:convoDbQueryNodesScopeFunction,
+    [convoFunctions.dbGetNodesByPath]:convoDbGetNodesByPathScopeFunction,
+    [convoFunctions.dbGetNodePermission]:convoDbGetNodePermissionScopeFunction,
+    [convoFunctions.dbCheckNodePermission]:convoDbCheckNodePermissionScopeFunction,
+    [convoFunctions.dbInsertNode]:convoDbInsertNodeScopeFunction,
+    [convoFunctions.dbUpdateNode]:convoDbUpdateNodeScopeFunction,
+    [convoFunctions.dbDeleteNode]:convoDbDeleteNodeScopeFunction,
+    [convoFunctions.dbQueryEdges]:convoDbQueryEdgesScopeFunction,
+    [convoFunctions.dbGetEdgeById]:convoDbGetEdgeByIdScopeFunction,
+    [convoFunctions.dbInsertEdge]:convoDbInsertEdgeScopeFunction,
+    [convoFunctions.dbUpdateEdge]:convoDbUpdateEdgeScopeFunction,
+    [convoFunctions.dbDeleteEdge]:convoDbDeleteEdgeScopeFunction,
+    [convoFunctions.dbQueryEmbeddings]:convoDbQueryEmbeddingsScopeFunction,
+    [convoFunctions.dbGetEmbeddingById]:convoDbGetEmbeddingByIdScopeFunction,
+    [convoFunctions.dbInsertEmbedding]:convoDbInsertEmbeddingScopeFunction,
+    [convoFunctions.dbUpdateEmbedding]:convoDbUpdateEmbeddingScopeFunction,
+    [convoFunctions.dbDeleteEmbedding]:convoDbDeleteEmbeddingScopeFunction,
+}
+```
+
+
+> user
+Complete the list of functions in the same fashion
+
+``` ts
+export const convoDbQueryNodesScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('queryNodesAsync',scope,ctx));
+```
+
+@time 2026-04-13T23:55:32-04:00
+@tokenUsage 11729 / 533 / $0.030655
+@model gpt-5.4-2026-03-05
+> assistant
+```ts
+export const convoDbQueryNodesScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('queryNodesAsync',scope,ctx));
+export const convoDbGetNodesByPathScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('getNodesByPathAsync',scope,ctx));
+export const convoDbGetNodePermissionScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('getNodePermissionAsync',scope,ctx));
+export const convoDbCheckNodePermissionScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('checkNodePermissionAsync',scope,ctx));
+export const convoDbInsertNodeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('insertNodeAsync',scope,ctx));
+export const convoDbUpdateNodeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('updateNodeAsync',scope,ctx));
+export const convoDbDeleteNodeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('deleteNodeAsync',scope,ctx));
+export const convoDbQueryEdgesScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('queryEdgesAsync',scope,ctx));
+export const convoDbGetEdgeByIdScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('getEdgeByIdAsync',scope,ctx));
+export const convoDbInsertEdgeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('insertEdgeAsync',scope,ctx));
+export const convoDbUpdateEdgeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('updateEdgeAsync',scope,ctx));
+export const convoDbDeleteEdgeScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('deleteEdgeAsync',scope,ctx));
+export const convoDbQueryEmbeddingsScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('queryEmbeddingsAsync',scope,ctx));
+export const convoDbGetEmbeddingByIdScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('getEmbeddingByIdAsync',scope,ctx));
+export const convoDbInsertEmbeddingScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('insertEmbeddingAsync',scope,ctx));
+export const convoDbUpdateEmbeddingScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('updateEmbeddingAsync',scope,ctx));
+export const convoDbDeleteEmbeddingScopeFunction=createConvoScopeFunction((scope,ctx)=>callDbAsync('deleteEmbeddingAsync',scope,ctx));
+```
+
+
+> user
+Complete the list of Convo-Lang function definitions corresponding to the scope functions.
+Also create convo `struct`s for function argument types
+
+``` convo
+# Queries the database for nodes
+\> dbQueryNodes(query:ConvoNodeQuery)
+```
+
+@time 2026-04-14T00:06:26-04:00
+@tokenUsage 43612 / 1105 / $0.11179250000000002
+@model gpt-5.4-2026-03-05
+> assistant
+```convo
+\> define
+ConvoEmbeddingSearch=struct(
+    type?:string
+    text:string
+    tolerance?:number
+)
+
+ConvoNodePropertyCondition=struct(
+    target:string
+    op:enum("=" "!=" ">" "<" ">=" "<=" "in" "all-in" "any-in" "contains" "contains-all" "contains-any" "like" "ilike")
+    value:any
+)
+
+ConvoNodeGroupCondition=struct(
+    groupOp:enum("and" "or")
+    conditions:array(any)
+)
+
+ConvoNodeOrderBy=struct(
+    prop:string
+    direction?:enum("asc" "desc")
+)
+
+ConvoNodeQueryStep=struct(
+    path?:string
+    condition?:any
+    permissionFrom?:string
+    permissionRequired?:int
+    embedding?:ConvoEmbeddingSearch
+    edge?:any
+    edgeDirection?:enum("forward" "reverse" "bi")
+    edgeLimit?:number
+)
+
+ConvoNodeQuery=struct(
+    keys?:any
+    steps:array(ConvoNodeQueryStep)
+    limit?:number
+    returnAllScanned?:boolean
+    readBatchSize?:number
+    skip?:number
+    nextToken?:string
+    permissionFrom?:string
+    permissionRequired?:int
+    orderBy?:any
+)
+
+InsertConvoNodeOptions=struct(
+    permissionFrom?:string
+)
+
+ConvoNodeUpdate=struct(
+    path:string
+    displayName?:string
+    modified?:string
+    description?:string
+    instructions?:string
+    data?:any
+)
+
+UpdateConvoNodeOptions=struct(
+    permissionFrom?:string
+)
+
+DeleteConvoNodeOptions=struct(
+    permissionFrom?:string
+)
+
+ConvoNodeEdgeQuery=struct(
+    id?:string
+    from?:string
+    to?:string
+    type?:string
+    name?:string
+    limit?:number
+    offset?:number
+    permissionFrom?:string
+    includeTotal?:boolean
+)
+
+InsertConvoNodeEdgeOptions=struct(
+    permissionFrom?:string
+)
+
+ConvoNodeEdgeUpdate=struct(
+    id:string
+    displayName?:string
+    modified?:string
+    description?:string
+    instructions?:string
+    grant?:int
+)
+
+UpdateConvoNodeEdgeOptions=struct(
+    permissionFrom?:string
+)
+
+DeleteConvoNodeEdgeOptions=struct(
+    permissionFrom?:string
+)
+
+ConvoNodeEmbeddingQuery=struct(
+    id?:string
+    path?:string
+    type?:string
+    name?:string
+    prop?:string
+    limit?:number
+    offset?:number
+    includeVector?:boolean
+    permissionFrom?:string
+    includeTotal?:boolean
+)
+
+InsertConvoNodeEmbeddingOptions=struct(
+    generateVector?:boolean
+    permissionFrom?:string
+)
+
+ConvoNodeEmbeddingUpdate=struct(
+    id:string
+    modified?:string
+    description?:string
+    instructions?:string
+    generateVector?:boolean
+)
+
+UpdateConvoNodeEmbeddingOptions=struct(
+    permissionFrom?:string
+)
+
+DeleteConvoNodeEmbeddingOptions=struct(
+    permissionFrom?:string
+)
+
+# Queries the database for nodes
+\> dbQueryNodes(query:ConvoNodeQuery)
+
+# Returns nodes matching a path. A wildcard path ending with /* can return multiple nodes
+\> dbGetNodesByPath(
+    path:string
+    permissionFrom?:string
+)
+
+# Returns the permissions granted from one node to another
+\> dbGetNodePermission(
+    fromPath:string
+    toPath:string
+)
+
+# Checks if one node has permission to another
+\> dbCheckNodePermission(
+    fromPath:string
+    toPath:string
+    type:int
+    matchAny?:boolean
+)
+
+# Inserts a new node
+\> dbInsertNode(
+    node:any
+    options?:InsertConvoNodeOptions
+)
+
+# Updates a node
+\> dbUpdateNode(
+    node:ConvoNodeUpdate
+    options?:UpdateConvoNodeOptions
+)
+
+# Deletes a node by path
+\> dbDeleteNode(
+    path:string
+    options?:DeleteConvoNodeOptions
+)
+
+# Returns matching edges
+\> dbQueryEdges(query:ConvoNodeEdgeQuery)
+
+# Returns an edge by id
+\> dbGetEdgeById(
+    id:string
+    permissionFrom?:string
+)
+
+# Inserts a new edge
+\> dbInsertEdge(
+    edge:any
+    options?:InsertConvoNodeEdgeOptions
+)
+
+# Updates an edge
+\> dbUpdateEdge(
+    update:ConvoNodeEdgeUpdate
+    options?:UpdateConvoNodeEdgeOptions
+)
+
+# Deletes an edge by id
+\> dbDeleteEdge(
+    id:string
+    options?:DeleteConvoNodeEdgeOptions
+)
+
+# Returns matching embeddings
+\> dbQueryEmbeddings(query:ConvoNodeEmbeddingQuery)
+
+# Returns an embedding by id
+\> dbGetEmbeddingById(
+    id:string
+    permissionFrom?:string
+)
+
+# Inserts a new embedding
+\> dbInsertEmbedding(
+    embedding:any
+    options?:InsertConvoNodeEmbeddingOptions
+)
+
+# Updates an embedding
+\> dbUpdateEmbedding(
+    update:ConvoNodeEmbeddingUpdate
+    options?:UpdateConvoNodeEmbeddingOptions
+)
+
+# Deletes an embedding by id
+\> dbDeleteEmbedding(
+    id:string
+    options?:DeleteConvoNodeEmbeddingOptions
+)
+```
+
+
+> user
+Add document comments to the structs
+
+@time 2026-04-14T00:07:30-04:00
+@tokenUsage 44730 / 1947 / $0.1166925
+@model gpt-5.4-2026-03-05
+> assistant
+```convo
+\> define
+# An embedding search definition used to filter nodes by semantic similarity
+ConvoEmbeddingSearch=struct(
+    # Optional embedding type to match
+    type?:string
+
+    # Input text used to generate or compare the embedding search
+    text:string
+
+    # Optional similarity tolerance
+    tolerance?:number
+)
+
+# A condition that compares a target property to a value
+ConvoNodePropertyCondition=struct(
+    # The property of the target object to evaluate. Dot notation may be used for nested properties
+    target:string
+
+    # The comparison operator
+    op:enum("=" "!=" ">" "<" ">=" "<=" "in" "all-in" "any-in" "contains" "contains-all" "contains-any" "like" "ilike")
+
+    # The value to compare against
+    value:any
+)
+
+# A grouped boolean condition containing nested conditions
+ConvoNodeGroupCondition=struct(
+    # Boolean operator used to combine nested conditions
+    groupOp:enum("and" "or")
+
+    # Nested conditions. Values may be property conditions or grouped conditions
+    conditions:array(any)
+)
+
+# Defines how query results should be ordered
+ConvoNodeOrderBy=struct(
+    # Property to order by. Dot notation may be used for nested properties
+    prop:string
+
+    # Sort direction
+    direction?:enum("asc" "desc")
+)
+
+# Represents a single traversal and filtering step in a node query
+ConvoNodeQueryStep=struct(
+    # Exact normalized path or supported wildcard path to filter current nodes by
+    path?:string
+
+    # Condition applied to the current nodes before traversal
+    condition?:any
+
+    # Path permissions are evaluated from for the current nodes of this step
+    permissionFrom?:string
+
+    # Required permission type for the current nodes of this step
+    permissionRequired?:int
+
+    # Embedding search used to filter the current nodes
+    embedding?:ConvoEmbeddingSearch
+
+    # Edge filter used to select connected nodes for traversal
+    edge?:any
+
+    # Direction edges are traversed in
+    edgeDirection?:enum("forward" "reverse" "bi")
+
+    # Maximum number of destination nodes to traverse after deduplication
+    edgeLimit?:number
+)
+
+# Query definition used to select nodes from the database
+ConvoNodeQuery=struct(
+    # Keys of node properties to return. Use "*" or omit for all properties
+    keys?:any
+
+    # Steps to evaluate during traversal
+    steps:array(ConvoNodeQueryStep)
+
+    # Maximum number of nodes to return
+    limit?:number
+
+    # If true all scanned nodes are returned instead of only final traversal results
+    returnAllScanned?:boolean
+
+    # Number of items read from the backing datastore at a time
+    readBatchSize?:number
+
+    # Number of nodes to skip
+    skip?:number
+
+    # Token used to resume querying
+    nextToken?:string
+
+    # Path permissions are evaluated from on the final result set
+    permissionFrom?:string
+
+    # Required permission type for the final result set
+    permissionRequired?:int
+
+    # Ordering applied to returned nodes
+    orderBy?:any
+)
+
+# Options for inserting a node
+InsertConvoNodeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# A node update payload
+ConvoNodeUpdate=struct(
+    # Path of the node to update
+    path:string
+
+    # Updated display name
+    displayName?:string
+
+    # Updated modified timestamp
+    modified?:string
+
+    # Updated description
+    description?:string
+
+    # Updated instructions
+    instructions?:string
+
+    # Replacement data value
+    data?:any
+)
+
+# Options for updating a node
+UpdateConvoNodeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Options for deleting a node
+DeleteConvoNodeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Raw query definition for selecting edges
+ConvoNodeEdgeQuery=struct(
+    # Edge id to match
+    id?:string
+
+    # From path to match
+    from?:string
+
+    # To path to match
+    to?:string
+
+    # Edge type to match
+    type?:string
+
+    # Edge name to match
+    name?:string
+
+    # Maximum number of edges to return
+    limit?:number
+
+    # Number of edges to skip
+    offset?:number
+
+    # Path permissions are evaluated from
+    permissionFrom?:string
+
+    # If true the total number of matching edges should be returned
+    includeTotal?:boolean
+)
+
+# Options for inserting an edge
+InsertConvoNodeEdgeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# An edge update payload
+ConvoNodeEdgeUpdate=struct(
+    # Id of the edge to update
+    id:string
+
+    # Updated display name
+    displayName?:string
+
+    # Updated modified timestamp
+    modified?:string
+
+    # Updated description
+    description?:string
+
+    # Updated instructions
+    instructions?:string
+
+    # Updated granted permission value
+    grant?:int
+)
+
+# Options for updating an edge
+UpdateConvoNodeEdgeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Options for deleting an edge
+DeleteConvoNodeEdgeOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Raw query definition for selecting embeddings
+ConvoNodeEmbeddingQuery=struct(
+    # Embedding id to match
+    id?:string
+
+    # Node path to match
+    path?:string
+
+    # Embedding type to match
+    type?:string
+
+    # Embedding name to match
+    name?:string
+
+    # Embedding property to match
+    prop?:string
+
+    # Maximum number of embeddings to return
+    limit?:number
+
+    # Number of embeddings to skip
+    offset?:number
+
+    # If true the embedding vector should be returned
+    includeVector?:boolean
+
+    # Path permissions are evaluated from
+    permissionFrom?:string
+
+    # If true the total number of matching embeddings should be returned
+    includeTotal?:boolean
+)
+
+# Options for inserting an embedding
+InsertConvoNodeEmbeddingOptions=struct(
+    # If true the embedding vector should be generated asynchronously
+    generateVector?:boolean
+
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# An embedding update payload
+ConvoNodeEmbeddingUpdate=struct(
+    # Id of the embedding to update
+    id:string
+
+    # Updated modified timestamp
+    modified?:string
+
+    # Updated description
+    description?:string
+
+    # Updated instructions
+    instructions?:string
+
+    # If true the embedding vector should be regenerated asynchronously
+    generateVector?:boolean
+)
+
+# Options for updating an embedding
+UpdateConvoNodeEmbeddingOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Options for deleting an embedding
+DeleteConvoNodeEmbeddingOptions=struct(
+    # Path permissions are evaluated from
+    permissionFrom?:string
+)
+
+# Queries the database for nodes
+\> dbQueryNodes(query:ConvoNodeQuery)
+
+# Returns nodes matching a path. A wildcard path ending with /* can return multiple nodes
+\> dbGetNodesByPath(
+    path:string
+    permissionFrom?:string
+)
+
+# Returns the permissions granted from one node to another
+\> dbGetNodePermission(
+    fromPath:string
+    toPath:string
+)
+
+# Checks if one node has permission to another
+\> dbCheckNodePermission(
+    fromPath:string
+    toPath:string
+    type:int
+    matchAny?:boolean
+)
+
+# Inserts a new node
+\> dbInsertNode(
+    node:any
+    options?:InsertConvoNodeOptions
+)
+
+# Updates a node
+\> dbUpdateNode(
+    node:ConvoNodeUpdate
+    options?:UpdateConvoNodeOptions
+)
+
+# Deletes a node by path
+\> dbDeleteNode(
+    path:string
+    options?:DeleteConvoNodeOptions
+)
+
+# Returns matching edges
+\> dbQueryEdges(query:ConvoNodeEdgeQuery)
+
+# Returns an edge by id
+\> dbGetEdgeById(
+    id:string
+    permissionFrom?:string
+)
+
+# Inserts a new edge
+\> dbInsertEdge(
+    edge:any
+    options?:InsertConvoNodeEdgeOptions
+)
+
+# Updates an edge
+\> dbUpdateEdge(
+    update:ConvoNodeEdgeUpdate
+    options?:UpdateConvoNodeEdgeOptions
+)
+
+# Deletes an edge by id
+\> dbDeleteEdge(
+    id:string
+    options?:DeleteConvoNodeEdgeOptions
+)
+
+# Returns matching embeddings
+\> dbQueryEmbeddings(query:ConvoNodeEmbeddingQuery)
+
+# Returns an embedding by id
+\> dbGetEmbeddingById(
+    id:string
+    permissionFrom?:string
+)
+
+# Inserts a new embedding
+\> dbInsertEmbedding(
+    embedding:any
+    options?:InsertConvoNodeEmbeddingOptions
+)
+
+# Updates an embedding
+\> dbUpdateEmbedding(
+    update:ConvoNodeEmbeddingUpdate
+    options?:UpdateConvoNodeEmbeddingOptions
+)
+
+# Deletes an embedding by id
+\> dbDeleteEmbedding(
+    id:string
+    options?:DeleteConvoNodeEmbeddingOptions
+)
+```
+
+
+> user
+Write a compact system prompt explaining how to use the db functions
+
+@time 2026-04-14T00:09:43-04:00
+@tokenUsage 46696 / 30 / $0.11681500000000002
+@model gpt-5.4-2026-03-05
+> assistant
+Before I write it: should the system prompt be plain text, or formatted as a Convo-Lang `> system` block?
+
+
+> user
+in a system block
+
+@time 2026-04-14T00:10:16-04:00
+@tokenUsage 46737 / 420 / $0.11789250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+```convo
+\> system
+You can use the db functions to read and modify graph data stored in a ConvoDb.
+
+Use node functions for primary records:
+- dbQueryNodes(query) to search nodes using paths, conditions, permissions, embeddings and traversal steps
+- dbGetNodesByPath(path permissionFrom?) to load one or more nodes by exact path or wildcard path
+- dbInsertNode(node options?) to create a node
+- dbUpdateNode(node options?) to update mutable node fields
+- dbDeleteNode(path options?) to delete a node by path
+
+Use permission functions to inspect or validate access:
+- dbGetNodePermission(fromPath toPath) to get granted permission bits
+- dbCheckNodePermission(fromPath toPath type matchAny?) to verify access
+
+Use edge functions for graph relationships:
+- dbQueryEdges(query) to search edges
+- dbGetEdgeById(id permissionFrom?) to load one edge
+- dbInsertEdge(edge options?) to create an edge
+- dbUpdateEdge(update options?) to update mutable edge fields
+- dbDeleteEdge(id options?) to delete an edge
+
+Use embedding functions for vector search metadata:
+- dbQueryEmbeddings(query) to search embeddings
+- dbGetEmbeddingById(id permissionFrom?) to load one embedding
+- dbInsertEmbedding(embedding options?) to create an embedding
+- dbUpdateEmbedding(update options?) to update mutable embedding fields
+- dbDeleteEmbedding(id options?) to delete an embedding
+
+Guidelines:
+- Prefer reading before writing when ids, paths or current state are uncertain
+- Use exact paths and ids when known
+- Use permissionFrom when operating on behalf of a user or actor
+- Node and edge query functions can return multiple results
+- Update functions only change mutable fields
+- Delete functions permanently remove the target record
+- When the user asks to find related records, prefer dbQueryNodes with steps and edge traversal
+- When the user asks for direct lookup, prefer dbGetNodesByPath, dbGetEdgeById or dbGetEmbeddingById
+```
+
+
+> user

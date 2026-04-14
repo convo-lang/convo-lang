@@ -1,0 +1,2840 @@
+@import .././base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts as types
+@import ../../packages/db/src/BaseConvoDb.ts as baseDb
+
+> system
+
+`packages/convo-lang/src/lib/db/convo-db-types.ts`
+``` ts
+{{types}}
+```
+
+`packages/db/src/BaseConvoDb.ts`
+``` ts
+{{baseDb}}
+```
+
+
+> user
+Create a README style markdown guide on how to use the ConvoDb class and all its features
+
+- Include use cases
+- Explain how node paths allow you to emulate a file system and how it makes managing permissions easy using the filesystem based approach
+- Include a section about how Adapters (classes that implement the ConvoDb interface) allow data to be store in many different backing formats
+- Current adapters:
+  - `BaseConvoDb` - Base adaptor that simplify creating adapters
+  - `InMemoryConvoDb` - stores data in memory
+  - `BaseSqliteConvoDb` - An abstract SQLite adaptor that allows for creating SQLite adapters by only implementing a query function
+  - `BunSqliteConvoDb` - SQLite adaptor that uses Bun's SQLite implement
+  - `BasePostgresConvoDb` - An abstract Postgres adaptor that allows for creating Postgres adapters by only implementing a query function
+  - `BunPostgresConvoDb` - Postgres adaptor that uses Bun's Postgres implement
+  - `HttpConvoDb` - An adaptor that proxies remote ConvoDb's over HTTP.
+  - `LocalStorageConvoDb` - An adaptor that stores data in local storage in the browser
+  - `IndexDbConvoDb` - An adaptor that stores data in index db in the browser
+  - `HttpConvoDb` - An adaptor that proxies remote ConvoDb's over HTTP.
+  - `FsConvoDb` - An adaptor uses the local file system for storage
+  - `LayeredConvoDb` - An adapter that allows you to layer other adapters on top of each other and routes requests based on layer path rules. It is similar Unix fs mounts work
+
+
+Adapters are imported from "@convo-lang/db"
+The ConvoDb interface is imported from "@convo-lang/convo-lang"
+
+@time 2026-04-13T19:16:40-04:00
+@tokenUsage 22278 / 85 / $0.0559075
+@model gpt-5.4-2026-03-05
+> assistant
+Before I draft it, one quick question:
+
+Do you want the README guide to be:
+1. **end-user focused** with practical examples and light API detail, or
+2. **developer/reference style** with broader API coverage, method breakdowns, and more exact TypeScript examples?
+
+If you want, I can also do a **hybrid README** that starts practical and then includes a reference section.
+
+
+> user
+Make it end-user focused and target it towards developers building AI agents and other agentic systems
+
+
+@time 2026-04-13T19:20:48-04:00
+@tokenUsage 22411 / 5772 / $0.0704575
+@model gpt-5.4-2026-03-05
+> assistant
+# ConvoDb
+
+ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
+
+It gives you a consistent way to work with:
+
+- **Nodes** for storing entities, documents, tools, users, tasks, memory, and structured data
+- **Edges** for relationships, workflows, permissions, and graph traversal
+- **Embeddings** for semantic search and retrieval
+- **Path-based permissions** for simple but powerful access control
+- **Portable adapters** so the same ConvoDb code can run in memory, in the browser, over HTTP, on the file system, or on SQL backends
+
+Adapters are imported from:
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+```
+
+The `ConvoDb` interface and core types are imported from:
+
+```ts
+import { ConvoDb } from '@convo-lang/convo-lang';
+```
+
+---
+
+## Why ConvoDb is useful for AI agents
+
+AI agents usually need more than a plain key-value store.
+
+They often need to:
+
+- store conversations, memory, tasks, and plans
+- connect related things together
+- search by meaning, not just exact match
+- scope access per user, agent, workspace, or tool
+- move between local, browser, and server storage without changing application logic
+
+ConvoDb is designed for those patterns.
+
+A single system can use it to store:
+
+- **agent memory**
+- **tool definitions**
+- **user profiles**
+- **documents**
+- **task graphs**
+- **execution history**
+- **permissions**
+- **vector embeddings**
+
+---
+
+## Core concepts
+
+### Nodes
+
+A node is the main stored object.
+
+A node has:
+
+- a unique `path`
+- a `type`
+- arbitrary `data`
+- optional metadata like `name`, `description`, and timestamps
+
+Example:
+
+```ts
+const userNode={
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        email:'alex@example.com',
+        tier:'pro',
+    },
+};
+```
+
+You can use nodes for things like:
+
+- users
+- agents
+- memories
+- documents
+- tools
+- jobs
+- tasks
+- organizations
+- workspaces
+
+---
+
+### Edges
+
+Edges connect nodes.
+
+They are useful for:
+
+- relationships
+- traversal
+- workflow links
+- permission grants
+
+Example uses:
+
+- user owns workspace
+- agent can access tool
+- task depends on another task
+- memory belongs to session
+- user has permission to project subtree
+
+---
+
+### Embeddings
+
+Embeddings let you attach searchable semantic vectors to nodes.
+
+This is especially useful for AI systems that need:
+
+- retrieval-augmented generation
+- semantic memory lookup
+- document similarity search
+- contextual recall
+
+Embeddings point to a node and usually reference a property like `data`.
+
+---
+
+## File-system style paths
+
+One of ConvoDb’s most important ideas is that every node has a normalized path that behaves like a file-system path.
+
+Examples:
+
+- `/users/alex`
+- `/users/alex/memories/memory-001`
+- `/agents/researcher`
+- `/workspaces/acme/docs/roadmap`
+- `/orgs/acme/projects/p1/tasks/task-42`
+
+This makes your data feel like a structured namespace instead of a flat table.
+
+### Why this is powerful
+
+Paths let you model hierarchical systems naturally:
+
+- users under `/users/*`
+- organizations under `/orgs/*`
+- documents under `/docs/*`
+- agent state under `/agents/*`
+- session memory under `/sessions/*`
+
+You can think of it like a virtual file system for application data.
+
+Example structure:
+
+```txt
+/users/alex
+/users/alex/memories/summary
+/users/alex/memories/preferences
+/agents/researcher
+/agents/researcher/tools/web-search
+/workspaces/acme
+/workspaces/acme/docs/product-spec
+/workspaces/acme/tasks/task-1
+```
+
+### Path rules
+
+ConvoDb paths are normalized and follow file-system-like rules:
+
+- paths start with `/`
+- trailing slashes are removed except for `/`
+- duplicate slashes are normalized
+- paths are case-sensitive
+- `.` and `..` are not allowed
+- stored node paths cannot contain `*`
+- wildcard matching is supported in queries like `/users/*`
+
+---
+
+## Filesystem-style permissions
+
+Path-based organization makes permissions much easier to reason about.
+
+Instead of building a totally custom ACL system from scratch, you can grant permissions from one node to another node path or subtree ancestor using edges.
+
+### Why this works well
+
+If you grant access to:
+
+```txt
+/workspaces/acme
+```
+
+that permission can apply to descendant nodes such as:
+
+```txt
+/workspaces/acme/docs/spec
+/workspaces/acme/tasks/task-1
+/workspaces/acme/agents/researcher
+```
+
+So a single permission edge can cover an entire subtree.
+
+This is a lot like file-system permissions or mounted directory access in Unix-style systems.
+
+### Example permission model
+
+- user node: `/users/alex`
+- workspace node: `/workspaces/acme`
+- document node: `/workspaces/acme/docs/spec`
+
+Grant read/write access from the user to the workspace root, and that grant can be used when checking access to deeper paths.
+
+This makes it easy to express:
+
+- user can read a workspace
+- agent can write into a memory subtree
+- tool runner can execute against a tool namespace
+- tenant-scoped access to a whole branch of data
+
+### Permission types
+
+ConvoDb supports bitwise permissions:
+
+- `read`
+- `write`
+- `execute`
+
+And combinations like:
+
+- `readWrite`
+- `readExecute`
+- `writeExecute`
+- `all`
+
+---
+
+## Installation and imports
+
+### Core interface and types
+
+```ts
+import {
+    ConvoDb,
+    ConvoNodePermissionType,
+} from '@convo-lang/convo-lang';
+```
+
+### Adapters
+
+```ts
+import {
+    InMemoryConvoDb,
+} from '@convo-lang/db';
+```
+
+---
+
+## Quick start
+
+### Create a database
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb();
+```
+
+### Insert some nodes
+
+```ts
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        role:'developer',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/airports/jfk',
+    type:'airport',
+    displayName:'JFK Airport',
+    data:{
+        city:'New York',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/trips/alex-jfk',
+    type:'trip',
+    displayName:'Trip to JFK',
+    data:{
+        status:'planning',
+        origin:'/users/alex/home',
+        destination:'/airports/jfk',
+    },
+});
+```
+
+### Query nodes by path
+
+```ts
+const trips=await db.getNodesByPathAsync('/trips/*');
+
+if(trips.success){
+    console.log(trips.result.nodes);
+}
+```
+
+---
+
+## Common use cases for agentic systems
+
+### 1. Agent memory
+
+Store short-term and long-term memory by path:
+
+```txt
+/agents/researcher/memory/working/task-1
+/agents/researcher/memory/episodic/2026-01-10
+/agents/researcher/memory/semantic/product-facts
+```
+
+Benefits:
+
+- easy namespace separation
+- simple cleanup by subtree
+- permission scoping per agent
+
+---
+
+### 2. Multi-tenant AI workspaces
+
+Organize each tenant under a root path:
+
+```txt
+/tenants/acme
+/tenants/acme/users/alex
+/tenants/acme/docs/handbook
+/tenants/acme/agents/support-bot
+```
+
+Grant a user or agent access at `/tenants/acme` and let that flow down the subtree.
+
+---
+
+### 3. Tool registries
+
+Store tool definitions as nodes:
+
+```txt
+/tools/web-search
+/tools/calculator
+/tools/sql-query
+```
+
+Then connect agents to allowed tools with edges.
+
+---
+
+### 4. Workflow and task graphs
+
+Represent tasks and dependencies with nodes and edges:
+
+```txt
+/workflows/onboarding
+/workflows/onboarding/tasks/create-account
+/workflows/onboarding/tasks/send-email
+```
+
+Use edges to model:
+
+- depends on
+- blocks
+- completes
+- owned by
+
+---
+
+### 5. RAG and semantic retrieval
+
+Store documents and embeddings:
+
+```txt
+/docs/product/overview
+/docs/product/faq
+/docs/product/pricing
+```
+
+Create embeddings for each document node and query semantically.
+
+---
+
+### 6. Conversation and session state
+
+```txt
+/sessions/session-001
+/sessions/session-001/messages/msg-1
+/sessions/session-001/messages/msg-2
+/sessions/session-001/summary
+```
+
+Useful for:
+
+- chat agents
+- orchestrators
+- copilots
+- long-running workflows
+
+---
+
+## Working with nodes
+
+### Insert a node
+
+```ts
+await db.insertNodeAsync({
+    path:'/agents/researcher',
+    type:'agent',
+    displayName:'Research Agent',
+    data:{
+        model:'gpt-style-model',
+        goal:'Find and summarize information',
+    },
+});
+```
+
+### Update a node
+
+`data` is replaced as a whole when updated.
+
+```ts
+await db.updateNodeAsync({
+    path:'/agents/researcher',
+    displayName:'Research Agent v2',
+    data:{
+        model:'gpt-style-model',
+        goal:'Find, rank, and summarize information',
+    },
+});
+```
+
+### Delete a node
+
+Deleting a node also deletes:
+
+- connected edges
+- embeddings pointing to the node
+
+```ts
+await db.deleteNodeAsync('/agents/researcher');
+```
+
+---
+
+## Querying nodes
+
+ConvoDb supports traversal-based queries.
+
+A query is made of one or more `steps`. Each step can filter nodes and optionally traverse edges to move to connected nodes.
+
+### Simple path query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+        },
+    ],
+});
+```
+
+### Query by condition
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+            condition:{
+                target:'data.tier',
+                op:'=',
+                value:'pro',
+            },
+        },
+    ],
+});
+```
+
+### Query with ordering
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    orderBy:{
+        prop:'path',
+        direction:'asc',
+    },
+});
+```
+
+### Return only selected keys
+
+```ts
+const r=await db.queryNodesAsync({
+    keys:['path','type','data'],
+    steps:[
+        {
+            path:'/agents/*',
+        },
+    ],
+});
+```
+
+### Pagination
+
+```ts
+const firstPage=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    limit:20,
+});
+
+if(firstPage.success && firstPage.result.nextToken){
+    const secondPage=await db.queryNodesAsync({
+        steps:[
+            {
+                path:'/docs/*',
+            },
+        ],
+        limit:20,
+        nextToken:firstPage.result.nextToken,
+    });
+}
+```
+
+---
+
+## Conditions
+
+Conditions can target top-level properties or nested properties in `data`.
+
+Example:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                target:'data.status',
+                op:'=',
+                value:'open',
+            },
+        },
+    ],
+});
+```
+
+Supported operator categories include:
+
+- equality and comparison: `=`, `!=`, `>`, `<`, `>=`, `<=`
+- array operators: `in`, `all-in`, `any-in`, `contains`, `contains-all`, `contains-any`
+- wildcard string operators: `like`, `ilike`
+
+### Grouped conditions
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                groupOp:'and',
+                conditions:[
+                    {
+                        target:'data.status',
+                        op:'=',
+                        value:'open',
+                    },
+                    {
+                        target:'data.priority',
+                        op:'>=',
+                        value:3,
+                    },
+                ],
+            },
+        },
+    ],
+});
+```
+
+---
+
+## Traversing relationships with edges
+
+Edges turn ConvoDb into a graph-aware database.
+
+### Insert an edge
+
+```ts
+await db.insertEdgeAsync({
+    type:'uses-tool',
+    from:'/agents/researcher',
+    to:'/tools/web-search',
+    data:undefined as never,
+});
+```
+
+Note: the actual edge shape is based on `ConvoNodeEdge`, which includes fields like `type`, `from`, `to`, optional metadata, and optional `grant`.
+
+A more typical example:
+
+```ts
+await db.insertEdgeAsync({
+    type:'uses-tool',
+    from:'/agents/researcher',
+    to:'/tools/web-search',
+    description:'Research agent can use web search',
+});
+```
+
+### Query edges directly
+
+```ts
+const edgeResult=await db.queryEdgesAsync({
+    from:'/agents/researcher',
+    type:'uses-tool',
+});
+```
+
+### Traverse from one node to connected nodes
+
+Start from an agent and move to its tools:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/agents/researcher',
+            edge:'uses-tool',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+### Reverse traversal
+
+Find agents that can use a tool:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/web-search',
+            edge:'uses-tool',
+            edgeDirection:'reverse',
+        },
+    ],
+});
+```
+
+### Multi-step traversal
+
+From a user to their workspace to its documents:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/alex',
+            edge:'member-of',
+            edgeDirection:'forward',
+        },
+        {
+            edge:'contains',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+---
+
+## Permissions
+
+Permissions are represented using edges with the `grant` property.
+
+### Grant a user read/write access to a workspace
+
+```ts
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+```
+
+### Check permissions directly
+
+```ts
+const permission=await db.getNodePermissionAsync(
+    '/users/alex',
+    '/workspaces/acme/docs/spec',
+);
+
+if(permission.success){
+    console.log(permission.result);
+}
+```
+
+### Enforce permissions during reads
+
+```ts
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+```
+
+### Enforce permissions during writes
+
+```ts
+await db.insertNodeAsync(
+    {
+        path:'/workspaces/acme/docs/new-doc',
+        type:'doc',
+        data:{
+            title:'New Doc',
+        },
+    },
+    {
+        permissionFrom:'/users/alex',
+    },
+);
+```
+
+### Why path-based permissions are easier
+
+With path roots, you usually grant at a meaningful boundary:
+
+- `/tenants/acme`
+- `/workspaces/acme`
+- `/agents/researcher/memory`
+- `/tools`
+
+That means fewer permission records and simpler reasoning.
+
+Instead of granting access document-by-document, you can often grant once at the subtree root.
+
+---
+
+## Embeddings and semantic search
+
+Embeddings attach vector-searchable representations to nodes.
+
+### Insert a document node
+
+```ts
+await db.insertNodeAsync({
+    path:'/docs/faq/refunds',
+    type:'doc',
+    data:{
+        title:'Refund Policy',
+        body:'Customers may request a refund within 30 days...',
+    },
+});
+```
+
+### Insert an embedding
+
+```ts
+await db.insertEmbeddingAsync({
+    path:'/docs/faq/refunds',
+    prop:'data.body',
+    type:'text',
+});
+```
+
+### Query embeddings directly
+
+```ts
+const embeddings=await db.queryEmbeddingsAsync({
+    path:'/docs/faq/refunds',
+});
+```
+
+### Semantic node lookup in a query step
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+            embedding:{
+                text:'How do refunds work?',
+                type:'text',
+            },
+        },
+    ],
+});
+```
+
+### Embedding instructions
+
+Embeddings can include instructions describing how to transform source data before generating the vector.
+
+This is useful when you want to:
+
+- combine title and body
+- summarize a large object
+- embed only selected fields
+- normalize noisy content before indexing
+
+---
+
+## Streaming query results
+
+For larger scans, stream nodes instead of loading them all at once.
+
+```ts
+for await(const item of db.streamNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+})){
+    if(item.type==='error'){
+        console.error(item.error);
+        break;
+    }
+
+    console.log(item.node.path);
+}
+```
+
+Useful for:
+
+- long-running ingestion
+- batch processing
+- agent maintenance jobs
+- offline indexing
+- migration tasks
+
+---
+
+## Command-based execution
+
+ConvoDb also supports command objects, which can be useful when:
+
+- sending DB instructions over HTTP
+- building agent tools around structured actions
+- serializing operations
+- proxying remote databases
+
+### Execute one command
+
+```ts
+const result=await db.executeCommandAsync({
+    queryNodes:{
+        query:{
+            steps:[
+                {
+                    path:'/docs/*',
+                },
+            ],
+        },
+    },
+});
+```
+
+### Execute multiple commands
+
+```ts
+const result=await db.executeCommandsAsync([
+    {
+        insertNode:{
+            node:{
+                path:'/agents/planner',
+                type:'agent',
+                data:{},
+            },
+        },
+    },
+    {
+        queryNodes:{
+            query:{
+                steps:[
+                    {
+                        path:'/agents/*',
+                    },
+                ],
+            },
+        },
+    },
+]);
+```
+
+This pattern is especially useful for remote and tool-driven agent architectures.
+
+---
+
+## Adapters
+
+A major benefit of ConvoDb is that your application can target the `ConvoDb` interface while storage is handled by interchangeable adapters.
+
+This means your agent logic can stay mostly the same while storage changes depending on environment or scale.
+
+Adapters are imported from:
+
+```ts
+import {
+    InMemoryConvoDb,
+    LocalStorageConvoDb,
+    HttpConvoDb,
+} from '@convo-lang/db';
+```
+
+### Why adapters matter
+
+Different agent systems need different storage setups:
+
+- local prototyping
+- browser-only apps
+- persistent desktop apps
+- server-backed APIs
+- SQL production systems
+- layered hybrid systems
+
+With adapters, you can switch storage without redesigning your domain model.
+
+---
+
+## Current adapters
+
+### `BaseConvoDb`
+
+A base adapter that simplifies building new adapters.
+
+Use this when you want to implement a custom backend while reusing the shared traversal, permissions, validation, command execution, and embedding behavior.
+
+Best for:
+
+- custom storage engines
+- internal platform adapters
+- adapting proprietary databases
+
+---
+
+### `InMemoryConvoDb`
+
+Stores everything in memory.
+
+Best for:
+
+- testing
+- unit tests
+- demos
+- prototypes
+- ephemeral agent runs
+
+---
+
+### `BaseSqliteConvoDb`
+
+An abstract SQLite adapter that makes it easier to create SQLite-based adapters by only implementing a query function.
+
+Best for:
+
+- embedded apps
+- desktop tools
+- local dev environments
+- lightweight persistent stores
+
+---
+
+### `BunSqliteConvoDb`
+
+A SQLite adapter using Bun’s SQLite implementation.
+
+Best for:
+
+- Bun-based apps
+- local persistence
+- fast dev setups
+
+---
+
+### `BasePostgresConvoDb`
+
+An abstract Postgres adapter that makes it easier to create Postgres adapters by only implementing a query function.
+
+Best for:
+
+- server backends
+- production APIs
+- scalable relational persistence
+
+---
+
+### `BunPostgresConvoDb`
+
+A Postgres adapter using Bun’s Postgres implementation.
+
+Best for:
+
+- Bun servers
+- cloud-hosted APIs
+- multi-user production systems
+
+---
+
+### `HttpConvoDb`
+
+A proxy adapter for remote ConvoDb instances over HTTP.
+
+Best for:
+
+- client/server architectures
+- browser apps
+- remote agent workers
+- service boundaries
+- centralized data access
+
+---
+
+### `LocalStorageConvoDb`
+
+Stores data in browser local storage.
+
+Best for:
+
+- small browser apps
+- local demos
+- offline-capable prototypes
+- simple single-user tools
+
+---
+
+### `IndexDbConvoDb`
+
+Stores data in IndexedDB in the browser.
+
+Best for:
+
+- larger browser datasets
+- offline-first apps
+- local AI assistants
+- client-side memory stores
+
+---
+
+### `FsConvoDb`
+
+Uses the local file system for storage.
+
+Best for:
+
+- developer tools
+- CLI workflows
+- local-first systems
+- inspectable data layouts
+
+---
+
+### `LayeredConvoDb`
+
+Lets you layer multiple adapters together and route requests based on path rules.
+
+This works similarly to Unix file-system mounts.
+
+For example:
+
+- `/cache/*` in memory
+- `/browser/*` in IndexedDB
+- `/shared/*` over HTTP
+- `/archive/*` on disk
+
+Best for:
+
+- hybrid storage architectures
+- caching layers
+- multi-environment apps
+- path-routed storage strategies
+
+---
+
+## Example adapter usage patterns
+
+### Local prototype
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb();
+```
+
+### Browser app
+
+```ts
+import { IndexDbConvoDb } from '@convo-lang/db';
+
+const db=new IndexDbConvoDb();
+```
+
+### Remote API client
+
+```ts
+import { HttpConvoDb } from '@convo-lang/db';
+
+const db=new HttpConvoDb({
+    baseUrl:'https://api.example.com/convo-db',
+});
+```
+
+### Hybrid layered storage
+
+Use fast local storage for temporary memory and remote storage for shared data.
+
+```ts
+import {
+    InMemoryConvoDb,
+    HttpConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+
+const cacheDb=new InMemoryConvoDb();
+const remoteDb=new HttpConvoDb({
+    baseUrl:'https://api.example.com/convo-db',
+});
+
+const db=new LayeredConvoDb({
+    layers:[
+        {
+            path:'/agents/*',
+            db:cacheDb,
+        },
+        {
+            path:'/shared/*',
+            db:remoteDb,
+        },
+    ],
+});
+```
+
+---
+
+## How ConvoDb helps build agent systems
+
+### Memory architecture
+
+Use path namespaces to separate memory types:
+
+```txt
+/agents/planner/memory/working
+/agents/planner/memory/episodic
+/agents/planner/memory/semantic
+```
+
+### Tool access control
+
+Grant tools by path and edge relationships:
+
+```txt
+/tools/web-search
+/tools/code-runner
+/tools/calendar
+```
+
+### Multi-agent coordination
+
+Store agents under:
+
+```txt
+/agents/researcher
+/agents/planner
+/agents/executor
+```
+
+Use edges to model:
+
+- delegates-to
+- depends-on
+- reports-to
+- uses-tool
+
+### Human + agent collaboration
+
+Put users and agents into the same graph:
+
+```txt
+/users/alex
+/agents/support
+/workspaces/acme
+```
+
+Then connect them with edges and shared path permissions.
+
+---
+
+## Recommended modeling patterns
+
+### Use paths as stable namespaces
+
+Good:
+
+```txt
+/users/alex
+/users/alex/preferences
+/users/alex/memory/profile
+```
+
+Less ideal:
+
+```txt
+/item-1
+/item-2
+/item-3
+```
+
+Hierarchical paths make reasoning, querying, and permissions much easier.
+
+### Keep `type` meaningful
+
+Examples:
+
+- `user`
+- `agent`
+- `doc`
+- `task`
+- `workspace`
+- `memory`
+- `tool`
+
+### Store domain data in `data`
+
+Use top-level fields for cross-cutting metadata and `data` for application content.
+
+### Grant permissions high in the tree when appropriate
+
+Prefer granting at:
+
+```txt
+/workspaces/acme
+```
+
+instead of individually at:
+
+```txt
+/workspaces/acme/docs/doc-1
+/workspaces/acme/docs/doc-2
+/workspaces/acme/docs/doc-3
+```
+
+### Use edges for relationships, not only nesting
+
+Paths model hierarchy.
+Edges model relationships.
+
+You often want both.
+
+Example:
+
+- path says a task lives under a workflow
+- edge says it depends on another task
+
+---
+
+## Minimal end-to-end example
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb();
+
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    data:{
+        role:'admin',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme',
+    type:'workspace',
+    data:{
+        name:'Acme Workspace',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme/docs/spec',
+    type:'doc',
+    data:{
+        title:'System Spec',
+        body:'This workspace contains product requirements and architecture notes.',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
+
+---
+
+## Summary
+
+ConvoDb is a strong fit for developers building:
+
+- AI agents
+- agent memory systems
+- RAG pipelines
+- workflow engines
+- multi-tenant AI apps
+- browser-based copilots
+- local-first AI tools
+- graph-shaped knowledge systems
+
+Its biggest strengths are:
+
+- **path-based organization**
+- **filesystem-style permission modeling**
+- **graph traversal with edges**
+- **semantic retrieval through embeddings**
+- **portable storage through adapters**
+
+If you build agentic systems that need structure, memory, retrieval, and access control, ConvoDb gives you one model that can span local, browser, server, and remote environments.
+
+---
+
+## Imports recap
+
+```ts
+import { ConvoDb, ConvoNodePermissionType } from '@convo-lang/convo-lang';
+import {
+    BaseConvoDb,
+    InMemoryConvoDb,
+    BaseSqliteConvoDb,
+    BunSqliteConvoDb,
+    BasePostgresConvoDb,
+    BunPostgresConvoDb,
+    HttpConvoDb,
+    LocalStorageConvoDb,
+    IndexDbConvoDb,
+    FsConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+```
+
+If you want, I can also turn this into:
+- a **repo-ready polished README.md**
+- a **shorter landing-page version**
+- or a **README with exact API examples verified against the current TypeScript interfaces**
+
+
+> user
+Turn it into a epo-ready polished README.md
+
+@time 2026-04-13T19:23:37-04:00
+@tokenUsage 28199 / 5602 / $0.08450250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+```md
+# ConvoDb
+
+ConvoDb is a path-based, graph-capable database interface for building AI agents, agent memory systems, RAG pipelines, workflow engines, knowledge graphs, and other agentic systems.
+
+It combines a few ideas that work especially well for modern AI applications:
+
+- **Nodes** for storing entities, documents, tasks, tools, users, memories, and arbitrary structured data
+- **Edges** for relationships, graph traversal, and permissions
+- **Embeddings** for semantic search and retrieval
+- **Filesystem-style paths** for intuitive organization and subtree-based access control
+- **Portable adapters** so the same ConvoDb code can run in memory, in browsers, over HTTP, on the local filesystem, and on SQL backends
+
+If you are building systems that need memory, retrieval, relationships, and permissions, ConvoDb gives you one consistent model that can span local development, browser apps, and production backends.
+
+---
+
+## Why ConvoDb
+
+AI agents rarely fit cleanly into a single storage pattern.
+
+Most agentic systems need some combination of:
+
+- structured records
+- hierarchical organization
+- graph relationships
+- semantic retrieval
+- scoped permissions
+- local and remote portability
+
+ConvoDb is designed around those needs.
+
+You can use it to power:
+
+- agent memory
+- long-running task graphs
+- document stores
+- tool registries
+- user and tenant workspaces
+- collaboration systems
+- browser-based copilots
+- local-first AI tools
+- hybrid local/remote AI applications
+
+---
+
+## Core ideas
+
+### Nodes
+
+Nodes are the main records stored in ConvoDb.
+
+A node has:
+
+- a unique `path`
+- a `type`
+- arbitrary `data`
+- optional metadata like `displayName`, `description`, `instructions`, and timestamps
+
+Example:
+
+```ts
+const userNode={
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        email:'alex@example.com',
+        tier:'pro',
+    },
+};
+```
+
+Typical node types include:
+
+- `user`
+- `agent`
+- `doc`
+- `task`
+- `workspace`
+- `memory`
+- `tool`
+- `session`
+
+---
+
+### Edges
+
+Edges connect nodes.
+
+They are useful for:
+
+- relationship graphs
+- workflow dependency graphs
+- membership and ownership
+- tool access
+- permission grants
+- traversal queries
+
+Examples:
+
+- user belongs to workspace
+- agent uses tool
+- task depends on task
+- message belongs to session
+- user is granted access to a workspace subtree
+
+---
+
+### Embeddings
+
+Embeddings attach semantic vector search capability to nodes.
+
+This makes ConvoDb useful for:
+
+- RAG pipelines
+- semantic document search
+- memory recall
+- context retrieval
+- similarity search
+
+Embeddings point at a node path and usually reference a property such as `data.body` or `data.summary`.
+
+---
+
+## Filesystem-style paths
+
+One of ConvoDb’s core design choices is that every node is identified by a normalized path that behaves like a filesystem path.
+
+Examples:
+
+- `/users/alex`
+- `/users/alex/memory/profile`
+- `/agents/researcher`
+- `/workspaces/acme/docs/spec`
+- `/orgs/acme/projects/project-1/tasks/task-42`
+
+This makes your data feel like a structured namespace instead of a flat table.
+
+### Why paths are powerful
+
+Paths let you model application structure naturally:
+
+- users under `/users/*`
+- agents under `/agents/*`
+- sessions under `/sessions/*`
+- workspaces under `/workspaces/*`
+- documents under `/docs/*`
+- tenant data under `/tenants/*`
+
+Example structure:
+
+```txt
+/users/alex
+/users/alex/memory/preferences
+/users/alex/memory/profile
+/agents/researcher
+/agents/researcher/tools/web-search
+/workspaces/acme
+/workspaces/acme/docs/spec
+/workspaces/acme/tasks/task-1
+```
+
+### Path rules
+
+ConvoDb paths are normalized and follow simple rules:
+
+- paths start with `/`
+- trailing slashes are removed except for `/`
+- duplicate slashes are normalized
+- paths are case-sensitive
+- `.` and `..` are not allowed
+- stored node paths cannot contain `*`
+- wildcard query paths like `/users/*` are supported
+
+---
+
+## Filesystem-style permissions
+
+The path model also makes permissions much easier to manage.
+
+Instead of attaching access control to every single record independently, you can grant access at a meaningful root and let it apply to descendants.
+
+For example, a grant to:
+
+```txt
+/workspaces/acme
+```
+
+can be used when checking access to:
+
+```txt
+/workspaces/acme/docs/spec
+/workspaces/acme/tasks/task-1
+/workspaces/acme/agents/researcher
+```
+
+This is similar to how filesystem permissions or mounted directory access are often reasoned about.
+
+### Why this is useful
+
+For agentic systems, subtree-based permissions are a very natural fit:
+
+- grant a user access to a workspace
+- grant an agent access to a memory subtree
+- grant a tool runner execute access to a tool namespace
+- grant a tenant-scoped service access to everything under a tenant root
+
+This usually means:
+
+- fewer permission records
+- simpler access rules
+- easier reasoning
+- easier multi-tenant isolation
+
+### Permission types
+
+ConvoDb supports these permission bits:
+
+- `read`
+- `write`
+- `execute`
+
+And common combinations such as:
+
+- `readWrite`
+- `readExecute`
+- `writeExecute`
+- `all`
+
+---
+
+## Installation and imports
+
+The `ConvoDb` interface and shared types are imported from:
+
+```ts
+import { ConvoDb, ConvoNodePermissionType } from '@convo-lang/convo-lang';
+```
+
+Adapters are imported from:
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+```
+
+---
+
+## Quick start
+
+### Create a database
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb();
+```
+
+### Insert some nodes
+
+```ts
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        role:'developer',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/airports/jfk',
+    type:'airport',
+    displayName:'JFK Airport',
+    data:{
+        city:'New York',
+        code:'JFK',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/trips/alex-jfk',
+    type:'trip',
+    displayName:'Alex Trip to JFK',
+    data:{
+        status:'planning',
+        destination:'/airports/jfk',
+    },
+});
+```
+
+### Query by path
+
+```ts
+const trips=await db.getNodesByPathAsync('/trips/*');
+
+if(trips.success){
+    console.log(trips.result.nodes);
+}
+```
+
+---
+
+## Use cases
+
+ConvoDb is especially useful for developers building AI agents and other agentic systems.
+
+### Agent memory
+
+Use path namespaces to separate memory types:
+
+```txt
+/agents/researcher/memory/working/current-task
+/agents/researcher/memory/episodic/2026-04-01
+/agents/researcher/memory/semantic/product-facts
+```
+
+This makes it easy to:
+
+- scope memory per agent
+- clean up old memory by subtree
+- apply permissions to whole memory areas
+- support short-term and long-term memory patterns
+
+---
+
+### Multi-tenant AI workspaces
+
+Model each tenant or workspace under its own root:
+
+```txt
+/tenants/acme
+/tenants/acme/users/alex
+/tenants/acme/docs/handbook
+/tenants/acme/agents/support
+```
+
+This works well for:
+
+- team copilots
+- enterprise AI assistants
+- customer-isolated workspaces
+- tenant-level authorization
+
+---
+
+### Tool registries
+
+Store tools as nodes:
+
+```txt
+/tools/web-search
+/tools/calculator
+/tools/sql-query
+/tools/calendar
+```
+
+Then connect agents to the tools they are allowed to use with edges.
+
+---
+
+### Workflow and task graphs
+
+Represent workflows and tasks with nodes and edges:
+
+```txt
+/workflows/onboarding
+/workflows/onboarding/tasks/create-account
+/workflows/onboarding/tasks/send-email
+/workflows/onboarding/tasks/verify-access
+```
+
+Use edges for:
+
+- depends on
+- blocks
+- assigned to
+- completes
+- triggers
+
+---
+
+### RAG and semantic retrieval
+
+Store documents as nodes and add embeddings for semantic search:
+
+```txt
+/docs/product/overview
+/docs/product/faq
+/docs/product/pricing
+```
+
+This supports:
+
+- retrieval pipelines
+- semantic knowledge lookup
+- document grounding
+- memory recall for agents
+
+---
+
+### Conversation and session state
+
+```txt
+/sessions/session-001
+/sessions/session-001/messages/msg-1
+/sessions/session-001/messages/msg-2
+/sessions/session-001/summary
+```
+
+Useful for:
+
+- chat agents
+- support copilots
+- multi-step orchestration
+- resumable agent sessions
+
+---
+
+## Basic CRUD
+
+### Insert a node
+
+```ts
+await db.insertNodeAsync({
+    path:'/agents/researcher',
+    type:'agent',
+    displayName:'Research Agent',
+    data:{
+        model:'example-model',
+        goal:'Find and summarize useful information',
+    },
+});
+```
+
+### Update a node
+
+Node updates are partial, but `data` is replaced as a whole when provided.
+
+```ts
+await db.updateNodeAsync({
+    path:'/agents/researcher',
+    displayName:'Research Agent v2',
+    data:{
+        model:'example-model',
+        goal:'Find, rank, and summarize useful information',
+    },
+});
+```
+
+### Delete a node
+
+Deleting a node also deletes:
+
+- all connected edges
+- all embeddings pointing to the node
+
+```ts
+await db.deleteNodeAsync('/agents/researcher');
+```
+
+---
+
+## Querying nodes
+
+ConvoDb queries are traversal-oriented.
+
+A query contains one or more `steps`. Each step can:
+
+- filter nodes by path
+- filter by conditions
+- filter by permissions
+- filter by embeddings
+- traverse connected edges to move to the next set of nodes
+
+### Simple path query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+        },
+    ],
+});
+```
+
+### Query by nested data condition
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+            condition:{
+                target:'data.tier',
+                op:'=',
+                value:'pro',
+            },
+        },
+    ],
+});
+```
+
+### Query with sort order
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    orderBy:{
+        prop:'path',
+        direction:'asc',
+    },
+});
+```
+
+### Select only certain keys
+
+```ts
+const r=await db.queryNodesAsync({
+    keys:['path','type','data'],
+    steps:[
+        {
+            path:'/agents/*',
+        },
+    ],
+});
+```
+
+### Pagination with `nextToken`
+
+```ts
+const firstPage=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    limit:20,
+});
+
+if(firstPage.success && firstPage.result.nextToken){
+    const secondPage=await db.queryNodesAsync({
+        steps:[
+            {
+                path:'/docs/*',
+            },
+        ],
+        limit:20,
+        nextToken:firstPage.result.nextToken,
+    });
+}
+```
+
+### Stream results
+
+Streaming is useful for large scans, ingestion, maintenance jobs, and indexing.
+
+```ts
+for await(const item of db.streamNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+})){
+    if(item.type==='error'){
+        console.error(item.error);
+        break;
+    }
+
+    console.log(item.node.path);
+}
+```
+
+---
+
+## Conditions
+
+Conditions can target top-level properties or nested values inside `data`.
+
+### Simple condition
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                target:'data.status',
+                op:'=',
+                value:'open',
+            },
+        },
+    ],
+});
+```
+
+### Grouped conditions
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                groupOp:'and',
+                conditions:[
+                    {
+                        target:'data.status',
+                        op:'=',
+                        value:'open',
+                    },
+                    {
+                        target:'data.priority',
+                        op:'>=',
+                        value:3,
+                    },
+                ],
+            },
+        },
+    ],
+});
+```
+
+### Supported operator categories
+
+Comparison operators:
+
+- `=`
+- `!=`
+- `>`
+- `<`
+- `>=`
+- `<=`
+
+Array operators:
+
+- `in`
+- `all-in`
+- `any-in`
+- `contains`
+- `contains-all`
+- `contains-any`
+
+Wildcard string operators:
+
+- `like`
+- `ilike`
+
+---
+
+## Working with edges
+
+Edges make ConvoDb graph-aware.
+
+You can query them directly or traverse them from node queries.
+
+### Insert an edge
+
+```ts
+await db.insertEdgeAsync({
+    type:'uses-tool',
+    from:'/agents/researcher',
+    to:'/tools/web-search',
+    description:'Research agent can use the web search tool',
+});
+```
+
+### Query edges directly
+
+```ts
+const edgeResult=await db.queryEdgesAsync({
+    from:'/agents/researcher',
+    type:'uses-tool',
+});
+```
+
+### Traverse from one node to connected nodes
+
+Find the tools used by an agent:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/agents/researcher',
+            edge:'uses-tool',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+### Reverse traversal
+
+Find agents that can use a tool:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/web-search',
+            edge:'uses-tool',
+            edgeDirection:'reverse',
+        },
+    ],
+});
+```
+
+### Multi-step traversal
+
+Move from a user to a workspace and then to nodes contained inside that workspace:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/alex',
+            edge:'member-of',
+            edgeDirection:'forward',
+        },
+        {
+            edge:'contains',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+---
+
+## Permissions
+
+Permissions are represented using edges with the `grant` property.
+
+This makes permission storage explicit, graph-aware, and easy to combine with path-based subtree semantics.
+
+### Grant read/write access
+
+```ts
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+```
+
+### Get effective permission
+
+```ts
+const permission=await db.getNodePermissionAsync(
+    '/users/alex',
+    '/workspaces/acme/docs/spec',
+);
+
+if(permission.success){
+    console.log(permission.result);
+}
+```
+
+### Check permission
+
+```ts
+const check=await db.checkNodePermissionAsync(
+    '/users/alex',
+    '/workspaces/acme/docs/spec',
+    ConvoNodePermissionType.read,
+);
+
+if(check.success){
+    console.log('allowed');
+}
+```
+
+### Enforce permissions on reads
+
+```ts
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+```
+
+### Enforce permissions on writes
+
+```ts
+await db.insertNodeAsync(
+    {
+        path:'/workspaces/acme/docs/new-doc',
+        type:'doc',
+        data:{
+            title:'New Document',
+        },
+    },
+    {
+        permissionFrom:'/users/alex',
+    },
+);
+```
+
+### Why subtree permissions are so useful
+
+Instead of granting access record-by-record, you can often grant at a boundary like:
+
+- `/tenants/acme`
+- `/workspaces/acme`
+- `/agents/researcher/memory`
+- `/tools`
+
+That gives you a filesystem-style mental model that is much easier to manage as your data grows.
+
+---
+
+## Embeddings and semantic retrieval
+
+Embeddings let you search nodes by meaning instead of only by exact fields.
+
+### Insert a document node
+
+```ts
+await db.insertNodeAsync({
+    path:'/docs/faq/refunds',
+    type:'doc',
+    data:{
+        title:'Refund Policy',
+        body:'Customers may request a refund within 30 days of purchase.',
+    },
+});
+```
+
+### Insert an embedding
+
+```ts
+await db.insertEmbeddingAsync({
+    path:'/docs/faq/refunds',
+    prop:'data.body',
+    type:'text',
+});
+```
+
+### Query embeddings directly
+
+```ts
+const embeddings=await db.queryEmbeddingsAsync({
+    path:'/docs/faq/refunds',
+});
+```
+
+### Semantic filtering in a node query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+            embedding:{
+                text:'How do refunds work?',
+                type:'text',
+            },
+        },
+    ],
+});
+```
+
+### Embedding instructions
+
+Embeddings may include `instructions` that describe how the source data should be transformed before vector generation.
+
+This is useful when you want to:
+
+- combine title and body
+- summarize large objects before embedding
+- embed selected fields only
+- normalize content for better retrieval quality
+
+---
+
+## Command-based execution
+
+ConvoDb also supports command objects. This is especially useful when you want to:
+
+- proxy database operations over HTTP
+- expose database actions as tool calls
+- serialize operations between services
+- build remote agent runtimes
+
+### Execute a single command
+
+```ts
+const result=await db.executeCommandAsync({
+    queryNodes:{
+        query:{
+            steps:[
+                {
+                    path:'/docs/*',
+                },
+            ],
+        },
+    },
+});
+```
+
+### Execute multiple commands
+
+```ts
+const result=await db.executeCommandsAsync([
+    {
+        insertNode:{
+            node:{
+                path:'/agents/planner',
+                type:'agent',
+                data:{},
+            },
+        },
+    },
+    {
+        queryNodes:{
+            query:{
+                steps:[
+                    {
+                        path:'/agents/*',
+                    },
+                ],
+            },
+        },
+    },
+]);
+```
+
+This command format works especially well with remote systems and tool-driven agent architectures.
+
+---
+
+## Adapters
+
+A major benefit of ConvoDb is that your application can target the `ConvoDb` interface while different adapters handle storage.
+
+That means your application logic can stay mostly the same while storage changes based on your environment, scale, or deployment model.
+
+Adapters are imported from:
+
+```ts
+import {
+    InMemoryConvoDb,
+    LocalStorageConvoDb,
+    HttpConvoDb,
+} from '@convo-lang/db';
+```
+
+### Why adapters matter
+
+Different agent systems need different storage strategies:
+
+- in-memory for tests and prototypes
+- browser storage for local-first apps
+- HTTP proxying for remote services
+- SQLite for embedded persistence
+- Postgres for production backends
+- layered setups for hybrid local/remote architectures
+
+By coding against the `ConvoDb` interface, you can switch adapters without redesigning your data model.
+
+---
+
+## Current adapters
+
+### `BaseConvoDb`
+
+A base adapter that simplifies building custom adapters.
+
+It provides shared logic for:
+
+- query traversal
+- permissions
+- validation
+- command execution
+- embedding generation flow
+
+Use it when implementing your own storage backend.
+
+---
+
+### `InMemoryConvoDb`
+
+Stores data in memory.
+
+Best for:
+
+- tests
+- demos
+- prototypes
+- temporary agent runs
+
+---
+
+### `BaseSqliteConvoDb`
+
+An abstract SQLite adapter that allows you to build SQLite adapters by implementing a query function.
+
+Best for:
+
+- local persistent apps
+- embedded tools
+- desktop AI applications
+- lightweight server storage
+
+---
+
+### `BunSqliteConvoDb`
+
+A SQLite adapter using Bun’s SQLite implementation.
+
+Best for:
+
+- Bun-based local apps
+- development environments
+- compact persistent stores
+
+---
+
+### `BasePostgresConvoDb`
+
+An abstract Postgres adapter that allows you to build Postgres adapters by implementing a query function.
+
+Best for:
+
+- production server systems
+- shared backends
+- scalable multi-user deployments
+
+---
+
+### `BunPostgresConvoDb`
+
+A Postgres adapter using Bun’s Postgres implementation.
+
+Best for:
+
+- Bun server applications
+- cloud APIs
+- production AI backends
+
+---
+
+### `HttpConvoDb`
+
+A proxy adapter that connects to a remote ConvoDb over HTTP.
+
+Best for:
+
+- browser clients
+- remote workers
+- service-based architectures
+- centralized data layers
+
+---
+
+### `LocalStorageConvoDb`
+
+Stores data in browser local storage.
+
+Best for:
+
+- small browser apps
+- offline demos
+- local prototypes
+- single-user tools
+
+---
+
+### `IndexDbConvoDb`
+
+Stores data in IndexedDB in the browser.
+
+Best for:
+
+- larger browser datasets
+- offline-first AI apps
+- local browser memory stores
+- richer client-side persistence
+
+---
+
+### `FsConvoDb`
+
+Stores data using the local filesystem.
+
+Best for:
+
+- CLIs
+- local developer tools
+- inspectable data storage
+- local-first workflows
+
+---
+
+### `LayeredConvoDb`
+
+A hybrid adapter that layers multiple adapters together and routes requests by path rules.
+
+This is similar to how Unix filesystem mounts work.
+
+Example uses:
+
+- `/cache/*` in memory
+- `/local/*` in IndexedDB
+- `/shared/*` over HTTP
+- `/archive/*` on disk
+
+Best for:
+
+- hybrid architectures
+- local caching
+- path-routed storage
+- mixed local/remote systems
+
+---
+
+## Adapter examples
+
+### In-memory prototype
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb();
+```
+
+### Browser persistence
+
+```ts
+import { IndexDbConvoDb } from '@convo-lang/db';
+
+const db=new IndexDbConvoDb();
+```
+
+### Remote API proxy
+
+```ts
+import { HttpConvoDb } from '@convo-lang/db';
+
+const db=new HttpConvoDb({
+    baseUrl:'https://api.example.com/convo-db',
+});
+```
+
+### Layered hybrid storage
+
+```ts
+import {
+    InMemoryConvoDb,
+    HttpConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+
+const cacheDb=new InMemoryConvoDb();
+const remoteDb=new HttpConvoDb({
+    baseUrl:'https://api.example.com/convo-db',
+});
+
+const db=new LayeredConvoDb({
+    layers:[
+        {
+            path:'/agents/*',
+            db:cacheDb,
+        },
+        {
+            path:'/shared/*',
+            db:remoteDb,
+        },
+    ],
+});
+```
+
+---
+
+## Recommended modeling patterns
+
+### Use paths as stable namespaces
+
+Good:
+
+```txt
+/users/alex
+/users/alex/preferences
+/users/alex/memory/profile
+```
+
+Less useful:
+
+```txt
+/item-1
+/item-2
+/item-3
+```
+
+Hierarchical paths make organization, querying, and permissions much simpler.
+
+---
+
+### Keep `type` meaningful
+
+Good examples:
+
+- `user`
+- `agent`
+- `doc`
+- `task`
+- `workspace`
+- `memory`
+- `tool`
+
+---
+
+### Put domain content in `data`
+
+Use the node’s top-level properties for metadata and use `data` for your application-specific content.
+
+---
+
+### Use paths for hierarchy and edges for relationships
+
+Paths tell you where something lives.
+
+Edges tell you how things relate.
+
+You usually want both.
+
+Example:
+
+- a task lives under `/workflows/onboarding/tasks/create-account`
+- an edge says it `depends-on` another task
+
+---
+
+### Grant permissions high in the tree when possible
+
+Prefer granting access at a root like:
+
+```txt
+/workspaces/acme
+```
+
+instead of one node at a time like:
+
+```txt
+/workspaces/acme/docs/doc-1
+/workspaces/acme/docs/doc-2
+/workspaces/acme/docs/doc-3
+```
+
+This keeps authorization simpler and more maintainable.
+
+---
+
+## End-to-end example
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb();
+
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    data:{
+        role:'admin',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme',
+    type:'workspace',
+    data:{
+        name:'Acme Workspace',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme/docs/spec',
+    type:'doc',
+    data:{
+        title:'System Spec',
+        body:'This workspace contains product requirements and architecture notes.',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
+
+---
+
+## Summary
+
+ConvoDb is a strong fit for developers building:
+
+- AI agents
+- memory systems
+- RAG workflows
+- graph-shaped knowledge systems
+- multi-tenant AI applications
+- browser-based copilots
+- local-first AI tools
+- workflow and orchestration engines
+
+Its key strengths are:
+
+- **path-based organization**
+- **filesystem-style permission modeling**
+- **graph traversal with edges**
+- **semantic retrieval with embeddings**
+- **adapter-based portability across environments**
+
+If your system needs structure, retrieval, relationships, and access control, ConvoDb provides a clean and portable foundation.
+
+---
+
+## Import recap
+
+```ts
+import { ConvoDb, ConvoNodePermissionType } from '@convo-lang/convo-lang';
+import {
+    BaseConvoDb,
+    InMemoryConvoDb,
+    BaseSqliteConvoDb,
+    BunSqliteConvoDb,
+    BasePostgresConvoDb,
+    BunPostgresConvoDb,
+    HttpConvoDb,
+    LocalStorageConvoDb,
+    IndexDbConvoDb,
+    FsConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+```
+```
+
+
+> user
