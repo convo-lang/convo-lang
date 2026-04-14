@@ -3590,12 +3590,14 @@ export interface ConvoImportBase
     templateName?:string;
     role?:string;
     assign?:string;
+    tag?:string;
 }
 
 export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
     const modifiers=name.split(' ');
 
     let templateName:string|undefined;
+    let tag:string|undefined;
     let role:string|undefined;
     let assign:string|undefined;
     name='';
@@ -3608,6 +3610,16 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
             modifiers[i]=m.substring(1);
             if(m.startsWith('!template:')){
                 templateName=m.substring(10);
+            }else if(m.startsWith('!tag:')){
+                tag=m.substring(5);
+                if(!modifiers.includes('!merge')){
+                    modifiers.push('!merge');
+                }
+            }else if(m.startsWith('!file:') || m==='!file'){
+                tag='FILE_CONTENT';
+                if(!modifiers.includes('!merge')){
+                    modifiers.push('!merge');
+                }
             }else if(m.startsWith('!role:')){
                 role=m.substring(6);
             }else if(m.startsWith('!assign:')){
@@ -3620,7 +3632,44 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
         }
 
     }
-    return {name,modifiers,templateName,role,assign}
+    return {name,modifiers,templateName,role,assign,tag}
+}
+
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string)=>{
+    const tag=convoImport.tag;
+    if(!tag){
+        return content;
+    }
+    const close=`</${tag}>`;
+    let comment='';
+    let closingEscape:string|undefined;
+    if(content.includes(close)){
+        const split=content.split(close);
+        closingEscape=`((CLOSE_TAG[${tag}]))`;
+        content=split.join(closingEscape);
+        const count=split.length-1;
+        const m=count>1;
+        comment+=(
+            `The contents of this XML tag contain ${
+                count
+            } ${
+                m?'instances':'instance'
+            } of its own closing tag. The ${
+                m?'instances':'instance'
+            } have be replaced with ${
+                closingEscape
+            }`
+        )
+    }
+    return (
+        `<${tag} name="${
+            escapeHtml(path?getFileName(path):convoImport.name)
+        }"${path?` path="${escapeHtml(path)}"`:''}${
+            comment?` comment="${comment}"`:''
+        }${closingEscape?` closing-escape="${closingEscape}"`:''}>\n${
+            content
+        }\n${close}`
+    )
 }
 
 export const convoTranscriptionRequestToSupportRequest=(request:ConvoTranscriptionRequest):ConvoTranscriptionSupportRequest=>{
@@ -3628,7 +3677,7 @@ export const convoTranscriptionRequestToSupportRequest=(request:ConvoTranscripti
         model:request.model,
         provider:request.provider,
         audioType:request.audio.type,
-        audioSize:request.audio.length,
+        audioSize:0,//request.audio.length,
         labelSpeakers:request.labelSpeakers,
         includeSegments:request.includeSegments,
         speakerRefsCount:request.speakerRefs?.length,

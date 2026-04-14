@@ -2010,6 +2010,16 @@ export interface ConvoImport extends ConvoImportContext
     templateName?:string;
 
     /**
+     * Name of XML tag to wrap imported content. The tag will also include a name attribute.
+     */
+    tag?:string;
+
+    /**
+     * Used with glob imports to filter by file name
+     */
+    filter?:string;
+
+    /**
      * The role given to content imports.
      * @default "system"
      */
@@ -2076,6 +2086,11 @@ export interface ConvoModule
      * The file path of module
      */
     filePath?:string;
+
+    /**
+     * Can be used as a relative file name
+     */
+    relativeName?:string;
 }
 
 export type ConvoImportHandler=(_import:ConvoImport)=>ConvoModule|ConvoModule[]|null|undefined|Promise<ConvoModule|ConvoModule[]|null|undefined>;
