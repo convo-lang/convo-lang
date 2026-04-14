@@ -65,8 +65,8 @@ export interface BaseConvoDbOptions
 
 
 
-export abstract class BaseConvoDb implements ConvoDb{
-
+export abstract class BaseConvoDb implements ConvoDb
+{
     protected embeddingsService?:ConvoEmbeddingsService;
     protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
     protected convoOptions?:ConversationOptions;
@@ -75,7 +75,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         embeddingsService,
         embeddingOptions,
         convoOptions,
-    }:BaseConvoDbOptions={}){
+    }:BaseConvoDbOptions={})
+    {
         this.embeddingsService=embeddingsService;
         this.embeddingOptions=embeddingOptions;
         this.convoOptions=convoOptions;
@@ -120,7 +121,7 @@ export abstract class BaseConvoDb implements ConvoDb{
      * @param orderBy Ordering to apply to returned nodes.
      */
     protected abstract _selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>;
-    
+
     /**
      * Selects node paths matching a query step path filter.
      *
@@ -236,7 +237,7 @@ export abstract class BaseConvoDb implements ConvoDb{
      * The base class validates normalization and permissions before calling this method.
      * Implementations should enforce any remaining datastore-specific constraints.
      *
-     * @param node Node to insert.
+     * @param node Node to insert. `node.data` is always a `Record<string,any>`.
      * @param options Insert options with `permissionFrom` removed because permission checks were already handled.
      */
     protected abstract _insertNodeAsync(node:ConvoNode,options:Omit<InsertConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>;
@@ -245,12 +246,21 @@ export abstract class BaseConvoDb implements ConvoDb{
      * Updates an existing node in the backing store.
      *
      * The base class validates path normalization and permissions before calling this method.
-     * Implementations should apply documented update semantics and enforce immutable fields.
+     * The base class also applies documented node update semantics for `data` before forwarding
+     * to this method:
+     * - if `update.data===null`, it is converted to `{}`
+     * - if `options?.mergeData` is true and `update.data` is provided, the base class shallow merges
+     *   `update.data` into the current node `data`
      *
-     * @param node Node update payload.
+     * Extending classes do not need to implement `data` merge behavior and may treat `update.data`
+     * as the final replacement value when it is present.
+     *
+     * Implementations should apply any remaining documented update semantics and enforce immutable fields.
+     *
+     * @param node Node update payload after base-class preprocessing.
      * @param options Update options with `permissionFrom` removed because permission checks were already handled.
      */
-    protected abstract _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
+    protected abstract _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid;
 
     /**
      * Deletes a node from the backing store.
@@ -326,13 +336,14 @@ export abstract class BaseConvoDb implements ConvoDb{
      * @param options Update options with `permissionFrom` removed because permission checks were already handled.
      */
     protected abstract _updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options:Omit<UpdateConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid;
-    
+
     protected loggingEnabled=false;
+
     public enableLogging()
     {
         this.loggingEnabled=true;
     }
-    
+
     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
         query:ConvoNodeQuery<TKeys>
     ):PromiseResultType<ConvoNodeQueryResult<
@@ -345,7 +356,7 @@ export abstract class BaseConvoDb implements ConvoDb{
         :TKeys extends (infer U)[]?
             "*" extends U?
                 keyof ConvoNode
-            : 
+            :
                 Exclude<U,"*"|null|undefined> & keyof ConvoNode
         :
             keyof ConvoNode
@@ -372,7 +383,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                         break streamLoop;
                     }
                     break;
-                    
+
                 case 'error':
                     return {
                         success:false,
@@ -397,10 +408,11 @@ export abstract class BaseConvoDb implements ConvoDb{
                 nodes,
                 nextToken:isComplete?undefined:JSON.stringify(state),
             }
-        }
+        };
     }
 
-    protected getBatchSize(query:ConvoNodeQuery<any>):number{
+    protected getBatchSize(query:ConvoNodeQuery<any>):number
+    {
         return defaultConvoNodeQueryLimit+1;
     }
 
@@ -417,7 +429,7 @@ export abstract class BaseConvoDb implements ConvoDb{
         :TKeys extends (infer U)[]?
             "*" extends U?
                 keyof ConvoNode
-            : 
+            :
                 Exclude<U,"*"|null|undefined> & keyof ConvoNode
         :
             keyof ConvoNode
@@ -439,7 +451,7 @@ export abstract class BaseConvoDb implements ConvoDb{
         :TKeys extends (infer U)[]?
             "*" extends U?
                 keyof ConvoNode
-            : 
+            :
                 Exclude<U,"*"|null|undefined> & keyof ConvoNode
         :
             keyof ConvoNode
@@ -479,7 +491,7 @@ export abstract class BaseConvoDb implements ConvoDb{
         if(keys!=='*' && !keys.includes('path')){
             keys.push('path');
         }
-        
+
         if(state.returnedCount>=limit){
             return;
         }
@@ -525,7 +537,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                     }
                     const r=await this._selectNodesByPathsAsync(keys,loadPaths,orderBy);
                     if(cancel.isCanceled){return;}
-                    
+
                     if(!r.success){
                         yield errorResultToConvoNodeStreamItem(r,state);
                         return;
@@ -615,7 +627,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                             permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
                         },paths,orderBy,batchSize,offset));
                         if(cancel.isCanceled){return;}
-                        
+
                         if(!r.success){
                             yield errorResultToConvoNodeStreamItem(r,state);
                             return;
@@ -631,7 +643,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                             embedding:e
                         },paths,orderBy,batchSize,offset));
                         if(cancel.isCanceled){return;}
-                        
+
                         if(!r.success){
                             yield errorResultToConvoNodeStreamItem(r,state);
                             return;
@@ -649,7 +661,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                             edgeLimit:step.edgeLimit,
                         },paths,orderBy,batchSize,offset));
                         if(cancel.isCanceled){return;}
-                        
+
                         if(!r.success){
                             yield errorResultToConvoNodeStreamItem(r,state);
                             return;
@@ -665,7 +677,7 @@ export abstract class BaseConvoDb implements ConvoDb{
                         statusCode:500,
                     }
                     return;
-                
+
             }
 
             const nextStage=getNextStepStage(state.stepStage);
@@ -686,7 +698,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         }
     }
 
-    public getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>{
+    public getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>
+    {
         return this.queryNodesAsync({steps:[{path}],permissionFrom});
     }
 
@@ -744,20 +757,21 @@ export abstract class BaseConvoDb implements ConvoDb{
         }
     }
 
-    public async insertNodeAsync(node:ConvoNode,options?:InsertConvoNodeOptions):PromiseResultType<ConvoNode>{
+    public async insertNodeAsync(node:ConvoNode,options?:InsertConvoNodeOptions):PromiseResultType<ConvoNode>
+    {
         if(node.path!==normalizeConvoNodePath(node.path,'none')){
             return {
                 success:false,
                 error:`Invalid node path. Paths should be normalized - ${node.path}`,
                 statusCode:400,
-            }
+            };
         }
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
                 error:`Invalid node path. Permission paths should be normalized - ${options.permissionFrom}`,
                 statusCode:400,
-            }
+            };
         }
         if(options?.permissionFrom){
             const permission=await this.checkNodePermissionAsync(options.permissionFrom,node.path,ConvoNodePermissionType.write);
@@ -769,7 +783,8 @@ export abstract class BaseConvoDb implements ConvoDb{
     }
 
 
-    public async updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid{
+    public async updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid
+    {
         if(node.path!==normalizeConvoNodePath(node.path,'none')){
             return {
                 success:false,
@@ -790,11 +805,27 @@ export abstract class BaseConvoDb implements ConvoDb{
                 return permission;
             }
         }
+
+        if(node.data===null){
+            node={...node,data:{}};
+        }
+
+        if(options?.mergeData && node.data){
+            const current=await this.selectNodeByPathAsync(node.path,['data']);
+            if(!current.success){
+                return current;
+            }
+            if(current.result?.data){
+                node={...node,data:{...current.result.data,...node.data}};
+            }
+        }
+
         return await this._updateNodeAsync(node,options);
     }
 
 
-    public async deleteNodeAsync(path:string,options?:DeleteConvoNodeOptions):PromiseResultTypeVoid{
+    public async deleteNodeAsync(path:string,options?:DeleteConvoNodeOptions):PromiseResultTypeVoid
+    {
         if(path!==normalizeConvoNodePath(path,'none')){
             return {
                 success:false,
@@ -821,9 +852,10 @@ export abstract class BaseConvoDb implements ConvoDb{
 
 
 
-    public abstract queryEdgesAsync(query: ConvoNodeEdgeQuery): PromiseResultType<ConvoNodeEdgeQueryResult>;
+    public abstract queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>;
 
-    public async getEdgeByIdAsync(id: string, permissionFrom?: string): PromiseResultType<ConvoNodeEdge>{
+    public async getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge>
+    {
         if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
             return {
                 success:false,
@@ -888,7 +920,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         return this._insertEdgeAsync(edge,options);
     }
 
-    public async updateEdgeAsync(update: ConvoNodeEdgeUpdate, options?: UpdateConvoNodeEdgeOptions): PromiseResultTypeVoid{
+    public async updateEdgeAsync(update:ConvoNodeEdgeUpdate,options?:UpdateConvoNodeEdgeOptions):PromiseResultTypeVoid
+    {
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -917,7 +950,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         return await this._updateEdgeAsync(update,options);
     }
 
-    public async deleteEdgeAsync(id: string, options?: DeleteConvoNodeEdgeOptions): PromiseResultTypeVoid{
+    public async deleteEdgeAsync(id:string,options?:DeleteConvoNodeEdgeOptions):PromiseResultTypeVoid
+    {
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -946,9 +980,10 @@ export abstract class BaseConvoDb implements ConvoDb{
         return await this._deleteEdgeAsync(id,options);
     }
 
-    public abstract queryEmbeddingsAsync(query: ConvoNodeEmbeddingQuery): PromiseResultType<ConvoNodeEmbeddingQueryResult>;
+    public abstract queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>;
 
-    public async getEmbeddingByIdAsync(id: string, permissionFrom?: string): PromiseResultType<ConvoNodeEmbedding>{
+    public async getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding>
+    {
         if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
             return {
                 success:false,
@@ -975,7 +1010,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         }
     }
 
-    public async insertEmbeddingAsync(embedding: Omit<ConvoNodeEmbedding, "id">, options?: InsertConvoNodeEmbeddingOptions): PromiseResultType<ConvoNodeEmbedding>{
+    public async insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,"id">,options?:InsertConvoNodeEmbeddingOptions):PromiseResultType<ConvoNodeEmbedding>
+    {
         if(embedding.path!==normalizeConvoNodePath(embedding.path,'none')){
             return {
                 success:false,
@@ -999,7 +1035,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         return await this._insertEmbeddingAsync(embedding,options);
     }
 
-    public async updateEmbeddingAsync(update: ConvoNodeEmbeddingUpdate, options?: UpdateConvoNodeEmbeddingOptions): PromiseResultTypeVoid{
+    public async updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options?:UpdateConvoNodeEmbeddingOptions):PromiseResultTypeVoid
+    {
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1022,7 +1059,8 @@ export abstract class BaseConvoDb implements ConvoDb{
         return await this._updateEmbeddingAsync(update,options);
     }
 
-    public async deleteEmbeddingAsync(id: string, options?: DeleteConvoNodeEmbeddingOptions): PromiseResultTypeVoid{
+    public async deleteEmbeddingAsync(id:string,options?:DeleteConvoNodeEmbeddingOptions):PromiseResultTypeVoid
+    {
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1134,7 +1172,8 @@ export abstract class BaseConvoDb implements ConvoDb{
     /**
      * Creates a Convo-Lang conversation that can be used for natural language processing.
      */
-    protected createConversation(){
+    protected createConversation()
+    {
         return new Conversation(this.convoOptions);
     }
 
@@ -1439,7 +1478,7 @@ const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>
             success:true,
             result:state,
         }
-            
+
     }catch(ex){
         return {
             success:false,
@@ -1447,7 +1486,7 @@ const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>
             statusCode:400,
         }
     }
-}
+};
 
 /**
  * Normalizes the provided paths array in place.

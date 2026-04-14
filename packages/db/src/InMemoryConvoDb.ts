@@ -236,7 +236,7 @@ export class InMemoryConvoDb extends BaseConvoDb
         }
     }
 
-    protected async _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+    protected async _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
         const current=this.nodes.get(node.path);
         if(!current){
             return {
@@ -276,7 +276,7 @@ export class InMemoryConvoDb extends BaseConvoDb
                 updated.instructions=node.instructions;
             }
         }
-        if(node.data!==undefined){
+        if(node.data){
             updated.data=deepClone(node.data);
         }
 

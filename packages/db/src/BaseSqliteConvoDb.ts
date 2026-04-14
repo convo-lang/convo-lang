@@ -43,6 +43,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
         try{
             await (this.initPromise??(this.initPromise=this._initAsync()));
         }catch(ex){
+            console.error('Failed to init SQLite DB',ex);
             this.initError=getErrorMessage(ex);
         }
     }
@@ -429,7 +430,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
     }
 
     protected async _insertNodeAsync(node:ConvoNode,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>{
-        const n=deepClone(node);
+        const n=node;
         const sql=`INSERT INTO ${this.nodeTableName} (
             path, displayName, name, created, modified, description, instructions, type, data
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -442,7 +443,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
             n.modified??null,
             n.description??null,
             n.instructions??null,
-            n.type,
+            n.type??null,
             serializeValue(n.data),
         ];
 
@@ -457,7 +458,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
         };
     }
 
-    protected async _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+    protected async _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<any,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
         const sets:string[]=[];
         const bind:any[]=[];
 
@@ -867,13 +868,13 @@ const serializeValue=(value:any):any=>{
     if(value instanceof Uint8Array){
         return value;
     }
-    if(typeof Buffer!=='undefined' && value instanceof Buffer){
+    if(typeof Buffer!=='undefined' && (value instanceof Buffer)){
         return value;
     }
     if(typeof value==='string'){
         return value;
     }
-    return Buffer.from(JSON.stringify(value));
+    return Buffer.from(JSON.stringify(value))
 }
 
 const deserializeBlobJsonValue=(value:any):any=>{

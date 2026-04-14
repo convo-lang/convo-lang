@@ -1,4 +1,4 @@
-import { CancelToken } from "@iyio/common";
+import { CancelToken, Scope } from "@iyio/common";
 import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
 
 /**
@@ -66,19 +66,19 @@ export interface ConvoNode
     type:string;
 
     /**
-     * Arbitrary data
+     * Arbitrary object data
      */
-    data:any;
+    data:Record<string,any>;
 }
 
 /**
  * A node update where `path` is required, optional fields may be updated or unset with `null`,
- * `name`, `type`, and `created` are immutable, and `data` is replaced as a whole.
+ * `name`, `type`, and `created` are immutable, and `data` is replaced as a whole by default.
  * 
  * Update semantics:
  * - omitted or `undefined` properties are treated as no update
  * - properties documented as unsettable may be unset by assigning `null`
- * - `data` is replaced as a whole and `null` is a valid replacement value
+ * - `data` is replaced as a whole and `null` is a valid replacement value unless `mergeData` is used
  */
 export interface ConvoNodeUpdate
 {
@@ -108,22 +108,13 @@ export interface ConvoNodeUpdate
     instructions?:string|null;
 
     /**
-     * Updated data. Data is replaced as a whole. If `null`, data will be replaced with `null`.
-     * If omitted or `undefined`, data will not be updated.
+     * Updated data object. If null data will be to an empty object.
+     * By default data replaces the existing data as a whole. When `UpdateConvoNodeOptions.mergeData`
+     * is true the provided data is shallow merged with the existing data instead.
      */
-    data?:any;
+    data?:Record<string,any>|null;
 }
 
-/**
- * Connects nodes within a graph. Edges are used to connect related data and also to manage permissions.
- * For example, many systems will define users as a node and manage their access to other resources / nodes
- * using the grant properties of the edge.
- * 
- * Edge behavior:
- * - node query step traversal direction is controlled by `ConvoNodeQueryStep.edgeDirection`
- * - raw edge queries are directional and match `from` and `to` by equality
- * - edges are directional when evaluating permissions
- */
 export interface ConvoNodeEdge
 {
     /**
@@ -493,7 +484,8 @@ export interface ConvoNodeOrderBy
     direction?:'asc'|'desc';
 }
 
-export enum ConvoNodePermissionType{
+export enum ConvoNodePermissionType
+{
     none=0,
     read=4,
     write=2,
@@ -729,7 +721,6 @@ export interface ConvoNodeEdgeQueryResult
     total?:number;
 }
 
-
 export interface InsertConvoNodeOptions
 {
 
@@ -777,6 +768,12 @@ export interface UpdateConvoNodeOptions
      * If undefined permissions are not evaluated.
      */
     permissionFrom?:string;
+
+    /**
+     * If true data passed to a node will be merged with the existing data instead of fully replacing it.
+     * The merge is shallow and only applies when `node.data` is provided.
+     */
+    mergeData?:boolean;
 }
 
 export interface DeleteConvoNodeOptions
@@ -949,6 +946,8 @@ export interface ConvoDbExport
     embeddings:ConvoNodeEmbedding[];
 }
 
+export type ConvoDbFactory=(scope:Scope)=>ConvoDb;
+
 /**
  * Stores and retrieves nodes.
  */
@@ -993,6 +992,8 @@ export interface ConvoDb
 
     /**
      * Updates a node. `name`, `type`, and `created` are immutable.
+     * By default `data` replaces the existing data as a whole. If `options.mergeData` is true,
+     * provided `data` is shallow merged with the existing data instead.
      */
     updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid;
 
@@ -1001,8 +1002,6 @@ export interface ConvoDb
      * Deleting a node also deletes all edges connected to the node and all embeddings pointing to the node.
      */
     deleteNodeAsync(path:string,options?:DeleteConvoNodeOptions):PromiseResultTypeVoid;
-
-
 
     /**
      * Returns matching edges. Raw edge queries are directional and match `from` and `to` by equality.
@@ -1030,8 +1029,6 @@ export interface ConvoDb
      * Deletes an edge by id.
      */
     deleteEdgeAsync(id:string,options?:DeleteConvoNodeEdgeOptions):PromiseResultTypeVoid;
-
-
 
     /**
      * Returns all matching embeddings. By default the vector of the embedding will not be returned
@@ -1072,7 +1069,6 @@ export interface ConvoDb
      */
     executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>;
 }
-
 
 /**
  * ConvoDbCommands represent function calls to the ConvoDb interface.

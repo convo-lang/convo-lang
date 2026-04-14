@@ -1,4 +1,4 @@
-import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, getObjKeyCount, getValueByPath, isClassInstanceObject, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
+import { UnsupportedError, asArray, deepClone, dupDeleteUndefined, escapeHtml, getFileName, getObjKeyCount, getValueByPath, isClassInstanceObject, parseBoolean, parseRegexCached, starStringTestCached, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { format } from "date-fns";
 import { ZodObject } from "zod";
@@ -576,6 +576,101 @@ export const convoFunctions={
     getNodeInput:'getNodeInput',
 
 
+    /**
+     * Configures the ConvoDb connection
+     */
+    dbConfig:'dbConfig',
+
+    /**
+     * Queries the ConvoDb
+     */
+    dbQueryNodes:'dbQueryNodes',
+
+    /**
+     * Returns nodes matching a given path. A wildcard path (path ending with /*) can return multiple
+     * nodes
+     */
+    dbGetNodesByPath:'dbGetNodesByPath',
+
+    /**
+     * Gets the permissions from one node to another
+     */
+    dbGetNodePermission:'dbGetNodePermission',
+
+    /**
+     * Checks if one node has permission to another
+     */
+    dbCheckNodePermission:'dbCheckNodePermission',
+
+    /**
+     * Inserts a node
+     */
+    dbInsertNode:'dbInsertNode',
+
+    /**
+     * Updates a node
+     */
+    dbUpdateNode:'dbUpdateNode',
+
+    /**
+     * Deletes a node
+     */
+    dbDeleteNode:'dbDeleteNode',
+
+    /**
+     * Queries edges
+     */
+    dbQueryEdges:'dbQueryEdges',
+
+    /**
+     * Gets an edge by id
+     */
+    dbGetEdgeById:'dbGetEdgeById',
+
+    /**
+     * Inserts an edge
+     */
+    dbInsertEdge:'dbInsertEdge',
+
+    /**
+     * Updates an edge
+     */
+    dbUpdateEdge:'dbUpdateEdge',
+
+    /**
+     * Deletes an edge
+     */
+    dbDeleteEdge:'dbDeleteEdge',
+
+    /**
+     * Queries embeddings
+     */
+    dbQueryEmbeddings:'dbQueryEmbeddings',
+
+    /**
+     * Gets an embedding by id
+     */
+    dbGetEmbeddingById:'dbGetEmbeddingById',
+
+    /**
+     * Inserts an embedding
+     */
+    dbInsertEmbedding:'dbInsertEmbedding',
+
+    /**
+     * Updates an embedding
+     */
+    dbUpdateEmbedding:'dbUpdateEmbedding',
+
+    /**
+     * Deletes an embedding
+     */
+    dbDeleteEmbedding:'dbDeleteEmbedding',
+
+
+
+
+
 } as const;
 
 /**
@@ -858,6 +953,16 @@ export const convoVars={
      * Stores historical node information including each node input
      */
     __nodeStack:'__nodeStack',
+
+    /**
+     * A reference to a ConvoDb
+     */
+    __db:'__db',
+
+    /**
+     * A ConvoDb connection string
+     */
+    __dbConnection:'__dbConnection'
 
 } as const;
 
@@ -1781,6 +1886,7 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.dayMs,
     convoFunctions.aryFindMatch,
     convoFunctions.aryRemoveMatch,
+    convoFunctions.dbConfig,
     'merge',
     'print',
     'setObjDefaults',

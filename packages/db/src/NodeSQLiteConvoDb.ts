@@ -1,9 +1,9 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
 import { getErrorMessage } from "@iyio/common";
-import type { Database } from "bun:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
 
-export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
+export interface NodeSQLiteConvoDbOptions extends BaseSqliteConvoDbOptions
 {
     /**
      * Path to database on disk. If not defined in memory db will be used
@@ -11,21 +11,20 @@ export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
     dbPath?:string;
 }
 
-export class BunSqliteConvoDb extends BaseSqliteConvoDb
+export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
 {
 
     public static fromConnectionString(connectionString?:string){
-        return new BunSqliteConvoDb({dbPath:connectionString})
+        return new NodeSQLiteConvoDb({dbPath:connectionString})
     }
 
     private readonly dbPath?:string;
-    private readonly initSchema?:boolean;
-    private db?:Database;
+    private db?:DatabaseSync;
 
     public constructor({
         dbPath,
         ...baseProps
-    }:BunSqliteConvoDbOptions){
+    }:NodeSQLiteConvoDbOptions){
         super(baseProps);
         this.dbPath=dbPath;
     }
@@ -34,8 +33,8 @@ export class BunSqliteConvoDb extends BaseSqliteConvoDb
     
     protected override async _initAsync()
     {
-        const sqliteMod=await import('bun:sqlite');
-        this.db=new sqliteMod.Database(this.dbPath||'');
+        const Db=(await import('node:sqlite')).default.DatabaseSync;
+        this.db=new Db(this.dbPath||"test.db");
         await super._initAsync();
     }
 
@@ -59,16 +58,16 @@ export class BunSqliteConvoDb extends BaseSqliteConvoDb
     private execSql(sql: string, bind:any[]=[]):any[]
     {
         if(!this.db){
-            throw new Error('BunSqliteNodeStore not inited');
+            throw new Error('NodeSQLiteConvoDb not inited');
         }
-        if(this.loggingEnabled){
+        //if(this.loggingEnabled){
             console.log('SQL:',sql,bind);
-        }
+        //}
         const stmt=this.db.prepare(sql);
         const results=stmt.all(...bind) as any[];
-        if(this.loggingEnabled){
+        //if(this.loggingEnabled){
             console.log('SQL Result:',results);
-        }
+        //}
         return results;
     }
 

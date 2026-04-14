@@ -23,3 +23,4 @@ export const convoTranscriptionService=defineService<ConvoTranscriptionService>(
 export const convoTtsService=defineService<ConvoTtsService>('ConvoTtsService');
 export const convoEmbeddingsService=defineService<ConvoEmbeddingsService>('ConvoEmbeddingsService');
 export const convoDbService=defineService<ConvoDb>('ConvoDb');
+export const convoDbProvider=defineProvider<(connection?:string)=>Promise<ConvoDb|undefined>>('ConvoDbProvider');

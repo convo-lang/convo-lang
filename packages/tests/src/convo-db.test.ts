@@ -1,17 +1,20 @@
 import { ConvoNodePermissionType, HttpConvoCompletionService, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
 import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
+import { NodeSQLiteConvoDb } from "@convo-lang/db/NodeSQLiteConvoDb.js";
 import { uuid } from "@iyio/common";
 import { expect, test } from "bun:test";
 
-type Type='bun'|'mem'|'http';
-const type:Type='http' as Type;
+type Type='bun'|'node'|'mem'|'http';
+const type:Type='bun' as Type;
 
 const createStore=()=>(
     type==='http'?
         new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
     :type==='bun'?
         new BunSqliteConvoDb({})
+    :type==='node'?
+        new NodeSQLiteConvoDb({})
     :
         new InMemoryConvoDb({})
 );
@@ -590,6 +593,59 @@ test("insertNodeAsync updateNodeAsync and deleteNodeAsync validate bad paths and
         throw new Error('expected success');
     }
     expect(getDeleted.result.nodes).toEqual([]);
+});
+
+test("updateNodeAsync supports mergeData option",async ()=>{
+    const store=createStore();
+
+    await store.insertNodeAsync(createNode('/node/merge',{
+        data:{
+            a:1,
+            b:2,
+            nested:{keep:true},
+        },
+    }));
+
+    const replaceOk=await store.updateNodeAsync({
+        path:'/node/merge',
+        data:{
+            b:3,
+            c:4,
+        },
+    });
+    expect(replaceOk.success).toBe(true);
+
+    const replaced=await store.getNodesByPathAsync('/node/merge');
+    expect(replaced.success).toBe(true);
+    if(!replaced.success){
+        throw new Error('expected success');
+    }
+    expect(replaced.result.nodes[0]?.data).toEqual({
+        b:3,
+        c:4,
+    });
+
+    const mergeOk=await store.updateNodeAsync({
+        path:'/node/merge',
+        data:{
+            c:5,
+            d:6,
+        },
+    },{
+        mergeData:true,
+    });
+    expect(mergeOk.success).toBe(true);
+
+    const merged=await store.getNodesByPathAsync('/node/merge');
+    expect(merged.success).toBe(true);
+    if(!merged.success){
+        throw new Error('expected success');
+    }
+    expect(merged.result.nodes[0]?.data).toEqual({
+        b:3,
+        c:5,
+        d:6,
+    });
 });
 
 test("queryEdgesAsync getEdgeByIdAsync insertEdgeAsync updateEdgeAsync deleteEdgeAsync work and validate inputs",async ()=>{
