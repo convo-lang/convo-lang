@@ -3317,13 +3317,15 @@ export class Conversation
         }
         this.importMessages.push(msg);
 
-        const index=Math.max(0,this._messages.indexOf(msg));
+        let index=Math.max(0,this._messages.indexOf(msg));
         for(const t of msg.tags){
             if(t.name!==convoTags.import || !t.value){
                 continue;
             }
             const externFunctions:Record<string,ConvoScopeFunction>={}
+            let l=this._messages.length;
             const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions);
+            index+=this._messages.length-l;
             exe?.loadFunctions(imported,externFunctions);
         }
     }
