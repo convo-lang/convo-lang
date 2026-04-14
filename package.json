@@ -16,7 +16,7 @@
         "@types/chrome": "^0.0.262",
         "@types/jest": "^30.0.0",
         "@types/markdown-it": "^14.1.1",
-        "@types/node": "18.14.2",
+        "@types/node": "22",
         "@types/node-fetch": "^2.6.2",
         "@types/pg": "^8.11.6",
         "@types/react": "^18.0.0",
