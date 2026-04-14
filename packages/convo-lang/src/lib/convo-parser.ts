@@ -1307,6 +1307,18 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         }
                         break;
 
+                    case convoTags.order:{
+                        const order=Number(tag.value);
+                        if(isFinite(order)){
+                            msg.order=order;
+                        }
+                        break;
+                    }
+
+                    case convoTags.top:
+                        msg.order=0;
+                        break;
+
                     case convoTags.importMatch:
                         if(tag.value){
                             const r=parseConvoImportMatch(tag.value);

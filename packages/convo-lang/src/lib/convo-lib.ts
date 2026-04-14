@@ -1208,6 +1208,17 @@ export const convoTags={
     edge:'edge',
 
     /**
+     * Alias for (@)order 0
+     */
+    top:'top',
+
+    /**
+     * Sets the order which the tagged message appears. negative value are inserted form the end
+     * of the conversation
+     */
+    order:'order',
+
+    /**
      * Used to track the time messages are created.
      */
     time:'time',

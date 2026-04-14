@@ -127,6 +127,8 @@ export interface ConvoMessage
 
     insert?:ConvoInsert;
 
+    order?:number;
+
     /**
      * Name of a group the message belongs to.
      */
@@ -1128,6 +1130,8 @@ export interface FlatConvoMessage
     parallel?:boolean;
 
     insert?:ConvoInsert;
+
+    order?:number;
 
     /**
      * Id of node the message belongs to. By default messages belong to the main node.

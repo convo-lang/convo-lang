@@ -3299,6 +3299,9 @@ export class Conversation
         if(msg.insert){
             flat.insert={...msg.insert};
         }
+        if(msg.order!==undefined){
+            flat.order=msg.order;
+        }
         if(msg.group){
             flat.group=msg.group;
         }
@@ -4871,6 +4874,13 @@ export class Conversation
             if(setCurrent){
                 this.setFlat(flat);
             }
+            
+            const ml=messages.length;
+            messages.sort((a,b)=>{
+                const ai=a.order??ml;
+                const bi=b.order??ml;
+                return (ai<0?ml+ai:ai)-(bi<0?ml+bi:bi);
+            });
 
             return flat;
         }finally{
