@@ -1,4 +1,4 @@
-import { getDirectoryName, getUriProtocol } from "@iyio/common";
+import { getDirectoryName, getUriProtocol, joinPaths, normalizePath } from "@iyio/common";
 import { VfsDirReadRecursiveOptions, vfs } from "@iyio/vfs";
 import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types.js";
 
@@ -12,6 +12,8 @@ export class ConvoVfsImportService implements ConvoImportService
 
     public async handleImport(_import:ConvoImport):Promise<ConvoModule|ConvoModule[]|null>{
         const path=_import.targetPath??_import.name;
+        const baseDirRel=getDirectoryName(_import.name);
+        const baseDir=normalizePath(joinPaths(_import.sourceDirectory??'.',baseDirRel));
         if(path.includes('*')){
             let rOptions:VfsDirReadRecursiveOptions|undefined;
             if(path.includes('**')){
@@ -20,7 +22,6 @@ export class ConvoVfsImportService implements ConvoImportService
             }
 
             const items=await (rOptions?vfs().readDirRecursiveAsync(rOptions):vfs().readDirAsync(path));
-            const baseDir=_import.targetPath?getDirectoryName(_import.targetPath):undefined;
             return await Promise.all(items.items.filter(i=>i.type==='file').map<Promise<ConvoModule>>(async i=>{
                 const isConvo=i.name?.toLowerCase().endsWith('.convo');
                 const file=await vfs().readStringAsync(i.path);
@@ -29,7 +30,7 @@ export class ConvoVfsImportService implements ConvoImportService
                     convo:isConvo?file:undefined,
                     content:isConvo?undefined:file,
                     filePath:i.path,
-                    relativeName:baseDir?'.'+i.path.substring(baseDir.length):undefined
+                    relativeName:joinPaths(baseDirRel,i.path.substring(baseDir.length+1)),
                 }
             }));
         }else{
@@ -40,7 +41,8 @@ export class ConvoVfsImportService implements ConvoImportService
                 name:_import.name,
                 convo:isConvo?file:undefined,
                 content:isConvo?undefined:file,
-                filePath:path
+                filePath:path,
+                relativeName:joinPaths(baseDirRel,path.substring(baseDir.length+1)),
             }
         }
     }
