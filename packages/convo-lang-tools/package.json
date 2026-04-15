@@ -364,6 +364,10 @@
                 "command": "convo.modules",
                 "title": "Convo: Modules",
                 "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
             }
         ],
         "keybindings": [
@@ -383,6 +387,11 @@
                 "command": "convo.new",
                 "key": "shift+alt+ctrl+n",
                 "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
             }
         ],
         "configuration": {

@@ -1,13 +1,13 @@
-import { Disposable, ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
+import { ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
 
 const defaultTypeCommand='default:type';
 const defaultTabCommand='tab';
 
 export const registerTypingHandler=(context:ExtensionContext)=>{
     let isHandlingType=false;
-    let isHandlingTab=false;
+    let isHandlingConvoTab=false;
 
-    const typeDisposable=commands.registerCommand('type',async (args:{text:string})=>{
+    context.subscriptions.push(commands.registerCommand('type',async (args:{text:string})=>{
         if(isHandlingType){
             await commands.executeCommand(defaultTypeCommand,args);
             return;
@@ -36,43 +36,27 @@ export const registerTypingHandler=(context:ExtensionContext)=>{
         }finally{
             isHandlingType=false;
         }
-    });
+    }));
 
-    const tabDisposable=commands.registerCommand('tab',async ()=>{
-        if(isHandlingTab){
-            await commands.executeCommand(defaultTabCommand);
+    context.subscriptions.push(commands.registerCommand('convo.tab',async ()=>{
+        if(isHandlingConvoTab){
             return;
         }
 
-        isHandlingTab=true;
+        isHandlingConvoTab=true;
         try{
             const editor=window.activeTextEditor;
-            if(!editor || !shouldHandleEditor(editor)){
-                await commands.executeCommand(defaultTabCommand);
-                return;
-            }
-
-            if(editor.selections.length!==1){
-                await commands.executeCommand(defaultTabCommand);
-                return;
-            }
-
-            if(!await moveCursorAfterMarkdownImageAltTextAsync(editor)){
-                await commands.executeCommand(defaultTabCommand);
+            if(editor && shouldHandleEditor(editor) && editor.selections.length===1){
+                if(await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                    return;
+                }
             }
         }finally{
-            isHandlingTab=false;
+            isHandlingConvoTab=false;
         }
-    });
 
-    context.subscriptions.push(
-        typeDisposable,
-        tabDisposable,
-        new Disposable(()=>{
-            typeDisposable.dispose();
-            tabDisposable.dispose();
-        })
-    );
+        await commands.executeCommand(defaultTabCommand);
+    }));
 }
 
 const shouldHandleEditor=(editor:TextEditor)=>{

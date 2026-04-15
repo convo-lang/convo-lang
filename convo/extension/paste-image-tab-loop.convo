@@ -1,0 +1,1181 @@
+@import ./extension-rules.convo
+@import ../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts !file
+
+> user
+When the tab key is pressed an recursive loop is entered
+
+@time 2026-04-15T13:01:59-04:00
+@tokenUsage 23595 / 40 / $0.05908750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Do you want me to fix only the recursive Tab handling bug in the VS Code extension, or also clean up the related disposal logic in `typing-handler.ts` while I’m there?
+
+
+> user
+both
+
+@time 2026-04-15T13:02:37-04:00
+@tokenUsage 23643 / 1446 / $0.06272250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="typing-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts_" fenced>
+```ts
+import { ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
+
+const defaultTypeCommand='default:type';
+const defaultTabCommand='default:tab';
+
+export const registerTypingHandler=(context:ExtensionContext)=>{
+    let isHandlingType=false;
+    let isHandlingTab=false;
+
+    context.subscriptions.push(commands.registerCommand('type',async (args:{text:string})=>{
+        if(isHandlingType){
+            await commands.executeCommand(defaultTypeCommand,args);
+            return;
+        }
+
+        isHandlingType=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor){
+                await commands.executeCommand(defaultTypeCommand,args);
+                return;
+            }
+
+            const text=args?.text??'';
+            await commands.executeCommand(defaultTypeCommand,args);
+
+            if(text!=='>'){
+                return;
+            }
+
+            if(!shouldHandleEditor(editor)){
+                return;
+            }
+
+            await insertClosingXmlTagAsync(editor);
+        }finally{
+            isHandlingType=false;
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('tab',async ()=>{
+        if(isHandlingTab){
+            await commands.executeCommand(defaultTabCommand);
+            return;
+        }
+
+        isHandlingTab=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor || !shouldHandleEditor(editor)){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(editor.selections.length!==1){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(!await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                await commands.executeCommand(defaultTabCommand);
+            }
+        }finally{
+            isHandlingTab=false;
+        }
+    }));
+}
+
+const shouldHandleEditor=(editor:TextEditor)=>{
+    const document=editor.document;
+    if(document.languageId==='source.convo'){
+        return true;
+    }
+    return hasConvoRegionBeforeCursor(document,editor.selection.active);
+}
+
+const hasConvoRegionBeforeCursor=(document:TextDocument,position:Position)=>{
+    const text=document.getText(new Range(new Position(0,0),position));
+
+    const jsMatch=/\/\*convo\*\/\s*`[^`]*$/s.exec(text);
+    if(jsMatch){
+        return !/\$\{[^}]*$/s.test(jsMatch[0]);
+    }
+
+    const pythonMatches=[...text.matchAll(/"""\*convo\*[\s\S]*?"""/g)];
+    const openPython=/"""\*convo\*[\s\S]*$/s.exec(text);
+    if(openPython && (!pythonMatches.length || pythonMatches[pythonMatches.length-1]!.index!==openPython.index)){
+        return true;
+    }
+
+    const mdOpen=/(^|\n)(\s*)(`{3,}|~{3,})\s*convo(?:\s+[^`~]*)?\n[\s\S]*$/i.exec(text);
+    if(mdOpen){
+        const afterOpen=text.slice(mdOpen.index!+mdOpen[0].length);
+        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2]??'')}${escapeRegExp(mdOpen[3]??'')}\\s*$`,'m');
+        if(!closeRe.test(afterOpen)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const moveCursorAfterMarkdownImageAltTextAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return false;
+    }
+
+    const document=editor.document;
+    const lineIndex=selection.active.line;
+    const line=document.lineAt(lineIndex);
+    const lineText=line.text;
+    const cursorChar=selection.active.character;
+
+    const image=getMarkdownImageAtPosition(lineText,cursorChar);
+    if(!image){
+        return false;
+    }
+
+    const insertPos=new Position(lineIndex,image.end);
+    const changed=await editor.edit(builder=>{
+        builder.insert(insertPos,'\n');
+    });
+
+    if(!changed){
+        return false;
+    }
+
+    const newPos=new Position(lineIndex+1,0);
+    editor.selection=new Selection(newPos,newPos);
+    return true;
+}
+
+const getMarkdownImageAtPosition=(lineText:string,cursorChar:number):{end:number}|undefined=>{
+    const re=/!\[[^\]\r\n]*\]\([^\)\r\n]*\)/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(lineText))){
+        const full=match[0];
+        const start=match.index;
+        const altStart=start+2;
+        const altEnd=lineText.indexOf(']',altStart);
+        if(altEnd===-1){
+            continue;
+        }
+        if(cursorChar>=altStart && cursorChar<=altEnd){
+            return {
+                end:start+full.length
+            };
+        }
+    }
+    return;
+}
+
+const insertClosingXmlTagAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return;
+    }
+
+    const document=editor.document;
+    const position=selection.active;
+    const line=document.lineAt(position.line).text;
+    const linePrefix=line.slice(0,position.character);
+
+    const tag=getOpeningTagAtLineEnd(linePrefix);
+    if(!tag){
+        return;
+    }
+
+    const nextText=document.getText(new Range(position,new Position(position.line,line.length)));
+    if(nextText.startsWith(`</${tag}>`)){
+        return;
+    }
+
+    const insertText=`</${tag}>`;
+
+    const changed=await editor.edit(builder=>{
+        builder.insert(position,insertText);
+    });
+
+    if(!changed){
+        return;
+    }
+
+    editor.selection=new Selection(position,position);
+}
+
+const getOpeningTagAtLineEnd=(text:string):string|undefined=>{
+    const match=/<([A-Za-z_][\w.-]*)(?:\s+[^<>]*?)?>$/.exec(text);
+    if(!match){
+        return;
+    }
+
+    const full=match[0];
+    if(full.startsWith('</')){
+        return;
+    }
+    if(/\/\s*>$/.test(full)){
+        return;
+    }
+    if(/^<(!|[?])/.test(full)){
+        return;
+    }
+
+    return match[1];
+}
+
+const escapeRegExp=(value:string)=>{
+    return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+```
+</FILE_CONTENT>
+
+The recursion bug was caused by registering `tab` and then executing `tab` again as the fallback. I changed the fallback command to `default:tab`.
+
+I also cleaned up the disposal logic by removing the extra manual `Disposable` wrapper since `context.subscriptions.push(...)` already handles disposal for the registered commands.
+
+
+> user
+When I press tab a warning appears saying `default:tab` is not a command
+
+@time 2026-04-15T13:04:46-04:00
+@tokenUsage 25081 / 43 / $0.06281
+@model gpt-5.4-2026-03-05
+> assistant
+Before I patch it: do you want Tab to fall back to the editor’s normal indent/tab behavior in all cases, or only when the custom markdown-image behavior does not apply inside Convo regions?
+
+
+> user
+Fallback in all cases
+
+@time 2026-04-15T13:05:43-04:00
+@tokenUsage 25135 / 1350 / $0.06621250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="typing-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts__" fenced>
+```ts
+import { ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
+
+const defaultTypeCommand='default:type';
+const fallbackTabCommand='tab';
+
+export const registerTypingHandler=(context:ExtensionContext)=>{
+    let isHandlingType=false;
+    let isHandlingTab=false;
+
+    context.subscriptions.push(commands.registerCommand('type',async (args:{text:string})=>{
+        if(isHandlingType){
+            await commands.executeCommand(defaultTypeCommand,args);
+            return;
+        }
+
+        isHandlingType=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor){
+                await commands.executeCommand(defaultTypeCommand,args);
+                return;
+            }
+
+            const text=args?.text??'';
+            await commands.executeCommand(defaultTypeCommand,args);
+
+            if(text!=='>'){
+                return;
+            }
+
+            if(!shouldHandleEditor(editor)){
+                return;
+            }
+
+            await insertClosingXmlTagAsync(editor);
+        }finally{
+            isHandlingType=false;
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('tab',async ()=>{
+        if(isHandlingTab){
+            return;
+        }
+
+        isHandlingTab=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor || !shouldHandleEditor(editor) || editor.selections.length!==1){
+                return;
+            }
+
+            if(await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                return;
+            }
+        }finally{
+            isHandlingTab=false;
+        }
+
+        await commands.executeCommand(fallbackTabCommand);
+    }));
+}
+
+const shouldHandleEditor=(editor:TextEditor)=>{
+    const document=editor.document;
+    if(document.languageId==='source.convo'){
+        return true;
+    }
+    return hasConvoRegionBeforeCursor(document,editor.selection.active);
+}
+
+const hasConvoRegionBeforeCursor=(document:TextDocument,position:Position)=>{
+    const text=document.getText(new Range(new Position(0,0),position));
+
+    const jsMatch=/\/\*convo\*\/\s*`[^`]*$/s.exec(text);
+    if(jsMatch){
+        return !/\$\{[^}]*$/s.test(jsMatch[0]);
+    }
+
+    const pythonMatches=[...text.matchAll(/"""\*convo\*[\s\S]*?"""/g)];
+    const openPython=/"""\*convo\*[\s\S]*$/s.exec(text);
+    if(openPython && (!pythonMatches.length || pythonMatches[pythonMatches.length-1]!.index!==openPython.index)){
+        return true;
+    }
+
+    const mdOpen=/(^|\n)(\s*)(`{3,}|~{3,})\s*convo(?:\s+[^`~]*)?\n[\s\S]*$/i.exec(text);
+    if(mdOpen){
+        const afterOpen=text.slice(mdOpen.index!+mdOpen[0].length);
+        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2]??'')}${escapeRegExp(mdOpen[3]??'')}\\s*$`,'m');
+        if(!closeRe.test(afterOpen)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const moveCursorAfterMarkdownImageAltTextAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return false;
+    }
+
+    const document=editor.document;
+    const lineIndex=selection.active.line;
+    const line=document.lineAt(lineIndex);
+    const lineText=line.text;
+    const cursorChar=selection.active.character;
+
+    const image=getMarkdownImageAtPosition(lineText,cursorChar);
+    if(!image){
+        return false;
+    }
+
+    const insertPos=new Position(lineIndex,image.end);
+    const changed=await editor.edit(builder=>{
+        builder.insert(insertPos,'\n');
+    });
+
+    if(!changed){
+        return false;
+    }
+
+    const newPos=new Position(lineIndex+1,0);
+    editor.selection=new Selection(newPos,newPos);
+    return true;
+}
+
+const getMarkdownImageAtPosition=(lineText:string,cursorChar:number):{end:number}|undefined=>{
+    const re=/!\[[^\]\r\n]*\]\([^\)\r\n]*\)/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(lineText))){
+        const full=match[0];
+        const start=match.index;
+        const altStart=start+2;
+        const altEnd=lineText.indexOf(']',altStart);
+        if(altEnd===-1){
+            continue;
+        }
+        if(cursorChar>=altStart && cursorChar<=altEnd){
+            return {
+                end:start+full.length
+            };
+        }
+    }
+    return;
+}
+
+const insertClosingXmlTagAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return;
+    }
+
+    const document=editor.document;
+    const position=selection.active;
+    const line=document.lineAt(position.line).text;
+    const linePrefix=line.slice(0,position.character);
+
+    const tag=getOpeningTagAtLineEnd(linePrefix);
+    if(!tag){
+        return;
+    }
+
+    const nextText=document.getText(new Range(position,new Position(position.line,line.length)));
+    if(nextText.startsWith(`</${tag}>`)){
+        return;
+    }
+
+    const insertText=`</${tag}>`;
+
+    const changed=await editor.edit(builder=>{
+        builder.insert(position,insertText);
+    });
+
+    if(!changed){
+        return;
+    }
+
+    editor.selection=new Selection(position,position);
+}
+
+const getOpeningTagAtLineEnd=(text:string):string|undefined=>{
+    const match=/<([A-Za-z_][\w.-]*)(?:\s+[^<>]*?)?>$/.exec(text);
+    if(!match){
+        return;
+    }
+
+    const full=match[0];
+    if(full.startsWith('</')){
+        return;
+    }
+    if(/\/\s*>$/.test(full)){
+        return;
+    }
+    if(/^<(!|[?])/.test(full)){
+        return;
+    }
+
+    return match[1];
+}
+
+const escapeRegExp=(value:string)=>{
+    return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+```
+</FILE_CONTENT>
+
+
+> user
+Now the extension host freezes and becomes unresponsive after pressing tab. I think a tab keyboarding
+with filters needs to be setup in combination with the package.json
+
+@time 2026-04-15T13:08:58-04:00
+@tokenUsage 26492 / 41 / $0.06633250000000002
+@model gpt-5.4-2026-03-05
+> assistant
+Do you want me to fix this by removing the `tab` command override entirely and wiring the behavior through a dedicated command plus a `package.json` keybinding with `when` filters?
+
+
+> user
+yes
+
+@time 2026-04-15T13:10:20-04:00
+@tokenUsage 26541 / 4980 / $0.07880250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" fenced>
+```json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="typing-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts" fenced>
+```ts
+import { ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
+
+const defaultTypeCommand='default:type';
+const defaultTabCommand='tab';
+
+export const registerTypingHandler=(context:ExtensionContext)=>{
+    let isHandlingType=false;
+    let isHandlingConvoTab=false;
+
+    context.subscriptions.push(commands.registerCommand('type',async (args:{text:string})=>{
+        if(isHandlingType){
+            await commands.executeCommand(defaultTypeCommand,args);
+            return;
+        }
+
+        isHandlingType=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor){
+                await commands.executeCommand(defaultTypeCommand,args);
+                return;
+            }
+
+            const text=args?.text??'';
+            await commands.executeCommand(defaultTypeCommand,args);
+
+            if(text!=='>'){
+                return;
+            }
+
+            if(!shouldHandleEditor(editor)){
+                return;
+            }
+
+            await insertClosingXmlTagAsync(editor);
+        }finally{
+            isHandlingType=false;
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.tab',async ()=>{
+        if(isHandlingConvoTab){
+            return;
+        }
+
+        isHandlingConvoTab=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(editor && shouldHandleEditor(editor) && editor.selections.length===1){
+                if(await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                    return;
+                }
+            }
+        }finally{
+            isHandlingConvoTab=false;
+        }
+
+        await commands.executeCommand(defaultTabCommand);
+    }));
+}
+
+const shouldHandleEditor=(editor:TextEditor)=>{
+    const document=editor.document;
+    if(document.languageId==='source.convo'){
+        return true;
+    }
+    return hasConvoRegionBeforeCursor(document,editor.selection.active);
+}
+
+const hasConvoRegionBeforeCursor=(document:TextDocument,position:Position)=>{
+    const text=document.getText(new Range(new Position(0,0),position));
+
+    const jsMatch=/\/\*convo\*\/\s*`[^`]*$/s.exec(text);
+    if(jsMatch){
+        return !/\$\{[^}]*$/s.test(jsMatch[0]);
+    }
+
+    const pythonMatches=[...text.matchAll(/"""\*convo\*[\s\S]*?"""/g)];
+    const openPython=/"""\*convo\*[\s\S]*$/s.exec(text);
+    if(openPython && (!pythonMatches.length || pythonMatches[pythonMatches.length-1]!.index!==openPython.index)){
+        return true;
+    }
+
+    const mdOpen=/(^|\n)(\s*)(`{3,}|~{3,})\s*convo(?:\s+[^`~]*)?\n[\s\S]*$/i.exec(text);
+    if(mdOpen){
+        const afterOpen=text.slice(mdOpen.index!+mdOpen[0].length);
+        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2]??'')}${escapeRegExp(mdOpen[3]??'')}\\s*$`,'m');
+        if(!closeRe.test(afterOpen)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const moveCursorAfterMarkdownImageAltTextAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return false;
+    }
+
+    const document=editor.document;
+    const lineIndex=selection.active.line;
+    const line=document.lineAt(lineIndex);
+    const lineText=line.text;
+    const cursorChar=selection.active.character;
+
+    const image=getMarkdownImageAtPosition(lineText,cursorChar);
+    if(!image){
+        return false;
+    }
+
+    const insertPos=new Position(lineIndex,image.end);
+    const changed=await editor.edit(builder=>{
+        builder.insert(insertPos,'\n');
+    });
+
+    if(!changed){
+        return false;
+    }
+
+    const newPos=new Position(lineIndex+1,0);
+    editor.selection=new Selection(newPos,newPos);
+    return true;
+}
+
+const getMarkdownImageAtPosition=(lineText:string,cursorChar:number):{end:number}|undefined=>{
+    const re=/!\[[^\]\r\n]*\]\([^\)\r\n]*\)/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(lineText))){
+        const full=match[0];
+        const start=match.index;
+        const altStart=start+2;
+        const altEnd=lineText.indexOf(']',altStart);
+        if(altEnd===-1){
+            continue;
+        }
+        if(cursorChar>=altStart && cursorChar<=altEnd){
+            return {
+                end:start+full.length
+            };
+        }
+    }
+    return;
+}
+
+const insertClosingXmlTagAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return;
+    }
+
+    const document=editor.document;
+    const position=selection.active;
+    const line=document.lineAt(position.line).text;
+    const linePrefix=line.slice(0,position.character);
+
+    const tag=getOpeningTagAtLineEnd(linePrefix);
+    if(!tag){
+        return;
+    }
+
+    const nextText=document.getText(new Range(position,new Position(position.line,line.length)));
+    if(nextText.startsWith(`</${tag}>`)){
+        return;
+    }
+
+    const insertText=`</${tag}>`;
+
+    const changed=await editor.edit(builder=>{
+        builder.insert(position,insertText);
+    });
+
+    if(!changed){
+        return;
+    }
+
+    editor.selection=new Selection(position,position);
+}
+
+const getOpeningTagAtLineEnd=(text:string):string|undefined=>{
+    const match=/<([A-Za-z_][\w.-]*)(?:\s+[^<>]*?)?>$/.exec(text);
+    if(!match){
+        return;
+    }
+
+    const full=match[0];
+    if(full.startsWith('</')){
+        return;
+    }
+    if(/\/\s*>$/.test(full)){
+        return;
+    }
+    if(/^<(!|[?])/.test(full)){
+        return;
+    }
+
+    return match[1];
+}
+
+const escapeRegExp=(value:string)=>{
+    return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+```
+</FILE_CONTENT>
+
+This removes the direct `tab` override and replaces it with a dedicated `convo.tab` command bound in `package.json`.
+
+Why this fixes it:
+- overriding `tab` and then calling `tab` again can recurse through keybinding/command routing
+- `convo.tab` is a normal extension command
+- the keybinding captures Tab only for `source.convo`
+- when the custom image behavior does not apply, it falls through to the normal Tab command
+
+One note: `defaultTabCommand='tab'` is okay here now because we are no longer inside a handler for the `tab` command itself.
+
+
+> user
