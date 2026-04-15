@@ -1174,7 +1174,7 @@ image I have copied from by OS's file explorer it only pastes the path of the im
 @tokenUsage 29753 / 833 / $0.076465
 @model gpt-5.4-2026-03-05
 > assistant
-<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts" fenced>
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts__" fenced>
 ```ts
 import { extname } from 'path';
 import { promises as fs } from 'fs';
@@ -1284,6 +1284,164 @@ export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
             if(!text){
                 return;
             }
+
+            return [
+                new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)
+            ];
+        }
+    };
+
+    context.subscriptions.push(languages.registerDocumentPasteEditProvider(
+        {language:'source.convo'},
+        provider,
+        {
+            providedPasteEditKinds:[DocumentDropOrPasteEditKind.Text],
+            pasteMimeTypes:[
+                ...imageMimeTypes,
+                'text/uri-list',
+            ],
+        }
+    ));
+}
+
+```
+</FILE_CONTENT>
+
+
+> user
+Change the default alt text to `description` and select the alt text in editor after pasted
+
+@time 2026-04-15T08:08:59-04:00
+@tokenUsage 30611 / 945 / $0.07889000000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts" fenced>
+```ts
+import { extname } from 'path';
+import { promises as fs } from 'fs';
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Selection, Uri, window } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const imageMimeTypes=[
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/x-icon',
+    'image/heic',
+    'image/heif',
+    'image/avif',
+];
+
+const extToMime:Record<string,string>={
+    '.png':'image/png',
+    '.jpg':'image/jpeg',
+    '.jpeg':'image/jpeg',
+    '.gif':'image/gif',
+    '.webp':'image/webp',
+    '.svg':'image/svg+xml',
+    '.bmp':'image/bmp',
+    '.tif':'image/tiff',
+    '.tiff':'image/tiff',
+    '.ico':'image/x-icon',
+    '.heic':'image/heic',
+    '.heif':'image/heif',
+    '.avif':'image/avif',
+};
+
+const pastedAltText='description';
+
+const tryCreateMarkdownImageAsync=async (dataTransfer:ReadonlyMap<string,any>):Promise<string|undefined>=>
+{
+    for(const mimeType of imageMimeTypes){
+        const item=dataTransfer.get(mimeType);
+        if(!item){
+            continue;
+        }
+
+        const file=await item.asFile?.();
+        const bytes=file?
+            await file.data()
+        :
+            await item.asBytes?.();
+
+        if(!bytes){
+            continue;
+        }
+
+        const base64=Buffer.from(bytes).toString('base64');
+        return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+    }
+
+    const uriListItem=dataTransfer.get('text/uri-list');
+    const uriList=await uriListItem?.asString?.();
+    if(uriList){
+        const uris=uriList
+            .split(/\r?\n/g)
+            .map(v=>v.trim())
+            .filter(v=>v && !v.startsWith('#'));
+
+        for(const value of uris){
+            try{
+                const uri=Uri.parse(value);
+                if(uri.scheme!=='file'){
+                    continue;
+                }
+
+                const mimeType=extToMime[extname(uri.fsPath).toLowerCase()];
+                if(!mimeType){
+                    continue;
+                }
+
+                const bytes=await fs.readFile(uri.fsPath);
+                const base64=Buffer.from(bytes).toString('base64');
+                return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+            }catch{
+            }
+        }
+    }
+
+    return;
+}
+
+export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
+{
+    void ext;
+
+    const provider:DocumentPasteEditProvider={
+        async provideDocumentPasteEdits(
+            document,
+            ranges,
+            dataTransfer
+        ){
+            void document;
+            void ranges;
+
+            const text=await tryCreateMarkdownImageAsync(dataTransfer as ReadonlyMap<string,any>);
+            if(!text){
+                return;
+            }
+
+            setTimeout(()=>{
+                const editor=window.activeTextEditor;
+                if(!editor || editor.document!==document){
+                    return;
+                }
+
+                const selections=editor.selections.map(selection=>{
+                    const startOffset=document.offsetAt(selection.start);
+                    const altStart=document.positionAt(startOffset+2);
+                    const altEnd=document.positionAt(startOffset+2+pastedAltText.length);
+                    return new Selection(altStart,altEnd);
+                });
+                if(selections.length){
+                    editor.selections=selections;
+                }
+            },0);
 
             return [
                 new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)

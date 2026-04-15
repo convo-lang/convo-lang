@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { extname } from 'path';
-import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Uri } from 'vscode';
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Selection, Uri, window } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 
 const imageMimeTypes=[
@@ -34,7 +34,7 @@ const extToMime:Record<string,string>={
     '.avif':'image/avif',
 };
 
-const pastedAltText='pasted image';
+const pastedAltText='image';
 
 const tryCreateMarkdownImageAsync=async (dataTransfer:ReadonlyMap<string,any>):Promise<string|undefined>=>
 {
@@ -111,6 +111,23 @@ export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
             if(!text){
                 return;
             }
+            const editor=window.activeTextEditor;
+            if(editor && editor.document===document && editor.selections.length){
+                const selections=editor.selections.map(selection=>{
+                    const startOffset=document.offsetAt(selection.start);
+                    return startOffset;
+                });
+                setTimeout(()=>{
+                    if(editor.document===document){
+                        editor.selections=selections.map(startOffset=>{
+                            const altStart=document.positionAt(startOffset+2);
+                            const altEnd=document.positionAt(startOffset+2+pastedAltText.length);
+                            return new Selection(altStart,altEnd);
+                        });
+                    }
+                },50);
+            }
+            
 
             return [
                 new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)
