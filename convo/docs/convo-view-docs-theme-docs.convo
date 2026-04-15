@@ -1,3 +1,56 @@
+@import ../base.convo
+
+@import ../../packages/convo-lang/src/lib/convo-view-theme.ts !file
+
+@import ../../packages/convo-lang-react/src/lib/ConvoView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/AudioVisualizer.ts !file
+@import ../../packages/convo-lang-react/src/lib/Button.tsx !file
+@import ../../packages/convo-lang-react/src/lib/convo-lang-react.ts !file
+@import ../../packages/convo-lang-react/src/lib/convo-theme-lib.ts !file
+@import ../../packages/convo-lang-react/src/lib/convo-view-themes.ts !file
+@import ../../packages/convo-lang-react/src/lib/ConvoContentMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoFunctionCallMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoInput.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoLoader.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMarkdownViewer.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMessageListView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoModelSelector.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoSourceView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoStatusIndicator.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoStreamingMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoSuggestionsView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoTaskView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoThemeIcon.tsx !file
+@import ../../packages/convo-lang-react/src/lib/RecordingCtrl.ts !file
+@import ../../packages/convo-lang-react/src/lib/useButtonBase.tsx !file
+@import ../../packages/convo-lang-react/src/lib/util.ts !file
+@import ../../packages/convo-lang-react/src/lib/VadCtrl.ts !file
+
+> user
+
+Document the properties of the `ConvoViewTheme` interface in the `convo-view-theme.ts` file.
+The `convo-view-themes.ts` file defines the default theme show in the following image.
+
+Image of Demo using the ConvoView:
+{{mdImg('./demo.png')}}
+
+@time 2026-04-14T23:14:17-04:00
+@tokenUsage 32440 / 60 / $0.08125
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the change: do you want me to add JSDoc comments for **every property** in `ConvoViewTheme`, including the more self-explanatory/internal-looking ones, or just document the public/common theme properties thoroughly and leave a few obvious ones minimally described?
+
+
+> user
+Document all properties
+
+@time 2026-04-14T23:15:35-04:00
+@tokenUsage 32510 / 3790 / $0.09075
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-view-theme.ts" target-output-path="../../packages/convo-lang/src/lib/convo-view-theme.ts" fenced>
+```ts
 import { ConvoIconType } from "./convo-lang-ui-types.js";
 
 /**
@@ -748,3 +801,8 @@ export interface ConvoViewTheme
      */
     sourceViewLineNumberClassName?:string;
 }
+```
+</FILE_CONTENT>
+
+
+> user
