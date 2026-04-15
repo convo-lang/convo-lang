@@ -1,0 +1,1685 @@
+@import ../base.convo
+
+@import ../../packages/convo-lang/src/lib/convo-view-theme.ts !file
+
+@import ../../packages/convo-lang-react/src/lib/ConvoView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/AudioVisualizer.ts !file
+@import ../../packages/convo-lang-react/src/lib/Button.tsx !file
+@import ../../packages/convo-lang-react/src/lib/convo-lang-react.ts !file
+@import ../../packages/convo-lang-react/src/lib/convo-lang-theme.ts !file
+@import ../../packages/convo-lang-react/src/lib/convo-theme-lib.ts !file
+@import ../../packages/convo-lang-react/src/lib/convo-view-themes.ts !file
+@import ../../packages/convo-lang-react/src/lib/ConvoContentMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoFunctionCallMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoInput.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoLoader.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMarkdownViewer.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMessageListView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoModelSelector.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoSourceView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoStatusIndicator.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoStreamingMessageView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoSuggestionsView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoTaskView.tsx !file
+@import ../../packages/convo-lang-react/src/lib/ConvoThemeIcon.tsx !file
+@import ../../packages/convo-lang-react/src/lib/RecordingCtrl.ts !file
+@import ../../packages/convo-lang-react/src/lib/useButtonBase.tsx !file
+@import ../../packages/convo-lang-react/src/lib/util.ts !file
+@import ../../packages/convo-lang-react/src/lib/VadCtrl.ts !file
+@import ../../docs/learn-convo-lang.md
+@import ../../examples/nextjs-tailwinds/pages/index.tsx !file
+
+> user
+Create a README about how to use the ConvoView component. Include use cases and examples.
+Start out high level to quickly show the Benefits and utility. Cover all features.
+
+The nextjs-tailwinds/pages/index.tsx file is a working example of the ConvoView component.
+
+Image of demo index.tsx:
+{{mdImg('./demo.png')}}
+
+@time 2026-04-14T23:21:22-04:00
+@tokenUsage 40105 / 109 / $0.100535
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate it, two quick questions:
+
+1. Where should I place the README?
+   - `../../packages/convo-lang-react/README.md`
+   - `../../packages/convo-lang-react/src/lib/README-ConvoView.md`
+   - or another path?
+
+2. Do you want the README focused only on `ConvoView`, or should it also include brief sections for related building blocks it uses (`ConvoInput`, `ConvoMessageListView`, `ConvoSourceView`, theming, hooks)?
+
+
+> user
+1. put it in ../../docs/convo-view.md
+2. You can include the building blocks, but the primary focus should be on using the ConvoView
+
+Also include the benefits of it using Convo-Lang
+
+
+@time 2026-04-14T23:27:03-04:00
+@tokenUsage 71535 / 7823 / $0.19839500000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-view.md" target-output-path="../../docs/convo-view.md" fenced>
+``` md
+# ConvoView
+
+`ConvoView` is the primary React UI component for building chat interfaces powered by Convo-Lang.
+
+It gives you a production-ready conversation surface with support for:
+
+- Convo-Lang prompts and templates
+- message rendering
+- function/tool calls
+- streaming responses
+- markdown
+- model selection
+- attachments and images
+- source view editing
+- suggestions
+- custom renderers
+- audio recording
+- live voice mode
+- text-to-speech response playback
+- theming
+- multi-panel and redirected layouts
+
+If you want a fast way to embed a capable AI chat UI into a React or Next.js app, `ConvoView` is the main entry point.
+
+---
+
+## Why use ConvoView
+
+At a high level, `ConvoView` combines three things that are usually painful to assemble by hand:
+
+1. **A real chat UI**
+   - message list
+   - input
+   - status indicators
+   - suggestions
+   - scrolling behavior
+   - source/code editing mode
+
+2. **A conversation controller**
+   - manages the active conversation
+   - tracks tasks and streaming state
+   - handles message appends and completions
+   - connects UI state to Convo-Lang execution
+
+3. **A Convo-Lang runtime integration**
+   - uses Convo-Lang prompts directly
+   - supports tool/function calls naturally
+   - supports variables, templates, modules, and imports
+   - supports multiple model backends and endpoints
+
+This means you can focus on the behavior of your AI product instead of wiring together:
+- chat state
+- request orchestration
+- tool call rendering
+- markdown rendering
+- source editing
+- media attachment logic
+- voice recording and playback
+- model switching
+- theme management
+
+---
+
+## Why Convo-Lang makes ConvoView especially useful
+
+`ConvoView` is not just a generic chat box. It is specifically designed for **Convo-Lang conversations**.
+
+That matters because Convo-Lang gives your UI a structured prompt and execution model instead of a plain “send text to model” flow.
+
+### Benefits of using ConvoView with Convo-Lang
+
+- **Prompt ownership**
+  - your agent logic can live in plain-text Convo-Lang
+  - easier to version, inspect, review, and share
+
+- **Built-in structure**
+  - system prompts, user messages, assistant messages, functions, results, RAG, tags, variables, and transforms all map cleanly into the UI
+
+- **Better tool/function UX**
+  - tool calls and results are first-class parts of the conversation
+  - they can be shown, hidden, streamed, or custom-rendered
+
+- **Stateful prompting**
+  - variables and execution state can drive how the conversation behaves over time
+
+- **LLM portability**
+  - the same prompt can work across multiple providers and models
+  - `ConvoView` can optionally expose model selection directly in the UI
+
+- **Inspectability**
+  - users and developers can switch to source mode and inspect or edit the conversation source
+
+- **Richer app patterns**
+  - use render targets, component renderers, extern functions, and source mode to build more than a standard chatbot
+
+In practice, `ConvoView` works well for:
+- copilots
+- customer support agents
+- structured assistants
+- internal tools
+- AI workflows with tools/functions
+- multi-modal chat
+- voice-first experiences
+- developer-facing prompt editors
+- side-panel artifact workflows
+
+---
+
+## Demo example
+
+A working example exists here:
+
+- `examples/nextjs-tailwinds/pages/index.tsx`
+
+That example demonstrates:
+- theme switching
+- dark mode
+- showing system, function, and result messages
+- streaming
+- markdown
+- attachments
+- model selector
+- audio recorder
+- live mode
+- read-aloud responses
+- extern functions
+- side-panel artifacts
+
+It is the best reference for a complete in-app usage example.
+
+---
+
+## Installation
+
+Install the React package and the core Convo-Lang package.
+
+``` sh
+npm i @convo-lang/convo-lang-react @convo-lang/convo-lang
+```
+
+You will typically also want a Convo-Lang-compatible backend endpoint if you are calling hosted models over HTTP.
+
+---
+
+## Basic usage
+
+The smallest useful example is a `ConvoView` pointed at a Convo-Lang endpoint.
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export default function MyPage()
+{
+    return (
+        <div className="h-[700px]">
+            <ConvoView
+                className="h-full"
+                httpEndpoint="http://localhost:7222/api/convo-lang"
+            />
+        </div>
+    );
+}
+```
+
+This gives you:
+- a conversation UI
+- a default theme
+- a default input
+- a default message list
+- a default controller
+- a connection to your HTTP completion backend
+
+---
+
+## Slightly more realistic example
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+const template=/*convo*/`
+\> system
+You are a helpful assistant for a software team.
+Be concise and useful.
+
+\> assistant
+Hi! What are you working on today?
+`;
+
+export default function HelpDeskPage()
+{
+    return (
+        <div className="h-[800px]">
+            <ConvoView
+                className="h-full"
+                httpEndpoint="http://localhost:7222/api/convo-lang"
+                template={template}
+                inputPlaceholder="Ask a question"
+                enableStreaming
+                enableMarkdown
+                enableSlashCommands
+                suggestionsLocation="before-input"
+            />
+        </div>
+    );
+}
+```
+
+---
+
+## What ConvoView renders
+
+By default `ConvoView` can render:
+
+- user messages
+- assistant messages
+- system messages
+- function definitions
+- function/tool calls
+- function/tool results
+- RAG messages
+- suggestion messages
+- component-rendered messages
+- streaming messages
+- source/code view of the conversation
+
+---
+
+## Core mental model
+
+`ConvoView` is a wrapper around a `ConversationUiCtrl`.
+
+### If you do nothing
+`ConvoView` creates its own controller.
+
+### If you need control
+You can pass your own `ConversationUiCtrl` through the `ctrl` prop.
+
+This gives you two modes:
+
+- **simple mode**
+  - use `ConvoView` as a self-contained chat component
+
+- **advanced mode**
+  - create and control the conversation externally
+  - share the same controller across multiple components
+  - build custom layouts around the same underlying conversation
+
+---
+
+## Common use cases
+
+### 1. Standard AI chat window
+
+Use `ConvoView` as a single full chat experience with a prompt template and endpoint.
+
+Best for:
+- internal assistants
+- support chat
+- workflow copilots
+- general-purpose chat apps
+
+``` tsx
+<ConvoView
+    className="h-full"
+    httpEndpoint="/api/convo-lang"
+    template={template}
+    enableStreaming
+    enableMarkdown
+/>
+```
+
+---
+
+### 2. Branded chat UI with custom styling
+
+Use `theme` and `className` to match your product design.
+
+Best for:
+- productized copilots
+- customer-facing assistants
+- embedded SaaS support tools
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    theme=\{{
+        convoViewClassName:'bg-background text-foreground rounded-3xl',
+        messageClassName:'rounded-2xl border',
+        inputContainerClassName:'rounded-3xl border bg-background',
+        inputSubmitButtonClassName:'rounded-full bg-primary text-primary-foreground',
+    }}
+/>
+```
+
+---
+
+### 3. Prompt editing and developer tooling
+
+Enable source mode or show source to let users inspect and edit the Convo-Lang conversation.
+
+Best for:
+- prompt builders
+- internal debugging tools
+- AI workflow editors
+- educational tools
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    showSource
+    showInputWithSource
+/>
+```
+
+You can also control the source display mode with `sourceMode`.
+
+---
+
+### 4. Tool-driven assistants
+
+Use Convo-Lang functions, extern functions, and optional custom renderers for tool calls and results.
+
+Best for:
+- agents that call APIs
+- workflow automation UIs
+- business process assistants
+- artifact creation tools
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    externFunctions=\{{
+        createTicket(title:string,priority:string){
+            return {id:'T-100',title,priority};
+        }
+    }}
+    showFunctions
+    showResults
+/>
+```
+
+---
+
+### 5. Artifact or side-panel layouts
+
+Redirect messages or use render targets to split the experience into multiple panels.
+
+Best for:
+- Claude-style artifact layouts
+- side-by-side results
+- document viewers
+- generated app previews
+
+The example app in `nextjs-tailwinds/pages/index.tsx` demonstrates a related pattern by rendering generated HTML tools in a side panel.
+
+---
+
+### 6. Voice-first chat
+
+Enable recording, live mode, and optional read-back of responses.
+
+Best for:
+- mobile-friendly assistants
+- hands-free workflows
+- accessibility-focused experiences
+- real-time voice interaction
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAudioRecorder
+    enableLiveMode
+    readResponses
+/>
+```
+
+---
+
+### 7. Multi-modal chat with attachments
+
+Allow users to attach images or other accepted file types.
+
+Best for:
+- visual assistants
+- image understanding
+- media analysis
+- document/image workflows
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAttachment
+    acceptAttachmentTypes="image/*"
+    maxImageWidth={1024}
+/>
+```
+
+---
+
+## Quick start examples
+
+## Example: simple chat
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export function SimpleChat()
+{
+    return (
+        <ConvoView
+            className="h-full"
+            httpEndpoint="/api/convo-lang"
+        />
+    );
+}
+```
+
+---
+
+## Example: chat with a prompt template
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+const template=/*convo*/`
+\> define
+appName='Acme Support'
+
+\> system
+You are the official assistant for \{{appName}}.
+Always be polite and concise.
+
+\> assistant
+Hi, how can I help you today?
+`;
+
+export function TemplatedChat()
+{
+    return (
+        <ConvoView
+            className="h-full"
+            httpEndpoint="/api/convo-lang"
+            template={template}
+            enableStreaming
+            enableMarkdown
+        />
+    );
+}
+```
+
+---
+
+## Example: use a default conversation value
+
+`defaultValue` can seed the conversation source directly.
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+const defaultValue=/*convo*/`
+\> assistant
+Hello, how can I help?
+
+\> user
+Show me an example of Convo-Lang in action
+`.trim()+'\n';
+
+export function SeededChat()
+{
+    return (
+        <ConvoView
+            className="h-full"
+            httpEndpoint="/api/convo-lang"
+            defaultValue={defaultValue}
+        />
+    );
+}
+```
+
+---
+
+## Example: use extern functions
+
+Extern functions let the conversation call into your app code.
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export function ToolChat()
+{
+    return (
+        <ConvoView
+            className="h-full"
+            httpEndpoint="/api/convo-lang"
+            showFunctions
+            showResults
+            externFunctions=\{{
+                saveTodo(title:string)
+                {
+                    return {
+                        success:true,
+                        id:'todo_123',
+                        title,
+                    };
+                },
+            }}
+            template={/*convo*/`
+# Save a todo item
+\> extern saveTodo(
+    title:string
+)
+
+\> assistant
+Tell me about a task you want to save.
+`}
+        />
+    );
+}
+```
+
+---
+
+## Example: model selector
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableModelSelector
+    selectableModels={[
+        'gpt-5',
+        'claude-3-7-sonnet',
+        'deepseek-r1',
+    ]}
+/>
+```
+
+If `selectableModels` is not provided, `ConvoView` can attempt to load the available models from the conversation backend.
+
+---
+
+## Example: suggestions near the input
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    suggestionsLocation="before-input"
+    forceInlineSuggestionsLocation
+/>
+```
+
+This can show suggestions:
+- inline in the message stream
+- before the input
+- after the input
+- or both inline and near the input
+
+---
+
+## Example: audio, live mode, and response playback
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAudioRecorder
+    enableLiveMode
+    readResponses
+/>
+```
+
+---
+
+## Example: custom input renderer
+
+Use `renderInput` if you want to fully replace the default input UI.
+
+``` tsx
+import { Button } from '@convo-lang/convo-lang-react';
+
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    noInput
+    renderInput={(ctrl)=>(
+        <div className="p-4 border-t flex gap-2">
+            <Button onClick={()=>ctrl.appendUiMessageAsync('Hello')}>
+                Say hello
+            </Button>
+            <Button onClick={()=>ctrl.appendUiMessageAsync('Summarize this conversation')}>
+                Summarize
+            </Button>
+        </div>
+    )}
+/>
+```
+
+---
+
+## Example: use your own controller
+
+``` tsx
+import { ConversationUiCtrl } from '@convo-lang/convo-lang';
+import { useMemo } from 'react';
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export function ControlledChat()
+{
+    const ctrl=useMemo(()=>new ConversationUiCtrl({
+        template:`
+\> system
+You are a planning assistant.
+`,
+    }),[]);
+
+    return (
+        <ConvoView
+            ctrl={ctrl}
+            httpEndpoint="/api/convo-lang"
+            enableStreaming
+        />
+    );
+}
+```
+
+Use this when:
+- multiple components need the same conversation
+- you want external lifecycle control
+- you want to set controller state directly
+
+---
+
+## Example: get the created controller
+
+``` tsx
+import { useState } from 'react';
+import { ConversationUiCtrl } from '@convo-lang/convo-lang';
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export function GetControllerExample()
+{
+    const [ctrl,setCtrl]=useState<ConversationUiCtrl|null>(null);
+
+    return (
+        <div className="h-full flex flex-col">
+            <div className="p-2 border-b">
+                <button onClick={()=>ctrl?.appendUiMessageAsync('Write a haiku')}>
+                    Ask for haiku
+                </button>
+            </div>
+            <ConvoView
+                className="flex-1"
+                httpEndpoint="/api/convo-lang"
+                getCtrl={setCtrl}
+            />
+        </div>
+    );
+}
+```
+
+---
+
+## Example: custom attachment picker
+
+`browseAttachmentRequested` lets you replace the default file input behavior.
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAttachment
+    acceptAttachmentTypes="image/*"
+    browseAttachmentRequested={async (accept)=>{
+        console.log('Open custom picker for',accept);
+        return null;
+    }}
+/>
+```
+
+Return one of:
+- `File`
+- `Blob`
+- base64 data URL string
+- `null`
+- `undefined`
+
+---
+
+## Example: custom theme
+
+``` tsx
+import { ConvoView } from '@convo-lang/convo-lang-react';
+
+export function ThemedChat()
+{
+    return (
+        <ConvoView
+            httpEndpoint="/api/convo-lang"
+            theme=\{{
+                convoViewClassName:'relative flex flex-col bg-background text-foreground',
+                rowClassName:'flex items-start gap-3',
+                messageClassName:'rounded-2xl border p-3',
+                assistantMessageClassName:'bg-muted',
+                userMessageClassName:'bg-primary text-primary-foreground',
+                inputAreaClassName:'absolute left-0 right-0 bottom-0 p-4',
+                inputContainerClassName:'rounded-3xl border bg-background',
+                inputClassName:'flex-1 p-3 outline-none resize-none',
+                inputSubmitButtonClassName:'size-8 rounded-full bg-primary text-primary-foreground',
+            }}
+        />
+    );
+}
+```
+
+---
+
+## Props overview
+
+Below is a practical guide to the main `ConvoView` props.
+
+## Controller and lifecycle
+
+### `ctrl?:ConversationUiCtrl`
+Provide your own controller instead of letting `ConvoView` create one.
+
+### `getCtrl?:(ctrl:ConversationUiCtrl)=>void`
+Called with the active controller.
+
+### `ctrlOptions?:ConversationUiCtrlOptions`
+Options passed to an auto-created controller.
+
+### `appendTrigger?:ConvoUiAppendTrigger`
+Programmatically append content or trigger completion.
+
+Useful when:
+- external UI elements need to inject messages
+- you want button-driven message appends
+- you want to trigger completions from outside the chat input
+
+### `beforeCreateExeCtx?:BeforeCreateConversationExeCtx|null|undefined`
+Hook that runs before the execution context is created.
+
+Good for:
+- last-second variable insertion
+- modifying the conversation before completion
+- injecting app state
+
+### `enabledInitMessage?:boolean`
+Allows initialization messages to trigger completions on mount.
+
+### `onVarsChange?:(vars:Record<string,any>)=>void`
+Observe conversation variable changes.
+
+---
+
+## Prompt and template configuration
+
+### `template?:string`
+Main Convo-Lang source template.
+
+### `templatePrefix?:string`
+Prepends raw Convo-Lang source before `template`.
+
+### `defaultValue?:string`
+Sets the current conversation source.
+
+### `imports?:string|string[]`
+Imports inserted into the conversation source as `@import` statements.
+
+### `modules?:ConvoModule[]`
+Modules to register with the conversation.
+
+### `modulesRefreshKey?:string|number`
+Force module refresh when modules change.
+
+### `defaultVars?:Record<string,any>`
+Default variable values inserted into the conversation.
+
+### `externFunctions?:Record<string,(...params:any[])=>any>`
+Backs `extern` functions declared in the Convo-Lang source.
+
+---
+
+## Backend and model configuration
+
+### `httpEndpoint?:string`
+Convo-Lang-compatible API endpoint.
+
+When provided, `ConvoView` wires this endpoint to:
+- completion service
+- transcription service
+- text-to-speech service
+- embeddings service
+
+### `enableModelSelector?:boolean`
+Shows a model dropdown in the UI.
+
+### `selectableModels?:string[]`
+Limit model choices to a fixed list.
+
+### `enableStreaming?:boolean`
+Enables streaming responses.
+
+---
+
+## Rendering and display behavior
+
+### `showSource?:boolean`
+Switch from chat UI to source view.
+
+### `sourceMode?:ConvoEditorMode`
+Controls what source content is shown.
+
+Typical modes include things like:
+- code
+- flat
+- text
+- model
+- vars
+- imports
+- modules
+
+### `showInputWithSource?:boolean`
+If `true`, keep the input visible while in source mode.
+
+### `showFunctions?:boolean`
+Render functions/function messages as bubbles.
+
+### `showResults?:boolean`
+Render variable assignments and result messages as bubbles.
+
+### `showSystem?:boolean`
+Render system messages as bubbles.
+
+### `enableMarkdown?:ConvoMarkdownEnableState`
+Enable markdown rendering for user messages, assistant messages, or both.
+
+### `disableDefaultFunctionCallRender?:boolean`
+Turn off the default function call renderer.
+
+Useful if you want all tool rendering to be custom.
+
+### `disableScroll?:boolean`
+Disable scrolling in message or source views.
+
+### `messageBottomPadding?:string|null`
+Extra space at the bottom of the message list.
+
+Useful when:
+- using floating inputs
+- preventing the last message from sitting behind the input
+
+---
+
+## Suggestions
+
+### `suggestionsLocation?:'inline'|'before-input'|'after-input'`
+Controls where suggestion messages render.
+
+### `forceInlineSuggestionsLocation?:boolean`
+Keep suggestions inline even when also rendering them near the input.
+
+### `suggestionProps?:Partial<ConvoSuggestionsViewProps>`
+Props for the suggestions component near the input.
+
+---
+
+## Message list customization
+
+### `messageListProps?:ConvoMessageViewProps`
+Extra props forwarded into the default message list rendering path.
+
+### `ragRenderer?:ConvoRagRenderer`
+Custom renderer for RAG messages.
+
+### `componentRenderers?:Record<string,ConvoComponentRenderer>`
+Render custom components for embedded components and tool outputs.
+
+### `renderTarget?:string`
+Render only messages for a specific target.
+
+### `redirectMessagesView?:(view:any)=>void`
+Redirect the rendered messages view outside of the component.
+
+Useful for:
+- multi-panel layouts
+- detached message rendering
+- artifact panels
+
+---
+
+## Input customization
+
+### `renderInput?:(ctrl:ConversationUiCtrl)=>any`
+Completely replace the default input UI.
+
+### `noInput?:boolean`
+Hide the input entirely.
+
+### `inputProps?:Partial<ConvoInputProps>`
+Pass props to the default input component.
+
+### `inputPlaceholder?:string`
+Placeholder text for the input.
+
+### `beforeInputStart?:any`
+Rendered before the input, at the start of the row above it.
+
+### `beforeInputEnd?:any`
+Rendered before the input, at the end of the row above it.
+
+### `afterInputStart?:any`
+Rendered after the input, at the start of the row below it.
+
+### `afterInputEnd?:any`
+Rendered after the input, at the end of the row below it.
+
+---
+
+## Attachments and media
+
+### `enableAttachment?:boolean`
+Enable attachments, typically images.
+
+### `acceptAttachmentTypes?:string`
+Accepted file types for the attachment picker.
+
+Default:
+``` ts
+'image/*'
+```
+
+### `browseAttachmentRequested?:(accept:string)=>Promise<File|Blob|string|null|undefined>`
+Override the default attachment browser.
+
+### `maxImageWidth?:number`
+Max image width before resize.
+
+### `maxImageHeight?:number`
+Max image height before resize.
+
+---
+
+## Voice and audio
+
+### `enableAudioRecorder?:boolean`
+Enable microphone recording.
+
+### `enableLiveMode?:boolean`
+Enable live conversational voice mode.
+
+### `readResponses?:boolean`
+Read assistant responses with text-to-speech.
+
+---
+
+## Source view behavior
+
+### `codeInputAutoScrollBehavior?:ScrollBehavior`
+Controls auto-scroll behavior in source mode.
+
+### `sourceDarkMode?:boolean|'auto'`
+Controls source editor dark mode behavior.
+
+---
+
+## Input change events
+
+### `onInputChange?:(change:ConversationInputChange)=>void`
+Called when the input changes.
+
+This applies to:
+- chat input
+- source editor input
+
+The callback receives:
+
+``` ts
+export interface ConversationInputChange
+{
+    type:'chat'|'source';
+    value:string;
+}
+```
+
+---
+
+## Theming
+
+### `theme?:ConvoViewTheme`
+Theme object controlling class names and icons across the entire view.
+
+This is one of the strongest parts of `ConvoView` because nearly every visual surface can be themed.
+
+Theme categories include:
+- root layout
+- icons
+- messages
+- rows
+- markdown/plain text
+- suggestions
+- message list
+- loader
+- input
+- attachment buttons
+- audio recorder UI
+- task display
+- function call display
+- RAG display
+- source view
+
+A large set of theme fields is supported. Examples include:
+
+- `convoViewClassName`
+- `messageClassName`
+- `assistantMessageClassName`
+- `userMessageClassName`
+- `rowClassName`
+- `inputContainerClassName`
+- `inputClassName`
+- `inputSubmitButtonClassName`
+- `suggestionButtonClassName`
+- `functionCallClassName`
+- `sourceViewClassName`
+- icon fields such as `assistantIcon`, `userIcon`, `loaderIcon`
+
+The default theme is provided internally via `getConvoViewTheme('default')`.
+
+---
+
+## Feature-by-feature guide
+
+## 1. Streaming
+
+Enable streaming with:
+
+``` tsx
+<ConvoView enableStreaming httpEndpoint="/api/convo-lang" />
+```
+
+Benefits:
+- faster perceived response times
+- better chat UX
+- visible progressive generation
+- supports streaming function-call rendering
+
+---
+
+## 2. Markdown rendering
+
+Enable markdown rendering with:
+
+``` tsx
+<ConvoView enableMarkdown httpEndpoint="/api/convo-lang" />
+```
+
+This allows assistant or user messages to render markdown using the configured markdown renderer.
+
+Useful for:
+- docs assistants
+- code assistants
+- formatted summaries
+- rich response UIs
+
+---
+
+## 3. Function/tool calls
+
+Convo-Lang functions map naturally into the UI.
+
+You can:
+- show function definitions with `showFunctions`
+- show result bubbles with `showResults`
+- allow default function call rendering
+- replace default rendering with custom components
+- stream function-call output
+
+Example:
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    showFunctions
+    showResults
+/>
+```
+
+---
+
+## 4. System message visibility
+
+System messages are usually part of the prompt rather than the user-facing UI. For debugging or developer tools, you can expose them.
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    showSystem
+/>
+```
+
+Useful for:
+- debugging prompts
+- teaching Convo-Lang
+- prompt engineering tools
+- admin/debug builds
+
+---
+
+## 5. Source mode
+
+Source mode swaps the chat list for a code/source-oriented view of the conversation.
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    showSource
+    showInputWithSource
+/>
+```
+
+This is especially useful because Convo-Lang is plain text. Users can inspect or edit the underlying conversation script directly.
+
+Good for:
+- prompt labs
+- debugging
+- developer tools
+- educational demos
+- AI workflow editing
+
+---
+
+## 6. Suggestions
+
+Suggestions can be rendered:
+- inline in the message stream
+- above the input
+- below the input
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    suggestionsLocation="after-input"
+/>
+```
+
+---
+
+## 7. Attachments
+
+Enable file/image attachments:
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAttachment
+    acceptAttachmentTypes="image/*"
+/>
+```
+
+This is ideal when using Convo-Lang with:
+- vision models
+- image analysis tools
+- multi-modal assistants
+
+---
+
+## 8. Audio recorder
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAudioRecorder
+/>
+```
+
+This enables the recording UI and transcription flow.
+
+---
+
+## 9. Live mode
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableAudioRecorder
+    enableLiveMode
+/>
+```
+
+Live mode is for direct speech-driven interaction with the LLM.
+
+---
+
+## 10. Read responses aloud
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    readResponses
+/>
+```
+
+This enables TTS response playback when configured services are available.
+
+---
+
+## 11. Model selection
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableModelSelector
+/>
+```
+
+This is useful for:
+- model comparison
+- debugging
+- user-controlled model choice
+- internal evaluation tools
+
+---
+
+## 12. Slash commands
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    enableSlashCommands
+/>
+```
+
+This enables slash-command usage through the UI controller.
+
+---
+
+## 13. Render targets and redirected views
+
+These features let you break the UI apart into more advanced layouts.
+
+### `renderTarget`
+Filters which messages render in this instance.
+
+### `redirectMessagesView`
+Lets you render the message view elsewhere.
+
+These are advanced but powerful for:
+- split-pane apps
+- side panels
+- artifacts
+- embedded tool surfaces
+
+---
+
+## 14. Custom component renderers
+
+If your Convo-Lang messages or function results map to named components, you can render custom React output.
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    componentRenderers=\{{
+        chart:{
+            render(comp,ctx){
+                return <div>Custom chart renderer</div>;
+            },
+        },
+    }}
+/>
+```
+
+This is one of the biggest reasons to use ConvoView for serious AI products instead of generic chat UIs.
+
+It lets your AI output become app UI.
+
+---
+
+## 15. RAG rendering
+
+You can override how RAG messages display.
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    ragRenderer={(message)=>(
+        <div className="text-sm opacity-80">
+            Retrieved: {message.content}
+        </div>
+    )}
+/>
+```
+
+---
+
+## Building blocks around ConvoView
+
+While `ConvoView` is the primary component, it is composed of smaller pieces.
+
+You usually do not need to use these directly at first, but it helps to know what exists.
+
+## `ConvoInput`
+Default chat input UI.
+
+Features include:
+- text entry
+- submit button
+- attachments
+- image previews
+- audio recording
+- live mode controls
+- transcription status
+- custom props via `inputProps`
+
+Use `renderInput` to replace it.
+
+---
+
+## `ConvoMessageListView`
+Renders the conversation message stream.
+
+Supports:
+- message rendering
+- streaming messages
+- auto-scroll
+- suggestion suppression
+- custom status indicator
+- markdown and function rendering options
+
+Use `redirectMessagesView` when you want to move this outside of `ConvoView`.
+
+---
+
+## `ConvoSourceView`
+Renders the conversation as source/code.
+
+Supports:
+- source editing
+- alternate source modes
+- scrolling behavior
+- dark mode behavior
+- submission from source mode
+
+---
+
+## `ConvoSuggestionsView`
+Renders suggestion buttons near the input.
+
+---
+
+## `ConvoModelSelector`
+Renders the model dropdown when enabled.
+
+---
+
+## Hooks and helpers
+
+The library also exposes hooks that are useful when building around `ConvoView`.
+
+## `useConversationUiCtrl`
+Access the current `ConversationUiCtrl` from context.
+
+## `useConversation`
+Get the active conversation.
+
+## `useConversationMessages`
+Get flattened messages.
+
+## `useConvoTheme`
+Get the active `ConvoViewTheme`.
+
+These are useful when building adjacent custom UI around the main `ConvoView`.
+
+---
+
+## Working from the example app
+
+The example in `examples/nextjs-tailwinds/pages/index.tsx` is a strong reference because it shows how `ConvoView` behaves in a real page.
+
+Highlights from that example:
+
+- the page wraps `ConvoView` in a full-height bordered container
+- the theme is changed externally using page-level state
+- multiple booleans toggle major features
+- an `externFunctions` entry is used to create HTML tools
+- generated artifact content is rendered in a side panel iframe
+- `defaultValue` seeds a real working Convo-Lang conversation
+- audio, live mode, markdown, attachments, streaming, and model selection are all exposed with toggles
+
+A simplified version of that usage looks like this:
+
+``` tsx
+<ConvoView
+    httpEndpoint="http://localhost:7222/api/convo-lang"
+    className="flex-1"
+    inputPlaceholder="Ask something cool"
+    enableMarkdown={enableMarkdown}
+    enableSlashCommands={enableSlashCommands}
+    suggestionsLocation="before-input"
+    forceInlineSuggestionsLocation
+    showFunctions={showFunctions}
+    showResults={showResults}
+    showSystem={showSystem}
+    enableStreaming={enableStreaming}
+    enableAttachment={enableAttachment}
+    enableModelSelector={enableModelSelector}
+    enableAudioRecorder={enableAudioRecorder}
+    enableLiveMode={enableLiveMode}
+    defaultValue={defaultValue}
+    readResponses={readResponses}
+    externFunctions=\{{
+        createHtmlTool(name:string,content:string)
+        {
+            return 'created';
+        },
+    }}
+/>
+```
+
+This is a very good “everything turned on” reference.
+
+---
+
+## Recommended adoption path
+
+If you are new to `ConvoView`, start in this order:
+
+### Step 1
+Render a basic chat:
+- `httpEndpoint`
+- `className`
+
+### Step 2
+Add your Convo-Lang prompt:
+- `template`
+- `defaultValue`
+- `externFunctions`
+
+### Step 3
+Improve the UX:
+- `enableStreaming`
+- `enableMarkdown`
+- `inputPlaceholder`
+- `suggestionsLocation`
+
+### Step 4
+Add advanced UI:
+- `enableModelSelector`
+- `enableAttachment`
+- `showSource`
+- `showFunctions`
+- `showResults`
+
+### Step 5
+Add multimodal and voice:
+- `enableAudioRecorder`
+- `enableLiveMode`
+- `readResponses`
+
+### Step 6
+Move into app-specific rendering:
+- `componentRenderers`
+- `ragRenderer`
+- `renderTarget`
+- `redirectMessagesView`
+- custom `theme`
+
+---
+
+## When to use ConvoView vs a fully custom UI
+
+Use `ConvoView` when you want:
+- a complete chat UI quickly
+- strong Convo-Lang integration
+- support for tools, results, source mode, and voice
+- a flexible but batteries-included architecture
+
+Use a fully custom UI when:
+- your chat layout is extremely specialized
+- you want total control over every surface
+- you only need a tiny subset of features
+
+Even in fully custom cases, `ConversationUiCtrl` and the React hooks can still be useful.
+
+---
+
+## Practical patterns
+
+## Pattern: readonly transcript viewer
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    noInput
+/>
+```
+
+Useful for:
+- review screens
+- transcript embeds
+- historical conversation views
+
+---
+
+## Pattern: floating prompt lab
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    showSource
+    showInputWithSource
+    sourceDarkMode="auto"
+/>
+```
+
+Useful for:
+- prompt experimentation
+- dev tools
+- editing prompt flows in-browser
+
+---
+
+## Pattern: support copilot
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    template={supportTemplate}
+    enableStreaming
+    enableMarkdown
+    enableAttachment
+    enableModelSelector
+/>
+```
+
+Useful for:
+- customer support
+- agent workspaces
+- operations consoles
+
+---
+
+## Pattern: voice assistant
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    template={voiceTemplate}
+    enableAudioRecorder
+    enableLiveMode
+    readResponses
+/>
+```
+
+Useful for:
+- kiosks
+- accessibility
+- hands-free tools
+- mobile usage
+
+---
+
+## Pattern: artifact assistant
+
+``` tsx
+<ConvoView
+    httpEndpoint="/api/convo-lang"
+    template={artifactTemplate}
+    showFunctions
+    showResults
+    componentRenderers={componentRenderers}
+/>
+```
+
+Useful for:
+- generated UI
+- dashboards
+- documents
+- code or chart artifacts
+
+---
+
+## Notes and best practices
+
+- Prefer `template` for stable prompt definitions.
+- Use `defaultValue` when you want to seed or replace the conversation source.
+- Use `externFunctions` for bridging Convo-Lang to app code.
+- Turn on `showSystem`, `showFunctions`, and `showResults` in debug builds.
+- Use `enableStreaming` for a much better chat experience.
+- Use `componentRenderers` when AI output should become interactive UI.
+- Use `showSource` and `sourceMode` for prompt debugging and teaching.
+- Use `theme` instead of rewriting the component unless you truly need a fully custom layout.
+- Use `getCtrl` or `ctrl` when external UI needs to manipulate the conversation directly.
+
+---
+
+## Summary
+
+`ConvoView` is the fastest way to build a full-featured Convo-Lang chat experience in React.
+
+It is especially powerful because it combines:
+- a ready-to-use chat UI
+- a conversation controller
+- first-class Convo-Lang support
+- tools, results, RAG, and source-mode support
+- multimodal and voice features
+- extensive theming and rendering hooks
+
+If you only remember one thing, remember this:
+
+**`ConvoView` is not just a message box. It is a full UI shell for Convo-Lang-powered agents and workflows.**
+
+If you want to see it in action, start with:
+
+- `examples/nextjs-tailwinds/pages/index.tsx`
+
+and then adapt that example to your own prompt, endpoint, tools, and theme.
+```
+</FILE_CONTENT>
+
+
+> user
