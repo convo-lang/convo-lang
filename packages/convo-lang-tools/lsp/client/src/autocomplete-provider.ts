@@ -58,7 +58,7 @@ export const createConvoPathCompletionProvider=()=>{
                 }
 
                 const insertText=ctx.wrapMode==='embed'?
-                    `{{@${relToConvo}}}`:
+                    relToConvo:
                     `${relToConvo} !file`;
 
                 const item=new CompletionItem(relToConvo,CompletionItemKind.File);
@@ -102,16 +102,19 @@ const getConvoPathCompletionContext=(
         };
     }
 
-    const embedIndex=linePrefix.lastIndexOf('{{@');
-    if(embedIndex>=0){
-        const query=linePrefix.substring(embedIndex+3);
-        if(/[\s}]/.test(query)){
+    const embedMatch=/(^|\s)\{\{@([^\s]*)$/.exec(linePrefix);
+    if(embedMatch){
+        const value=embedMatch[2]??'';
+        if(!value.startsWith('.')){
             return undefined;
         }
+        const start=value.length?
+            linePrefix.length-value.length:
+            linePrefix.length;
         return {
-            query,
+            query:value,
             wrapMode:'embed',
-            range:new Range(line,embedIndex,line,linePrefix.length)
+            range:new Range(line,start,line,linePrefix.length)
         };
     }
 
