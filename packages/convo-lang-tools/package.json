@@ -97,12 +97,12 @@
                     "group": "navigation@01"
                 },
                 {
-                    "command": "convo.open-settings",
+                    "command": "convo.text",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@02"
                 },
                 {
-                    "command": "convo.split",
+                    "command": "convo.vars",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@03"
                 },
@@ -112,32 +112,32 @@
                     "group": "navigation@04"
                 },
                 {
-                    "command": "convo.complete-graph",
+                    "command": "convo.open-settings",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@05"
                 },
                 {
-                    "command": "convo.text",
+                    "command": "convo.split",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@06"
                 },
                 {
-                    "command": "convo.flat",
+                    "command": "convo.complete-graph",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@07"
                 },
                 {
-                    "command": "convo.flat-all",
+                    "command": "convo.flat",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@08"
                 },
                 {
-                    "command": "convo.messages",
+                    "command": "convo.flat-all",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@09"
                 },
                 {
-                    "command": "convo.vars",
+                    "command": "convo.messages",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@10"
                 },
