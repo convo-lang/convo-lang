@@ -1,0 +1,435 @@
+@import ./extension-rules.convo
+@import ../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts !file
+
+> user
+After the image is pasted and the alt text is selected by the paste handler the window remains
+scrolled horizontal to the end of the very long line and the you can not set the selection.
+
+I would like the window to scroll back to the horizontal start of the line where the image was
+pasted.
+
+@time 2026-04-15T08:53:38-04:00
+@tokenUsage 23212 / 44 / $0.058140000000000004
+@model gpt-5.4-2026-03-05
+> assistant
+Do you want me to make this change only for the image paste flow in `.convo` files, or should I also try to preserve/reset horizontal scroll for any future paste handlers using the same pattern?
+
+
+> user
+Just for convo files after the timeout executes that makes the selection by setting editor.selections.
+I added a comment where the action should occur.
+
+@time 2026-04-15T08:55:42-04:00
+@tokenUsage 23301 / 1025 / $0.06081500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts" fenced>
+```ts
+import { promises as fs } from 'fs';
+import { extname } from 'path';
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Selection, TextEditorRevealType, Uri, window } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const imageMimeTypes=[
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/x-icon',
+    'image/heic',
+    'image/heif',
+    'image/avif',
+];
+
+const extToMime:Record<string,string>={
+    '.png':'image/png',
+    '.jpg':'image/jpeg',
+    '.jpeg':'image/jpeg',
+    '.gif':'image/gif',
+    '.webp':'image/webp',
+    '.svg':'image/svg+xml',
+    '.bmp':'image/bmp',
+    '.tif':'image/tiff',
+    '.tiff':'image/tiff',
+    '.ico':'image/x-icon',
+    '.heic':'image/heic',
+    '.heif':'image/heif',
+    '.avif':'image/avif',
+};
+
+const pastedAltText='image';
+
+const tryCreateMarkdownImageAsync=async (dataTransfer:ReadonlyMap<string,any>):Promise<string|undefined>=>
+{
+    for(const mimeType of imageMimeTypes){
+        const item=dataTransfer.get(mimeType);
+        if(!item){
+            continue;
+        }
+
+        const file=await item.asFile?.();
+        const bytes=file?
+            await file.data()
+        :
+            await item.asBytes?.();
+
+        if(!bytes){
+            continue;
+        }
+
+        const base64=Buffer.from(bytes).toString('base64');
+        return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+    }
+
+    const uriListItem=dataTransfer.get('text/uri-list');
+    const uriList=await uriListItem?.asString?.() as string|undefined;
+    if(uriList){
+        const uris=uriList
+            .split(/\r?\n/g)
+            .map(v=>v.trim())
+            .filter(v=>v && !v.startsWith('#'));
+
+        for(const value of uris){
+            try{
+                const uri=Uri.parse(value);
+                if(uri.scheme!=='file'){
+                    continue;
+                }
+
+                const mimeType=extToMime[extname(uri.fsPath).toLowerCase()];
+                if(!mimeType){
+                    continue;
+                }
+
+                const bytes=await fs.readFile(uri.fsPath);
+                const base64=bytes.toString('base64');
+                return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+            }catch{
+            }
+        }
+    }
+
+    return;
+}
+
+export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
+{
+    void ext;
+
+    const provider:DocumentPasteEditProvider={
+        async provideDocumentPasteEdits(
+            document,
+            ranges,
+            dataTransfer
+        ){
+            void document;
+            void ranges;
+
+            const map=new Map<string,any>();
+            for(const [key,value] of dataTransfer){
+                map.set(key,value);
+            }
+
+            const text=await tryCreateMarkdownImageAsync(map);
+            if(!text){
+                return;
+            }
+            const editor=window.activeTextEditor;
+            if(editor && editor.document===document && editor.selections.length){
+                const selections=editor.selections.map(selection=>{
+                    const startOffset=document.offsetAt(selection.start);
+                    return startOffset;
+                });
+                setTimeout(()=>{
+                    if(editor.document===document){
+                        editor.selections=selections.map(startOffset=>{
+                            const altStart=document.positionAt(startOffset+2);
+                            const altEnd=document.positionAt(startOffset+2+pastedAltText.length);
+                            return new Selection(altStart,altEnd);
+                        });
+                        editor.revealRange(
+                            new Selection(editor.selections[0]!.start,editor.selections[0]!.start),
+                            TextEditorRevealType.InCenterIfOutsideViewport
+                        );
+                    }
+                },50);
+            }
+            
+
+            return [
+                new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)
+            ];
+        }
+    };
+
+    context.subscriptions.push(languages.registerDocumentPasteEditProvider(
+        {language:'source.convo'},
+        provider,
+        {
+            providedPasteEditKinds:[DocumentDropOrPasteEditKind.Text],
+            pasteMimeTypes:[
+                ...imageMimeTypes,
+                'text/uri-list',
+            ],
+        }
+    ));
+}
+```
+</FILE_CONTENT>
+
+
+> user
+After the user updates the alt message and presses tab a new line should be added after the image
+and their cursor should be moved to the newline. You can use the typing-handler to implmeent if needed
+
+@time 2026-04-15T09:00:39-04:00
+@tokenUsage 25327 / 88 / $0.0635375
+@model gpt-5.4-2026-03-05
+> assistant
+A couple quick questions before I change it:
+
+1. Should this only happen when the current selection is exactly the pasted image alt text created by the paste handler?
+2. Should `Tab` replace the normal tab behavior only in that specific case, and otherwise behave exactly as it does now?
+3. For multi-cursor pastes, should it add a newline after each pasted image, or is single-cursor support enough?
+
+
+> user
+1. No it can work for any markdown image alt text
+2. Yes only replace the tab bavhavior for the specific case
+3. Only single cursor
+
+@time 2026-04-15T09:02:25-04:00
+@tokenUsage 25455 / 1414 / $0.0671725
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="typing-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts" fenced>
+```ts
+import { Disposable, ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
+
+const defaultTypeCommand='default:type';
+const defaultTabCommand='tab';
+
+export const registerTypingHandler=(context:ExtensionContext)=>{
+    let isHandlingType=false;
+    let isHandlingTab=false;
+
+    const typeDisposable=commands.registerCommand('type',async (args:{text:string})=>{
+        if(isHandlingType){
+            await commands.executeCommand(defaultTypeCommand,args);
+            return;
+        }
+
+        isHandlingType=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor){
+                await commands.executeCommand(defaultTypeCommand,args);
+                return;
+            }
+
+            const text=args?.text??'';
+            await commands.executeCommand(defaultTypeCommand,args);
+
+            if(text!=='>'){
+                return;
+            }
+
+            if(!shouldHandleEditor(editor)){
+                return;
+            }
+
+            await insertClosingXmlTagAsync(editor);
+        }finally{
+            isHandlingType=false;
+        }
+    });
+
+    const tabDisposable=commands.registerCommand('tab',async ()=>{
+        if(isHandlingTab){
+            await commands.executeCommand(defaultTabCommand);
+            return;
+        }
+
+        isHandlingTab=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor || !shouldHandleEditor(editor)){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(editor.selections.length!==1){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(!await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                await commands.executeCommand(defaultTabCommand);
+            }
+        }finally{
+            isHandlingTab=false;
+        }
+    });
+
+    context.subscriptions.push(
+        typeDisposable,
+        tabDisposable,
+        new Disposable(()=>{
+            typeDisposable.dispose();
+            tabDisposable.dispose();
+        })
+    );
+}
+
+const shouldHandleEditor=(editor:TextEditor)=>{
+    const document=editor.document;
+    if(document.languageId==='source.convo'){
+        return true;
+    }
+    return hasConvoRegionBeforeCursor(document,editor.selection.active);
+}
+
+const hasConvoRegionBeforeCursor=(document:TextDocument,position:Position)=>{
+    const text=document.getText(new Range(new Position(0,0),position));
+
+    const jsMatch=/\/\*convo\*\/\s*`[^`]*$/s.exec(text);
+    if(jsMatch){
+        return !/\$\{[^}]*$/s.test(jsMatch[0]);
+    }
+
+    const pythonMatches=[...text.matchAll(/"""\*convo\*[\s\S]*?"""/g)];
+    const openPython=/"""\*convo\*[\s\S]*$/s.exec(text);
+    if(openPython && (!pythonMatches.length || pythonMatches[pythonMatches.length-1]!.index!==openPython.index)){
+        return true;
+    }
+
+    const mdOpen=/(^|\n)(\s*)(`{3,}|~{3,})\s*convo(?:\s+[^`~]*)?\n[\s\S]*$/i.exec(text);
+    if(mdOpen){
+        const afterOpen=text.slice(mdOpen.index!+mdOpen[0].length);
+        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2]??'')}${escapeRegExp(mdOpen[3]??'')}\\s*$`,'m');
+        if(!closeRe.test(afterOpen)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const moveCursorAfterMarkdownImageAltTextAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return false;
+    }
+
+    const document=editor.document;
+    const lineIndex=selection.active.line;
+    const line=document.lineAt(lineIndex);
+    const lineText=line.text;
+    const cursorChar=selection.active.character;
+
+    const image=getMarkdownImageAtPosition(lineText,cursorChar);
+    if(!image){
+        return false;
+    }
+
+    const insertPos=new Position(lineIndex,image.end);
+    const changed=await editor.edit(builder=>{
+        builder.insert(insertPos,'\n');
+    });
+
+    if(!changed){
+        return false;
+    }
+
+    const newPos=new Position(lineIndex+1,0);
+    editor.selection=new Selection(newPos,newPos);
+    return true;
+}
+
+const getMarkdownImageAtPosition=(lineText:string,cursorChar:number):{end:number}|undefined=>{
+    const re=/!\[[^\]\r\n]*\]\([^\)\r\n]*\)/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(lineText))){
+        const full=match[0];
+        const start=match.index;
+        const altStart=start+2;
+        const altEnd=lineText.indexOf(']',altStart);
+        if(altEnd===-1){
+            continue;
+        }
+        if(cursorChar>=altStart && cursorChar<=altEnd){
+            return {
+                end:start+full.length
+            };
+        }
+    }
+    return;
+}
+
+const insertClosingXmlTagAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return;
+    }
+
+    const document=editor.document;
+    const position=selection.active;
+    const line=document.lineAt(position.line).text;
+    const linePrefix=line.slice(0,position.character);
+
+    const tag=getOpeningTagAtLineEnd(linePrefix);
+    if(!tag){
+        return;
+    }
+
+    const nextText=document.getText(new Range(position,new Position(position.line,line.length)));
+    if(nextText.startsWith(`</${tag}>`)){
+        return;
+    }
+
+    const insertText=`</${tag}>`;
+
+    const changed=await editor.edit(builder=>{
+        builder.insert(position,insertText);
+    });
+
+    if(!changed){
+        return;
+    }
+
+    editor.selection=new Selection(position,position);
+}
+
+const getOpeningTagAtLineEnd=(text:string):string|undefined=>{
+    const match=/<([A-Za-z_][\w.-]*)(?:\s+[^<>]*?)?>$/.exec(text);
+    if(!match){
+        return;
+    }
+
+    const full=match[0];
+    if(full.startsWith('</')){
+        return;
+    }
+    if(/\/\s*>$/.test(full)){
+        return;
+    }
+    if(/^<(!|[?])/.test(full)){
+        return;
+    }
+
+    return match[1];
+}
+
+const escapeRegExp=(value:string)=>{
+    return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+```
+</FILE_CONTENT>
+
+
+> user

@@ -1,11 +1,13 @@
 import { Disposable, ExtensionContext, Position, Range, Selection, TextDocument, TextEditor, commands, window } from 'vscode';
 
 const defaultTypeCommand='default:type';
+const defaultTabCommand='tab';
 
 export const registerTypingHandler=(context:ExtensionContext)=>{
     let isHandlingType=false;
+    let isHandlingTab=false;
 
-    const disposable=commands.registerCommand('type',async (args:{text:string})=>{
+    const typeDisposable=commands.registerCommand('type',async (args:{text:string})=>{
         if(isHandlingType){
             await commands.executeCommand(defaultTypeCommand,args);
             return;
@@ -36,9 +38,41 @@ export const registerTypingHandler=(context:ExtensionContext)=>{
         }
     });
 
-    context.subscriptions.push(disposable,new Disposable(()=>{
-        disposable.dispose();
-    }));
+    const tabDisposable=commands.registerCommand('tab',async ()=>{
+        if(isHandlingTab){
+            await commands.executeCommand(defaultTabCommand);
+            return;
+        }
+
+        isHandlingTab=true;
+        try{
+            const editor=window.activeTextEditor;
+            if(!editor || !shouldHandleEditor(editor)){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(editor.selections.length!==1){
+                await commands.executeCommand(defaultTabCommand);
+                return;
+            }
+
+            if(!await moveCursorAfterMarkdownImageAltTextAsync(editor)){
+                await commands.executeCommand(defaultTabCommand);
+            }
+        }finally{
+            isHandlingTab=false;
+        }
+    });
+
+    context.subscriptions.push(
+        typeDisposable,
+        tabDisposable,
+        new Disposable(()=>{
+            typeDisposable.dispose();
+            tabDisposable.dispose();
+        })
+    );
 }
 
 const shouldHandleEditor=(editor:TextEditor)=>{
@@ -66,13 +100,64 @@ const hasConvoRegionBeforeCursor=(document:TextDocument,position:Position)=>{
     const mdOpen=/(^|\n)(\s*)(`{3,}|~{3,})\s*convo(?:\s+[^`~]*)?\n[\s\S]*$/i.exec(text);
     if(mdOpen){
         const afterOpen=text.slice(mdOpen.index!+mdOpen[0].length);
-        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2])}${escapeRegExp(mdOpen[3])}\\s*$`,'m');
+        const closeRe=new RegExp(`(^|\\n)${escapeRegExp(mdOpen[2]??'')}${escapeRegExp(mdOpen[3]??'')}\\s*$`,'m');
         if(!closeRe.test(afterOpen)){
             return true;
         }
     }
 
     return false;
+}
+
+const moveCursorAfterMarkdownImageAltTextAsync=async (editor:TextEditor)=>{
+    const selection=editor.selection;
+    if(!selection.isEmpty){
+        return false;
+    }
+
+    const document=editor.document;
+    const lineIndex=selection.active.line;
+    const line=document.lineAt(lineIndex);
+    const lineText=line.text;
+    const cursorChar=selection.active.character;
+
+    const image=getMarkdownImageAtPosition(lineText,cursorChar);
+    if(!image){
+        return false;
+    }
+
+    const insertPos=new Position(lineIndex,image.end);
+    const changed=await editor.edit(builder=>{
+        builder.insert(insertPos,'\n');
+    });
+
+    if(!changed){
+        return false;
+    }
+
+    const newPos=new Position(lineIndex+1,0);
+    editor.selection=new Selection(newPos,newPos);
+    return true;
+}
+
+const getMarkdownImageAtPosition=(lineText:string,cursorChar:number):{end:number}|undefined=>{
+    const re=/!\[[^\]\r\n]*\]\([^\)\r\n]*\)/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(lineText))){
+        const full=match[0];
+        const start=match.index;
+        const altStart=start+2;
+        const altEnd=lineText.indexOf(']',altStart);
+        if(altEnd===-1){
+            continue;
+        }
+        if(cursorChar>=altStart && cursorChar<=altEnd){
+            return {
+                end:start+full.length
+            };
+        }
+    }
+    return;
 }
 
 const insertClosingXmlTagAsync=async (editor:TextEditor)=>{

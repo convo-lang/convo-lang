@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { extname } from 'path';
-import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Selection, Uri, window } from 'vscode';
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Selection, TextEditorRevealType, Uri, window } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 
 const imageMimeTypes=[
@@ -124,6 +124,10 @@ export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
                             const altEnd=document.positionAt(startOffset+2+pastedAltText.length);
                             return new Selection(altStart,altEnd);
                         });
+                        editor.revealRange(
+                            new Selection(editor.selections[0]!.start,editor.selections[0]!.start),
+                            TextEditorRevealType.InCenterIfOutsideViewport
+                        );
                     }
                 },50);
             }
