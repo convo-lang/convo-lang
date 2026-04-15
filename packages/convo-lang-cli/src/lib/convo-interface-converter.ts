@@ -986,7 +986,7 @@ const watchProjectAsync=async (project:ProjectCtx)=>{
             },queueDelay);
         }
         watchLoop: for await (const evt of watcher){
-            if(Date.now()-start<startDelay || !extReg.test(evt.filename)){
+            if(!evt.filename || Date.now()-start<startDelay || !extReg.test(evt.filename)){
                 continue;
             }
 
