@@ -8,6 +8,7 @@ import { realpath } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
 import { extensionPublisher } from './build-const.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
@@ -85,6 +86,14 @@ export function activate(context:ExtensionContext){
         'source.convo',
         new OutputTagCodeLensProvider()
     ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
 
     context.subscriptions.push(...createFoldingProviders());
 }
@@ -124,6 +133,7 @@ const startLsp=(context:ExtensionContext)=>{
 	client.start();
 
 }
+
 
 const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 

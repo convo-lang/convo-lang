@@ -1,3 +1,30 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+
+> user
+Add syntax highlighting for inline code blocks in convo files. Use the same rules as markdown
+
+
+@time 2026-04-15T00:03:12-04:00
+@tokenUsage 21842 / 51 / $0.05473250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the change, one quick question:
+
+Do you want inline backtick code in `.convo` files to use the same TextMate scopes as Markdown inline code, or is it enough to just add visual highlighting that behaves similarly?
+
+
+> user
+Just replicate the visual styling
+
+@time 2026-04-15T00:06:30-04:00
+@tokenUsage 21905 / 9897 / $0.079505
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo.tmLanguage.json" target-output-path="../../packages/convo-lang-tools/syntaxes/convo.tmLanguage.json" fenced>
+```json
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
     "name":"convo",
@@ -1369,3 +1396,10 @@
     }
 
 }
+```
+</FILE_CONTENT>
+
+Added inline backtick highlighting to `.convo` syntax using Markdown-style scopes for visual parity.
+
+
+> user

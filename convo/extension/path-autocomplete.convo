@@ -1,0 +1,2497 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+
+> user
+I would like to add support for autocompleting file paths for the Convo-Lang extension.
+Autocomplete should start when the user types `@import .` or `\{{@`.
+
+The Autocomplete should help the user type the path to a file relative to the current convo file.
+
+Fuzzy search should work too. For example if the user starts to type `MyDbClass.ts` and the
+file is located at `./packages/providers/src/db/MyDbClass.ts` the full relative path
+to the file should appear in the options.
+
+@time 2026-04-14T23:52:43-04:00
+@tokenUsage 21936 / 252 / $0.055470000000000005
+@model gpt-5.4-2026-03-05
+> assistant
+A few quick questions before I implement it:
+
+1. Do you want this as:
+   - a VS Code completion provider in the extension client, or
+   - LSP-based completion from the language server?
+
+2. For fuzzy matching, should suggestions search:
+   - only downward from the current file’s directory,
+   - the whole workspace,
+   - or the current workspace folder containing the convo file?
+
+3. Should the inserted path always be:
+   - `./...` / `../...` relative to the current convo file,
+   - or relative to workspace root?
+
+4. For `\{{@`, what exact patterns should trigger path completion?
+   - any text immediately after `\{{@`
+   - only specific commands/tags after `\{{@`
+   - or literally just file-path completion starting at that point
+
+5. Should directories also be suggested, or files only?
+
+6. Do you want hidden folders / heavy folders excluded by default, such as:
+   - `node_modules`
+   - `.git`
+   - `dist`
+   - `out`
+   - `build`
+
+7. Should this work only in `.convo` files, or also inside embedded convo blocks in JS / TS / Python / Markdown?
+
+
+> user
+1. a VS Code completion provider in the extension client
+2. the whole workspace
+3. relative to the current convo file
+4. It should complete to something like: `\{{@./path/to/file.txt}}`
+5. Just files
+6. Yes, also hide all file hidden by git
+7. Only in .convo file, not in embedded convo blocks
+
+@time 2026-04-14T23:59:48-04:00
+@tokenUsage 22272 / 8038 / $0.07577500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.tsx" fenced>
+```ts
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
+import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, getFileName, joinPaths, normalizePath } from '@iyio/common';
+import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
+import { realpath } from 'fs/promises';
+import * as path from 'path';
+import { CompletionItem, CompletionItemKind, CompletionItemTag, ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { extensionPublisher } from './build-const.js';
+import { ConvoCliShell } from './ConvoCliShell.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
+import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider, registerOutTagCommands } from './output-tag-code-lens.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+
+let client:LanguageClient;
+
+const example=/*convo*/`
+# Builds a vehicle for the user
+\> buildVehicle(
+
+    # A short description of the vehicle
+    description:string;
+
+    # The color of the vehicle
+    color?:string
+
+    # The type of the vehicle
+    type:enum('car' 'truck' 'van' 'boat')
+
+    # The top speed of the vehicle in miles per hour
+    topSpeed:number
+
+    # The max payload capcapty the vehicle can cary in pounds
+    payloadCapacity?:number;
+) -> (
+
+    return({
+        isTruck:eq(type,'truck')
+        isFast:gte(topSpeed,150)
+    })
+)
+
+\> system
+You are funny mechanical engineer helping a customer build a vehicle. Use the buildVehicle function
+to build vehicles.
+
+\> user
+I need a car that can do the quarter mile in 7 seconds or less
+
+\> user
+Use the buildVehicle function to build my vehicle
+
+`
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCommands(context,ext);
+    registerTypingHandler(context);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+
+interface ConvoPathCompletionContext
+{
+    range:Range;
+    query:string;
+    wrapMode:'import'|'embed';
+}
+
+const createConvoPathCompletionProvider=()=>{
+    return {
+        provideCompletionItems:async (
+            document:TextDocument,
+            position:any
+        ):Promise<CompletionItem[]>=>{
+            if(document.languageId!=='source.convo' || document.uri.scheme!=='file'){
+                return [];
+            }
+
+            const line=document.lineAt(position.line).text;
+            const linePrefix=line.substring(0,position.character);
+            const ctx=getConvoPathCompletionContext(document,position.line,linePrefix);
+            if(!ctx){
+                return [];
+            }
+
+            const convoDir=path.dirname(document.uri.fsPath);
+            const workspaceFolder=workspace.getWorkspaceFolder(document.uri);
+            const root=workspaceFolder?.uri.fsPath;
+            if(!root){
+                return [];
+            }
+
+            const files=await workspace.findFiles(
+                new workspace.RelativePattern(root,'**/*'),
+                '**/{.git,node_modules,dist,out,build}/**'
+            );
+
+            const items:CompletionItem[]=[];
+            for(const file of files){
+                if(file.scheme!=='file'){
+                    continue;
+                }
+                const filePath=file.fsPath;
+                const relToConvo=normalizeRelativePath(path.relative(convoDir,filePath));
+                if(!relToConvo){
+                    continue;
+                }
+                if(isHiddenByPath(relToConvo) || isHiddenByPath(path.relative(root,filePath))){
+                    continue;
+                }
+
+                const searchable=getSearchablePath(relToConvo);
+                const score=getFuzzyScore(searchable,ctx.query);
+                if(score===Number.NEGATIVE_INFINITY){
+                    continue;
+                }
+
+                const insertText=ctx.wrapMode==='embed'?
+                    `\{{@${relToConvo}}}`:
+                    relToConvo;
+
+                const item=new CompletionItem(relToConvo,CompletionItemKind.File);
+                item.range=ctx.range;
+                item.insertText=insertText;
+                item.detail=path.relative(root,filePath);
+                item.sortText=getSortText(score,relToConvo);
+                if(isLikelyGeneratedPath(filePath)){
+                    item.tags=[CompletionItemTag.Deprecated];
+                }
+                items.push(item);
+            }
+
+            return items.sort((a,b)=>{
+                const av=a.sortText??a.label.toString();
+                const bv=b.sortText??b.label.toString();
+                return av.localeCompare(bv);
+            });
+        }
+    };
+}
+
+const getConvoPathCompletionContext=(
+    document:TextDocument,
+    line:number,
+    linePrefix:string
+):ConvoPathCompletionContext|undefined=>{
+    const importMatch=/(^|\s)@import\s+([^\s]*)$/.exec(linePrefix);
+    if(importMatch){
+        const value=importMatch[2]??'';
+        if(!value.startsWith('.')){
+            return undefined;
+        }
+        const start=value.length?
+            linePrefix.length-value.length:
+            linePrefix.length;
+        return {
+            query:value,
+            wrapMode:'import',
+            range:new Range(line,start,line,linePrefix.length)
+        };
+    }
+
+    const embedIndex=linePrefix.lastIndexOf('\{{@');
+    if(embedIndex>=0){
+        const query=linePrefix.substring(embedIndex+3);
+        if(/[\s}]/.test(query)){
+            return undefined;
+        }
+        return {
+            query,
+            wrapMode:'embed',
+            range:new Range(line,embedIndex,line,linePrefix.length)
+        };
+    }
+
+    return undefined;
+}
+
+const normalizeRelativePath=(relPath:string)=>{
+    if(!relPath){
+        return './';
+    }
+    const normalized=relPath.split(path.sep).join('/');
+    if(normalized.startsWith('.')){
+        return normalized;
+    }
+    return './'+normalized;
+}
+
+const isHiddenByPath=(value:string)=>{
+    const parts=value.split(/[\\/]+/g);
+    for(const part of parts){
+        if(!part || part==='.' || part==='..'){
+            continue;
+        }
+        if(part.startsWith('.')){
+            return true;
+        }
+    }
+    return false;
+}
+
+const getSearchablePath=(relPath:string)=>{
+    return relPath
+        .replace(/^\.\//,'')
+        .replace(/\//g,' ')
+        .toLowerCase();
+}
+
+const getFuzzyScore=(candidate:string,query:string)=>{
+    const q=query.trim().toLowerCase();
+    if(!q || q==='.' || q==='./'){
+        return 0;
+    }
+
+    const normalizedQuery=q
+        .replace(/^\.\//,'')
+        .replace(/\\/g,'/')
+        .toLowerCase();
+
+    const compactCandidate=candidate.replace(/\s+/g,'/');
+    if(compactCandidate.includes(normalizedQuery)){
+        return 10000-normalizedQuery.length;
+    }
+
+    let score=0;
+    let lastIndex=-1;
+    for(const ch of normalizedQuery){
+        if(ch==='/' || ch===' '){
+            continue;
+        }
+        const index=compactCandidate.indexOf(ch,lastIndex+1);
+        if(index<0){
+            return Number.NEGATIVE_INFINITY;
+        }
+        score+=lastIndex<0?
+            10
+        :index===lastIndex+1?
+            8
+        :
+            Math.max(1,4-(index-lastIndex));
+        lastIndex=index;
+    }
+
+    const baseName=path.posix.basename(compactCandidate);
+    if(baseName===normalizedQuery){
+        score+=5000;
+    }else if(baseName.includes(normalizedQuery)){
+        score+=2000;
+    }
+
+    return score;
+}
+
+const getSortText=(score:number,relPath:string)=>{
+    const normalizedScore=Math.max(0,999999-score).toString().padStart(6,'0');
+    return `${normalizedScore}_${relPath.toLowerCase()}`;
+}
+
+const isLikelyGeneratedPath=(filePath:string)=>{
+    return /[\\/](dist|out|build)[\\/]/i.test(filePath);
+}
+
+const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    registerOutTagCommands(context,ext);
+
+    context.subscriptions.push(commands.registerCommand('convo.parse', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const r=parseConvoCode(src);
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(r.result??r,null,4)
+        })
+
+        await window.showTextDocument(doc);
+
+
+    }));
+
+
+
+    context.subscriptions.push(commands.registerCommand('convo.new', async () => {
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:'> user\n',
+        });
+        const editor=await window.showTextDocument(doc);
+        const pos=doc.positionAt(doc.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }));
+
+    const getConvoEditorContextAsync=async (cliOptions:ConvoCliOptions={},docPath?:string):Promise<{cli:ConvoCli,src:string,convo:Conversation,document?:TextDocument,cwd:string|undefined}|undefined>=>{
+        const document=window.activeTextEditor?.document;
+        if(!document && !docPath){
+            return;
+        }
+
+        if(!docPath && document){
+            docPath=document.uri.scheme==='file'?document.uri.fsPath:undefined;
+        }
+        if(!docPath){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(docPath){
+            src=await readFileAsStringAsync(docPath);
+        }else if(document?.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document?.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cwd=docPath?path.dirname(docPath):undefined;
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:cwd,
+            sourcePath:docPath,
+            ...cliOptions
+        });
+
+        const convo=cli.convo;
+        convo.append(src,{disableAutoFlatten:true,filePath:docPath});
+
+        return {
+            cli,
+            convo,
+            src,
+            document,
+            cwd
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.modules', async () => {
+
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const src=ctx.convo.getDebuggingModulesCode();
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+        const flat=await ctx.convo.flattenAsync();
+
+        const src=flatConvoMessagesToTextView(flat.messages);
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.vars', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(flat.exe.getUserSharedVars(),createJsonRefReplacer(),4),
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    const getFlat=async (options?:FlattenConvoOptions)=>{
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(undefined,options),true);
+        const obj:any={}
+        for(const e in flat){
+            const v=(flat as any)[e];
+            if((typeof v !== 'object') || v===null){
+                obj[e]=v;
+            }
+        }
+        obj.messages=flat.messages;
+        obj.vars=(flat as any).vars;
+        for(const e in flat){
+            if(e in obj){
+                continue;
+            }
+            const v=(flat as any)[e];
+            if((typeof v === 'object') && v!==null){
+                obj[e]=v;
+            }
+        }
+        return obj;
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.flat-all', async () => {
+
+        const obj=await getFlat({nodeBehavior:'keepAll'});
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+
+        const obj=await getFlat();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.messages', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(ctx.convo.messages,createJsonRefReplacer(),4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-targets', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+        })
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        const options=getConvoMakeOptionsFromVars(
+            document.uri.fsPath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            browserInf:new ConvoBrowserCtrl(),
+        });
+        try{
+            const debugOutput=await ctrl.getDebugOutputAsync();
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(debugOutput,null,4),
+            });
+
+            await window.showTextDocument(doc);
+        }finally{
+            ctrl.dispose();
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-sync', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-sync', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open-convo', async (target?:ConvoMakeExtTarget) => {
+        const convoFile=target?.obj.convoFile;
+        if(convoFile){
+            const document=await workspace.openTextDocument(Uri.file(convoFile));
+            const editor=await window.showTextDocument(document);
+            const pos=document.positionAt(document.getText().length);
+            editor.selection=new Selection(pos,pos);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single-review', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath,forceReview:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-delete-all', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        const confirm=await window.showWarningMessage(
+            `Delete outputs of ${getFileName(ctrl.filePath)}\n\nAre you sure you want to delete all outputs of "${ctrl.filePath}"?`,
+            {modal:true},
+            'Delete'
+        );
+        if(confirm === 'Delete'){
+            const targets=await target.getTargetsAsync(true);
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete ${targets.length} outputs?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm==='Delete'){
+                for(const t of targets){
+                    await workspace.fs.delete(Uri.file(t.obj.outPath),{useTrash:true});
+                }
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-delete', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete "${targetPath}"?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm === 'Delete'){
+                await workspace.fs.delete(Uri.file(targetPath),{useTrash:true});
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-open', async (build?:ConvoMakeExtBuild|string) => {
+        const targetPath=(typeof build === 'string')?build:build?.ctrl.filePath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-stop', async (build?:ConvoMakeExtBuild|string) => {
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        const ctrls=[...ext.makeCtrls];
+        for(const ctrl of ctrls){
+            if(!ctrl.preview){
+                ctrl.dispose();
+            }
+        }
+    }));
+
+    interface MakeOptions
+    {
+        build?:ConvoMakeExtBuild|string;
+        rebuild?:boolean|ConvoMakeTargetRebuild|string|(string|ConvoMakeTargetRebuild)[];
+        sync?:string|boolean;
+        forceReview?:boolean;
+    }
+    const makeAsync=async ({
+        build,
+        rebuild,
+        sync,
+        forceReview
+    }:MakeOptions) => {
+
+        const token=new CancelToken();
+
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:sourcePath,
+            bufferOutput:true,
+            exeCwd:path.dirname(sourcePath),
+        })
+        if(token.isCanceled){return}
+
+        const ctx=await getConvoEditorContextAsync(undefined,sourcePath);
+        if(token.isCanceled){return}
+
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        if(token.isCanceled){return}
+
+        const options=getConvoMakeOptionsFromVars(
+            sourcePath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            forceReview,
+            rebuild,
+            browserInf:new ConvoBrowserCtrl(),
+            shell:new ConvoCliShell(),
+        });
+        ext.addMakeCtrl(ctrl);
+        token.onCancel(()=>{
+            ctrl.dispose();
+        })
+        commands.executeCommand('convoMakeBuild.focus');
+        try{
+            if(sync===true){
+                await ctrl.syncAllTargetCachesWithOutput();
+            }else if(sync){
+                await ctrl.syncTargetCacheWithOutput(sync);
+            }else{
+                await ctrl.buildAsync();
+            }
+        }finally{
+            ctrl.dispose();
+        }
+        if(sync){
+            await ext.scanMakeCtrlsAsync();
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync({build:v})));
+
+    context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+        });
+
+        try{
+
+            const convo=cli.convo;
+            convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
+            const flat=await convo.flattenAsync();
+            const converted=await convo.toModelInputAsync(flat);
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(converted,createJsonRefReplacer(),4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    const completeAsync=async (cliOptions:ConvoCliOptions={}) => {
+
+        const document=window.activeTextEditor?.document;
+
+        if(document?.languageId!=='source.convo'){
+
+            let createdNew=false;
+
+            const selection=window.activeTextEditor?.selection
+            if(document && selection){
+                const text=document.getText(new Range(selection.start,selection.end));
+                if(text){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:text})
+                    await window.showTextDocument(doc);
+                    createdNew=true;
+                }
+            }
+
+            if(!createdNew){
+
+                const option=await window.showWarningMessage(
+                    'Conversation completion requires a .convo file', 'Complete example', 'Create empty', 'Dismiss'
+                );
+
+                if(option==='Create empty'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:'> system\nsystem prompt here\n\n> user\nprompt here\n'})
+                    await window.showTextDocument(doc);
+                    return;
+                }else if(option==='Complete example'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:example})
+                    await window.showTextDocument(doc);
+                }else{
+                    return;
+                }
+            }
+
+        }
+
+        await window.withProgress({
+            location: ProgressLocation.Notification,
+            title: cliOptions.graph?"Completing Graph":"Completing conversation",
+            cancellable: true
+        }, async (progress, token) => {
+
+            const document=window.activeTextEditor?.document;
+            if(!document){
+                return;
+            }
+
+            const src=document?.getText();
+            if(!src){
+                return;
+            }
+            progress.report({ message:document.uri.path });
+
+            let done=false;
+
+            const startLength=src.length;
+            let tmpAppend='';
+
+            const lock=new Lock(1);
+
+            const setCodeAsync=async (code:string,isFinal:boolean,append:boolean)=>{
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const release=await lock.waitAsync();
+                try{
+                    if(done && !isFinal){
+                        return;
+                    }
+                    if(!isFinal && tmpAppend){
+                        code=tmpAppend+'\n\n'+code;
+                    }
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        const all=append?
+                            new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                            new Range(document.positionAt(0),document.positionAt(document.getText().length));
+                        builder.replace(all,code);
+                    })
+                }finally{
+                    release();
+                }
+            }
+
+            try{
+
+
+                let msg=`\n\n// completing...`;
+                await setCodeAsync(msg,false,true);
+
+                const cli=await createConvoCliAsync({
+                    config:ext.getCliConfig(),
+                    inline:src,
+                    sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+                    bufferOutput:true,
+                    exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+                    allowExec:async (command)=>{
+                        if(token.isCancellationRequested){
+                            return false;
+                        }
+                        const option=await window.showWarningMessage(
+                            `exec > ${command}`, 'Deny', 'Allow'
+                        );
+                        tmpAppend+=`\n// exec > ${command.split('\n').join(' ')}`;
+                        await setCodeAsync(msg,false,true);
+                        return option==='Allow';
+                    },
+                    ...cliOptions,
+                });
+
+                token.onCancellationRequested(()=>{
+                    cli.convo.dispose();
+                })
+
+                let firstAppend=true;
+                cli.convo.onAppend.subscribe(v=>{
+                    if(firstAppend){
+                        firstAppend=false;
+                        return;
+                    }
+                    tmpAppend+='\n\n'+v.text
+                    setCodeAsync(msg,false,true);
+                })
+
+                await cli.executeAsync();
+                done=true;
+
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+            }catch(ex){
+                const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
+                const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
+                const suggestConfig=/(401|403|unauthorized|denied|api\s*key)/i.test(err);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Click the settings (🛠️) icon above the top right of this file`:''}`,true,false);
+                if(suggestConfig){
+                    window.showInformationMessage(
+                        tryMsg,
+                        'Open Convo-Lang Settings'
+                    ).then(selection => {
+                        if (selection === 'Open Convo-Lang Settings') {
+                            commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+                        }
+                    });
+                }
+            }finally{
+                done=true;
+            }
+
+
+        });
+
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.open-settings',()=>{
+        commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+    }));
+
+    const rebuildAsync=async (document:TextDocument,getRebuildOptions:(outPath:string,makePath:string)=>ConvoMakeTargetRebuild)=>{
+        const text=document.getText();
+        const conversation=new Conversation();
+        conversation.append(text);
+        const vars=(await conversation.flattenAsync()).exe.sharedVars;
+        const root=vars[convoVars.__makeRoot];
+        const file=vars[convoVars.__makeFile];
+        const out=vars[convoVars.__makeOut];
+
+        const makePath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,file)));
+        const outPath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,out)));
+
+        await makeAsync({build:makePath,rebuild:getRebuildOptions(outPath,makePath)});
+
+        const editor=await window.showTextDocument(document);
+        const pos=document.positionAt(document.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{
+
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                    continueConversation:true,
+                }));
+
+                break;
+            }
+
+            default:
+                await completeAsync();
+                break;
+        }
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
+    }));
+
+    const splitAsync=async (complete:boolean)=>{
+        const document=window.activeTextEditor?.document;
+        if(document?.languageId!=='source.convo'){
+            return;
+        }
+
+        const selection=window.activeTextEditor?.selection;
+        let text:string|undefined;
+        if(selection){
+            text=document.getText(new Range(selection.start,selection.end));
+        }
+
+        if(!text){
+            text=document.getText();
+        }
+
+        let saveTo:string|undefined;
+        if(!document.isUntitled && document.uri.scheme==='file'){
+            const dir=path.dirname(document.uri.path);
+
+            let fileName=path.basename(document.uri.path);
+            let n=1;
+            const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo/i.exec(fileName);
+            if(match){
+                n=Number(match[2])+1;
+                fileName=fileName.substring(0,match.index);
+            }else if(fileName.toLowerCase().endsWith('.convo')){
+                fileName=fileName.substring(0,fileName.length-6);
+            }
+            while(true){
+                const d=new Date();
+                const name=`${
+                    fileName
+                }-${
+                    d.getFullYear()
+                }-${
+                    (d.getMonth()+1).toString().padStart(2,'0')
+                }-${
+                    d.getDate().toString().padStart(2,'0')
+                }-${
+                    n.toString().padStart(4,'0')
+                }.convo`;
+                saveTo=path.join(dir,name);
+                if(!await pathExistsAsync(saveTo)){
+                    break;
+                }
+                n++;
+            }
+
+        }
+        let doc:TextDocument;
+
+        if(saveTo){
+            const uri=Uri.file(saveTo);
+            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8') as Uint8Array);
+            doc=await workspace.openTextDocument(uri);
+        }else{
+            doc=await workspace.openTextDocument({language:'source.convo',content:text});
+        }
+
+        await window.showTextDocument(doc);
+
+        if(complete){
+            await completeAsync();
+        }
+    }
+    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                }));
+
+                break;
+            }
+
+            default:
+                await splitAsync(true);
+                break;
+        }
+    }));
+    context.subscriptions.push(commands.registerCommand('convo.split',async ()=>{
+        await splitAsync(false);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.refresh-make-targets', async () => {
+        await ext.scanMakeCtrlsAsync();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
+
+        const cli=await createConvoCliAsync({config:ext.getCliConfig()});
+        try{
+            const models=await cli.convo.getAllModelsAsync();
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(models,null,4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    let configChangeIv:any;
+    let showingConfigChange=false;
+    workspace.onDidChangeConfiguration((e)=>{
+        if(showingConfigChange){
+            return;
+        }
+        if(e.affectsConfiguration('convo')){
+            clearTimeout(configChangeIv);
+            configChangeIv=setTimeout(()=>{
+                showingConfigChange=true;
+                window.showInformationMessage('Convo-Lang setting changed. Reload window to apply changes?','Reload').then(selection => {
+                    showingConfigChange=false;
+                    if(selection==='Reload'){
+                        commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            },1600);
+        }
+    })
+}
+```
+</FILE_CONTENT>
+
+This adds a client-side completion provider for `.convo` files that:
+
+- triggers for `@import .`
+- triggers for `\{{@`
+- searches the whole workspace folder containing the current convo file
+- inserts paths relative to the current convo file
+- supports fuzzy matching against full relative paths and filenames
+- excludes common heavy folders and dot-hidden paths
+
+One important note: `workspace.findFiles()` respects VS Code excludes, but it does not fully guarantee “all git-ignored files” are filtered unless the user/workspace settings align with that behavior. If you want, I can do a second pass and make this stricter by reading `.gitignore`/git status directly.
+
+
+> user
+When completed for `@import .` append ` !file` after the path 
+
+@time 2026-04-15T00:14:53-04:00
+@tokenUsage 30543 / 7903 / $0.096115
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" fenced>
+```ts
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
+import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, getFileName, joinPaths, normalizePath } from '@iyio/common';
+import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
+import { realpath } from 'fs/promises';
+import * as path from 'path';
+import { CompletionItem, CompletionItemKind, CompletionItemTag, ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { extensionPublisher } from './build-const.js';
+import { ConvoCliShell } from './ConvoCliShell.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
+import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider, registerOutTagCommands } from './output-tag-code-lens.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+
+let client:LanguageClient;
+
+const example=/*convo*/`
+# Builds a vehicle for the user
+\> buildVehicle(
+
+    # A short description of the vehicle
+    description:string;
+
+    # The color of the vehicle
+    color?:string
+
+    # The type of the vehicle
+    type:enum('car' 'truck' 'van' 'boat')
+
+    # The top speed of the vehicle in miles per hour
+    topSpeed:number
+
+    # The max payload capcapty the vehicle can cary in pounds
+    payloadCapacity?:number;
+) -> (
+
+    return({
+        isTruck:eq(type,'truck')
+        isFast:gte(topSpeed,150)
+    })
+)
+
+\> system
+You are funny mechanical engineer helping a customer build a vehicle. Use the buildVehicle function
+to build vehicles.
+
+\> user
+I need a car that can do the quarter mile in 7 seconds or less
+
+\> user
+Use the buildVehicle function to build my vehicle
+
+`
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCommands(context,ext);
+    registerTypingHandler(context);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+
+interface ConvoPathCompletionContext
+{
+    range:Range;
+    query:string;
+    wrapMode:'import'|'embed';
+}
+
+const createConvoPathCompletionProvider=()=>{
+    return {
+        provideCompletionItems:async (
+            document:TextDocument,
+            position:any
+        ):Promise<CompletionItem[]>=>{
+            if(document.languageId!=='source.convo' || document.uri.scheme!=='file'){
+                return [];
+            }
+
+            const line=document.lineAt(position.line).text;
+            const linePrefix=line.substring(0,position.character);
+            const ctx=getConvoPathCompletionContext(document,position.line,linePrefix);
+            if(!ctx){
+                return [];
+            }
+
+            const convoDir=path.dirname(document.uri.fsPath);
+            const workspaceFolder=workspace.getWorkspaceFolder(document.uri);
+            const root=workspaceFolder?.uri.fsPath;
+            if(!root){
+                return [];
+            }
+
+            const files=await workspace.findFiles(
+                new workspace.RelativePattern(root,'**/*'),
+                '**/{.git,node_modules,dist,out,build}/**'
+            );
+
+            const items:CompletionItem[]=[];
+            for(const file of files){
+                if(file.scheme!=='file'){
+                    continue;
+                }
+                const filePath=file.fsPath;
+                const relToConvo=normalizeRelativePath(path.relative(convoDir,filePath));
+                if(!relToConvo){
+                    continue;
+                }
+                if(isHiddenByPath(relToConvo) || isHiddenByPath(path.relative(root,filePath))){
+                    continue;
+                }
+
+                const searchable=getSearchablePath(relToConvo);
+                const score=getFuzzyScore(searchable,ctx.query);
+                if(score===Number.NEGATIVE_INFINITY){
+                    continue;
+                }
+
+                const insertText=ctx.wrapMode==='embed'?
+                    `\{{@${relToConvo}}}`:
+                    `${relToConvo} !file`;
+
+                const item=new CompletionItem(relToConvo,CompletionItemKind.File);
+                item.range=ctx.range;
+                item.insertText=insertText;
+                item.detail=path.relative(root,filePath);
+                item.sortText=getSortText(score,relToConvo);
+                if(isLikelyGeneratedPath(filePath)){
+                    item.tags=[CompletionItemTag.Deprecated];
+                }
+                items.push(item);
+            }
+
+            return items.sort((a,b)=>{
+                const av=a.sortText??a.label.toString();
+                const bv=b.sortText??b.label.toString();
+                return av.localeCompare(bv);
+            });
+        }
+    };
+}
+
+const getConvoPathCompletionContext=(
+    document:TextDocument,
+    line:number,
+    linePrefix:string
+):ConvoPathCompletionContext|undefined=>{
+    const importMatch=/(^|\s)@import\s+([^\s]*)$/.exec(linePrefix);
+    if(importMatch){
+        const value=importMatch[2]??'';
+        if(!value.startsWith('.')){
+            return undefined;
+        }
+        const start=value.length?
+            linePrefix.length-value.length:
+            linePrefix.length;
+        return {
+            query:value,
+            wrapMode:'import',
+            range:new Range(line,start,line,linePrefix.length)
+        };
+    }
+
+    const embedIndex=linePrefix.lastIndexOf('\{{@');
+    if(embedIndex>=0){
+        const query=linePrefix.substring(embedIndex+3);
+        if(/[\s}]/.test(query)){
+            return undefined;
+        }
+        return {
+            query,
+            wrapMode:'embed',
+            range:new Range(line,embedIndex,line,linePrefix.length)
+        };
+    }
+
+    return undefined;
+}
+
+const normalizeRelativePath=(relPath:string)=>{
+    if(!relPath){
+        return './';
+    }
+    const normalized=relPath.split(path.sep).join('/');
+    if(normalized.startsWith('.')){
+        return normalized;
+    }
+    return './'+normalized;
+}
+
+const isHiddenByPath=(value:string)=>{
+    const parts=value.split(/[\\/]+/g);
+    for(const part of parts){
+        if(!part || part==='.' || part==='..'){
+            continue;
+        }
+        if(part.startsWith('.')){
+            return true;
+        }
+    }
+    return false;
+}
+
+const getSearchablePath=(relPath:string)=>{
+    return relPath
+        .replace(/^\.\//,'')
+        .replace(/\//g,' ')
+        .toLowerCase();
+}
+
+const getFuzzyScore=(candidate:string,query:string)=>{
+    const q=query.trim().toLowerCase();
+    if(!q || q==='.' || q==='./'){
+        return 0;
+    }
+
+    const normalizedQuery=q
+        .replace(/^\.\//,'')
+        .replace(/\\/g,'/')
+        .toLowerCase();
+
+    const compactCandidate=candidate.replace(/\s+/g,'/');
+    if(compactCandidate.includes(normalizedQuery)){
+        return 10000-normalizedQuery.length;
+    }
+
+    let score=0;
+    let lastIndex=-1;
+    for(const ch of normalizedQuery){
+        if(ch==='/' || ch===' '){
+            continue;
+        }
+        const index=compactCandidate.indexOf(ch,lastIndex+1);
+        if(index<0){
+            return Number.NEGATIVE_INFINITY;
+        }
+        score+=lastIndex<0?
+            10
+        :index===lastIndex+1?
+            8
+        :
+            Math.max(1,4-(index-lastIndex));
+        lastIndex=index;
+    }
+
+    const baseName=path.posix.basename(compactCandidate);
+    if(baseName===normalizedQuery){
+        score+=5000;
+    }else if(baseName.includes(normalizedQuery)){
+        score+=2000;
+    }
+
+    return score;
+}
+
+const getSortText=(score:number,relPath:string)=>{
+    const normalizedScore=Math.max(0,999999-score).toString().padStart(6,'0');
+    return `${normalizedScore}_${relPath.toLowerCase()}`;
+}
+
+const isLikelyGeneratedPath=(filePath:string)=>{
+    return /[\\/](dist|out|build)[\\/]/i.test(filePath);
+}
+
+const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    registerOutTagCommands(context,ext);
+
+    context.subscriptions.push(commands.registerCommand('convo.parse', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const r=parseConvoCode(src);
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(r.result??r,null,4)
+        })
+
+        await window.showTextDocument(doc);
+
+
+    }));
+
+
+
+    context.subscriptions.push(commands.registerCommand('convo.new', async () => {
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:'> user\n',
+        });
+        const editor=await window.showTextDocument(doc);
+        const pos=doc.positionAt(doc.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }));
+
+    const getConvoEditorContextAsync=async (cliOptions:ConvoCliOptions={},docPath?:string):Promise<{cli:ConvoCli,src:string,convo:Conversation,document?:TextDocument,cwd:string|undefined}|undefined>=>{
+        const document=window.activeTextEditor?.document;
+        if(!document && !docPath){
+            return;
+        }
+
+        if(!docPath && document){
+            docPath=document.uri.scheme==='file'?document.uri.fsPath:undefined;
+        }
+        if(!docPath){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(docPath){
+            src=await readFileAsStringAsync(docPath);
+        }else if(document?.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document?.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cwd=docPath?path.dirname(docPath):undefined;
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:cwd,
+            sourcePath:docPath,
+            ...cliOptions
+        });
+
+        const convo=cli.convo;
+        convo.append(src,{disableAutoFlatten:true,filePath:docPath});
+
+        return {
+            cli,
+            convo,
+            src,
+            document,
+            cwd
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.modules', async () => {
+
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const src=ctx.convo.getDebuggingModulesCode();
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+        const flat=await ctx.convo.flattenAsync();
+
+        const src=flatConvoMessagesToTextView(flat.messages);
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.vars', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(flat.exe.getUserSharedVars(),createJsonRefReplacer(),4),
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    const getFlat=async (options?:FlattenConvoOptions)=>{
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(undefined,options),true);
+        const obj:any={}
+        for(const e in flat){
+            const v=(flat as any)[e];
+            if((typeof v !== 'object') || v===null){
+                obj[e]=v;
+            }
+        }
+        obj.messages=flat.messages;
+        obj.vars=(flat as any).vars;
+        for(const e in flat){
+            if(e in obj){
+                continue;
+            }
+            const v=(flat as any)[e];
+            if((typeof v === 'object') && v!==null){
+                obj[e]=v;
+            }
+        }
+        return obj;
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.flat-all', async () => {
+
+        const obj=await getFlat({nodeBehavior:'keepAll'});
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+
+        const obj=await getFlat();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.messages', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(ctx.convo.messages,createJsonRefReplacer(),4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-targets', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+        })
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        const options=getConvoMakeOptionsFromVars(
+            document.uri.fsPath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            browserInf:new ConvoBrowserCtrl(),
+        });
+        try{
+            const debugOutput=await ctrl.getDebugOutputAsync();
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(debugOutput,null,4),
+            });
+
+            await window.showTextDocument(doc);
+        }finally{
+            ctrl.dispose();
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-sync', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-sync', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open-convo', async (target?:ConvoMakeExtTarget) => {
+        const convoFile=target?.obj.convoFile;
+        if(convoFile){
+            const document=await workspace.openTextDocument(Uri.file(convoFile));
+            const editor=await window.showTextDocument(document);
+            const pos=document.positionAt(document.getText().length);
+            editor.selection=new Selection(pos,pos);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single-review', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath,forceReview:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-delete-all', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        const confirm=await window.showWarningMessage(
+            `Delete outputs of ${getFileName(ctrl.filePath)}\n\nAre you sure you want to delete all outputs of "${ctrl.filePath}"?`,
+            {modal:true},
+            'Delete'
+        );
+        if(confirm === 'Delete'){
+            const targets=await target.getTargetsAsync(true);
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete ${targets.length} outputs?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm==='Delete'){
+                for(const t of targets){
+                    await workspace.fs.delete(Uri.file(t.obj.outPath),{useTrash:true});
+                }
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-delete', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete "${targetPath}"?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm === 'Delete'){
+                await workspace.fs.delete(Uri.file(targetPath),{useTrash:true});
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-open', async (build?:ConvoMakeExtBuild|string) => {
+        const targetPath=(typeof build === 'string')?build:build?.ctrl.filePath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-stop', async (build?:ConvoMakeExtBuild|string) => {
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        const ctrls=[...ext.makeCtrls];
+        for(const ctrl of ctrls){
+            if(!ctrl.preview){
+                ctrl.dispose();
+            }
+        }
+    }));
+
+    interface MakeOptions
+    {
+        build?:ConvoMakeExtBuild|string;
+        rebuild?:boolean|ConvoMakeTargetRebuild|string|(string|ConvoMakeTargetRebuild)[];
+        sync?:string|boolean;
+        forceReview?:boolean;
+    }
+    const makeAsync=async ({
+        build,
+        rebuild,
+        sync,
+        forceReview
+    }:MakeOptions) => {
+
+        const token=new CancelToken();
+
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:sourcePath,
+            bufferOutput:true,
+            exeCwd:path.dirname(sourcePath),
+        })
+        if(token.isCanceled){return}
+
+        const ctx=await getConvoEditorContextAsync(undefined,sourcePath);
+        if(token.isCanceled){return}
+
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        if(token.isCanceled){return}
+
+        const options=getConvoMakeOptionsFromVars(
+            sourcePath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            forceReview,
+            rebuild,
+            browserInf:new ConvoBrowserCtrl(),
+            shell:new ConvoCliShell(),
+        });
+        ext.addMakeCtrl(ctrl);
+        token.onCancel(()=>{
+            ctrl.dispose();
+        })
+        commands.executeCommand('convoMakeBuild.focus');
+        try{
+            if(sync===true){
+                await ctrl.syncAllTargetCachesWithOutput();
+            }else if(sync){
+                await ctrl.syncTargetCacheWithOutput(sync);
+            }else{
+                await ctrl.buildAsync();
+            }
+        }finally{
+            ctrl.dispose();
+        }
+        if(sync){
+            await ext.scanMakeCtrlsAsync();
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync({build:v})));
+
+    context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+        });
+
+        try{
+
+            const convo=cli.convo;
+            convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
+            const flat=await convo.flattenAsync();
+            const converted=await convo.toModelInputAsync(flat);
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(converted,createJsonRefReplacer(),4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    const completeAsync=async (cliOptions:ConvoCliOptions={}) => {
+
+        const document=window.activeTextEditor?.document;
+
+        if(document?.languageId!=='source.convo'){
+
+            let createdNew=false;
+
+            const selection=window.activeTextEditor?.selection
+            if(document && selection){
+                const text=document.getText(new Range(selection.start,selection.end));
+                if(text){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:text})
+                    await window.showTextDocument(doc);
+                    createdNew=true;
+                }
+            }
+
+            if(!createdNew){
+
+                const option=await window.showWarningMessage(
+                    'Conversation completion requires a .convo file', 'Complete example', 'Create empty', 'Dismiss'
+                );
+
+                if(option==='Create empty'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:'> system\nsystem prompt here\n\n> user\nprompt here\n'})
+                    await window.showTextDocument(doc);
+                    return;
+                }else if(option==='Complete example'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:example})
+                    await window.showTextDocument(doc);
+                }else{
+                    return;
+                }
+            }
+
+        }
+
+        await window.withProgress({
+            location: ProgressLocation.Notification,
+            title: cliOptions.graph?"Completing Graph":"Completing conversation",
+            cancellable: true
+        }, async (progress, token) => {
+
+            const document=window.activeTextEditor?.document;
+            if(!document){
+                return;
+            }
+
+            const src=document?.getText();
+            if(!src){
+                return;
+            }
+            progress.report({ message:document.uri.path });
+
+            let done=false;
+
+            const startLength=src.length;
+            let tmpAppend='';
+
+            const lock=new Lock(1);
+
+            const setCodeAsync=async (code:string,isFinal:boolean,append:boolean)=>{
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const release=await lock.waitAsync();
+                try{
+                    if(done && !isFinal){
+                        return;
+                    }
+                    if(!isFinal && tmpAppend){
+                        code=tmpAppend+'\n\n'+code;
+                    }
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        const all=append?
+                            new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                            new Range(document.positionAt(0),document.positionAt(document.getText().length));
+                        builder.replace(all,code);
+                    })
+                }finally{
+                    release();
+                }
+            }
+
+            try{
+
+
+                let msg=`\n\n// completing...`;
+                await setCodeAsync(msg,false,true);
+
+                const cli=await createConvoCliAsync({
+                    config:ext.getCliConfig(),
+                    inline:src,
+                    sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+                    bufferOutput:true,
+                    exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+                    allowExec:async (command)=>{
+                        if(token.isCancellationRequested){
+                            return false;
+                        }
+                        const option=await window.showWarningMessage(
+                            `exec > ${command}`, 'Deny', 'Allow'
+                        );
+                        tmpAppend+=`\n// exec > ${command.split('\n').join(' ')}`;
+                        await setCodeAsync(msg,false,true);
+                        return option==='Allow';
+                    },
+                    ...cliOptions,
+                });
+
+                token.onCancellationRequested(()=>{
+                    cli.convo.dispose();
+                })
+
+                let firstAppend=true;
+                cli.convo.onAppend.subscribe(v=>{
+                    if(firstAppend){
+                        firstAppend=false;
+                        return;
+                    }
+                    tmpAppend+='\n\n'+v.text
+                    setCodeAsync(msg,false,true);
+                })
+
+                await cli.executeAsync();
+                done=true;
+
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+            }catch(ex){
+                const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
+                const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
+                const suggestConfig=/(401|403|unauthorized|denied|api\s*key)/i.test(err);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Click the settings (🛠️) icon above the top right of this file`:''}`,true,false);
+                if(suggestConfig){
+                    window.showInformationMessage(
+                        tryMsg,
+                        'Open Convo-Lang Settings'
+                    ).then(selection => {
+                        if (selection === 'Open Convo-Lang Settings') {
+                            commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+                        }
+                    });
+                }
+            }finally{
+                done=true;
+            }
+
+
+        });
+
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.open-settings',()=>{
+        commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+    }));
+
+    const rebuildAsync=async (document:TextDocument,getRebuildOptions:(outPath:string,makePath:string)=>ConvoMakeTargetRebuild)=>{
+        const text=document.getText();
+        const conversation=new Conversation();
+        conversation.append(text);
+        const vars=(await conversation.flattenAsync()).exe.sharedVars;
+        const root=vars[convoVars.__makeRoot];
+        const file=vars[convoVars.__makeFile];
+        const out=vars[convoVars.__makeOut];
+
+        const makePath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,file)));
+        const outPath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,out)));
+
+        await makeAsync({build:makePath,rebuild:getRebuildOptions(outPath,makePath)});
+
+        const editor=await window.showTextDocument(document);
+        const pos=document.positionAt(document.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{
+
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                    continueConversation:true,
+                }));
+
+                break;
+            }
+
+            default:
+                await completeAsync();
+                break;
+        }
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
+    }));
+
+    const splitAsync=async (complete:boolean)=>{
+        const document=window.activeTextEditor?.document;
+        if(document?.languageId!=='source.convo'){
+            return;
+        }
+
+        const selection=window.activeTextEditor?.selection;
+        let text:string|undefined;
+        if(selection){
+            text=document.getText(new Range(selection.start,selection.end));
+        }
+
+        if(!text){
+            text=document.getText();
+        }
+
+        let saveTo:string|undefined;
+        if(!document.isUntitled && document.uri.scheme==='file'){
+            const dir=path.dirname(document.uri.path);
+
+            let fileName=path.basename(document.uri.path);
+            let n=1;
+            const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo/i.exec(fileName);
+            if(match){
+                n=Number(match[2])+1;
+                fileName=fileName.substring(0,match.index);
+            }else if(fileName.toLowerCase().endsWith('.convo')){
+                fileName=fileName.substring(0,fileName.length-6);
+            }
+            while(true){
+                const d=new Date();
+                const name=`${
+                    fileName
+                }-${
+                    d.getFullYear()
+                }-${
+                    (d.getMonth()+1).toString().padStart(2,'0')
+                }-${
+                    d.getDate().toString().padStart(2,'0')
+                }-${
+                    n.toString().padStart(4,'0')
+                }.convo`;
+                saveTo=path.join(dir,name);
+                if(!await pathExistsAsync(saveTo)){
+                    break;
+                }
+                n++;
+            }
+
+        }
+        let doc:TextDocument;
+
+        if(saveTo){
+            const uri=Uri.file(saveTo);
+            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8') as Uint8Array);
+            doc=await workspace.openTextDocument(uri);
+        }else{
+            doc=await workspace.openTextDocument({language:'source.convo',content:text});
+        }
+
+        await window.showTextDocument(doc);
+
+        if(complete){
+            await completeAsync();
+        }
+    }
+    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                }));
+
+                break;
+            }
+
+            default:
+                await splitAsync(true);
+                break;
+        }
+    }));
+    context.subscriptions.push(commands.registerCommand('convo.split',async ()=>{
+        await splitAsync(false);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.refresh-make-targets', async () => {
+        await ext.scanMakeCtrlsAsync();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
+
+        const cli=await createConvoCliAsync({config:ext.getCliConfig()});
+        try{
+            const models=await cli.convo.getAllModelsAsync();
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(models,null,4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    let configChangeIv:any;
+    let showingConfigChange=false;
+    workspace.onDidChangeConfiguration((e)=>{
+        if(showingConfigChange){
+            return;
+        }
+        if(e.affectsConfiguration('convo')){
+            clearTimeout(configChangeIv);
+            configChangeIv=setTimeout(()=>{
+                showingConfigChange=true;
+                window.showInformationMessage('Convo-Lang setting changed. Reload window to apply changes?','Reload').then(selection => {
+                    showingConfigChange=false;
+                    if(selection==='Reload'){
+                        commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            },1600);
+        }
+    })
+}
+```
+</FILE_CONTENT>
+
+
+> user

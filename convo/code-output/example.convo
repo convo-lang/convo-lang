@@ -1,5 +1,6 @@
 @import ../base.convo
 @import ./example-files/*.txt !file
+@import ../../assets/convo-make.png !file
 
 > user
 Create an adventure document that combines the users and activites
