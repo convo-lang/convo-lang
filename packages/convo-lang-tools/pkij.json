@@ -6,6 +6,7 @@
         "test-map-tool":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../map-tool",
         "test-guardians":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../guardians-collective-platform",
         "test-helios":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../helios-v2",
+        "test-familyark":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../familyark",
         "test-simple-shad":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../simple-shad",
         "test-self":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../..",
         "publish-ext":"./publish.sh",
