@@ -1,4 +1,3 @@
-/* eslint-disable @nrwl/nx/enforce-module-boundaries */
 import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
@@ -17,6 +16,7 @@ import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider, registerOutTagCommands } from './output-tag-code-lens.js';
 
 const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
 
@@ -79,6 +79,10 @@ export function activate(context:ExtensionContext){
         'source.convo',
         new ConvoDocumentLinkProvider()
     ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
 
     context.subscriptions.push(...createFoldingProviders());
 }
@@ -120,6 +124,8 @@ const startLsp=(context:ExtensionContext)=>{
 }
 
 const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    registerOutTagCommands(context,ext);
 
     context.subscriptions.push(commands.registerCommand('convo.parse', async () => {
         const document=window.activeTextEditor?.document;
