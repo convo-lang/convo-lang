@@ -1,0 +1,53 @@
+@import ../base.convo
+@import ./example-files/*.txt !file
+
+> user
+Create an adventure document that combines the users and activites
+
+@time 2026-04-14T15:03:57-04:00
+@tokenUsage 1207 / 56 / $0.0031575
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate it, a quick question:
+
+Do you want the adventure document as:
+1. plain text,
+2. JSON,
+3. CSV,
+
+and should I create one adventure per user using one activity each in order, or combine every user with every activity?
+
+
+> user
+Use SQL and make it a funny adventure story. Insert each sentence in to the `story` table.
+``` sql
+create table story(
+    content text
+);
+```
+
+
+
+@time 2026-04-14T17:38:22-04:00
+@tokenUsage 1386 / 189 / $0.0039375
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="adventure.sql" target-output-path="./example-files/adventure.sql" fenced>
+```sql
+insert into story(content) values
+('Matt, 32, strutted onto the beach like he was auditioning for a sunscreen commercial, only to lose an argument with a folding chair.'),
+('Jeff, 45, hit the town with the confidence of a man who had definitely misunderstood the dress code, but he made it work with interpretive dancing.'),
+('Scott, 38, took a walk in the woods and immediately began negotiating with a squirrel who clearly had no interest in peace.'),
+('By sunset, the trio had formed an elite adventure squad powered by bad decisions, mysterious snacks, and unreasonable optimism.'),
+('Some say they found themselves that day; others say they mostly found sand in weird places, a karaoke bar, and several aggressively judgmental trees.');
+```
+</FILE_CONTENT>
+
+<STUFF target-output-path="./stuff.txt" closing-escape="((CLOSE_TAG[STUFF]))">
+abc
+\> abc \{{abc}}
+
+((CLOSE_TAG[STUFF]))
+
+</STUFF>
+

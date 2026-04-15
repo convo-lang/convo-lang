@@ -1,0 +1,331 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts !file
+
+
+> user
+Implement the functionality of the convo.output-tag-write and convo.output-tag-diff for the Convo-Lang
+VSCode extension.
+
+The convo.output-tag-write command should first ask the user to confirm they want to overwrite the current file.
+
+The convo.output-tag-diff command should show the user a diff of the current contents of the target file
+and the content of the output tag.
+
+If the output tag has the `fenced` boolean attribute the wrapping code fench in the xml tag should
+be removed.
+
+
+
+Example convo file with outputs
+<EXAMPLE_CONVO>
+{{---
+@import ../base.convo
+@import ./example-files/*.txt !file
+
+> user
+Create an adventure document that combines the users and activites
+
+@time 2026-04-14T15:03:57-04:00
+@tokenUsage 1207 / 56 / $0.0031575
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate it, a quick question:
+
+Do you want the adventure document as:
+1. plain text,
+2. JSON,
+3. CSV,
+
+and should I create one adventure per user using one activity each in order, or combine every user with every activity?
+
+
+> user
+Use SQL and make it a funny adventure story. Insert each sentence in to the `story` table.
+``` sql
+create table story(
+    content text
+);
+```
+
+
+
+@time 2026-04-14T17:38:22-04:00
+@tokenUsage 1386 / 189 / $0.0039375
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="adventure.sql" target-output-path="./example-files/adventure.sql" fenced>
+```sql
+insert into story(content) values
+('Matt, 32, strutted onto the beach like he was auditioning for a sunscreen commercial, only to lose an argument with a folding chair.'),
+('Jeff, 44, hit the town with the confidence of a man who had definitely misunderstood the dress code, but he made it work with interpretive dancing.'),
+('Scott, 38, took a walk in the woods and immediately began negotiating with a squirrel who clearly had no interest in peace.'),
+('By sunset, the trio had formed an elite adventure squad powered by bad decisions, mysterious snacks, and unreasonable optimism.'),
+('Some say they found themselves that day; others say they mostly found sand in weird places, a karaoke bar, and several aggressively judgmental trees.');
+```
+</FILE_CONTENT>
+
+<STUFF>
+abc
+</STUFF>
+
+
+---}}
+
+<EXAMPLE_CONVO>
+
+
+@time 2026-04-14T21:17:51-04:00
+@tokenUsage 5840 / 51 / $0.014727500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Before I implement it, one quick question:
+
+Should `convo.output-tag-write` write the extracted output-tag content directly to disk without showing a diff first, or do you want it to open/save via an untitled editor before overwrite?
+
+
+> user
+Show a diff first
+
+@time 2026-04-14T21:19:07-04:00
+@tokenUsage 5902 / 1613 / $0.018787500000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="output-tag-code-lens.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts" fenced>
+```ts
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt';
+
+export interface OutputTagCodeLensArgs
+{
+    targetPath:string;
+}
+
+interface OutputTagInfo
+{
+    targetPath:string;
+    content:string;
+    range:vscode.Range;
+}
+
+export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
+{
+    public provideCodeLenses(document:vscode.TextDocument):vscode.CodeLens[]
+    {
+        const lenses:vscode.CodeLens[]=[];
+        const outputTags=getOutputTags(document);
+
+        for(const tag of outputTags){
+            lenses.push(
+                new vscode.CodeLens(tag.range,{
+                    title:'Open Output',
+                    command:'convo.output-tag-open',
+                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                }),
+                new vscode.CodeLens(tag.range,{
+                    title:'Write Output',
+                    command:'convo.output-tag-write',
+                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                }),
+                new vscode.CodeLens(tag.range,{
+                    title:'Open Diff',
+                    command:'convo.output-tag-diff',
+                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                }),
+            );
+        }
+
+        return lenses;
+    }
+}
+
+const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
+    const text=document.getText();
+    const tags:OutputTagInfo[]=[];
+    const tagRegex=/<(?<tagName>[\w-]+)\b(?<attrs>[^>]*)\btarget-output-path\s*=\s*("(?<targetPath1>[^"]*)"|'(?<targetPath2>[^']*)')[^>]*>(?<content>[\s\S]*?)<\/\k<tagName>>/g;
+
+    let match:RegExpExecArray|null;
+    while((match=tagRegex.exec(text))!==null){
+        const targetPath=match.groups?.targetPath1 ?? match.groups?.targetPath2;
+        if(!targetPath){
+            continue;
+        }
+
+        const attrs=match.groups?.attrs ?? '';
+        const rawContent=match.groups?.content ?? '';
+        const content=normalizeOutputTagContent(rawContent,attrs);
+        const start=document.positionAt(match.index);
+        const end=document.positionAt(match.index+match[0].length);
+        const baseDir=document.uri.scheme==='file'?
+            path.dirname(document.uri.fsPath):
+            '';
+
+        tags.push({
+            targetPath:baseDir?
+                path.resolve(baseDir,targetPath)
+            :
+                targetPath,
+            content,
+            range:new vscode.Range(start,end),
+        });
+    }
+
+    return tags;
+}
+
+const normalizeOutputTagContent=(content:string,attrs:string):string=>{
+    let value=content.trim();
+
+    if(/\bfenced\b/.test(attrs)){
+        const fencedMatch=value.match(/^```[^\n\r]*\r?\n([\s\S]*?)\r?\n```$/);
+        if(fencedMatch){
+            value=fencedMatch[1] ?? '';
+        }
+    }
+
+    return value.endsWith('\n')?
+        value
+    :
+        value+'\n';
+}
+
+const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:string):OutputTagInfo|undefined=>{
+    const normalizedTargetPath=path.normalize(targetPath);
+    return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath);
+}
+
+const getActiveOutputTag=(targetPath:string):OutputTagInfo|undefined=>{
+    const editor=window.activeTextEditor;
+    if(!editor){
+        return undefined;
+    }
+
+    return getOutputTagForTargetPath(editor.document,targetPath);
+}
+
+const createOutputPreviewUri=(targetPath:string):Uri=>{
+    return Uri.parse(`convo-output:${encodeURIComponent(targetPath)}`);
+}
+
+const showOutputDiffAsync=async (
+    targetPath:string,
+    content:string,
+):Promise<boolean>=>{
+    const previewUri=createOutputPreviewUri(targetPath);
+    await workspace.fs.writeFile(previewUri,Buffer.from(content,'utf8'));
+
+    let targetExists=true;
+    try{
+        await workspace.fs.stat(Uri.file(targetPath));
+    }catch{
+        targetExists=false;
+    }
+
+    const leftUri=targetExists?
+        Uri.file(targetPath)
+    :
+        Uri.parse('untitled:'+targetPath);
+
+    if(!targetExists){
+        const doc=await workspace.openTextDocument(leftUri);
+        const edit=new vscode.WorkspaceEdit();
+        edit.insert(leftUri,new vscode.Position(0,0),'');
+        await workspace.applyEdit(edit);
+        await doc.save();
+    }
+
+    await commands.executeCommand(
+        'vscode.diff',
+        leftUri,
+        previewUri,
+        `Output Diff: ${path.basename(targetPath)}`,
+    );
+
+    return true;
+}
+
+export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+    
+    context.subscriptions.push(workspace.registerTextDocumentContentProvider('convo-output',{
+        provideTextDocumentContent(uri:Uri):string{
+            return outputPreviewContent.get(uri.toString()) ?? '';
+        },
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-open',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+        const doc=await workspace.openTextDocument(Uri.file(targetPath));
+        await window.showTextDocument(doc);
+    }));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-write',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+
+        const tag=getActiveOutputTag(targetPath);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+
+        await showOutputDiffAsync(targetPath,tag.content);
+
+        const confirm=await window.showWarningMessage(
+            `Overwrite ${path.basename(targetPath)} with the output tag content?`,
+            { modal:true },
+            'Overwrite',
+        );
+        if(confirm!=='Overwrite'){
+            return;
+        }
+
+        await fs.mkdir(path.dirname(targetPath),{recursive:true});
+        await fs.writeFile(targetPath,tag.content,'utf8');
+
+        const openEditors=workspace.textDocuments.filter(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===path.normalize(targetPath));
+        for(const doc of openEditors){
+            await doc.save();
+        }
+
+        void window.showInformationMessage(`Wrote output to ${targetPath}`);
+    }));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+
+        const tag=getActiveOutputTag(targetPath);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+
+        await showOutputDiffAsync(targetPath,tag.content);
+    }));
+}
+
+const outputPreviewContent=new Map<string,string>();
+
+const originalWriteFile=workspace.fs.writeFile.bind(workspace.fs);
+workspace.fs.writeFile=async (uri:Uri,content:Uint8Array)=>{
+    if(uri.scheme==='convo-output'){
+        outputPreviewContent.set(uri.toString(),Buffer.from(content).toString('utf8'));
+        return;
+    }
+    return originalWriteFile(uri,content);
+};
+```
+</FILE_CONTENT>
+
+
+> user

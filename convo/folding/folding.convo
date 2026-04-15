@@ -1,0 +1,222 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/folding-provider.ts !file
+
+> user
+Im trying to add code folding support to the Convo-Lang extension. But the `provideFoldingRanges`
+function of the registered provider is not getting called. Do you see the issue?
+
+@time 2026-04-14T19:44:20-04:00
+@tokenUsage 20100 / 587 / $0.0517175
+@model gpt-5.4-2026-03-05
+> assistant
+Yes — the issue is in the selector you use when registering the folding provider.
+
+You register it with:
+
+```ts
+vscode.languages.registerFoldingRangeProvider('convo-lang', {
+```
+
+But your language id in `package.json` is:
+
+```json
+"id": "source.convo"
+```
+
+And elsewhere you also use that same id, for example:
+
+```ts
+languages.registerDocumentLinkProvider(
+    'source.convo',
+    new ConvoDocumentLinkProvider()
+)
+```
+
+So VS Code never associates the folding provider with Convo documents, which is why `provideFoldingRanges` is never called.
+
+## Fix
+
+Change this:
+
+```ts
+const r=vscode.languages.registerFoldingRangeProvider('convo-lang', {
+```
+
+to this:
+
+```ts
+const r=vscode.languages.registerFoldingRangeProvider('source.convo', {
+```
+
+## Updated file
+
+<FILE_CONTENT name="folding-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/folding-provider.ts" fenced>
+```ts
+import * as vscode from 'vscode';
+
+export const createFoldingProvider=()=>{
+    return vscode.languages.registerFoldingRangeProvider('source.convo', {
+        provideFoldingRanges(document, context, token) {
+            return findTagRanges(document);
+        }
+    });
+}
+
+function findTagRanges(document:vscode.TextDocument):vscode.FoldingRange[] {
+    const ranges:vscode.FoldingRange[]=[];
+    const stack:{name:string,line:number}[]=[];
+
+    const tagRegex=/<(\/)?([\w-]+)[^>/]*(\/?\s*)>/g;
+
+    for(let i=0;i<document.lineCount;i++){
+        const lineText=document.lineAt(i).text;
+        let match:RegExpExecArray|null;
+
+        while((match=tagRegex.exec(lineText))!==null){
+            const [,isClosing,tagName,isSelfClosing]=match;
+            if(!tagName){
+                continue;
+            }
+
+            if(isSelfClosing){
+                continue;
+            }
+
+            if(isClosing){
+                const index=stack.map(s=>s.name).lastIndexOf(tagName);
+                if(index!==-1){
+                    const openTag=stack.splice(index,1)[0];
+                    if(openTag && openTag.line!==i){
+                        ranges.push(new vscode.FoldingRange(openTag.line,i));
+                    }
+                }
+            }else{
+                stack.push({name:tagName,line:i});
+            }
+        }
+    }
+
+    return ranges;
+}
+```
+</FILE_CONTENT>
+
+## One more note
+
+You may also want to use a full document selector object instead of a string, e.g.:
+
+```ts
+vscode.languages.registerFoldingRangeProvider(
+    {language:'source.convo',scheme:'file'},
+    ...
+)
+```
+
+But the main bug is definitely the wrong language id.
+
+
+> user
+Clean up the formatting of the folding-provider.ts file
+
+@time 2026-04-14T20:02:18-04:00
+@tokenUsage 20820 / 62 / $0.05220500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it: do you want me to keep the current two-provider behavior exactly as-is and only reformat the file, or should I also rename the functions so they match what they actually fold (`findTagRanges` folds message blocks and `findMessageRanges` folds XML-like tags)?
+
+
+> user
+Yes update names too
+
+@time 2026-04-14T20:03:01-04:00
+@tokenUsage 20893 / 521 / $0.053535
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="folding-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/folding-provider.ts" fenced>
+```ts
+import * as vscode from 'vscode';
+
+export const createFoldingProviders=()=>{
+    return [
+        vscode.languages.registerFoldingRangeProvider('source.convo', {
+            provideFoldingRanges(document, context, token) {
+                return findConversationBlockRanges(document);
+            }
+        }),
+        vscode.languages.registerFoldingRangeProvider('source.convo', {
+            provideFoldingRanges(document, context, token) {
+                return findXmlTagRanges(document);
+            }
+        }),
+    ];
+}
+
+function findConversationBlockRanges(document:vscode.TextDocument):vscode.FoldingRange[] {
+    const ranges:vscode.FoldingRange[]=[];
+
+    let prev=-1;
+
+    const openMessage=/[ \t]*>/;
+
+    for(let i=0;i<document.lineCount;i++){
+        const lineText=document.lineAt(i).text;
+
+        if(openMessage.test(lineText)){
+            if(prev!==-1){
+                ranges.push(new vscode.FoldingRange(prev,i-1));
+            }
+            prev=i;
+        }
+    }
+
+    if(prev!==-1){
+        ranges.push(new vscode.FoldingRange(prev,document.lineCount-1));
+    }
+
+    return ranges;
+}
+
+function findXmlTagRanges(document:vscode.TextDocument):vscode.FoldingRange[] {
+    const ranges:vscode.FoldingRange[]=[];
+    const stack:{name:string,line:number}[]=[];
+
+    const tagRegex=/<(\/)?([\w-]+)[^>]*(\/?)>/g;
+
+    for(let i=0;i<document.lineCount;i++){
+        const lineText=document.lineAt(i).text;
+        let match:RegExpExecArray|null;
+
+        while((match=tagRegex.exec(lineText))!==null){
+            const [,isClosing,tagName,isSelfClosing]=match;
+            if(!tagName){
+                continue;
+            }
+
+            if(isSelfClosing){
+                continue;
+            }
+
+            if(isClosing){
+                const index=stack.map(s=>s.name).lastIndexOf(tagName);
+                if(index!==-1){
+                    const openTag=stack.splice(index,1)[0];
+                    if(openTag && openTag.line!==i){
+                        ranges.push(new vscode.FoldingRange(openTag.line,i));
+                    }
+                }
+            }else{
+                stack.push({name:tagName,line:i});
+            }
+        }
+    }
+
+    return ranges;
+}
+```
+</FILE_CONTENT>
+
+
+> user

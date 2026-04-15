@@ -1,4 +1,5 @@
-@import ../coding-style.md as codingStyle
+@import std://file-blocks
+@import ../coding-style.md !tag:CODING_STYLE
 
 > define
 __model='gpt-5.4'
@@ -6,8 +7,10 @@ __trackModel=true
 __trackTokenUsage=true;
 __trackTime=true
 
+// When true the user will be asked questions before completion
 enableReview=true
 
+@top
 > system
 You are a pragmatic coding assistant that prefers clean minimalist code.
 
@@ -16,15 +19,8 @@ as the given code.
 
 You are working in a mono-repo called Convo-Lang.
 
-Coding Style:
-<CODING_STYLE>
-{{codingStyle}}
-</CODING_STYLE>
 
 @condition=enableReview
 > system
 Before generating a response for the user ask them any questions you may have
-
-> user
-Give me an example of a basic state machine for tracking a users trip from their house to the airport
 
