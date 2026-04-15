@@ -17,6 +17,7 @@ import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
 import { OutputTagCodeLensProvider, registerOutTagCommands } from './output-tag-code-lens.js';
+import { registerTypingHandler } from './typing-handler.js';
 
 const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
 
@@ -65,6 +66,7 @@ export function activate(context:ExtensionContext){
     const ext=new ConvoExt();
 
     registerCommands(context,ext);
+    registerTypingHandler(context);
     startLsp(context);
 
     const treeView=window.createTreeView('convoMakeBuild',{
