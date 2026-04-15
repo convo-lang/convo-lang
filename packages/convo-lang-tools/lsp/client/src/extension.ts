@@ -12,6 +12,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 import { extensionPublisher } from './build-const.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
@@ -75,9 +76,11 @@ export function activate(context:ExtensionContext){
         }
     })
     context.subscriptions.push(languages.registerDocumentLinkProvider(
-        {pattern: '**/*.convo'},
+        'source.convo',
         new ConvoDocumentLinkProvider()
     ));
+
+    context.subscriptions.push(...createFoldingProviders());
 }
 
 export function deactivate():Thenable<void>|undefined {

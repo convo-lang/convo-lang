@@ -17,9 +17,6 @@
     "engines": {
         "vscode": "^1.75.0"
     },
-    "activationEvents": [
-        "onLanguage:convo.source"
-    ],
     "license": "Apache-2.0",
     "main": "./lsp/client/out/extension",
     "repository": {
