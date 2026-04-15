@@ -29,7 +29,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        const tag=getActiveOutputTag(targetPath);
+        const tag=getActiveOutputTag(targetPath,args.index);
         if(!tag){
             void window.showErrorMessage('Unable to find output tag content for the selected target.');
             return;
@@ -60,7 +60,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        const tag=getActiveOutputTag(targetPath);
+        const tag=getActiveOutputTag(targetPath,args.index);
         if(!tag){
             void window.showErrorMessage('Unable to find output tag content for the selected target.');
             return;
@@ -75,7 +75,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
-        const tag=getActiveOutputTag(targetPath);
+        const tag=getActiveOutputTag(targetPath,args.index);
         if(!tag){
             void window.showErrorMessage('Unable to find output tag content for the selected target.');
             return;
@@ -89,6 +89,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 export interface OutputTagCodeLensArgs
 {
     targetPath:string;
+    index:number;
 }
 
 interface OutputTagInfo
@@ -96,6 +97,7 @@ interface OutputTagInfo
     targetPath:string;
     content:string;
     range:vscode.Range;
+    index:number;
 }
 
 export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
@@ -110,22 +112,22 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                 new vscode.CodeLens(tag.range,{
                     title:'Open Output',
                     command:'convo.output-tag-open',
-                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                    arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
                 }),
                 new vscode.CodeLens(tag.range,{
                     title:'Write Output',
                     command:'convo.output-tag-write',
-                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                    arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
                 }),
                 new vscode.CodeLens(tag.range,{
                     title:'Open Diff',
                     command:'convo.output-tag-diff',
-                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                    arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
                 }),
                 new vscode.CodeLens(tag.range,{
                     title:'Copy Output',
                     command:'convo.output-tag-copy',
-                    arguments:[{targetPath:tag.targetPath} satisfies OutputTagCodeLensArgs],
+                    arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
                 }),
             );
         }
@@ -140,6 +142,7 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
     const tagRegex=/<(?<tagName>[\w-]+)\b(?<attrs>[^>]*)\btarget-output-path\s*=\s*("(?<targetPath1>[^"]*)"|'(?<targetPath2>[^']*)')(?<attrs2>[^>]*)>(?<content>[\s\S]*?)<\/\k<tagName>>/g;
 
     let match:RegExpExecArray|null;
+    let index=0;
     while((match=tagRegex.exec(text))!==null){
         const targetPath=match.groups?.['targetPath1'] ?? match.groups?.['targetPath2'];
         if(!targetPath){
@@ -162,6 +165,7 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
                 targetPath,
             content,
             range:new vscode.Range(start,end),
+            index:index++,
         });
     }
 
@@ -193,18 +197,18 @@ const normalizeOutputTagContent=(tag:string,content:string,attrs:string):string=
     return value.endsWith('\n')?value:value+'\n';
 }
 
-const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:string):OutputTagInfo|undefined=>{
+const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:string,index:number):OutputTagInfo|undefined=>{
     const normalizedTargetPath=path.normalize(targetPath);
-    return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath);
+    return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath && t.index===index);
 }
 
-const getActiveOutputTag=(targetPath:string):OutputTagInfo|undefined=>{
+const getActiveOutputTag=(targetPath:string,index:number):OutputTagInfo|undefined=>{
     const editor=window.activeTextEditor;
     if(!editor){
         return undefined;
     }
 
-    return getOutputTagForTargetPath(editor.document,targetPath);
+    return getOutputTagForTargetPath(editor.document,targetPath,index);
 }
 
 const createOutputPreviewUri=(targetPath:string):Uri=>{
