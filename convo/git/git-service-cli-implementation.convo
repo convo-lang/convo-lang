@@ -1,0 +1,3232 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/git/convo-git-types.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts !file
+
+> user
+Implement the functions of ConvoCliGitService using node child process
+
+@time 2026-04-15T14:58:09-04:00
+@tokenUsage 1961 / 188 / $0.0053725000000000005
+@model gpt-5.4-2026-03-05
+> assistant
+Before I implement it, a couple quick questions:
+
+1. Should `ConvoCliGitService` assume the current working directory is the git repo root, or should it detect/find the repo from `process.cwd()`?
+2. For `includeFileHash`, do you want:
+   - the working tree file content hash for `revision.type==='working'`, and
+   - the blob hash from the target revision for branch/tag/commit?
+   Or should it always return the working tree file hash when the file exists locally?
+3. For glob paths in `gitStatusAsync`, is it acceptable to rely on shell/git pathspec behavior, or do you want explicit glob expansion in Node?
+4. For untracked files in working-tree mode, should `gitStatusSingleAsync` return success with `isTracked:false` when the file exists, or should it only 404 when the file does not exist on disk?
+
+
+> user
+1. Add a `ConvoCliGitServiceOptions` interface that gets passed to the service and contains a `rootPath`
+   property. If undefined use `process.cwd()`.
+2. The current file hash of the file on disk
+3. Let git handle path patterns/pathspecs
+4. Return `isTracked:false`
+
+When referencing `process` use `globalThis.process`.
+
+Example:
+``` ts
+function example(){
+    const process=globalThis.process;
+    if(!process){
+        return {
+            success:false,
+            error:'globalThis.process not defined by by runtime',
+            statusCode:500
+        }
+    }
+}
+```
+
+
+@time 2026-04-15T15:07:18-04:00
+@tokenUsage 2539 / 2705 / $0.01311
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="ConvoCliGitService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts_" fenced>
+```ts
+import { ConvoGitFileStatus, ConvoGitService, GitStatusRequest, GitStatusSingleRequest, PromiseResultType } from "@convo-lang/convo-lang";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync=promisify(execFile);
+
+export interface ConvoCliGitServiceOptions
+{
+    rootPath?:string;
+}
+
+export class ConvoCliGitService implements ConvoGitService
+{
+
+    private readonly rootPath?:string;
+
+    public constructor({
+        rootPath
+    }:ConvoCliGitServiceOptions={})
+    {
+        this.rootPath=rootPath;
+    }
+
+    public async gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPath=this.rootPath??process.cwd();
+        const filePath=resolve(rootPath,request.path);
+        const existsOnDisk=await this.pathExistsAsync(filePath);
+
+        if(!existsOnDisk){
+            return {
+                success:false,
+                error:`File not found - ${request.path}`,
+                statusCode:404,
+            };
+        }
+
+        const statusResult=await this.getSingleStatusAsync(rootPath,request.path,request.includeFileHash,request.revision);
+        return statusResult;
+    }
+
+    public async gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPath=this.rootPath??process.cwd();
+        return await this.getMultiStatusAsync(rootPath,request.paths,request.includeFileHash,request.revision);
+    }
+
+    private async getSingleStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus>
+    {
+        const multiResult=await this.getMultiStatusAsync(rootPath,[path],includeFileHash,revision);
+        if(!multiResult.success){
+            return multiResult;
+        }
+
+        const status=multiResult.result.find(s=>s.path===path)??await this.createSingleFallbackStatusAsync(rootPath,path,includeFileHash,revision);
+        return {
+            success:true,
+            result:status,
+        };
+    }
+
+    private async getMultiStatusAsync(
+        rootPath:string,
+        paths:string|string[],
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const pathList=Array.isArray(paths)?paths:[paths];
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        if(!revisionInfo.success){
+            return revisionInfo;
+        }
+
+        const trackedPathsResult=await this.getTrackedPathsAsync(rootPath,pathList,revisionInfo.result.revisionSpec);
+        if(!trackedPathsResult.success){
+            return trackedPathsResult;
+        }
+
+        const trackedPathSet=new Set(trackedPathsResult.result);
+
+        const statusMap=new Map<string,ConvoGitFileStatus>();
+        for(const path of trackedPathSet){
+            statusMap.set(path,{
+                path,
+                isTracked:true,
+                existsInRevision:false,
+                revisionHash:revisionInfo.result.revisionHash,
+            });
+        }
+
+        if(!revision || revision.type==='working'){
+            const untrackedResult=await this.getUntrackedPathsAsync(rootPath,pathList);
+            if(!untrackedResult.success){
+                return untrackedResult;
+            }
+
+            for(const path of untrackedResult.result){
+                if(!statusMap.has(path)){
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:false,
+                        isDirty:true,
+                        isModifiedInWorkingTree:true,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const ignoredResult=await this.getIgnoredPathsAsync(rootPath,pathList);
+            if(!ignoredResult.success){
+                return ignoredResult;
+            }
+
+            for(const path of ignoredResult.result){
+                const current=statusMap.get(path);
+                if(current){
+                    current.isIgnored=true;
+                    current.isTracked=current.isTracked??false;
+                }else{
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:true,
+                        isDirty:false,
+                        isModifiedInWorkingTree:false,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const workingChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only','--',...trackedArray]);
+                if(!workingChangedResult.success){
+                    return workingChangedResult;
+                }
+                const workingChangedSet=new Set(workingChangedResult.result);
+
+                const indexChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--cached','--name-only','--',...trackedArray]);
+                if(!indexChangedResult.success){
+                    return indexChangedResult;
+                }
+                const indexChangedSet=new Set(indexChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=workingChangedSet.has(path);
+                    item.isModifiedInIndex=indexChangedSet.has(path);
+                    item.isDirty=!!item.isModifiedInWorkingTree || !!item.isModifiedInIndex;
+                }
+            }
+        }else{
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const revisionChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only',revisionInfo.result.revisionSpec??'','--',...trackedArray]);
+                if(!revisionChangedResult.success){
+                    return revisionChangedResult;
+                }
+                const revisionChangedSet=new Set(revisionChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=revisionChangedSet.has(path);
+                    item.isModifiedInIndex=false;
+                    item.isDirty=!!item.isModifiedInWorkingTree;
+                }
+            }
+        }
+
+        if(includeFileHash){
+            for(const item of statusMap.values()){
+                const absPath=resolve(rootPath,item.path);
+                item.fileHash=await this.getDiskFileHashOrUndefinedAsync(absPath);
+            }
+        }
+
+        return {
+            success:true,
+            result:[...statusMap.values()],
+        };
+    }
+
+    private async createSingleFallbackStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):Promise<ConvoGitFileStatus>
+    {
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        const fileHash=includeFileHash?await this.getDiskFileHashOrUndefinedAsync(resolve(rootPath,path)):undefined;
+        return {
+            path,
+            isTracked:false,
+            isIgnored:false,
+            isDirty:revision?.type==='working'?true:false,
+            isModifiedInWorkingTree:revision?.type==='working'?true:false,
+            isModifiedInIndex:false,
+            existsInRevision:false,
+            revisionHash:revisionInfo.success?revisionInfo.result.revisionHash:undefined,
+            fileHash,
+        };
+    }
+
+    private async resolveRevisionAsync(
+        rootPath:string,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<{revisionSpec?:string;revisionHash?:string}>
+    {
+        if(!revision || revision.type==='working'){
+            return {
+                success:true,
+                result:{},
+            };
+        }
+
+        if(!revision.value){
+            return {
+                success:false,
+                error:'revision.value is required when revision.type is not working',
+                statusCode:400,
+            };
+        }
+
+        const revisionSpec=revision.value;
+        try{
+            const { stdout }=await execFileAsync('git',['rev-parse',revisionSpec],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:{
+                    revisionSpec,
+                    revisionHash:stdout.trim()||undefined,
+                },
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to resolve revision - ${revisionSpec}${this.getExecErrorMessage(err)}`,
+                statusCode:404,
+            };
+        }
+    }
+
+    private async getTrackedPathsAsync(
+        rootPath:string,
+        paths:string[],
+        revisionSpec?:string
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        const args=revisionSpec?
+            ['ls-tree','-r','--name-only',revisionSpec,'--',...paths]
+        :
+            ['ls-files','--',...paths];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get tracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    private async getUntrackedPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get untracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    private async getIgnoredPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--ignored','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get ignored paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    private async getDiffNameOnlyAsync(
+        rootPath:string,
+        args:string[]
+    ):PromiseResultType<string[]>
+    {
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get diff status${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    private parseLines(value:string):string[]
+    {
+        return value
+            .split('\n')
+            .map(v=>v.trim())
+            .filter(v=>!!v);
+    }
+
+    private async pathExistsAsync(path:string):Promise<boolean>
+    {
+        try{
+            await fs.access(path);
+            return true;
+        }catch{
+            return false;
+        }
+    }
+
+    private async getDiskFileHashOrUndefinedAsync(path:string):Promise<string|undefined>
+    {
+        try{
+            const stat=await fs.stat(path);
+            if(!stat.isFile()){
+                return undefined;
+            }
+            const buffer=await fs.readFile(path);
+            return createHash('sha1').update(buffer).digest('hex');
+        }catch{
+            return undefined;
+        }
+    }
+
+    private getExecErrorMessage(err:unknown):string
+    {
+        const e=err as { stderr?:string; message?:string }|undefined;
+        const message=e?.stderr?.trim()||e?.message?.trim();
+        return message?` - ${message}`:'';
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+Add JSDocs to all functions and properties
+
+@time 2026-04-15T15:19:08-04:00
+@tokenUsage 7822 / 3055 / $0.0271925
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="ConvoCliGitService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts__" fenced>
+```ts
+import { ConvoGitFileStatus, ConvoGitService, GitStatusRequest, GitStatusSingleRequest, PromiseResultType } from "@convo-lang/convo-lang";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync=promisify(execFile);
+
+/**
+ * Options used to configure the git service.
+ */
+export interface ConvoCliGitServiceOptions
+{
+    /**
+     * Root path used as the git working directory.
+     * Defaults to `globalThis.process.cwd()`.
+     */
+    rootPath?:string;
+}
+
+/**
+ * Node CLI implementation of the git service using child processes.
+ */
+export class ConvoCliGitService implements ConvoGitService
+{
+
+    /**
+     * Root path used for all git commands.
+     */
+    private readonly rootPath?:string;
+
+    /**
+     * Creates a new git service instance.
+     */
+    public constructor({
+        rootPath
+    }:ConvoCliGitServiceOptions={})
+    {
+        this.rootPath=rootPath;
+    }
+
+    /**
+     * Returns the git status for a single file.
+     */
+    public async gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPath=this.rootPath??process.cwd();
+        const filePath=resolve(rootPath,request.path);
+        const existsOnDisk=await this.pathExistsAsync(filePath);
+
+        if(!existsOnDisk){
+            return {
+                success:false,
+                error:`File not found - ${request.path}`,
+                statusCode:404,
+            };
+        }
+
+        const statusResult=await this.getSingleStatusAsync(rootPath,request.path,request.includeFileHash,request.revision);
+        return statusResult;
+    }
+
+    /**
+     * Returns the git status for one or more files or pathspecs.
+     */
+    public async gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPath=this.rootPath??process.cwd();
+        return await this.getMultiStatusAsync(rootPath,request.paths,request.includeFileHash,request.revision);
+    }
+
+    /**
+     * Returns the git status for a single path by delegating to the multi-path implementation.
+     */
+    private async getSingleStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus>
+    {
+        const multiResult=await this.getMultiStatusAsync(rootPath,[path],includeFileHash,revision);
+        if(!multiResult.success){
+            return multiResult;
+        }
+
+        const status=multiResult.result.find(s=>s.path===path)??await this.createSingleFallbackStatusAsync(rootPath,path,includeFileHash,revision);
+        return {
+            success:true,
+            result:status,
+        };
+    }
+
+    /**
+     * Returns the git status for one or more paths.
+     */
+    private async getMultiStatusAsync(
+        rootPath:string,
+        paths:string|string[],
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const pathList=Array.isArray(paths)?paths:[paths];
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        if(!revisionInfo.success){
+            return revisionInfo;
+        }
+
+        const trackedPathsResult=await this.getTrackedPathsAsync(rootPath,pathList,revisionInfo.result.revisionSpec);
+        if(!trackedPathsResult.success){
+            return trackedPathsResult;
+        }
+
+        const trackedPathSet=new Set(trackedPathsResult.result);
+
+        const statusMap=new Map<string,ConvoGitFileStatus>();
+        for(const path of trackedPathSet){
+            statusMap.set(path,{
+                path,
+                isTracked:true,
+                existsInRevision:false,
+                revisionHash:revisionInfo.result.revisionHash,
+            });
+        }
+
+        if(!revision || revision.type==='working'){
+            const untrackedResult=await this.getUntrackedPathsAsync(rootPath,pathList);
+            if(!untrackedResult.success){
+                return untrackedResult;
+            }
+
+            for(const path of untrackedResult.result){
+                if(!statusMap.has(path)){
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:false,
+                        isDirty:true,
+                        isModifiedInWorkingTree:true,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const ignoredResult=await this.getIgnoredPathsAsync(rootPath,pathList);
+            if(!ignoredResult.success){
+                return ignoredResult;
+            }
+
+            for(const path of ignoredResult.result){
+                const current=statusMap.get(path);
+                if(current){
+                    current.isIgnored=true;
+                    current.isTracked=current.isTracked??false;
+                }else{
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:true,
+                        isDirty:false,
+                        isModifiedInWorkingTree:false,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const workingChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only','--',...trackedArray]);
+                if(!workingChangedResult.success){
+                    return workingChangedResult;
+                }
+                const workingChangedSet=new Set(workingChangedResult.result);
+
+                const indexChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--cached','--name-only','--',...trackedArray]);
+                if(!indexChangedResult.success){
+                    return indexChangedResult;
+                }
+                const indexChangedSet=new Set(indexChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=workingChangedSet.has(path);
+                    item.isModifiedInIndex=indexChangedSet.has(path);
+                    item.isDirty=!!item.isModifiedInWorkingTree || !!item.isModifiedInIndex;
+                }
+            }
+        }else{
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const revisionChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only',revisionInfo.result.revisionSpec??'','--',...trackedArray]);
+                if(!revisionChangedResult.success){
+                    return revisionChangedResult;
+                }
+                const revisionChangedSet=new Set(revisionChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=revisionChangedSet.has(path);
+                    item.isModifiedInIndex=false;
+                    item.isDirty=!!item.isModifiedInWorkingTree;
+                }
+            }
+        }
+
+        if(includeFileHash){
+            for(const item of statusMap.values()){
+                const absPath=resolve(rootPath,item.path);
+                item.fileHash=await this.getDiskFileHashOrUndefinedAsync(absPath);
+            }
+        }
+
+        return {
+            success:true,
+            result:[...statusMap.values()],
+        };
+    }
+
+    /**
+     * Creates a fallback status for a single existing file when git does not report it.
+     */
+    private async createSingleFallbackStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):Promise<ConvoGitFileStatus>
+    {
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        const fileHash=includeFileHash?await this.getDiskFileHashOrUndefinedAsync(resolve(rootPath,path)):undefined;
+        return {
+            path,
+            isTracked:false,
+            isIgnored:false,
+            isDirty:revision?.type==='working'?true:false,
+            isModifiedInWorkingTree:revision?.type==='working'?true:false,
+            isModifiedInIndex:false,
+            existsInRevision:false,
+            revisionHash:revisionInfo.success?revisionInfo.result.revisionHash:undefined,
+            fileHash,
+        };
+    }
+
+    /**
+     * Resolves the requested revision into a git revision spec and hash.
+     */
+    private async resolveRevisionAsync(
+        rootPath:string,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<{revisionSpec?:string;revisionHash?:string}>
+    {
+        if(!revision || revision.type==='working'){
+            return {
+                success:true,
+                result:{},
+            };
+        }
+
+        if(!revision.value){
+            return {
+                success:false,
+                error:'revision.value is required when revision.type is not working',
+                statusCode:400,
+            };
+        }
+
+        const revisionSpec=revision.value;
+        try{
+            const { stdout }=await execFileAsync('git',['rev-parse',revisionSpec],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:{
+                    revisionSpec,
+                    revisionHash:stdout.trim()||undefined,
+                },
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to resolve revision - ${revisionSpec}${this.getExecErrorMessage(err)}`,
+                statusCode:404,
+            };
+        }
+    }
+
+    /**
+     * Returns tracked paths for the current working tree or a specific revision.
+     */
+    private async getTrackedPathsAsync(
+        rootPath:string,
+        paths:string[],
+        revisionSpec?:string
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        const args=revisionSpec?
+            ['ls-tree','-r','--name-only',revisionSpec,'--',...paths]
+        :
+            ['ls-files','--',...paths];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get tracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns untracked paths that match the provided pathspecs.
+     */
+    private async getUntrackedPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get untracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns ignored paths that match the provided pathspecs.
+     */
+    private async getIgnoredPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--ignored','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get ignored paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Executes a git diff-style command and returns the changed paths.
+     */
+    private async getDiffNameOnlyAsync(
+        rootPath:string,
+        args:string[]
+    ):PromiseResultType<string[]>
+    {
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get diff status${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Parses newline-delimited command output into a list of non-empty paths.
+     */
+    private parseLines(value:string):string[]
+    {
+        return value
+            .split('\n')
+            .map(v=>v.trim())
+            .filter(v=>!!v);
+    }
+
+    /**
+     * Returns true if the given path exists on disk.
+     */
+    private async pathExistsAsync(path:string):Promise<boolean>
+    {
+        try{
+            await fs.access(path);
+            return true;
+        }catch{
+            return false;
+        }
+    }
+
+    /**
+     * Returns the SHA-1 hash of the current file contents on disk.
+     */
+    private async getDiskFileHashOrUndefinedAsync(path:string):Promise<string|undefined>
+    {
+        try{
+            const stat=await fs.stat(path);
+            if(!stat.isFile()){
+                return undefined;
+            }
+            const buffer=await fs.readFile(path);
+            return createHash('sha1').update(buffer).digest('hex');
+        }catch{
+            return undefined;
+        }
+    }
+
+    /**
+     * Extracts a readable message from a child process execution error.
+     */
+    private getExecErrorMessage(err:unknown):string
+    {
+        const e=err as { stderr?:string; message?:string }|undefined;
+        const message=e?.stderr?.trim()||e?.message?.trim();
+        return message?` - ${message}`:'';
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+The implementation needs to account for the following:
+- If root is not provided do not assume the current working directory, look for the first .git folder up the directory chain if root is not defined
+- Paths passed to the service can be absolute file paths which will cause return name from git to not align.
+
+
+@time 2026-04-15T16:43:47-04:00
+@tokenUsage 11314 / 62 / $0.02844
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick question:
+
+If a provided absolute path is outside the resolved git root, should the service:
+1. return a 404/not found style result for that path, or
+2. return success with `isTracked:false` and normalize the path as originally passed?
+
+
+> user
+1. return `isTracked:false`
+
+@time 2026-04-15T16:46:12-04:00
+@tokenUsage 11391 / 3916 / $0.0382675
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="ConvoCliGitService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts_" fenced>
+```ts
+import { ConvoGitFileStatus, ConvoGitService, GitStatusRequest, GitStatusSingleRequest, PromiseResultType } from "@convo-lang/convo-lang";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync=promisify(execFile);
+
+/**
+ * Options used to configure the git service.
+ */
+export interface ConvoCliGitServiceOptions
+{
+    /**
+     * Root path used as the git working directory.
+     * If not provided the service will search upward for the nearest `.git` folder.
+     */
+    rootPath?:string;
+}
+
+/**
+ * Node CLI implementation of the git service using child processes.
+ */
+export class ConvoCliGitService implements ConvoGitService
+{
+
+    /**
+     * Root path used for all git commands.
+     */
+    private readonly rootPath?:string;
+
+    /**
+     * Creates a new git service instance.
+     */
+    public constructor({
+        rootPath
+    }:ConvoCliGitServiceOptions={})
+    {
+        this.rootPath=rootPath;
+    }
+
+    /**
+     * Returns the git status for a single file.
+     */
+    public async gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPathResult=await this.resolveRootPathAsync(request.path);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const normalizedPath=this.normalizePathForGit(rootPath,request.path);
+        const filePath=isAbsolute(request.path)?request.path:resolve(rootPath,request.path);
+        const existsOnDisk=await this.pathExistsAsync(filePath);
+
+        if(!existsOnDisk){
+            return {
+                success:false,
+                error:`File not found - ${request.path}`,
+                statusCode:404,
+            };
+        }
+
+        if(!normalizedPath){
+            return {
+                success:true,
+                result:await this.createSingleFallbackStatusAsync(rootPath,request.path,request.includeFileHash,request.revision),
+            };
+        }
+
+        return await this.getSingleStatusAsync(rootPath,normalizedPath,request.includeFileHash,request.revision);
+    }
+
+    /**
+     * Returns the git status for one or more files or pathspecs.
+     */
+    public async gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const inputPaths=Array.isArray(request.paths)?request.paths:[request.paths];
+        const rootPathResult=await this.resolveRootPathAsync(inputPaths[0]);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const gitPaths:string[]=[];
+        const outsideStatuses:ConvoGitFileStatus[]=[];
+
+        for(const inputPath of inputPaths){
+            const normalizedPath=this.normalizePathForGit(rootPath,inputPath);
+            if(normalizedPath){
+                gitPaths.push(normalizedPath);
+            }else{
+                outsideStatuses.push(await this.createSingleFallbackStatusAsync(rootPath,inputPath,request.includeFileHash,request.revision));
+            }
+        }
+
+        if(!gitPaths.length){
+            return {
+                success:true,
+                result:outsideStatuses,
+            };
+        }
+
+        const result=await this.getMultiStatusAsync(rootPath,gitPaths,request.includeFileHash,request.revision);
+        if(!result.success){
+            return result;
+        }
+
+        return {
+            success:true,
+            result:[
+                ...result.result,
+                ...outsideStatuses,
+            ],
+        };
+    }
+
+    /**
+     * Returns the git status for a single path by delegating to the multi-path implementation.
+     */
+    private async getSingleStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus>
+    {
+        const multiResult=await this.getMultiStatusAsync(rootPath,[path],includeFileHash,revision);
+        if(!multiResult.success){
+            return multiResult;
+        }
+
+        const status=multiResult.result.find(s=>s.path===path)??await this.createSingleFallbackStatusAsync(rootPath,path,includeFileHash,revision);
+        return {
+            success:true,
+            result:status,
+        };
+    }
+
+    /**
+     * Returns the git status for one or more paths.
+     */
+    private async getMultiStatusAsync(
+        rootPath:string,
+        paths:string|string[],
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const pathList=Array.isArray(paths)?paths:[paths];
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        if(!revisionInfo.success){
+            return revisionInfo;
+        }
+
+        const trackedPathsResult=await this.getTrackedPathsAsync(rootPath,pathList,revisionInfo.result.revisionSpec);
+        if(!trackedPathsResult.success){
+            return trackedPathsResult;
+        }
+
+        const trackedPathSet=new Set(trackedPathsResult.result);
+
+        const statusMap=new Map<string,ConvoGitFileStatus>();
+        for(const path of trackedPathSet){
+            statusMap.set(path,{
+                path,
+                isTracked:true,
+                existsInRevision:false,
+                revisionHash:revisionInfo.result.revisionHash,
+            });
+        }
+
+        if(!revision || revision.type==='working'){
+            const untrackedResult=await this.getUntrackedPathsAsync(rootPath,pathList);
+            if(!untrackedResult.success){
+                return untrackedResult;
+            }
+
+            for(const path of untrackedResult.result){
+                if(!statusMap.has(path)){
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:false,
+                        isDirty:true,
+                        isModifiedInWorkingTree:true,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const ignoredResult=await this.getIgnoredPathsAsync(rootPath,pathList);
+            if(!ignoredResult.success){
+                return ignoredResult;
+            }
+
+            for(const path of ignoredResult.result){
+                const current=statusMap.get(path);
+                if(current){
+                    current.isIgnored=true;
+                    current.isTracked=current.isTracked??false;
+                }else{
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:true,
+                        isDirty:false,
+                        isModifiedInWorkingTree:false,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const workingChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only','--',...trackedArray]);
+                if(!workingChangedResult.success){
+                    return workingChangedResult;
+                }
+                const workingChangedSet=new Set(workingChangedResult.result);
+
+                const indexChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--cached','--name-only','--',...trackedArray]);
+                if(!indexChangedResult.success){
+                    return indexChangedResult;
+                }
+                const indexChangedSet=new Set(indexChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=workingChangedSet.has(path);
+                    item.isModifiedInIndex=indexChangedSet.has(path);
+                    item.isDirty=!!item.isModifiedInWorkingTree || !!item.isModifiedInIndex;
+                }
+            }
+        }else{
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const revisionChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only',revisionInfo.result.revisionSpec??'','--',...trackedArray]);
+                if(!revisionChangedResult.success){
+                    return revisionChangedResult;
+                }
+                const revisionChangedSet=new Set(revisionChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=revisionChangedSet.has(path);
+                    item.isModifiedInIndex=false;
+                    item.isDirty=!!item.isModifiedInWorkingTree;
+                }
+            }
+        }
+
+        if(includeFileHash){
+            for(const item of statusMap.values()){
+                if(includeFileHash==='if-dirty' && !item.isDirty){
+                    continue;
+                }
+                const absPath=resolve(rootPath,item.path);
+                item.fileHash=await this.getDiskFileHashOrUndefinedAsync(absPath);
+            }
+        }
+
+        return {
+            success:true,
+            result:[...statusMap.values()],
+        };
+    }
+
+    /**
+     * Creates a fallback status for a single existing file when git does not report it.
+     */
+    private async createSingleFallbackStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):Promise<ConvoGitFileStatus>
+    {
+        const isDirty=revision?.type==='working'?true:false;
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        const filePath=isAbsolute(path)?path:resolve(rootPath,path);
+        const fileHash=(includeFileHash===true || (includeFileHash==='if-dirty' && isDirty))?await this.getDiskFileHashOrUndefinedAsync(filePath):undefined;
+        return {
+            path,
+            isTracked:false,
+            isIgnored:false,
+            isDirty,
+            isModifiedInWorkingTree:revision?.type==='working'?true:false,
+            isModifiedInIndex:false,
+            existsInRevision:false,
+            revisionHash:revisionInfo.success?revisionInfo.result.revisionHash:undefined,
+            fileHash,
+        };
+    }
+
+    /**
+     * Resolves the root path to use for git commands.
+     */
+    private async resolveRootPathAsync(pathHint?:string):PromiseResultType<string>
+    {
+        if(this.rootPath){
+            return {
+                success:true,
+                result:resolve(this.rootPath),
+            };
+        }
+
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const startPath=pathHint?
+            (
+                isAbsolute(pathHint)?
+                    pathHint
+                :
+                    resolve(process.cwd(),pathHint)
+            )
+        :
+            process.cwd();
+
+        const startDir=await this.getSearchStartDirectoryAsync(startPath);
+        const rootPath=await this.findGitRootAsync(startDir);
+        if(!rootPath){
+            return {
+                success:false,
+                error:`Unable to find .git folder from ${startDir}`,
+                statusCode:404,
+            };
+        }
+
+        return {
+            success:true,
+            result:rootPath,
+        };
+    }
+
+    /**
+     * Resolves the directory to start searching from.
+     */
+    private async getSearchStartDirectoryAsync(path:string):Promise<string>
+    {
+        try{
+            const stat=await fs.stat(path);
+            return stat.isDirectory()?path:dirname(path);
+        }catch{
+            return dirname(path);
+        }
+    }
+
+    /**
+     * Searches upward for the first directory containing a `.git` entry.
+     */
+    private async findGitRootAsync(startDir:string):Promise<string|undefined>
+    {
+        let current=resolve(startDir);
+        while(true){
+            const gitPath=resolve(current,'.git');
+            if(await this.pathExistsAsync(gitPath)){
+                return current;
+            }
+
+            const parent=dirname(current);
+            if(parent===current){
+                return undefined;
+            }
+
+            current=parent;
+        }
+    }
+
+    /**
+     * Normalizes an input path to a git-relative path when possible.
+     */
+    private normalizePathForGit(rootPath:string,path:string):string|undefined
+    {
+        if(!isAbsolute(path)){
+            return path;
+        }
+
+        const relativePath=relative(rootPath,path);
+        if(relativePath.startsWith('..') || relativePath===''){
+            return relativePath===''?undefined:undefined;
+        }
+
+        return relativePath.replaceAll('\\','/');
+    }
+
+    /**
+     * Resolves the requested revision into a git revision spec and hash.
+     */
+    private async resolveRevisionAsync(
+        rootPath:string,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<{revisionSpec?:string;revisionHash?:string}>
+    {
+        if(!revision || revision.type==='working'){
+            return {
+                success:true,
+                result:{},
+            };
+        }
+
+        if(!revision.value){
+            return {
+                success:false,
+                error:'revision.value is required when revision.type is not working',
+                statusCode:400,
+            };
+        }
+
+        const revisionSpec=revision.value;
+        try{
+            const { stdout }=await execFileAsync('git',['rev-parse',revisionSpec],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:{
+                    revisionSpec,
+                    revisionHash:stdout.trim()||undefined,
+                },
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to resolve revision - ${revisionSpec}${this.getExecErrorMessage(err)}`,
+                statusCode:404,
+            };
+        }
+    }
+
+    /**
+     * Returns tracked paths for the current working tree or a specific revision.
+     */
+    private async getTrackedPathsAsync(
+        rootPath:string,
+        paths:string[],
+        revisionSpec?:string
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        const args=revisionSpec?
+            ['ls-tree','-r','--name-only',revisionSpec,'--',...paths]
+        :
+            ['ls-files','--',...paths];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get tracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns untracked paths that match the provided pathspecs.
+     */
+    private async getUntrackedPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get untracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns ignored paths that match the provided pathspecs.
+     */
+    private async getIgnoredPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--ignored','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get ignored paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Executes a git diff-style command and returns the changed paths.
+     */
+    private async getDiffNameOnlyAsync(
+        rootPath:string,
+        args:string[]
+    ):PromiseResultType<string[]>
+    {
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get diff status${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Parses newline-delimited command output into a list of non-empty paths.
+     */
+    private parseLines(value:string):string[]
+    {
+        return value
+            .split('\n')
+            .map(v=>v.trim())
+            .filter(v=>!!v);
+    }
+
+    /**
+     * Returns true if the given path exists on disk.
+     */
+    private async pathExistsAsync(path:string):Promise<boolean>
+    {
+        try{
+            await fs.access(path);
+            return true;
+        }catch{
+            return false;
+        }
+    }
+
+    /**
+     * Returns the SHA-1 hash of the current file contents on disk.
+     */
+    private async getDiskFileHashOrUndefinedAsync(path:string):Promise<string|undefined>
+    {
+        try{
+            const stat=await fs.stat(path);
+            if(!stat.isFile()){
+                return undefined;
+            }
+            const buffer=await fs.readFile(path);
+            return createHash('sha1').update(buffer).digest('hex');
+        }catch{
+            return undefined;
+        }
+    }
+
+    /**
+     * Extracts a readable message from a child process execution error.
+     */
+    private getExecErrorMessage(err:unknown):string
+    {
+        const e=err as { stderr?:string; message?:string }|undefined;
+        const message=e?.stderr?.trim()||e?.message?.trim();
+        return message?` - ${message}`:'';
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+revisionHash is not getting set when request.revision is set to {type:'working'}
+
+@time 2026-04-15T17:16:43-04:00
+@tokenUsage 16382 / 4009 / $0.05097750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="ConvoCliGitService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts__" fenced>
+```ts
+import { ConvoGitFileStatus, ConvoGitService, GitStatusRequest, GitStatusSingleRequest, PromiseResultType } from "@convo-lang/convo-lang";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync=promisify(execFile);
+
+/**
+ * Options used to configure the git service.
+ */
+export interface ConvoCliGitServiceOptions
+{
+    /**
+     * Root path used as the git working directory.
+     * If not provided the service will search upward for the nearest `.git` folder.
+     */
+    rootPath?:string;
+}
+
+/**
+ * Node CLI implementation of the git service using child processes.
+ */
+export class ConvoCliGitService implements ConvoGitService
+{
+
+    /**
+     * Root path used for all git commands.
+     */
+    private readonly rootPath?:string;
+
+    /**
+     * Creates a new git service instance.
+     */
+    public constructor({
+        rootPath
+    }:ConvoCliGitServiceOptions={})
+    {
+        this.rootPath=rootPath;
+    }
+
+    /**
+     * Returns the git status for a single file.
+     */
+    public async gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPathResult=await this.resolveRootPathAsync(request.path);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const normalizedPath=this.normalizePathForGit(rootPath,request.path);
+        const filePath=isAbsolute(request.path)?request.path:resolve(rootPath,request.path);
+        const existsOnDisk=await this.pathExistsAsync(filePath);
+
+        if(!existsOnDisk){
+            return {
+                success:false,
+                error:`File not found - ${request.path}`,
+                statusCode:404,
+            };
+        }
+
+        if(!normalizedPath){
+            return {
+                success:true,
+                result:await this.createSingleFallbackStatusAsync(rootPath,request.path,request.includeFileHash,request.revision),
+            };
+        }
+
+        return await this.getSingleStatusAsync(rootPath,normalizedPath,request.includeFileHash,request.revision);
+    }
+
+    /**
+     * Returns the git status for one or more files or pathspecs.
+     */
+    public async gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const inputPaths=Array.isArray(request.paths)?request.paths:[request.paths];
+        const rootPathResult=await this.resolveRootPathAsync(inputPaths[0]);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const gitPaths:string[]=[];
+        const outsideStatuses:ConvoGitFileStatus[]=[];
+
+        for(const inputPath of inputPaths){
+            const normalizedPath=this.normalizePathForGit(rootPath,inputPath);
+            if(normalizedPath){
+                gitPaths.push(normalizedPath);
+            }else{
+                outsideStatuses.push(await this.createSingleFallbackStatusAsync(rootPath,inputPath,request.includeFileHash,request.revision));
+            }
+        }
+
+        if(!gitPaths.length){
+            return {
+                success:true,
+                result:outsideStatuses,
+            };
+        }
+
+        const result=await this.getMultiStatusAsync(rootPath,gitPaths,request.includeFileHash,request.revision);
+        if(!result.success){
+            return result;
+        }
+
+        return {
+            success:true,
+            result:[
+                ...result.result,
+                ...outsideStatuses,
+            ],
+        };
+    }
+
+    /**
+     * Returns the git status for a single path by delegating to the multi-path implementation.
+     */
+    private async getSingleStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus>
+    {
+        const multiResult=await this.getMultiStatusAsync(rootPath,[path],includeFileHash,revision);
+        if(!multiResult.success){
+            return multiResult;
+        }
+
+        const status=multiResult.result.find(s=>s.path===path)??await this.createSingleFallbackStatusAsync(rootPath,path,includeFileHash,revision);
+        return {
+            success:true,
+            result:status,
+        };
+    }
+
+    /**
+     * Returns the git status for one or more paths.
+     */
+    private async getMultiStatusAsync(
+        rootPath:string,
+        paths:string|string[],
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const pathList=Array.isArray(paths)?paths:[paths];
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        if(!revisionInfo.success){
+            return revisionInfo;
+        }
+
+        const trackedPathsResult=await this.getTrackedPathsAsync(rootPath,pathList,revisionInfo.result.revisionSpec);
+        if(!trackedPathsResult.success){
+            return trackedPathsResult;
+        }
+
+        const trackedPathSet=new Set(trackedPathsResult.result);
+
+        const statusMap=new Map<string,ConvoGitFileStatus>();
+        for(const path of trackedPathSet){
+            statusMap.set(path,{
+                path,
+                isTracked:true,
+                existsInRevision:false,
+                revisionHash:revisionInfo.result.revisionHash,
+            });
+        }
+
+        if(!revision || revision.type==='working'){
+            const untrackedResult=await this.getUntrackedPathsAsync(rootPath,pathList);
+            if(!untrackedResult.success){
+                return untrackedResult;
+            }
+
+            for(const path of untrackedResult.result){
+                if(!statusMap.has(path)){
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:false,
+                        isDirty:true,
+                        isModifiedInWorkingTree:true,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const ignoredResult=await this.getIgnoredPathsAsync(rootPath,pathList);
+            if(!ignoredResult.success){
+                return ignoredResult;
+            }
+
+            for(const path of ignoredResult.result){
+                const current=statusMap.get(path);
+                if(current){
+                    current.isIgnored=true;
+                    current.isTracked=current.isTracked??false;
+                }else{
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:true,
+                        isDirty:false,
+                        isModifiedInWorkingTree:false,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const workingChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only','--',...trackedArray]);
+                if(!workingChangedResult.success){
+                    return workingChangedResult;
+                }
+                const workingChangedSet=new Set(workingChangedResult.result);
+
+                const indexChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--cached','--name-only','--',...trackedArray]);
+                if(!indexChangedResult.success){
+                    return indexChangedResult;
+                }
+                const indexChangedSet=new Set(indexChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=workingChangedSet.has(path);
+                    item.isModifiedInIndex=indexChangedSet.has(path);
+                    item.isDirty=!!item.isModifiedInWorkingTree || !!item.isModifiedInIndex;
+                }
+            }
+        }else{
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const revisionChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only',revisionInfo.result.revisionSpec??'','--',...trackedArray]);
+                if(!revisionChangedResult.success){
+                    return revisionChangedResult;
+                }
+                const revisionChangedSet=new Set(revisionChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=revisionChangedSet.has(path);
+                    item.isModifiedInIndex=false;
+                    item.isDirty=!!item.isModifiedInWorkingTree;
+                }
+            }
+        }
+
+        if(includeFileHash){
+            for(const item of statusMap.values()){
+                if(includeFileHash==='if-dirty' && !item.isDirty){
+                    continue;
+                }
+                const absPath=resolve(rootPath,item.path);
+                item.fileHash=await this.getDiskFileHashOrUndefinedAsync(absPath);
+            }
+        }
+
+        return {
+            success:true,
+            result:[...statusMap.values()],
+        };
+    }
+
+    /**
+     * Creates a fallback status for a single existing file when git does not report it.
+     */
+    private async createSingleFallbackStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):Promise<ConvoGitFileStatus>
+    {
+        const isDirty=revision?.type==='working'?true:false;
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        const filePath=isAbsolute(path)?path:resolve(rootPath,path);
+        const fileHash=(includeFileHash===true || (includeFileHash==='if-dirty' && isDirty))?await this.getDiskFileHashOrUndefinedAsync(filePath):undefined;
+        return {
+            path,
+            isTracked:false,
+            isIgnored:false,
+            isDirty,
+            isModifiedInWorkingTree:revision?.type==='working'?true:false,
+            isModifiedInIndex:false,
+            existsInRevision:false,
+            revisionHash:revisionInfo.success?revisionInfo.result.revisionHash:undefined,
+            fileHash,
+        };
+    }
+
+    /**
+     * Resolves the root path to use for git commands.
+     */
+    private async resolveRootPathAsync(pathHint?:string):PromiseResultType<string>
+    {
+        if(this.rootPath){
+            return {
+                success:true,
+                result:resolve(this.rootPath),
+            };
+        }
+
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const startPath=pathHint?
+            (
+                isAbsolute(pathHint)?
+                    pathHint
+                :
+                    resolve(process.cwd(),pathHint)
+            )
+        :
+            process.cwd();
+
+        const startDir=await this.getSearchStartDirectoryAsync(startPath);
+        const rootPath=await this.findGitRootAsync(startDir);
+        if(!rootPath){
+            return {
+                success:false,
+                error:`Unable to find .git folder from ${startDir}`,
+                statusCode:404,
+            };
+        }
+
+        return {
+            success:true,
+            result:rootPath,
+        };
+    }
+
+    /**
+     * Resolves the directory to start searching from.
+     */
+    private async getSearchStartDirectoryAsync(path:string):Promise<string>
+    {
+        try{
+            const stat=await fs.stat(path);
+            return stat.isDirectory()?path:dirname(path);
+        }catch{
+            return dirname(path);
+        }
+    }
+
+    /**
+     * Searches upward for the first directory containing a `.git` entry.
+     */
+    private async findGitRootAsync(startDir:string):Promise<string|undefined>
+    {
+        let current=resolve(startDir);
+        while(true){
+            const gitPath=resolve(current,'.git');
+            if(await this.pathExistsAsync(gitPath)){
+                return current;
+            }
+
+            const parent=dirname(current);
+            if(parent===current){
+                return undefined;
+            }
+
+            current=parent;
+        }
+    }
+
+    /**
+     * Normalizes an input path to a git-relative path when possible.
+     */
+    private normalizePathForGit(rootPath:string,path:string):string|undefined
+    {
+        if(!isAbsolute(path)){
+            return path;
+        }
+
+        const relativePath=relative(rootPath,path);
+        if(relativePath.startsWith('..') || relativePath===''){
+            return undefined;
+        }
+
+        return relativePath.replaceAll('\\','/');
+    }
+
+    /**
+     * Resolves the requested revision into a git revision spec and hash.
+     */
+    private async resolveRevisionAsync(
+        rootPath:string,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<{revisionSpec?:string;revisionHash?:string}>
+    {
+        if(!revision){
+            return {
+                success:true,
+                result:{},
+            };
+        }
+
+        if(revision.type==='working'){
+            try{
+                const { stdout }=await execFileAsync('git',['rev-parse','HEAD'],{
+                    cwd:rootPath,
+                });
+                return {
+                    success:true,
+                    result:{
+                        revisionHash:stdout.trim()||undefined,
+                    },
+                };
+            }catch(err){
+                return {
+                    success:false,
+                    error:`Unable to resolve revision - HEAD${this.getExecErrorMessage(err)}`,
+                    statusCode:404,
+                };
+            }
+        }
+
+        if(!revision.value){
+            return {
+                success:false,
+                error:'revision.value is required when revision.type is not working',
+                statusCode:400,
+            };
+        }
+
+        const revisionSpec=revision.value;
+        try{
+            const { stdout }=await execFileAsync('git',['rev-parse',revisionSpec],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:{
+                    revisionSpec,
+                    revisionHash:stdout.trim()||undefined,
+                },
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to resolve revision - ${revisionSpec}${this.getExecErrorMessage(err)}`,
+                statusCode:404,
+            };
+        }
+    }
+
+    /**
+     * Returns tracked paths for the current working tree or a specific revision.
+     */
+    private async getTrackedPathsAsync(
+        rootPath:string,
+        paths:string[],
+        revisionSpec?:string
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        const args=revisionSpec?
+            ['ls-tree','-r','--name-only',revisionSpec,'--',...paths]
+        :
+            ['ls-files','--',...paths];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get tracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns untracked paths that match the provided pathspecs.
+     */
+    private async getUntrackedPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get untracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns ignored paths that match the provided pathspecs.
+     */
+    private async getIgnoredPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--ignored','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get ignored paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Executes a git diff-style command and returns the changed paths.
+     */
+    private async getDiffNameOnlyAsync(
+        rootPath:string,
+        args:string[]
+    ):PromiseResultType<string[]>
+    {
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get diff status${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Parses newline-delimited command output into a list of non-empty paths.
+     */
+    private parseLines(value:string):string[]
+    {
+        return value
+            .split('\n')
+            .map(v=>v.trim())
+            .filter(v=>!!v);
+    }
+
+    /**
+     * Returns true if the given path exists on disk.
+     */
+    private async pathExistsAsync(path:string):Promise<boolean>
+    {
+        try{
+            await fs.access(path);
+            return true;
+        }catch{
+            return false;
+        }
+    }
+
+    /**
+     * Returns the SHA-1 hash of the current file contents on disk.
+     */
+    private async getDiskFileHashOrUndefinedAsync(path:string):Promise<string|undefined>
+    {
+        try{
+            const stat=await fs.stat(path);
+            if(!stat.isFile()){
+                return undefined;
+            }
+            const buffer=await fs.readFile(path);
+            return createHash('sha1').update(buffer).digest('hex');
+        }catch{
+            return undefined;
+        }
+    }
+
+    /**
+     * Extracts a readable message from a child process execution error.
+     */
+    private getExecErrorMessage(err:unknown):string
+    {
+        const e=err as { stderr?:string; message?:string }|undefined;
+        const message=e?.stderr?.trim()||e?.message?.trim();
+        return message?` - ${message}`:'';
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+There has been some confusion. I was `revisionHash` to equal the has of the git commit that the file was last changed at
+
+@time 2026-04-15T17:19:11-04:00
+@tokenUsage 20425 / 115 / $0.05135000000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick clarification:
+
+For `revisionHash`, when you say “the git commit that the file was last changed at”, should that mean:
+
+1. the most recent commit in history that changed that file relative to `HEAD` / the selected revision, even if the file currently has uncommitted changes, or
+2. if the file is dirty, some value should indicate the working tree/index state instead?
+
+I’m assuming **#1** and would implement it using git history lookup for each tracked file, but want to confirm.
+
+
+> user
+Keep the `revisionHash` property and add a new property called `lastCommit` and set it to the most recent commit in history that changed that file relative to `HEAD` / the selected revision
+
+@time 2026-04-15T17:22:42-04:00
+@tokenUsage 20587 / 4951 / $0.06384500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-git-types.ts" target-output-path="../../packages/convo-lang/src/lib/git/convo-git-types.ts" dirty file-hash="38c95fd59c3f19146e0ec132152bb135a6eaf0aa" fenced>
+```ts
+import { PromiseResultType } from "../result-type.js";
+
+export type GitRevisionType='working'|'branch'|'tag'|'commit';
+
+export interface GitStatusRevision
+{
+    /**
+     * The type of revision to inspect.
+     */
+    type:GitRevisionType;
+
+    /**
+     * The branch name, tag name, or commit hash depending on the revision type.
+     * Not required when type is working.
+     */
+    value?:string;
+}
+
+export interface ConvoGitFileStatus
+{
+    /**
+     * Name of the file.
+     */
+    path:string;
+
+    isTracked?:boolean;
+
+    isIgnored?:boolean;
+
+    /**
+     * True when the file has any working tree or staged/index changes.
+     */
+    isDirty?:boolean;
+
+    /**
+     * True when the working tree version differs from the target revision.
+     */
+    isModifiedInWorkingTree?:boolean;
+
+    /**
+     * True when the staged/index version differs from the target revision.
+     */
+    isModifiedInIndex?:boolean;
+
+    /**
+     * True when the file exists in the target revision.
+     */
+    existsInRevision?:boolean;
+
+    /**
+     * The resolved hash of the revision used for comparison.
+     */
+    revisionHash?:string;
+
+    /**
+     * The most recent commit in history that changed the file relative to HEAD or the selected revision.
+     */
+    lastCommit?:string;
+
+    fileHash?:string;
+}
+
+export interface GitStatusRequestBase
+{
+    /**
+     * If true returned status items should include a file hash. If equals 'if-dirty' items should
+     * include a file hash only if the item isDirty.
+     */
+    includeFileHash?:boolean|'if-dirty';
+
+    /**
+     * The revision to inspect. Defaults to the working tree.
+     */
+    revision?:GitStatusRevision;
+}
+
+/**
+ * Request the status of a single file.
+ */
+export interface GitStatusSingleRequest extends GitStatusRequestBase
+{
+    /**
+     * Path to the file.
+     */
+    path:string;
+}
+
+/**
+ * Request the status of multiple files.
+ */
+export interface GitStatusRequest extends GitStatusRequestBase
+{
+    /**
+     * Paths of files to get status for. Paths can include globs.
+     */
+    paths:string|string[];
+}
+
+/**
+ * Handles git integration.
+ */
+export interface ConvoGitService
+{
+    /**
+     * Returns the git status of a single file. Will return a 404 if the target file does not exist.
+     */
+    gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>;
+
+    /**
+     * Returns the git status for all target files. Requested paths can include globs.
+     * If no files exist at the target path or paths an empty array will be returned.
+     */
+    gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>;
+}
+
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="ConvoCliGitService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoCliGitService.ts" dirty file-hash="80bb278fbe8dc810ddf9cc519d7e64d30335b215" fenced>
+```ts
+import { ConvoGitFileStatus, ConvoGitService, GitStatusRequest, GitStatusSingleRequest, PromiseResultType } from "@convo-lang/convo-lang";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync=promisify(execFile);
+
+/**
+ * Options used to configure the git service.
+ */
+export interface ConvoCliGitServiceOptions
+{
+    /**
+     * Root path used as the git working directory.
+     * If not provided the service will search upward for the nearest `.git` folder.
+     */
+    rootPath?:string;
+}
+
+/**
+ * Node CLI implementation of the git service using child processes.
+ */
+export class ConvoCliGitService implements ConvoGitService
+{
+
+    /**
+     * Root path used for all git commands.
+     */
+    private readonly rootPath?:string;
+
+    /**
+     * Creates a new git service instance.
+     */
+    public constructor({
+        rootPath
+    }:ConvoCliGitServiceOptions={})
+    {
+        this.rootPath=rootPath;
+    }
+
+    /**
+     * Returns the git status for a single file.
+     */
+    public async gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const rootPathResult=await this.resolveRootPathAsync(request.path);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const normalizedPath=this.normalizePathForGit(rootPath,request.path);
+        const filePath=isAbsolute(request.path)?request.path:resolve(rootPath,request.path);
+        const existsOnDisk=await this.pathExistsAsync(filePath);
+
+        if(!existsOnDisk){
+            return {
+                success:false,
+                error:`File not found - ${request.path}`,
+                statusCode:404,
+            };
+        }
+
+        if(!normalizedPath){
+            return {
+                success:true,
+                result:await this.createSingleFallbackStatusAsync(rootPath,request.path,request.includeFileHash,request.revision),
+            };
+        }
+
+        return await this.getSingleStatusAsync(rootPath,normalizedPath,request.includeFileHash,request.revision);
+    }
+
+    /**
+     * Returns the git status for one or more files or pathspecs.
+     */
+    public async gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const inputPaths=Array.isArray(request.paths)?request.paths:[request.paths];
+        const rootPathResult=await this.resolveRootPathAsync(inputPaths[0]);
+        if(!rootPathResult.success){
+            return rootPathResult;
+        }
+
+        const rootPath=rootPathResult.result;
+        const gitPaths:string[]=[];
+        const outsideStatuses:ConvoGitFileStatus[]=[];
+
+        for(const inputPath of inputPaths){
+            const normalizedPath=this.normalizePathForGit(rootPath,inputPath);
+            if(normalizedPath){
+                gitPaths.push(normalizedPath);
+            }else{
+                outsideStatuses.push(await this.createSingleFallbackStatusAsync(rootPath,inputPath,request.includeFileHash,request.revision));
+            }
+        }
+
+        if(!gitPaths.length){
+            return {
+                success:true,
+                result:outsideStatuses,
+            };
+        }
+
+        const result=await this.getMultiStatusAsync(rootPath,gitPaths,request.includeFileHash,request.revision);
+        if(!result.success){
+            return result;
+        }
+
+        return {
+            success:true,
+            result:[
+                ...result.result,
+                ...outsideStatuses,
+            ],
+        };
+    }
+
+    /**
+     * Returns the git status for a single path by delegating to the multi-path implementation.
+     */
+    private async getSingleStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus>
+    {
+        const multiResult=await this.getMultiStatusAsync(rootPath,[path],includeFileHash,revision);
+        if(!multiResult.success){
+            return multiResult;
+        }
+
+        const status=multiResult.result.find(s=>s.path===path)??await this.createSingleFallbackStatusAsync(rootPath,path,includeFileHash,revision);
+        return {
+            success:true,
+            result:status,
+        };
+    }
+
+    /**
+     * Returns the git status for one or more paths.
+     */
+    private async getMultiStatusAsync(
+        rootPath:string,
+        paths:string|string[],
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<ConvoGitFileStatus[]>
+    {
+        const pathList=Array.isArray(paths)?paths:[paths];
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        if(!revisionInfo.success){
+            return revisionInfo;
+        }
+
+        const trackedPathsResult=await this.getTrackedPathsAsync(rootPath,pathList,revisionInfo.result.revisionSpec);
+        if(!trackedPathsResult.success){
+            return trackedPathsResult;
+        }
+
+        const trackedPathSet=new Set(trackedPathsResult.result);
+
+        const statusMap=new Map<string,ConvoGitFileStatus>();
+        for(const path of trackedPathSet){
+            statusMap.set(path,{
+                path,
+                isTracked:true,
+                existsInRevision:false,
+                revisionHash:revisionInfo.result.revisionHash,
+            });
+        }
+
+        if(!revision || revision.type==='working'){
+            const untrackedResult=await this.getUntrackedPathsAsync(rootPath,pathList);
+            if(!untrackedResult.success){
+                return untrackedResult;
+            }
+
+            for(const path of untrackedResult.result){
+                if(!statusMap.has(path)){
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:false,
+                        isDirty:true,
+                        isModifiedInWorkingTree:true,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const ignoredResult=await this.getIgnoredPathsAsync(rootPath,pathList);
+            if(!ignoredResult.success){
+                return ignoredResult;
+            }
+
+            for(const path of ignoredResult.result){
+                const current=statusMap.get(path);
+                if(current){
+                    current.isIgnored=true;
+                    current.isTracked=current.isTracked??false;
+                }else{
+                    statusMap.set(path,{
+                        path,
+                        isTracked:false,
+                        isIgnored:true,
+                        isDirty:false,
+                        isModifiedInWorkingTree:false,
+                        isModifiedInIndex:false,
+                        existsInRevision:false,
+                        revisionHash:revisionInfo.result.revisionHash,
+                    });
+                }
+            }
+
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const workingChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only','--',...trackedArray]);
+                if(!workingChangedResult.success){
+                    return workingChangedResult;
+                }
+                const workingChangedSet=new Set(workingChangedResult.result);
+
+                const indexChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--cached','--name-only','--',...trackedArray]);
+                if(!indexChangedResult.success){
+                    return indexChangedResult;
+                }
+                const indexChangedSet=new Set(indexChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=workingChangedSet.has(path);
+                    item.isModifiedInIndex=indexChangedSet.has(path);
+                    item.isDirty=!!item.isModifiedInWorkingTree || !!item.isModifiedInIndex;
+                }
+            }
+        }else{
+            const trackedArray=[...trackedPathSet];
+            if(trackedArray.length){
+                const revisionChangedResult=await this.getDiffNameOnlyAsync(rootPath,['diff','--name-only',revisionInfo.result.revisionSpec??'','--',...trackedArray]);
+                if(!revisionChangedResult.success){
+                    return revisionChangedResult;
+                }
+                const revisionChangedSet=new Set(revisionChangedResult.result);
+
+                for(const path of trackedArray){
+                    const item=statusMap.get(path);
+                    if(!item){
+                        continue;
+                    }
+
+                    item.existsInRevision=true;
+                    item.isModifiedInWorkingTree=revisionChangedSet.has(path);
+                    item.isModifiedInIndex=false;
+                    item.isDirty=!!item.isModifiedInWorkingTree;
+                }
+            }
+        }
+
+        await this.populateLastCommitAsync(rootPath,[...statusMap.values()],revisionInfo.result.revisionSpec);
+
+        if(includeFileHash){
+            for(const item of statusMap.values()){
+                if(includeFileHash==='if-dirty' && !item.isDirty){
+                    continue;
+                }
+                const absPath=resolve(rootPath,item.path);
+                item.fileHash=await this.getDiskFileHashOrUndefinedAsync(absPath);
+            }
+        }
+
+        return {
+            success:true,
+            result:[...statusMap.values()],
+        };
+    }
+
+    /**
+     * Creates a fallback status for a single existing file when git does not report it.
+     */
+    private async createSingleFallbackStatusAsync(
+        rootPath:string,
+        path:string,
+        includeFileHash:boolean|'if-dirty'|undefined,
+        revision:GitStatusSingleRequest['revision']
+    ):Promise<ConvoGitFileStatus>
+    {
+        const isDirty=revision?.type==='working'?true:false;
+        const revisionInfo=await this.resolveRevisionAsync(rootPath,revision);
+        const filePath=isAbsolute(path)?path:resolve(rootPath,path);
+        const fileHash=(includeFileHash===true || (includeFileHash==='if-dirty' && isDirty))?await this.getDiskFileHashOrUndefinedAsync(filePath):undefined;
+        return {
+            path,
+            isTracked:false,
+            isIgnored:false,
+            isDirty,
+            isModifiedInWorkingTree:revision?.type==='working'?true:false,
+            isModifiedInIndex:false,
+            existsInRevision:false,
+            revisionHash:revisionInfo.success?revisionInfo.result.revisionHash:undefined,
+            fileHash,
+        };
+    }
+
+    /**
+     * Resolves the root path to use for git commands.
+     */
+    private async resolveRootPathAsync(pathHint?:string):PromiseResultType<string>
+    {
+        if(this.rootPath){
+            return {
+                success:true,
+                result:resolve(this.rootPath),
+            };
+        }
+
+        const process=globalThis.process;
+        if(!process){
+            return {
+                success:false,
+                error:'globalThis.process not defined by runtime',
+                statusCode:500,
+            };
+        }
+
+        const startPath=pathHint?
+            (
+                isAbsolute(pathHint)?
+                    pathHint
+                :
+                    resolve(process.cwd(),pathHint)
+            )
+        :
+            process.cwd();
+
+        const startDir=await this.getSearchStartDirectoryAsync(startPath);
+        const rootPath=await this.findGitRootAsync(startDir);
+        if(!rootPath){
+            return {
+                success:false,
+                error:`Unable to find .git folder from ${startDir}`,
+                statusCode:404,
+            };
+        }
+
+        return {
+            success:true,
+            result:rootPath,
+        };
+    }
+
+    /**
+     * Resolves the directory to start searching from.
+     */
+    private async getSearchStartDirectoryAsync(path:string):Promise<string>
+    {
+        try{
+            const stat=await fs.stat(path);
+            return stat.isDirectory()?path:dirname(path);
+        }catch{
+            return dirname(path);
+        }
+    }
+
+    /**
+     * Searches upward for the first directory containing a `.git` entry.
+     */
+    private async findGitRootAsync(startDir:string):Promise<string|undefined>
+    {
+        let current=resolve(startDir);
+        while(true){
+            const gitPath=resolve(current,'.git');
+            if(await this.pathExistsAsync(gitPath)){
+                return current;
+            }
+
+            const parent=dirname(current);
+            if(parent===current){
+                return undefined;
+            }
+
+            current=parent;
+        }
+    }
+
+    /**
+     * Normalizes an input path to a git-relative path when possible.
+     */
+    private normalizePathForGit(rootPath:string,path:string):string|undefined
+    {
+        if(!isAbsolute(path)){
+            return path;
+        }
+
+        const relativePath=relative(rootPath,path);
+        if(relativePath.startsWith('..') || relativePath===''){
+            return undefined;
+        }
+
+        return relativePath.replaceAll('\\','/');
+    }
+
+    /**
+     * Resolves the requested revision into a git revision spec and hash.
+     */
+    private async resolveRevisionAsync(
+        rootPath:string,
+        revision:GitStatusSingleRequest['revision']
+    ):PromiseResultType<{revisionSpec?:string;revisionHash?:string}>
+    {
+        if(!revision || revision.type==='working'){
+            try{
+                const { stdout }=await execFileAsync('git',['rev-parse','HEAD'],{
+                    cwd:rootPath,
+                });
+                return {
+                    success:true,
+                    result:{
+                        revisionHash:stdout.trim()||undefined,
+                    },
+                };
+            }catch(err){
+                return {
+                    success:false,
+                    error:`Unable to resolve revision - HEAD${this.getExecErrorMessage(err)}`,
+                    statusCode:404,
+                };
+            }
+        }
+
+        if(!revision.value){
+            return {
+                success:false,
+                error:'revision.value is required when revision.type is not working',
+                statusCode:400,
+            };
+        }
+
+        const revisionSpec=revision.value;
+        try{
+            const { stdout }=await execFileAsync('git',['rev-parse',revisionSpec],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:{
+                    revisionSpec,
+                    revisionHash:stdout.trim()||undefined,
+                },
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to resolve revision - ${revisionSpec}${this.getExecErrorMessage(err)}`,
+                statusCode:404,
+            };
+        }
+    }
+
+    /**
+     * Returns tracked paths for the current working tree or a specific revision.
+     */
+    private async getTrackedPathsAsync(
+        rootPath:string,
+        paths:string[],
+        revisionSpec?:string
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        const args=revisionSpec?
+            ['ls-tree','-r','--name-only',revisionSpec,'--',...paths]
+        :
+            ['ls-files','--',...paths];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get tracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns untracked paths that match the provided pathspecs.
+     */
+    private async getUntrackedPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get untracked paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Returns ignored paths that match the provided pathspecs.
+     */
+    private async getIgnoredPathsAsync(
+        rootPath:string,
+        paths:string[]
+    ):PromiseResultType<string[]>
+    {
+        if(!paths.length){
+            return {
+                success:true,
+                result:[],
+            };
+        }
+
+        try{
+            const { stdout }=await execFileAsync('git',['ls-files','--others','--ignored','--exclude-standard','--',...paths],{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get ignored paths${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Executes a git diff-style command and returns the changed paths.
+     */
+    private async getDiffNameOnlyAsync(
+        rootPath:string,
+        args:string[]
+    ):PromiseResultType<string[]>
+    {
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            return {
+                success:true,
+                result:this.parseLines(stdout),
+            };
+        }catch(err){
+            return {
+                success:false,
+                error:`Unable to get diff status${this.getExecErrorMessage(err)}`,
+                statusCode:500,
+            };
+        }
+    }
+
+    /**
+     * Populates the last commit that changed each tracked file relative to the selected revision.
+     */
+    private async populateLastCommitAsync(
+        rootPath:string,
+        items:ConvoGitFileStatus[],
+        revisionSpec?:string
+    ):Promise<void>
+    {
+        for(const item of items){
+            if(!item.isTracked){
+                continue;
+            }
+            item.lastCommit=await this.getLastCommitAsync(rootPath,item.path,revisionSpec);
+        }
+    }
+
+    /**
+     * Returns the last commit that changed the file at the selected revision.
+     */
+    private async getLastCommitAsync(
+        rootPath:string,
+        path:string,
+        revisionSpec?:string
+    ):Promise<string|undefined>
+    {
+        const args=revisionSpec?
+            ['log','-n','1','--format=%H',revisionSpec,'--',path]
+        :
+            ['log','-n','1','--format=%H','HEAD','--',path];
+
+        try{
+            const { stdout }=await execFileAsync('git',args,{
+                cwd:rootPath,
+            });
+            const value=stdout.trim();
+            return value||undefined;
+        }catch{
+            return undefined;
+        }
+    }
+
+    /**
+     * Parses newline-delimited command output into a list of non-empty paths.
+     */
+    private parseLines(value:string):string[]
+    {
+        return value
+            .split('\n')
+            .map(v=>v.trim())
+            .filter(v=>!!v);
+    }
+
+    /**
+     * Returns true if the given path exists on disk.
+     */
+    private async pathExistsAsync(path:string):Promise<boolean>
+    {
+        try{
+            await fs.access(path);
+            return true;
+        }catch{
+            return false;
+        }
+    }
+
+    /**
+     * Returns the SHA-1 hash of the current file contents on disk.
+     */
+    private async getDiskFileHashOrUndefinedAsync(path:string):Promise<string|undefined>
+    {
+        try{
+            const stat=await fs.stat(path);
+            if(!stat.isFile()){
+                return undefined;
+            }
+            const buffer=await fs.readFile(path);
+            return createHash('sha1').update(buffer).digest('hex');
+        }catch{
+            return undefined;
+        }
+    }
+
+    /**
+     * Extracts a readable message from a child process execution error.
+     */
+    private getExecErrorMessage(err:unknown):string
+    {
+        const e=err as { stderr?:string; message?:string }|undefined;
+        const message=e?.stderr?.trim()||e?.message?.trim();
+        return message?` - ${message}`:'';
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user

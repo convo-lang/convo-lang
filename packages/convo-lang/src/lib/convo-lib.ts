@@ -8,6 +8,7 @@ import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoDocumentReference } from "./convo-rag-types.js";
 import { convoSystemMessages } from "./convo-system-messages.js";
 import { ConvoBaseType, ConvoCompletion, ConvoCompletionMessage, ConvoCompletionService, ConvoFlowController, ConvoFunction, ConvoMessage, ConvoMessageModificationAction, ConvoMessageTemplate, ConvoMetadata, ConvoModelAlias, ConvoModelInfo, ConvoPrintFunction, ConvoScope, ConvoScopeError, ConvoScopeFunction, ConvoStatement, ConvoStringTemplateLiteralOptions, ConvoTag, ConvoThreadFilter, ConvoTokenUsage, ConvoTranscriptionRequest, ConvoTranscriptionSupportRequest, ConvoType, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, OptionalConvoValue, ParsedContentJsonOrString, StandardConvoSystemMessage, convoFlowControllerKey, convoMessageSourceReferenceKey, convoObjFlag, convoScopeFunctionMarker, convoScopeParentKey, convoStringTemplateLiteralOptionsFlag } from "./convo-types.js";
+import { ConvoGitFileStatus } from "./git/convo-git-types.js";
 
 export const convoBodyFnName='__body';
 export const convoArgsName='__args';
@@ -3752,7 +3753,7 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
     return {name,modifiers,templateName,role,assign,tag}
 }
 
-export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string)=>{
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus)=>{
     const tag=convoImport.tag;
     if(!tag){
         return content;
@@ -3782,6 +3783,12 @@ export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,pat
         `<${tag} name="${
             escapeHtml(path?getFileName(path):convoImport.name)
         }"${path?` path="${escapeHtml(path)}"`:''}${
+            gitStatus?(
+                (gitStatus.isDirty?` dirty`:'')+
+                (gitStatus.fileHash?` file-hash="${escapeHtml(gitStatus.fileHash)}"`:'')+
+                (gitStatus.lastCommit?` last-commit="${escapeHtml(gitStatus.lastCommit)}"`:'')
+            ):''
+        }${
             comment?` comment="${comment}"`:''
         }${closingEscape?` closing-escape="${closingEscape}"`:''}>\n${
             content

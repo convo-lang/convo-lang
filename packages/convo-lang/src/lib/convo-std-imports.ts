@@ -26,6 +26,17 @@ a similar XML block but replace the path attribute name with ${t}target-output-p
 If creating a new file and not given a path use a path relative to the parent
 directory of the referenced file.
 
+When updating a file any attribute of its XML tag as long as they dont override the attributes of
+your response. Do not forward the path attribute target-output-path will be used instead.
+
+XML File Block Attributes:
+- name: name of file
+- path: relative path from current directory to the file
+- fenced: Indicates the contents in the XML file block is wrapped in a markdown code fence for syntax highlighting
+- dirty: The source file has uncommitted git changes
+- file-hash: The hash of the file, usually only set when the file is dirty
+- last-commit: The hash of the last commit the file was part of
+
 You can also wrap the inner contents of the XML block with a markdown code fence to improve 
 syntax highlighting for the user. If you do include a code fence include the fenced boolean attribute.
 

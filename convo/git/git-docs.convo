@@ -1,0 +1,281 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/git/convo-git-types.ts !file
+
+> user
+Review the interfaced in the `convo-git-types.ts` file. Do you see any issues or missing functionality.
+
+@time 2026-04-15T14:47:29-04:00
+@tokenUsage 1621 / 105 / $0.004315
+@model gpt-5.4-2026-03-05
+> assistant
+A few questions before I give a concrete review:
+
+1. Should I limit this to API/interface design only, or also call out doc/comment typos and naming inconsistencies?
+2. Is this interface meant to support only local working-tree status, or also staged/index state, rename/copy detection, branch info, and ahead/behind metadata?
+3. Do you want me to propose an updated `convo-git-types.ts` file, or just review the current one and list issues/missing capabilities?
+
+
+> user
+1. call out doc/comment typos and naming inconsistencies too
+2. local working tree and staged/index state.
+3. propose an update
+
+Add functionality to get status for a particular branch, tag or commit.
+Add a property to the base request interface to facilitate.
+
+@time 2026-04-15T14:51:17-04:00
+@tokenUsage 1788 / 929 / $0.0067925
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-git-types.ts" target-output-path="../../packages/convo-lang/src/lib/git/convo-git-types.ts_" fenced>
+```ts
+import { PromiseResultType } from "../result-type.js";
+
+export type GitRevisionType='working'|'branch'|'tag'|'commit';
+
+export interface GitStatusRevision
+{
+    /**
+     * The type of revision to inspect.
+     */
+    type:GitRevisionType;
+
+    /**
+     * The branch name, tag name, or commit hash depending on the revision type.
+     * Not required when type is working.
+     */
+    value?:string;
+}
+
+export interface ConvoGitFileStatus
+{
+    /**
+     * Name of the file.
+     */
+    path:string;
+
+    isTracked?:boolean;
+
+    isIgnored?:boolean;
+
+    /**
+     * True when the working tree version differs from the target revision.
+     */
+    isDirty?:boolean;
+
+    /**
+     * True when the staged/index version differs from the target revision.
+     */
+    isStaged?:boolean;
+
+    /**
+     * The hash of the revision used for comparison.
+     */
+    commit?:string;
+
+    fileHash?:string;
+}
+
+export interface GitStatusRequestBase
+{
+    /**
+     * If true returned status items should include a file hash.
+     */
+    includeFileHash?:boolean;
+
+    /**
+     * The revision to inspect. Defaults to the working tree.
+     */
+    revision?:GitStatusRevision;
+}
+
+/**
+ * Request the status of a single file.
+ */
+export interface GitStatusSingleRequest extends GitStatusRequestBase
+{
+    /**
+     * Path to the file.
+     */
+    path:string;
+}
+
+/**
+ * Request the status of multiple files.
+ */
+export interface GitStatusRequest extends GitStatusRequestBase
+{
+    /**
+     * Paths of files to get status for. Paths can include globs.
+     */
+    paths:string|string[];
+}
+
+/**
+ * Handles git integration.
+ */
+export interface ConvoGitService
+{
+    /**
+     * Returns the git status of a single file. Will return a 404 if the target file does not exist.
+     */
+    gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>;
+
+    /**
+     * Returns the git status for all target files. Requested paths can include globs.
+     * If no files exist at the target path or paths an empty array will be returned.
+     */
+    gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>;
+}
+```
+</FILE_CONTENT>
+
+Issues I see in the original:
+
+- Typo: `interfaced` / in-file docs have a few grammar issues.
+- Typo: `If true the file has of return status items should include a file hash` is malformed.
+- Typo: `multiple file` should be `multiple files`.
+- Typo: `include blobs` should be `include globs`.
+- Naming mismatch: `commit?:string;` becomes misleading once you want branch/tag/commit support. I left the field name as-is for compatibility, but its doc now clarifies it is the resolved revision hash. If you want cleaner semantics, `revisionHash?:string;` would be better.
+- Missing staged/index state: original only had `isDirty`, which usually implies working tree changes, but not staged changes.
+- Missing revision selector: there was no way to ask for status relative to branch/tag/commit.
+- Missing explicit revision typing: adding `revision` to the base request makes all status requests consistently target working tree, branch, tag, or commit.
+
+A few additional design notes:
+
+- `GitStatusRevision.value` is optional to allow `type:'working'`, but ideally this should be a discriminated union so `value` is required for `branch|tag|commit` and forbidden for `working`.
+- `isDirty` and `isStaged` are still a little ambiguous for non-working revisions:
+  - for `working`, `isDirty` = working tree differs from HEAD/target and `isStaged` = index differs.
+  - for `branch|tag|commit`, `isDirty` may mean current working tree differs from that revision.
+If you want stricter semantics, I’d recommend replacing these with:
+- `isModifiedInWorkingTree?:boolean;`
+- `isModifiedInIndex?:boolean;`
+- `existsInRevision?:boolean;`
+
+If you want, I can do a second pass and tighten this into a more type-safe discriminated-union design.
+
+
+> user
+Change `commit?:string` to `revisionHash?:string`.
+
+Apply the stricter semantics, but leave the isDirty flag for simplicity, it should be true when there are any changes.
+
+@time 2026-04-15T14:56:19-04:00
+@tokenUsage 2762 / 576 / $0.008345
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-git-types.ts" target-output-path="../../packages/convo-lang/src/lib/git/convo-git-types.ts" fenced>
+```ts
+import { PromiseResultType } from "../result-type.js";
+
+export type GitRevisionType='working'|'branch'|'tag'|'commit';
+
+export interface GitStatusRevision
+{
+    /**
+     * The type of revision to inspect.
+     */
+    type:GitRevisionType;
+
+    /**
+     * The branch name, tag name, or commit hash depending on the revision type.
+     * Not required when type is working.
+     */
+    value?:string;
+}
+
+export interface ConvoGitFileStatus
+{
+    /**
+     * Name of the file.
+     */
+    path:string;
+
+    isTracked?:boolean;
+
+    isIgnored?:boolean;
+
+    /**
+     * True when the file has any working tree or staged/index changes.
+     */
+    isDirty?:boolean;
+
+    /**
+     * True when the working tree version differs from the target revision.
+     */
+    isModifiedInWorkingTree?:boolean;
+
+    /**
+     * True when the staged/index version differs from the target revision.
+     */
+    isModifiedInIndex?:boolean;
+
+    /**
+     * True when the file exists in the target revision.
+     */
+    existsInRevision?:boolean;
+
+    /**
+     * The resolved hash of the revision used for comparison.
+     */
+    revisionHash?:string;
+
+    fileHash?:string;
+}
+
+export interface GitStatusRequestBase
+{
+    /**
+     * If true returned status items should include a file hash.
+     */
+    includeFileHash?:boolean;
+
+    /**
+     * The revision to inspect. Defaults to the working tree.
+     */
+    revision?:GitStatusRevision;
+}
+
+/**
+ * Request the status of a single file.
+ */
+export interface GitStatusSingleRequest extends GitStatusRequestBase
+{
+    /**
+     * Path to the file.
+     */
+    path:string;
+}
+
+/**
+ * Request the status of multiple files.
+ */
+export interface GitStatusRequest extends GitStatusRequestBase
+{
+    /**
+     * Paths of files to get status for. Paths can include globs.
+     */
+    paths:string|string[];
+}
+
+/**
+ * Handles git integration.
+ */
+export interface ConvoGitService
+{
+    /**
+     * Returns the git status of a single file. Will return a 404 if the target file does not exist.
+     */
+    gitStatusSingleAsync(request:GitStatusSingleRequest):PromiseResultType<ConvoGitFileStatus>;
+
+    /**
+     * Returns the git status for all target files. Requested paths can include globs.
+     * If no files exist at the target path or paths an empty array will be returned.
+     */
+    gitStatusAsync(request:GitStatusRequest):PromiseResultType<ConvoGitFileStatus[]>;
+}
+```
+</FILE_CONTENT>
+
+
+> user

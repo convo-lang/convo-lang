@@ -1,0 +1,7 @@
+
+@import ../../packages/convo-lang/src/lib/git/convo-git-types.ts !file
+@import ../../examples/nextjs/next.config.mjs !file
+
+> user
+Add a description of the file to the top of the file as a comment
+

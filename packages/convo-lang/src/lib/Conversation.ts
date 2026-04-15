@@ -23,7 +23,7 @@ import { convoStdImportHandler } from "./convo-std-imports.js";
 import { convoScript } from "./convo-template.js";
 import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionChunk, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoFlatMessageSourceMessageKey, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod.js";
-import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoImportService } from "./convo.deps.js";
+import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoGitService, convoImportService } from "./convo.deps.js";
 import { isConvoObject } from "./convoAsync.js";
 import { createConvoVisionFunction } from "./createConvoVisionFunction.js";
 import { convoScopeFunctionEvalJavascript } from "./scope-functions/convoScopeFunctionEvalJavascript.js";
@@ -3412,8 +3412,27 @@ export class Conversation
 
                         const first=result[0];
                         if(first && modifiers.includes(convoImportModifiers.merge)){
+                            const git=convoGitService.get();
+                            const status=(!git || !importBase.tag)?null:await Promise.all(result.map(async r=>{
+                                if(!r.filePath){
+                                    return null;
+                                }
+                                const status=await git.gitStatusSingleAsync({
+                                    path:r.filePath,
+                                    includeFileHash:'if-dirty',
+                                });
+                                return {status:status.success?status.result:undefined,filePath:r.filePath};
+                            }));
                             result.sort((a,b)=>(a.filePath??a.name).localeCompare(b.filePath??b.name));
-                            first.content=result.map(r=>importBase.tag?applyConvoImportTag(r.content??'',importBase,r.relativeName):r.content).join('\n\n\n');
+                            first.content=result.map(r=>importBase.tag?
+                                applyConvoImportTag(
+                                    r.content??'',
+                                    importBase,
+                                    r.relativeName,
+                                    r.filePath?status?.find(s=>s?.filePath===r.filePath)?.status:undefined
+                                )
+                                :r.content
+                            ).join('\n\n\n');
                             imports.push(first);
                             tag=undefined;
                         }else{
@@ -3439,7 +3458,7 @@ export class Conversation
         const messages:ConvoMessage[]=[];
         for(const i of imports){
             if(!this.importedModules[i.name]){
-                messages.push(...this.registerModule(i,{name:i.name,modifiers,modifierMap,system,ignoreContent,templateName,tag,targetPath,role,assign},index,externFunctions));
+                messages.push(...await this.registerModuleAsync(i,{name:i.name,modifiers,modifierMap,system,ignoreContent,templateName,tag,targetPath,role,assign},index,externFunctions));
             }
         }
         return messages;
@@ -3447,7 +3466,7 @@ export class Conversation
 
     public readonly importedModules:Record<string,ConvoModule>={};
 
-    private registerModule(
+    private async registerModuleAsync(
         module:ConvoModule,
         importStatement:ConvoImport={
             name:module.name,
@@ -3504,7 +3523,11 @@ export class Conversation
         const contentSrc=module.content??'';
         let content=escapeConvo(contentSrc);
         if(importStatement.tag){
-            content=applyConvoImportTag(content,importStatement,module.relativeName);
+            const status=!module.filePath?undefined:await convoGitService.get()?.gitStatusSingleAsync({
+                path:module.filePath,
+                includeFileHash:'if-dirty',
+            });
+            content=applyConvoImportTag(content,importStatement,module.relativeName,status?.success?status.result:undefined);
         }
         const templateMessage=content?this.getImportTemplateMessage(importStatement):null;
         let templateUsed=false;
