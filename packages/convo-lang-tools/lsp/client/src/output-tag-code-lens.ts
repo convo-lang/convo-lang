@@ -148,7 +148,7 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
 
         const attrs=(match.groups?.['attrs']??'')+' '+(match.groups?.['attrs2']??'');
         const rawContent=match.groups?.['content'] ?? '';
-        const content=normalizeOutputTagContent(rawContent,attrs);
+        const content=normalizeOutputTagContent(match.groups?.['tagName']??'',rawContent,attrs);
         const start=document.positionAt(match.index);
         const end=document.positionAt(match.index+match[0].length);
         const baseDir=document.uri.scheme==='file'?
@@ -168,7 +168,7 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
     return tags;
 }
 
-const normalizeOutputTagContent=(content:string,attrs:string):string=>{
+const normalizeOutputTagContent=(tag:string,content:string,attrs:string):string=>{
     let value=content.trim();
     if(/\bfenced\b/.test(attrs)){
         content=content.trim();
@@ -183,6 +183,12 @@ const normalizeOutputTagContent=(content:string,attrs:string):string=>{
     }
 
     value=unescapeConvo(value);
+
+    const closing=/closing-escape=['"](?<closing>[^'"]+)['"]/.exec(attrs)?.groups?.['closing'];
+    
+    if(closing){
+        value=value.split(closing).join(`</${tag}>`);
+    }
 
     return value.endsWith('\n')?value:value+'\n';
 }
