@@ -3,6 +3,7 @@ import type { ConvoCompletionService, ConvoConversationCache, ConvoConversationC
 import { ConvoLocalStorageCache } from "./ConvoLocalStorageCache.js";
 import { ConvoVfsCache } from "./ConvoVfsCache.js";
 import type { ConvoDb } from "./db/convo-db-types.js";
+import { ConvoGitService } from "./git/convo-git-types.js";
 import { PassthroughConvoConversationConverter } from "./PassthroughConvoConversationConverter.js";
 
 export const convoCompletionService=defineService<ConvoCompletionService<any,any>>('ConvoCompletionService');
@@ -24,3 +25,4 @@ export const convoTtsService=defineService<ConvoTtsService>('ConvoTtsService');
 export const convoEmbeddingsService=defineService<ConvoEmbeddingsService>('ConvoEmbeddingsService');
 export const convoDbService=defineService<ConvoDb>('ConvoDb');
 export const convoDbProvider=defineProvider<(connection?:string)=>Promise<ConvoDb|undefined>>('ConvoDbProvider');
+export const convoGitService=defineService<ConvoGitService>('ConvoGitService');

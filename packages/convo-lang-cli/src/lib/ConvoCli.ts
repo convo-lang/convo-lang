@@ -1,17 +1,15 @@
-import { AppendConvoOptions, Conversation, ConvoHttpImportService, ConvoNodeGraphCtrl, ConvoScope, ConvoVfsImportService, ConvoWorker, ConvoWorkerCtx, convoAnthropicModule, convoCapabilitiesParams, convoDefaultModelParam, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam, parseConvoCode } from '@convo-lang/convo-lang';
-import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
+import { AppendConvoOptions, Conversation, ConvoNodeGraphCtrl, ConvoScope, ConvoWorker, ConvoWorkerCtx, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
-import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
-import { convoDbModule } from "@convo-lang/db/db-module.js";
-import { CancelToken, DisposeContainer, EnvParams, createJsonRefReplacer, deleteUndefined, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
+import { CancelToken, DisposeContainer, createJsonRefReplacer, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
-import { nodeCommonModule, pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
-import { VfsCtrl, vfs, vfsMntTypes } from '@iyio/vfs';
+import { pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
+import { VfsCtrl, vfsMntTypes } from '@iyio/vfs';
 import { VfsDiskMntCtrl } from "@iyio/vfs-node";
 import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import { z } from 'zod';
+import { convoCliModule } from './convo-cli-module.js';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
 import { createConvoExec } from './convo-exec.js';
 
@@ -165,50 +163,7 @@ const _initAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
     });
 
     initRootScope(reg=>{
-
-        if(config.env && !config.overrideEnv){
-            reg.addParams(config.env);
-        }
-
-        if(!options.config && !options.inlineConfig){
-            reg.addParams(new EnvParams());
-        }
-
-        if(config.env && config.overrideEnv){
-            reg.addParams(config.env);
-        }
-
-        reg.addParams(deleteUndefined({
-            [openAiApiKeyParam.typeName]:config.apiKey,
-            [openAiBaseUrlParam.typeName]:config.apiBaseUrl,
-            [openAiChatModelParam.typeName]:config.chatModel,
-            [openAiAudioModelParam.typeName]:config.audioModel,
-            [openAiImageModelParam.typeName]:config.imageModel,
-            [openAiVisionModelParam.typeName]:config.visionModel,
-            [openAiSecretsParam.typeName]:config.secrets,
-
-            [convoCapabilitiesParams.typeName]:config.capabilities,
-            [convoDefaultModelParam.typeName]:config.defaultModel?.trim()||'gpt-4.1',
-        }) as Record<string,string>);
-
-        reg.use(nodeCommonModule);
-        reg.use(convoOpenAiModule);
-        reg.use(convoBedrockModule);
-        reg.use(convoMcpClientModule);
-        reg.use(convoOpenRouterModule);
-        reg.use(convoAnthropicModule);
-        reg.use(convoDbModule);
-        // reg.implementService(convoDbService,()=>new BunSqliteConvoDb({
-        //     //dbPath:'convo-api.db',initSchema:true
-        // }))
-
-        reg.implementService(convoImportService,()=>new ConvoVfsImportService());
-        reg.implementService(convoImportService,()=>new ConvoHttpImportService());
-
-        reg.implementService(vfs,()=>vfsCtrl);
-        if(projectConfig){
-            reg.implementService(convoProjectConfig,()=>projectConfig);
-        }
+        convoCliModule(reg,vfsCtrl,config,options,projectConfig);
     })
     await rootScope.getInitPromise();
     return config;

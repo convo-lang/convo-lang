@@ -59,6 +59,7 @@ export * from './lib/ConvoVfsImportService.js';
 export * from './lib/db/convo-db-const.js';
 export * from './lib/db/convo-db-lib.js';
 export * from './lib/db/convo-db-types.js';
+export * from './lib/git/convo-git-types.js';
 export * from './lib/HttpConvoCompletionService.js';
 export * from './lib/LocalStorageConvoDataStore.js';
 export * from './lib/make/convo-make-common-lib.js';
