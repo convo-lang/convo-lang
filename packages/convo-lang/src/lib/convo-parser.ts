@@ -1507,6 +1507,7 @@ const unescapeMsgStr=(str:string):string=>{
 
     return str;
 }
+export const unescapeConvo=unescapeMsgStr;
 
 const removeBackslashes=(params:ConvoStatement[])=>{
 

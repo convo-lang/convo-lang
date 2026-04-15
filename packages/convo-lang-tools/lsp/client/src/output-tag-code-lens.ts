@@ -1,3 +1,4 @@
+import { unescapeConvo } from '@convo-lang/convo-lang';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -169,7 +170,6 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
 
 const normalizeOutputTagContent=(content:string,attrs:string):string=>{
     let value=content.trim();
-    console.log('hio 👋 👋 👋 NORM',{content,attrs});
     if(/\bfenced\b/.test(attrs)){
         content=content.trim();
         const match=/^```.*/.exec(content);
@@ -181,6 +181,8 @@ const normalizeOutputTagContent=(content:string,attrs:string):string=>{
         }
         value=content;
     }
+
+    value=unescapeConvo(value);
 
     return value.endsWith('\n')?value:value+'\n';
 }
