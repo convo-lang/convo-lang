@@ -1,3 +1,83 @@
+@import ./extension-rules.convo
+
+> user
+When a user pastes an image into a convo file I would like the image to be inserted directly into the code as a
+markdown image using a base64 url.
+
+> system
+Paste format: ![pasted image](data:image/png;base64,...)
+
+
+@time 2026-04-15T07:35:21-04:00
+@tokenUsage 22187 / 65 / $0.055630000000000006
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the change, one quick question:
+
+Should pasted images be inserted as plain markdown like the `Past format`
+
+or do you want a Convo-specific wrapper/format instead if the cursor is inside a `source.convo` file?
+
+
+> user
+Use the markdown format example
+
+
+
+
+@time 2026-04-15T07:40:11-04:00
+@tokenUsage 22271 / 6970 / $0.07310250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts_" fenced>
+```ts
+import { ConvoExt } from './ConvoExt.js';
+import { ExtensionContext, languages, Range, TextEditor, workspace } from 'vscode';
+
+const pngMime='image/png';
+const pastedAltText='pasted image';
+
+export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
+{
+    void ext;
+
+    context.subscriptions.push(languages.registerDocumentPasteEditProvider(
+        {language:'source.convo',scheme:'file'},
+        {
+            async provideDocumentPasteEdits(
+                document,
+                ranges,
+                dataTransfer
+            ){
+                void document;
+
+                const item=dataTransfer.get(pngMime);
+                if(!item){
+                    return;
+                }
+
+                const bytes=await item.asBytes();
+                const base64=Buffer.from(bytes).toString('base64');
+                const text=`![${pastedAltText}](data:${pngMime};base64,${base64})`;
+
+                return {
+                    insertText:text,
+                    additionalEdit:undefined,
+                };
+            }
+        },
+        {
+            pasteMimeTypes:[pngMime],
+            providedPasteEditKinds:[]
+        }
+    ));
+}
+
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" fenced>
+```ts
 import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
@@ -27,7 +107,7 @@ let client:LanguageClient;
 
 const example=/*convo*/`
 # Builds a vehicle for the user
-> buildVehicle(
+\> buildVehicle(
 
     # A short description of the vehicle
     description:string;
@@ -51,14 +131,14 @@ const example=/*convo*/`
     })
 )
 
-> system
+\> system
 You are funny mechanical engineer helping a customer build a vehicle. Use the buildVehicle function
 to build vehicles.
 
-> user
+\> user
 I need a car that can do the quarter mile in 7 seconds or less
 
-> user
+\> user
 Use the buildVehicle function to build my vehicle
 
 `
@@ -1001,3 +1081,231 @@ const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         }
     })
 }
+
+```
+</FILE_CONTENT>
+
+
+> user
+Add support for all common image formats
+
+@time 2026-04-15T07:42:03-04:00
+@tokenUsage 29255 / 382 / $0.0740925
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts_" fenced>
+```ts
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const imageMimeTypes=[
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/x-icon',
+    'image/heic',
+    'image/heif',
+    'image/avif',
+];
+
+const pastedAltText='pasted image';
+
+export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
+{
+    void ext;
+
+    const provider:DocumentPasteEditProvider={
+        async provideDocumentPasteEdits(
+            document,
+            ranges,
+            dataTransfer
+        ){
+            void document;
+            void ranges;
+
+            for(const mimeType of imageMimeTypes){
+                const item=dataTransfer.get(mimeType);
+                if(!item){
+                    continue;
+                }
+
+                const bytes=await item.asFile()?.data();
+                if(!bytes){
+                    continue;
+                }
+
+                
+                const base64=Buffer.from(bytes).toString('base64');
+                const text=`![${pastedAltText}](data:${mimeType};base64,${base64})`;
+
+                return [
+                    new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)
+                ];
+            }
+
+            return;
+        }
+    };
+
+    context.subscriptions.push(languages.registerDocumentPasteEditProvider(
+        [{language:'source.convo',scheme:'file'},'*.convo'],
+        provider,
+        {
+            providedPasteEditKinds: [DocumentDropOrPasteEditKind.Text],
+            pasteMimeTypes:imageMimeTypes,
+        }
+    ));
+}
+
+```
+</FILE_CONTENT>
+
+
+> user
+The paste functionality doesn't work if the convo file is a new unsaved file. And if I paste an 
+image I have copied from by OS's file explorer it only pastes the path of the image
+
+@time 2026-04-15T07:59:52-04:00
+@tokenUsage 29753 / 833 / $0.076465
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="register-image-paste-handler.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts" fenced>
+```ts
+import { extname } from 'path';
+import { promises as fs } from 'fs';
+import { DocumentDropOrPasteEditKind, DocumentPasteEdit, DocumentPasteEditProvider, ExtensionContext, languages, Uri } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const imageMimeTypes=[
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/x-icon',
+    'image/heic',
+    'image/heif',
+    'image/avif',
+];
+
+const extToMime:Record<string,string>={
+    '.png':'image/png',
+    '.jpg':'image/jpeg',
+    '.jpeg':'image/jpeg',
+    '.gif':'image/gif',
+    '.webp':'image/webp',
+    '.svg':'image/svg+xml',
+    '.bmp':'image/bmp',
+    '.tif':'image/tiff',
+    '.tiff':'image/tiff',
+    '.ico':'image/x-icon',
+    '.heic':'image/heic',
+    '.heif':'image/heif',
+    '.avif':'image/avif',
+};
+
+const pastedAltText='pasted image';
+
+const tryCreateMarkdownImageAsync=async (dataTransfer:ReadonlyMap<string,any>):Promise<string|undefined>=>
+{
+    for(const mimeType of imageMimeTypes){
+        const item=dataTransfer.get(mimeType);
+        if(!item){
+            continue;
+        }
+
+        const file=await item.asFile?.();
+        const bytes=file?
+            await file.data()
+        :
+            await item.asBytes?.();
+
+        if(!bytes){
+            continue;
+        }
+
+        const base64=Buffer.from(bytes).toString('base64');
+        return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+    }
+
+    const uriListItem=dataTransfer.get('text/uri-list');
+    const uriList=await uriListItem?.asString?.();
+    if(uriList){
+        const uris=uriList
+            .split(/\r?\n/g)
+            .map(v=>v.trim())
+            .filter(v=>v && !v.startsWith('#'));
+
+        for(const value of uris){
+            try{
+                const uri=Uri.parse(value);
+                if(uri.scheme!=='file'){
+                    continue;
+                }
+
+                const mimeType=extToMime[extname(uri.fsPath).toLowerCase()];
+                if(!mimeType){
+                    continue;
+                }
+
+                const bytes=await fs.readFile(uri.fsPath);
+                const base64=Buffer.from(bytes).toString('base64');
+                return `![${pastedAltText}](data:${mimeType};base64,${base64})`;
+            }catch{
+            }
+        }
+    }
+
+    return;
+}
+
+export const registerImagePasteHandler=(context:ExtensionContext,ext:ConvoExt)=>
+{
+    void ext;
+
+    const provider:DocumentPasteEditProvider={
+        async provideDocumentPasteEdits(
+            document,
+            ranges,
+            dataTransfer
+        ){
+            void document;
+            void ranges;
+
+            const text=await tryCreateMarkdownImageAsync(dataTransfer as ReadonlyMap<string,any>);
+            if(!text){
+                return;
+            }
+
+            return [
+                new DocumentPasteEdit(text,'Paste image as markdown data URL',DocumentDropOrPasteEditKind.Text)
+            ];
+        }
+    };
+
+    context.subscriptions.push(languages.registerDocumentPasteEditProvider(
+        {language:'source.convo'},
+        provider,
+        {
+            providedPasteEditKinds:[DocumentDropOrPasteEditKind.Text],
+            pasteMimeTypes:[
+                ...imageMimeTypes,
+                'text/uri-list',
+            ],
+        }
+    ));
+}
+
+```
+</FILE_CONTENT>
+
+
+> user

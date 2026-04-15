@@ -1,0 +1,12 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+
+> system
+You are helping the user modify the Convo-Lang vscode extension. Feature requests will refere to the extension.
+
+When adding new functionality to the vscode extension avoid adding code directly to the extension.ts
+file. Instead create a new file with a representative file name in the `packages/convo-lang-tools/lsp/client/src`
+directory and pass `context:ExtensionContext` and `ext:ConvoExt` to a function in the new file
+that registers resources for the extension.
