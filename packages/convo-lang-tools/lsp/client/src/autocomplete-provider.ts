@@ -57,7 +57,7 @@ export const createConvoPathCompletionProvider=()=>{
                     continue;
                 }
 
-                const insertText=ctx.wrapMode==='embed'?
+                const insertText=ctx.wrapMode==='embed' || relToConvo.toLowerCase().endsWith('.convo')?
                     relToConvo:
                     `${relToConvo} !file`;
 
