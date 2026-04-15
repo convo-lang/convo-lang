@@ -1,3 +1,60 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+
+> user
+Add syntax highlighting for code fences for the following languages:
+
+- ts
+- tsx
+- sql
+- sh (bash)
+
+But first give me a list of other languages you would suggest
+
+@time 2026-04-14T22:52:21-04:00
+@tokenUsage 13028 / 189 / $0.0330425
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the changes, a quick question:
+
+Do you want me to:
+1. **only add** the requested fenced code block highlighting for `ts`, `tsx`, `sql`, and `sh`/`bash`, or
+2. also include a small expansion with some **recommended additional common fence languages** at the same time?
+
+Suggested other languages to support next:
+- `html`
+- `css`
+- `yaml` / `yml`
+- `shellscript` / `zsh`
+- `toml`
+- `diff`
+- `graphql`
+- `java`
+- `csharp` / `cs`
+- `go`
+- `rust`
+- `php`
+
+My strongest recommendations for this repo are:
+- `html`
+- `yaml`
+- `toml`
+- `diff`
+- `graphql`
+
+If you want, I can proceed with just the 4 requested additions now.
+
+
+> user
+Add all of your recommendations
+
+@time 2026-04-14T22:55:05-04:00
+@tokenUsage 13229 / 9728 / $0.057392500000000006
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo.tmLanguage.json" target-output-path="../../packages/convo-lang-tools/syntaxes/convo.tmLanguage.json" fenced>
+``` json
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
     "name":"convo",
@@ -1345,3 +1402,8 @@
     }
 
 }
+```
+</FILE_CONTENT>
+
+
+> user
