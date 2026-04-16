@@ -8,7 +8,7 @@ import { ConvoExt } from './ConvoExt';
 
 
 export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
-    
+
     context.subscriptions.push(workspace.registerTextDocumentContentProvider('convo-output',{
         provideTextDocumentContent(uri:Uri):string{
             return outputPreviewContent.get(uri.toString()) ?? '';
@@ -98,6 +98,11 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             return;
         }
 
+        const allowed=await confirmShellRunAsync(context,tag);
+        if(!allowed){
+            return;
+        }
+
         const editor=window.activeTextEditor;
         if(!editor){
             return;
@@ -121,6 +126,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         });
 
         let appendQueue=Promise.resolve();
+        let killed=false;
 
         const appendAsync=(value:string)=>{
             if(!value){
@@ -153,29 +159,50 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             void appendAsync(`\n[process error] ${err.message}\n`);
         });
 
-        child.on('close',(code,signal)=>{
-            let endNote='';
-            if(signal){
-                endNote=`\n[process exited by signal ${signal}]\n`;
-            }else if(code!==0){
-                endNote=`\n[process exited with code ${code}]\n`;
-            }
-            appendAsync(endNote).then(async ()=>{
-                await appendQueue;
-                const activeEditor=window.activeTextEditor;
-                if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
-                    return;
+        await window.withProgress({
+            location:vscode.ProgressLocation.Notification,
+            title:'Running script',
+            cancellable:true,
+        },async (progress,token)=>{
+            const pid=child.pid ?? 'unknown';
+            progress.report({message:`PID: ${pid}`});
+
+            token.onCancellationRequested(()=>{
+                killed=true;
+                try{
+                    child.kill('SIGTERM');
+                }catch{
                 }
-                await activeEditor.edit(builder=>{
-                    builder.insert(
-                        activeEditor.document.positionAt(activeEditor.document.getText().length),
-                        footer,
-                    );
+            });
+
+            await new Promise<void>((resolve)=>{
+                child.on('close',(code,signal)=>{
+                    let endNote='';
+                    if(killed){
+                        endNote=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;
+                    }else if(signal){
+                        endNote=`\n[process exited by signal ${signal}]\n`;
+                    }else if(code!==0){
+                        endNote=`\n[process exited with code ${code}]\n`;
+                    }
+                    appendAsync(endNote).then(async ()=>{
+                        await appendQueue;
+                        const activeEditor=window.activeTextEditor;
+                        if(activeEditor && activeEditor.document.uri.toString()===document.uri.toString()){
+                            await activeEditor.edit(builder=>{
+                                builder.insert(
+                                    activeEditor.document.positionAt(activeEditor.document.getText().length),
+                                    footer,
+                                );
+                            });
+                            await revealDocumentEndAsync(activeEditor);
+                        }
+                        if(args.complete && !killed){
+                            await vscode.commands.executeCommand('convo.complete');
+                        }
+                        resolve();
+                    });
                 });
-                await revealDocumentEndAsync(activeEditor);
-                if(args.complete){
-                    await vscode.commands.executeCommand('convo.complete');
-                }
             });
         });
     }));
@@ -407,6 +434,36 @@ const escapeXmlAttr=(value:string):string=>{
         .replace(/"/g,'&quot;')
         .replace(/</g,'&lt;')
         .replace(/>/g,'&gt;');
+}
+
+const confirmShellRunAsync=async (
+    context:ExtensionContext,
+    tag:OutputTagInfo,
+):Promise<boolean>=>{
+    const config=workspace.getConfiguration('convo');
+    const alwaysRun=config.get<boolean>('alwaysRunOutputScripts') ?? false;
+    if(alwaysRun){
+        return true;
+    }
+
+    const detail=[
+        `Script: ${tag.targetPath}`,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+    ].filter(Boolean).join('\n');
+
+    const action=await window.showWarningMessage(
+        'Run shell script from convo output?',
+        { modal:true, detail },
+        'Run Script',
+        'Always Run Script',
+    );
+
+    if(action==='Always Run Script'){
+        await config.update('alwaysRunOutputScripts',true,vscode.ConfigurationTarget.Global);
+        return true;
+    }
+
+    return action==='Run Script';
 }
 
 const outputPreviewContent=new Map<string,string>();
