@@ -1396,7 +1396,7 @@ export class ConvoExecutionContext
             }
 
             case 'TrueFalse':
-                return parseConvoType('TrueFalse',/*convo*/`
+                return parseConvoType('TrueFalse',`
                     > define
                     TrueFalse=struct(
                         isTrue:boolean
@@ -1404,7 +1404,7 @@ export class ConvoExecutionContext
                 `);
 
             default:
-                return undefined;
+                return this.convo.conversation?.unregisteredVars[name];
 
         }
 

@@ -2340,7 +2340,6 @@ export class Conversation
             if(flat.queueRef && isSourceMessage){
                 this.append(`> ${convoRoles.insert} before ${flat.queueRef.label}`,{disableAutoFlatten:true,throwOnError:true})
             }
-
             for(const e in this.unregisteredVars){
                 flat.exe.setVar(false,this.unregisteredVars[e],e);
             }

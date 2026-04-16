@@ -162,7 +162,11 @@ export class ConvoExt
                 [openRouterApiKeyParam.typeName]:config.get<string>('openRouterApiKey')?.trim()||undefined,
                 [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
 
-            }) as Record<string,string>
+            }) as Record<string,string>,
+            unregisteredVars:{
+                __projectRoot:workspace.workspaceFolders?.[0]?.uri.fsPath??'.',
+                __projectAbsoluteRoot:workspace.workspaceFolders?.[0]?.uri.fsPath??'.',
+            }
         };
     }
 }

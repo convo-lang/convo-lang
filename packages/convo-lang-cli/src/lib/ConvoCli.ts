@@ -8,6 +8,7 @@ import { VfsCtrl, vfsMntTypes } from '@iyio/vfs';
 import { VfsDiskMntCtrl } from "@iyio/vfs-node";
 import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
+import Path from 'node:path';
 import { z } from 'zod';
 import { convoCliModule } from './convo-cli-module.js';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
@@ -92,6 +93,18 @@ const _getConfigAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         const defaultVars=c.defaultVars??(c.defaultVars={});
         for(const v of options.var){
             parseCliValue(v,defaultVars);
+        }
+    }
+
+    if(options.uVars){
+        const unregisteredVars=c.unregisteredVars??(c.unregisteredVars={});
+        for(const v of options.uVars){
+            const obj=parseJson5(v);
+            if(obj && (typeof obj === 'object')){
+                for(const e in obj){
+                    unregisteredVars[e]=obj[e];
+                }
+            }
         }
     }
 
@@ -221,7 +234,6 @@ export class ConvoCli
         }
         if(this.options.source){
             this.convo.unregisteredVars[convoVars.__mainFile]=this.options.source;
-
         }
     }
 
@@ -380,6 +392,19 @@ The current date and time is: "{{dateTime()}}"
         if(config.defaultVars){
             for(const e in config.defaultVars){
                 this.convo.defaultVars[e]=config.defaultVars[e];
+            }
+        }
+        if(config.unregisteredVars){
+            for(const e in config.unregisteredVars){
+                this.convo.unregisteredVars[e]=config.unregisteredVars[e];
+            }
+            const pr=this.convo.unregisteredVars['__projectRoot'];
+            const cwd=this.convo.unregisteredVars['__cwd'];
+            if(pr && cwd){
+                const relative=Path.relative(cwd,pr);
+                if(relative){
+                    this.convo.unregisteredVars['__projectRoot']=relative;
+                }
             }
         }
         if(!this.allowExec){

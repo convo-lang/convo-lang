@@ -27,6 +27,7 @@ export interface ConvoCliConfig
     secrets?:string;
     defaultModel?:string;
     defaultVars?:Record<string,any>;
+    unregisteredVars?:Record<string,any>;
 }
 
 export interface ConvoCliOptions
@@ -224,6 +225,12 @@ export interface ConvoCliOptions
      * @example --vars-path ./.env.local
      */
     varsPath?:string[];
+
+    /**
+     * Similar to the --vars argument but the variables are added to the unregistered variable.
+     * Use this for sensitive or environment specific variables that shouldn't be logged or tracked.
+     */
+    uVars?:string[];
 
     /**
      * If true make targets should be built

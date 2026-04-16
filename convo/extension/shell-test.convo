@@ -1,0 +1,98 @@
+@import ../base.convo
+
+> user
+What files are at the top of the repo
+
+@time 2026-04-15T19:15:59-04:00
+@tokenUsage 1620 / 64 / $0.004210000000000001
+@model gpt-5.4-2026-03-05
+> assistant
+I can list them, but I need to inspect the repo root first.
+
+<RUNNABLE_SCRIPT script-name="example" target-shell-type="bash" cwd="../..">
+``` bash
+
+ls -la
+```
+</RUNNABLE_SCRIPT>
+
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="example">
+``` output
+total 13
+drwxr-xr-x  22 root  wheel   704 Jul 19  2025 .
+drwxr-xr-x  22 root  wheel   704 Jul 19  2025 ..
+----------   1 root  admin     0 Jul 19  2025 .file
+drwxr-xr-x   2 root  wheel    64 Jul 19  2025 .nofollow
+drwxr-xr-x   2 root  wheel    64 Jul 19  2025 .resolve
+drwxr-xr-x   2 root  wheel    64 Jul 19  2025 .vol
+lrwxr-xr-x   1 root  admin    36 Jul 19  2025 .VolumeIcon.icns -> System/Volumes/Data/.VolumeIcon.icns
+drwxrwxr-x  84 root  admin  2688 Apr 13 10:57 Applications
+drwxr-xr-x@ 39 root  wheel  1248 Jul 19  2025 bin
+drwxrwxr-t   2 root  admin    64 Jan 22  2022 cores
+dr-xr-xr-x   4 root  wheel  6359 Apr  8 10:20 dev
+lrwxr-xr-x@  1 root  wheel    11 Jul 19  2025 etc -> private/etc
+lrwxr-xr-x   1 root  wheel    25 Apr  8 10:20 home -> /System/Volumes/Data/home
+drwxr-xr-x  74 root  wheel  2368 Aug 15  2025 Library
+drwxr-xr-x   4 root  wheel   128 Feb  3  2025 opt
+drwxr-xr-x   6 root  wheel   192 Apr  8 10:20 private
+drwxr-xr-x@ 76 root  wheel  2432 Jul 19  2025 sbin
+drwxr-xr-x@ 10 root  wheel   320 Jul 19  2025 System
+lrwxr-xr-x@  1 root  wheel    11 Jul 19  2025 tmp -> private/tmp
+drwxr-xr-x   7 root  admin   224 Aug  8  2025 Users
+drwxr-xr-x@ 11 root  wheel   352 Jul 19  2025 usr
+lrwxr-xr-x@  1 root  wheel    11 Jul 19  2025 var -> private/var
+drwxr-xr-x   4 root  wheel   128 Apr 13 09:50 Volumes
+
+```
+</SCRIPT_OUTPUT>
+
+
+@time 2026-04-15T20:33:07-04:00
+@tokenUsage 2453 / 220 / $0.006682500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+That output is for the filesystem root `/`, not the repo root.
+
+Top-level entries shown there are:
+
+- `.`
+- `..`
+- `.file`
+- `.nofollow`
+- `.resolve`
+- `.vol`
+- `.VolumeIcon.icns`
+- `Applications`
+- `bin`
+- `cores`
+- `dev`
+- `etc`
+- `home`
+- `Library`
+- `opt`
+- `private`
+- `sbin`
+- `System`
+- `tmp`
+- `Users`
+- `usr`
+- `var`
+- `Volumes`
+
+If you want the actual repo root for `Convo-Lang`, run this from the current directory and I can list the correct top-level repo files:
+
+<RUNNABLE_SCRIPT script-name="list-convo-lang-root" target-shell-type="bash" cwd="/Users/scott/docs/convo-lang/convo/extension">
+``` bash
+# move to the mono-repo root and list top-level entries, including hidden ones
+cd ../..
+ls -la
+```
+</RUNNABLE_SCRIPT>
+
+
+> user

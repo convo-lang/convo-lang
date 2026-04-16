@@ -1,8 +1,53 @@
+@import ./extension-rules.convo
+@import ../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts
+
+> user
+Implement the `convo.output-tag-execute-shell` command.
+
+Requirements:
+- The command should be ran in the bash shell
+- The output of the command should be written the the end of the current file wrapped in a XML tag
+- Use args.cwd as the working directory for the script. If not defined use the current working directory of the current process.
+- Both stdout and stderr should be captured and written back to the current file
+- The XML tag should have 1 attribute named script-name populated by args.targetPath
+- After the script starts the window should be scrolled to the end of the file
+
+Output Format:
+<EXAMPLE_OUTPUT_FORMAT>
+/> user
+
+<SCRIPT_OUTPUT script-name="list-frontend-package-content">
+``` txt
+OUTPUT GOES HERE
+```
+</SCRIPT_OUTPUT>
+
+</EXAMPLE_OUTPUT_FORMAT>
+
+If the file already ends with `> user` do not add it twice
+
+
+@time 2026-04-15T19:44:06-04:00
+@tokenUsage 25206 / 44 / $0.063125
+@model gpt-5.4-2026-03-05
+> assistant
+Do you want the command to append output incrementally while the bash script runs, or is it okay to wait for the process to finish and then append one final `<SCRIPT_OUTPUT>` block at the end?
+
+
+> user
+Append it incrementally
+
+@time 2026-04-15T19:45:59-04:00
+@tokenUsage 25261 / 2838 / $0.0702475
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="output-tag-code-lens.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts" fenced>
+``` ts
 import { unescapeConvo } from '@convo-lang/convo-lang';
-import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { spawn } from 'child_process';
 import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt';
 
@@ -124,9 +169,9 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
         const appendAsync=(value:string)=>{
             if(!value){
-                return appendQueue;
+                return;
             }
-            return appendQueue=appendQueue.then(async ()=>{
+            appendQueue=appendQueue.then(async ()=>{
                 const activeEditor=window.activeTextEditor;
                 if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
                     return;
@@ -160,7 +205,7 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
             }else if(code!==0){
                 endNote=`\n[process exited with code ${code}]\n`;
             }
-            appendAsync(endNote).then(async ()=>{
+            void appendAsync(endNote).then(async ()=>{
                 await appendQueue;
                 const activeEditor=window.activeTextEditor;
                 if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
@@ -173,9 +218,6 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
                     );
                 });
                 await revealDocumentEndAsync(activeEditor);
-                if(args.complete){
-                    await vscode.commands.executeCommand('convo.complete');
-                }
             });
         });
     }));
@@ -186,7 +228,6 @@ export interface OutputTagCodeLensArgs
     targetPath:string;
     index:number;
     cwd?:string;
-    complete?:boolean;
 }
 
 interface OutputTagInfo
@@ -242,13 +283,6 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                             arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd} satisfies OutputTagCodeLensArgs],
                         }),
                     );
-                    lenses.push(
-                        new vscode.CodeLens(tag.range,{
-                            title:'Run Script and complete',
-                            command:'convo.output-tag-execute-shell',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,complete:true} satisfies OutputTagCodeLensArgs],
-                        }),
-                    );
                     break;
             }
         }
@@ -271,9 +305,8 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
         }
 
         const attrs=(match.groups?.['attrs']??'')+' '+(match.groups?.['attrs2']??'');
-        const type=match.groups?.['blockType']==='target-output-path'?'file':'shell';
         const rawContent=match.groups?.['content'] ?? '';
-        const content=normalizeOutputTagContent(match.groups?.['tagName']??'',rawContent,attrs,type!=='shell');
+        const content=normalizeOutputTagContent(match.groups?.['tagName']??'',rawContent,attrs);
         const start=document.positionAt(match.index);
         const end=document.positionAt(match.index+match[0].length);
         const baseDir=document.uri.scheme==='file'?
@@ -283,18 +316,13 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
         const cwdMatch=/cwd\s*=\s*("([^"]*)"|'([^']*)')/.exec(attrs);
         const cwd=cwdMatch?.[2] ?? cwdMatch?.[3];
 
-        const nameMatch=/script-name\s*=\s*("([^"]*)"|'([^']*)')/.exec(attrs);
-        const name=nameMatch?.[2] ?? nameMatch?.[3];
-
         tags.push({
-            targetPath:(baseDir && type==='file')?
+            targetPath:baseDir?
                 path.resolve(baseDir,targetPath)
-            :type==='shell'?
-                (name??'script')
             :
                 targetPath,
             content,
-            type,
+            type:match.groups?.['blockType']==='target-output-path'?'file':'shell',
             range:new vscode.Range(start,end),
             index:index++,
             cwd,
@@ -304,9 +332,9 @@ const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
     return tags;
 }
 
-const normalizeOutputTagContent=(tag:string,content:string,attrs:string,requireFenced:boolean):string=>{
+const normalizeOutputTagContent=(tag:string,content:string,attrs:string):string=>{
     let value=content.trim();
-    if(!requireFenced || /\bfenced\b/.test(attrs)){
+    if(/\bfenced\b/.test(attrs)){
         content=content.trim();
         const match=/^```.*/.exec(content);
         if(match){
@@ -391,7 +419,7 @@ const writeOutputTagAsync=async (targetPath:string,content:string):Promise<void>
 const createScriptOutputHeader=(text:string,scriptName:string):string=>{
     const trimmedEnd=text.trimEnd();
     const endsWithUser=/>\s*user\s*$/m.test(trimmedEnd) && trimmedEnd.split(/\r?\n/).slice(-1)[0]?.trim()==='> user';
-    return `${text.length?'\n\n':''}${endsWithUser?'':'> user\n\n'}<SCRIPT_OUTPUT script-name="${scriptName}">\n\`\`\` output\n`;
+    return `${text.length?'\n\n':''}${endsWithUser?'':'> user\n\n'}<SCRIPT_OUTPUT script-name="${scriptName}">\n\`\`\` txt\n`;
 }
 
 const revealDocumentEndAsync=async (editor:vscode.TextEditor):Promise<void>=>{
@@ -410,3 +438,8 @@ const escapeXmlAttr=(value:string):string=>{
 }
 
 const outputPreviewContent=new Map<string,string>();
+```
+</FILE_CONTENT>
+
+
+> user

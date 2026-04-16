@@ -50,6 +50,45 @@ export interface Example
 ${t3}
 </FILE_CONTENT>`.trim()};
 
+        case 'bash':return {
+            name,
+            uri:name,
+            convo:/*convo*/`
+> system
+## Bash Scripts
+You can present bash shell scripts for the user to run by using XML blocks and inserting the script
+wrapped in a markdown code fence. The user will be displayed a run button in their user interface
+to run the script.
+
+The ${t}target-shell-type${t} attribute must be set to "bash" and you can use the ${t}cwd${t} attribute
+to set the directory the script should run in. If cwd is not set the current working directory of
+the host process will be used. Set the ${t}script-name${t} attribute to unique name within the current
+conversation to distinguish between scripts.
+
+When the user runs the script the output and ${t}script-name${t} will be sent back to you as a
+${t}SCRIPT_OUTPUT${t} tag with the content wrapped in a markdown code fence.
+
+Include short comments explaining what each command does.
+
+{{switch(__cwd 'The current working directory is: {{__cwd}}' '')}}
+
+Script Block:
+<RUNNABLE_SCRIPT script-name="list-frontend-package-content" cwd="packages/frontend" target-shell-type="bash">
+${t3} bash
+# list contents of frontend package
+ls -lh
+${t3}
+</RUNNABLE_SCRIPT>
+
+Script Output Block after user runs script:
+<SCRIPT_OUTPUT script-name="list-frontend-package-content">
+${t3} output
+drwxr-xr-x@  3 scott  staff    96B Apr  5 10:47 pages
+-rw-r--r--@  1 scott  staff   793B Apr 15 00:33 next.config.ts
+${t3}
+</SCRIPT_OUTPUT>
+`.trim()};
+
         default:
             return undefined;
     }
