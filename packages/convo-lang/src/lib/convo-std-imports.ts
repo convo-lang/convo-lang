@@ -61,16 +61,14 @@ wrapped in a markdown code fence. The user will be displayed a run button in the
 to run the script.
 
 The ${t}target-shell-type${t} attribute must be set to "bash" and you can use the ${t}cwd${t} attribute
-to set the directory the script should run in. If cwd is not set the current working directory of
-the host process will be used. Set the ${t}script-name${t} attribute to unique name within the current
-conversation to distinguish between scripts.
+to set the directory the script should run in. Use relative paths when setting cwd unless told otherwise.
+If cwd is not set the current working directory of the host process will be used. Set the ${t}script-name${t} 
+attribute to unique name within the current conversation to distinguish between scripts.
 
 When the user runs the script the output and ${t}script-name${t} will be sent back to you as a
 ${t}SCRIPT_OUTPUT${t} tag with the content wrapped in a markdown code fence.
 
 Include short comments explaining what each command does.
-
-{{switch(__cwd 'The current working directory is: {{__cwd}}' '')}}
 
 Script Block:
 <RUNNABLE_SCRIPT script-name="list-frontend-package-content" cwd="packages/frontend" target-shell-type="bash">
