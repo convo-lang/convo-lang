@@ -450,6 +450,11 @@ export const convoFunctions={
     fsWrite:'fsWrite',
 
     /**
+     * Append a string value to the virtual file system and returns the written value.
+     */
+    fsAppend:'fsAppend',
+
+    /**
      * Delete a file or directory from the virtual file system
      */
     fsRemove:'fsRemove',

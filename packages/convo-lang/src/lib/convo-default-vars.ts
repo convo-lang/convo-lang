@@ -1757,6 +1757,17 @@ export const extendedConvoVars={
         return value;
     }),
 
+    [convoFunctions.fsAppend]:createConvoScopeFunction(async (scope,ctx)=>{
+        if(typeof scope.paramValues?.[0] !== 'string'){
+            throw new ConvoError('invalid-args',{statement:scope.s},'fsWrite expects first argument to be a string');
+        }
+        const path=ctx.getFullPath(scope.paramValues[0],scope);
+        const value=scope.paramValues[1];
+
+        await vfs().appendStringAsync(path,(typeof value === 'string')?value:(value+''));
+        return value;
+    }),
+
     [convoFunctions.fsRead]:createConvoScopeFunction(async (scope,ctx)=>{
         if(typeof scope.paramValues?.[0] !== 'string'){
             throw new ConvoError('invalid-args',{statement:scope.s},'fsRead expects first argument to be a string');
