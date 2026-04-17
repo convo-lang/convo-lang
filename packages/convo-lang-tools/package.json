@@ -221,22 +221,22 @@
                     "group": "inline"
                 },
                 {
-                    "command": "convo.output-tag-open",
+                    "command": "convo.code-block-panel-tag-open",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
                     "group": "inline"
                 },
                 {
-                    "command": "convo.output-tag-write",
+                    "command": "convo.code-block-panel-tag-write",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
                     "group": "inline"
                 },
                 {
-                    "command": "convo.output-tag-diff",
+                    "command": "convo.code-block-panel-tag-diff",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
                     "group": "inline"
                 },
                 {
-                    "command": "convo.output-tag-copy",
+                    "command": "convo.code-block-panel-tag-copy",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
                     "group": "inline"
                 },
@@ -248,6 +248,21 @@
                 {
                     "command": "convo.output-tag-execute-shell-complete",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
                     "group": "inline"
                 }
             ]
@@ -276,27 +291,42 @@
                 "icon": "$(refresh)"
             },
             {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
                 "command": "convo.code-block-group-apply-all",
                 "title": "Convo: Apply All Code Blocks In Message",
                 "icon": "$(check-all)"
             },
             {
-                "command": "convo.output-tag-open",
+                "command": "convo.code-block-panel-tag-open",
                 "title": "Convo: Open Output",
                 "icon": "$(folder-opened)"
             },
             {
-                "command": "convo.output-tag-write",
+                "command": "convo.code-block-panel-tag-write",
                 "title": "Convo: Write Output",
                 "icon": "$(check)"
             },
             {
-                "command": "convo.output-tag-diff",
+                "command": "convo.code-block-panel-tag-diff",
                 "title": "Convo: Open Output Diff",
                 "icon": "$(diff)"
             },
             {
-                "command": "convo.output-tag-copy",
+                "command": "convo.code-block-panel-tag-copy",
                 "title": "Convo: Copy Output",
                 "icon": "$(copy)"
             },

@@ -1,0 +1,3926 @@
+@import ./_extension.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/util.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts !file
+
+> user
+Keep the last open code block view open after switching to a non convo-lang file.
+
+Also add the ability to pin a code block view the ability to switch the current
+code block view and pin code block views.
+
+@time 2026-04-17T18:54:45-04:00
+@tokenUsage 20591 / 67 / $0.051645
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the changes, one clarification:
+
+Do you want the Code Blocks view to support multiple pinned convo documents at once, with a way to switch between:
+1. the current active convo document, and
+2. any number of pinned convo documents,
+
+or should it support only a single pinned document at a time?
+
+
+> user
+1. yes
+2. yes
+
+and save the pinned tabs so they are there after restarting vscode
+
+@time 2026-04-17T18:57:40-04:00
+@tokenUsage 20685 / 8900 / $0.0739625
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```ts
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { getParsedOutputTagGroups, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+
+const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
+const selectedDocStateKey='convo.codeBlocks.selectedDoc';
+
+export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    const provider=new ConvoCodeBlockTreeProvider(context,ext);
+    const tree=window.createTreeView('convoCodeBlocks',{
+        treeDataProvider:provider,
+    });
+
+    context.subscriptions.push(tree);
+
+    context.subscriptions.push(commands.registerCommand('convo.code-blocks-refresh',async ()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeBlockGroupItem)=>{
+        await provider.applyAllAsync(item);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-pin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.pinDocumentAsync(item?.doc.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-unpin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.unpinDocumentAsync(item?.doc.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-switch',async (item?:ConvoCodeBlockDocItem)=>{
+        if(item){
+            await provider.selectDocumentAsync(item.doc.fsPath,true);
+        }else{
+            await provider.pickAndSelectDocumentAsync();
+        }
+    }));
+
+    context.subscriptions.push(window.onDidChangeActiveTextEditor((editor)=>{
+        void provider.handleActiveEditorChangedAsync(editor);
+    }));
+
+    context.subscriptions.push(workspace.onDidChangeTextDocument((e)=>{
+        provider.handleDocumentChanged(e.document);
+    }));
+
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        provider.handleDocumentChanged(document);
+    }));
+
+    void provider.initializeAsync();
+}
+
+class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlockTreeItem>
+{
+    private readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
+    public readonly onDidChangeTreeData=this.onDidChangeTreeDataEmitter.event;
+
+    private pinnedPaths:string[]=[];
+    private selectedPath:string|undefined;
+    private lastActiveConvoPath:string|undefined;
+
+    public constructor(
+        private readonly context:ExtensionContext,
+        private readonly ext:ConvoExt,
+    ){
+    }
+
+    public async initializeAsync():Promise<void>
+    {
+        const savedPinned=this.context.workspaceState.get<string[]>(pinnedDocsStateKey);
+        this.pinnedPaths=(savedPinned ?? []).map(p=>path.normalize(p));
+
+        const savedSelected=this.context.workspaceState.get<string>(selectedDocStateKey);
+        this.selectedPath=savedSelected?path.normalize(savedSelected):undefined;
+
+        await this.cleanupStateAsync();
+        await this.trySelectStartupDocumentAsync();
+        this.refresh();
+    }
+
+    public refresh():void
+    {
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    public getTreeItem(element:ConvoCodeBlockTreeItem):TreeItem
+    {
+        return element;
+    }
+
+    public async getChildren(element?:ConvoCodeBlockTreeItem):Promise<ConvoCodeBlockTreeItem[]>
+    {
+        if(element){
+            return element.getChildren?.() ?? [];
+        }
+
+        const document=await this.getSelectedDocumentAsync();
+        if(!document){
+            return [];
+        }
+
+        const items:ConvoCodeBlockTreeItem[]=[
+            new ConvoCodeBlockSwitcherItem(document,this.isPinned(document.uri.fsPath)),
+        ];
+
+        const groups=getParsedOutputTagGroups(document);
+        items.push(...groups.map(group=>new ConvoCodeBlockGroupItem(group)));
+
+        return items;
+    }
+
+    public async applyAllAsync(item?:ConvoCodeBlockGroupItem):Promise<void>
+    {
+        const target=item ?? await this.getActiveGroupAsync();
+        if(!target){
+            return;
+        }
+
+        const fileTags=target.group.tags.filter(t=>t.type==='file');
+        const shellTags=target.group.tags.filter(t=>t.type==='shell');
+
+        if(!fileTags.length && !shellTags.length){
+            return;
+        }
+
+        if(fileTags.length){
+            const action=await window.showWarningMessage(
+                `Apply ${fileTags.length} file output${fileTags.length===1?'':'s'} from this message?`,
+                {modal:true},
+                'Apply All',
+                'View First Diff',
+            );
+
+            if(action==='View First Diff'){
+                const first=fileTags[0];
+                if(first){
+                    await showOutputDiffAsync(first.targetPath,first.content);
+                }
+                return;
+            }
+
+            if(action!=='Apply All'){
+                return;
+            }
+
+            for(const tag of fileTags){
+                await writeOutputTagAsync(tag.targetPath,tag.content);
+            }
+        }
+
+        for(const tag of shellTags){
+            await commands.executeCommand('convo.output-tag-execute-shell',{
+                targetPath:tag.targetPath,
+                index:tag.index,
+                cwd:tag.cwd,
+            } satisfies OutputTagCodeLensArgs);
+        }
+    }
+
+    public async handleActiveEditorChangedAsync(editor:vscode.TextEditor|undefined):Promise<void>
+    {
+        const document=editor?.document;
+        if(document?.languageId==='source.convo' && document.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(document.uri.fsPath);
+            if(!this.selectedPath || !this.isPinned(this.selectedPath)){
+                await this.selectDocumentAsync(document.uri.fsPath,false);
+                return;
+            }
+        }
+
+        this.refresh();
+    }
+
+    public handleDocumentChanged(document:vscode.TextDocument):void
+    {
+        const selected=this.selectedPath;
+        if(!selected){
+            return;
+        }
+
+        if(document.uri.scheme!=='file'){
+            return;
+        }
+
+        if(path.normalize(document.uri.fsPath)!==selected){
+            return;
+        }
+
+        this.refresh();
+    }
+
+    public async pinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        if(!this.pinnedPaths.includes(normalized)){
+            this.pinnedPaths.push(normalized);
+            await this.savePinnedPathsAsync();
+        }
+
+        await this.selectDocumentAsync(normalized,false);
+        this.refresh();
+    }
+
+    public async unpinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        const nextPinned=this.pinnedPaths.filter(p=>p!==normalized);
+        if(nextPinned.length===this.pinnedPaths.length){
+            return;
+        }
+
+        this.pinnedPaths=nextPinned;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath===normalized){
+            const fallback=this.lastActiveConvoPath && this.lastActiveConvoPath!==normalized?
+                this.lastActiveConvoPath
+            :this.pinnedPaths[0];
+
+            await this.selectDocumentAsync(fallback,false);
+        }else{
+            this.refresh();
+        }
+    }
+
+    public async selectDocumentAsync(fsPath:string|undefined,revealDocument:boolean):Promise<void>
+    {
+        const normalized=fsPath?path.normalize(fsPath):undefined;
+        this.selectedPath=normalized;
+        await this.context.workspaceState.update(selectedDocStateKey,normalized);
+
+        if(revealDocument && normalized){
+            const doc=await workspace.openTextDocument(Uri.file(normalized));
+            await window.showTextDocument(doc,{preview:false,preserveFocus:false});
+        }
+
+        this.refresh();
+    }
+
+    public async pickAndSelectDocumentAsync():Promise<void>
+    {
+        const docs=await this.getAvailableDocumentsAsync();
+        if(!docs.length){
+            void window.showInformationMessage('No Convo documents available.');
+            return;
+        }
+
+        const items=docs.map(doc=>{
+            const fsPath=doc.uri.fsPath;
+            const normalized=path.normalize(fsPath);
+            const isPinned=this.isPinned(normalized);
+            const isSelected=this.selectedPath===normalized;
+            const isActive=this.lastActiveConvoPath===normalized;
+            return {
+                label:path.basename(fsPath),
+                description:getDocDescription(fsPath,isPinned,isSelected,isActive),
+                detail:fsPath,
+                doc,
+            };
+        });
+
+        const picked=await window.showQuickPick(items,{
+            placeHolder:'Select a Convo document for the Code Blocks view',
+        });
+
+        if(!picked){
+            return;
+        }
+
+        await this.selectDocumentAsync(picked.doc.uri.fsPath,true);
+    }
+
+    private async getActiveGroupAsync():Promise<ConvoCodeBlockGroupItem|undefined>
+    {
+        const roots=await this.getChildren();
+        return roots.find(r=>r instanceof ConvoCodeBlockGroupItem) as ConvoCodeBlockGroupItem|undefined;
+    }
+
+    private async cleanupStateAsync():Promise<void>
+    {
+        const kept:string[]=[];
+        for(const p of this.pinnedPaths){
+            if(await this.fileExistsAsync(p)){
+                kept.push(p);
+            }
+        }
+        this.pinnedPaths=kept;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath && !await this.fileExistsAsync(this.selectedPath)){
+            this.selectedPath=undefined;
+            await this.context.workspaceState.update(selectedDocStateKey,undefined);
+        }
+    }
+
+    private async trySelectStartupDocumentAsync():Promise<void>
+    {
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(active.uri.fsPath);
+            if(!this.selectedPath || !this.isPinned(this.selectedPath)){
+                await this.selectDocumentAsync(active.uri.fsPath,false);
+                return;
+            }
+        }
+
+        if(this.selectedPath){
+            return;
+        }
+
+        const openConvo=workspace.textDocuments.find(d=>d.languageId==='source.convo' && d.uri.scheme==='file');
+        if(openConvo){
+            this.lastActiveConvoPath=path.normalize(openConvo.uri.fsPath);
+            await this.selectDocumentAsync(openConvo.uri.fsPath,false);
+            return;
+        }
+
+        if(this.pinnedPaths[0]){
+            await this.selectDocumentAsync(this.pinnedPaths[0],false);
+        }
+    }
+
+    private async getSelectedDocumentAsync():Promise<vscode.TextDocument|undefined>
+    {
+        const selected=this.selectedPath;
+        if(!selected){
+            return undefined;
+        }
+
+        const openDoc=workspace.textDocuments.find(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===selected);
+        if(openDoc){
+            return openDoc;
+        }
+
+        try{
+            return await workspace.openTextDocument(Uri.file(selected));
+        }catch{
+            return undefined;
+        }
+    }
+
+    private async getAvailableDocumentsAsync():Promise<vscode.TextDocument[]>
+    {
+        const docs:vscode.TextDocument[]=[];
+
+        for(const doc of workspace.textDocuments){
+            if(doc.languageId==='source.convo' && doc.uri.scheme==='file'){
+                docs.push(doc);
+            }
+        }
+
+        for(const fsPath of this.pinnedPaths){
+            const normalized=path.normalize(fsPath);
+            const already=docs.some(d=>path.normalize(d.uri.fsPath)===normalized);
+            if(already){
+                continue;
+            }
+
+            try{
+                const doc=await workspace.openTextDocument(Uri.file(normalized));
+                if(doc.languageId==='source.convo'){
+                    docs.push(doc);
+                }
+            }catch{
+            }
+        }
+
+        docs.sort((a,b)=>a.uri.fsPath.localeCompare(b.uri.fsPath));
+        return docs;
+    }
+
+    private async resolveDocumentPathAsync(fsPath?:string):Promise<string|undefined>
+    {
+        if(fsPath){
+            return fsPath;
+        }
+
+        const selected=this.selectedPath;
+        if(selected){
+            return selected;
+        }
+
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            return active.uri.fsPath;
+        }
+
+        return undefined;
+    }
+
+    private isPinned(fsPath:string):boolean
+    {
+        return this.pinnedPaths.includes(path.normalize(fsPath));
+    }
+
+    private async savePinnedPathsAsync():Promise<void>
+    {
+        await this.context.workspaceState.update(pinnedDocsStateKey,this.pinnedPaths);
+    }
+
+    private async fileExistsAsync(fsPath:string):Promise<boolean>
+    {
+        try{
+            await workspace.fs.stat(Uri.file(fsPath));
+            return true;
+        }catch{
+            return false;
+        }
+    }
+}
+
+abstract class ConvoCodeBlockTreeItem extends TreeItem
+{
+    public getChildren?():Promise<ConvoCodeBlockTreeItem[]>;
+}
+
+class ConvoCodeBlockSwitcherItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly doc:vscode.TextDocument,
+        isPinned:boolean,
+    ){
+        super(path.basename(doc.uri.fsPath),TreeItemCollapsibleState.None);
+        this.description=isPinned?'Pinned':'Current';
+        this.tooltip=doc.uri.fsPath;
+        this.contextValue=isPinned?'code-block-doc-pinned':'code-block-doc';
+        this.iconPath=new vscode.ThemeIcon(isPinned?'pinned':'file');
+        this.command={
+            title:'Switch Code Block View',
+            command:'convo.code-block-view-switch',
+            arguments:[new ConvoCodeBlockDocItem(doc,isPinned)],
+        };
+    }
+}
+
+class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly doc:vscode.TextDocument,
+        isPinned:boolean,
+    ){
+        super(path.basename(doc.uri.fsPath),TreeItemCollapsibleState.None);
+        this.description=isPinned?'Pinned':'Current';
+        this.tooltip=doc.uri.fsPath;
+        this.contextValue=isPinned?'code-block-doc-pinned':'code-block-doc';
+        this.iconPath=new vscode.ThemeIcon(isPinned?'pinned':'file');
+    }
+}
+
+class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly group:ParsedOutputTagGroup,
+    ){
+        super(getGroupLabel(group),TreeItemCollapsibleState.Expanded);
+        this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
+        this.contextValue='code-block-group';
+        this.iconPath=new vscode.ThemeIcon('comment-discussion');
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return this.group.tags.map(tag=>new ConvoCodeBlockItem(tag));
+    }
+}
+
+class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly tag:ParsedOutputTagInfo,
+    ){
+        super(getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        this.description=getItemDescription(tag);
+        this.tooltip=getItemTooltip(tag);
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+
+        if(tag.type==='file'){
+            this.command={
+                title:'Open Output',
+                command:'convo.output-tag-open',
+                arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+            };
+            this.resourceUri=Uri.file(tag.targetPath);
+        }
+    }
+}
+
+const getGroupLabel=(group:ParsedOutputTagGroup):string=>{
+    const role=group.message.role ?? 'message';
+    const head=group.message.head?.trim();
+    return head?`> ${role} ${head}`:`> ${role}`;
+}
+
+const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
+    if(tag.type==='shell'){
+        return tag.codeBlock.attributes['script-name'] || 'script';
+    }
+
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+
+    return tag.codeBlock.tagName;
+}
+
+const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
+    const lang=tag.codeBlock.lang || 'text';
+    return tag.type==='shell'?
+        lang
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :
+        lang;
+}
+
+const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
+    const lines=[
+        `<${tag.codeBlock.tagName}>`,
+        tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+        `Lang: ${tag.codeBlock.lang || 'text'}`,
+    ].filter(Boolean);
+
+    return lines.join('\n');
+}
+
+const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isActive:boolean):string=>{
+    const parts:string[]=[];
+
+    if(isSelected){
+        parts.push('Selected');
+    }
+    if(isActive){
+        parts.push('Active');
+    }
+    if(isPinned){
+        parts.push('Pinned');
+    }
+
+    const dir=path.dirname(fsPath);
+    if(dir){
+        parts.push(dir);
+    }
+
+    return parts.join(' • ');
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="b555d1ed59b2b9704bed2dde6ceca60d93f995ec">
+```ts
+import * as path from 'path';
+import { ExtensionContext, languages, window } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCompletionCommands } from './completion-provider.js';
+import { registerConvoCodeBlockView } from './convo-code-block-view.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider } from './output-tag-code-lens.js';
+import { registerImagePasteHandler } from './register-image-paste-handler.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+let client:LanguageClient;
+
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCompletionCommands(context,ext);
+    registerTypingHandler(context);
+    registerImagePasteHandler(context,ext);
+    registerConvoCodeBlockView(context,ext);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation@02"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.output-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.output-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.output-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.output-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+When there is a pinned code block and I open another convo file its code block view
+does not appear in the panel. When a convo file is opened its code block view should
+be show regardless if another one is pinned.
+
+The main title bar for the "CODE BLOCKS" panel now shows options for pinning and 
+switch to code block view. This seems like a mistake.
+
+Node of the buttons of the code block view items do anything, for example when
+I press the diff button no diff window appears.
+
+@time 2026-04-17T19:10:35-04:00
+@tokenUsage 32215 / 86 / $0.08075250000000002
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick clarification:
+
+For the Code Blocks tree root, should it show:
+1. the active convo document first, followed by all pinned convo documents, each as its own expandable section, or
+2. a flat combined list of groups from the active document plus pinned documents?
+
+I’m assuming 1 is what you want, but want to confirm before changing the tree structure and command wiring.
+
+
+> user
+1. yes
+2. no
+
+
+@time 2026-04-17T19:13:01-04:00
+@tokenUsage 32315 / 9034 / $0.1033725
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" dirty file-hash="cd78014d08146ebdc3684978b95639d67fe06e82" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```ts
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { getParsedOutputTagGroups, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+
+const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
+const selectedDocStateKey='convo.codeBlocks.selectedDoc';
+
+export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    const provider=new ConvoCodeBlockTreeProvider(context,ext);
+    const tree=window.createTreeView('convoCodeBlocks',{
+        treeDataProvider:provider,
+    });
+
+    context.subscriptions.push(tree);
+
+    context.subscriptions.push(commands.registerCommand('convo.code-blocks-refresh',async ()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeBlockGroupItem)=>{
+        await provider.applyAllAsync(item);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-pin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.pinDocumentAsync(item?.doc.uri.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-unpin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.unpinDocumentAsync(item?.doc.uri.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-switch',async (item?:ConvoCodeBlockDocItem)=>{
+        if(item){
+            await provider.switchToDocumentAsync(item.doc.uri.fsPath,true);
+        }else{
+            await provider.pickAndSwitchDocumentAsync();
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-open',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.openOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-write',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.writeOutputTagByArgsAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.diffOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.copyOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(window.onDidChangeActiveTextEditor((editor)=>{
+        void provider.handleActiveEditorChangedAsync(editor);
+    }));
+
+    context.subscriptions.push(workspace.onDidChangeTextDocument((e)=>{
+        provider.handleDocumentChanged(e.document);
+    }));
+
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        provider.handleDocumentChanged(document);
+    }));
+
+    void provider.initializeAsync();
+}
+
+class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlockTreeItem>
+{
+    private readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
+    public readonly onDidChangeTreeData=this.onDidChangeTreeDataEmitter.event;
+
+    private pinnedPaths:string[]=[];
+    private selectedPath:string|undefined;
+    private lastActiveConvoPath:string|undefined;
+
+    public constructor(
+        private readonly context:ExtensionContext,
+        private readonly ext:ConvoExt,
+    ){
+    }
+
+    public async initializeAsync():Promise<void>
+    {
+        const savedPinned=this.context.workspaceState.get<string[]>(pinnedDocsStateKey);
+        this.pinnedPaths=(savedPinned ?? []).map(p=>path.normalize(p));
+
+        const savedSelected=this.context.workspaceState.get<string>(selectedDocStateKey);
+        this.selectedPath=savedSelected?path.normalize(savedSelected):undefined;
+
+        await this.cleanupStateAsync();
+        await this.trySelectStartupDocumentAsync();
+        this.refresh();
+    }
+
+    public refresh():void
+    {
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    public getTreeItem(element:ConvoCodeBlockTreeItem):TreeItem
+    {
+        return element;
+    }
+
+    public async getChildren(element?:ConvoCodeBlockTreeItem):Promise<ConvoCodeBlockTreeItem[]>
+    {
+        if(element){
+            return element.getChildren?.() ?? [];
+        }
+
+        const docs=await this.getVisibleDocumentsAsync();
+        return docs.map(doc=>new ConvoCodeBlockDocItem(
+            doc,
+            this.isPinned(doc.uri.fsPath),
+            this.isSelected(doc.uri.fsPath),
+            this.isActive(doc.uri.fsPath),
+        ));
+    }
+
+    public async applyAllAsync(item?:ConvoCodeBlockGroupItem):Promise<void>
+    {
+        const target=item;
+        if(!target){
+            return;
+        }
+
+        const fileTags=target.group.tags.filter(t=>t.type==='file');
+        const shellTags=target.group.tags.filter(t=>t.type==='shell');
+
+        if(!fileTags.length && !shellTags.length){
+            return;
+        }
+
+        if(fileTags.length){
+            const action=await window.showWarningMessage(
+                `Apply ${fileTags.length} file output${fileTags.length===1?'':'s'} from this message?`,
+                {modal:true},
+                'Apply All',
+                'View First Diff',
+            );
+
+            if(action==='View First Diff'){
+                const first=fileTags[0];
+                if(first){
+                    await showOutputDiffAsync(first.targetPath,first.content);
+                }
+                return;
+            }
+
+            if(action!=='Apply All'){
+                return;
+            }
+
+            for(const tag of fileTags){
+                await writeOutputTagAsync(tag.targetPath,tag.content);
+            }
+        }
+
+        for(const tag of shellTags){
+            await commands.executeCommand('convo.output-tag-execute-shell',{
+                targetPath:tag.targetPath,
+                index:tag.index,
+                cwd:tag.cwd,
+            } satisfies OutputTagCodeLensArgs);
+        }
+    }
+
+    public async handleActiveEditorChangedAsync(editor:vscode.TextEditor|undefined):Promise<void>
+    {
+        const document=editor?.document;
+        if(document?.languageId==='source.convo' && document.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(document.uri.fsPath);
+            if(!this.selectedPath || !this.isPinned(this.selectedPath)){
+                await this.selectDocumentAsync(document.uri.fsPath);
+                return;
+            }
+        }
+
+        this.refresh();
+    }
+
+    public handleDocumentChanged(document:vscode.TextDocument):void
+    {
+        if(document.uri.scheme!=='file'){
+            return;
+        }
+
+        const normalized=path.normalize(document.uri.fsPath);
+        if(this.selectedPath===normalized || this.lastActiveConvoPath===normalized || this.pinnedPaths.includes(normalized)){
+            this.refresh();
+        }
+    }
+
+    public async pinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        if(!this.pinnedPaths.includes(normalized)){
+            this.pinnedPaths.push(normalized);
+            await this.savePinnedPathsAsync();
+        }
+
+        await this.selectDocumentAsync(normalized);
+        this.refresh();
+    }
+
+    public async unpinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        const nextPinned=this.pinnedPaths.filter(p=>p!==normalized);
+        if(nextPinned.length===this.pinnedPaths.length){
+            return;
+        }
+
+        this.pinnedPaths=nextPinned;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath===normalized){
+            const fallback=this.lastActiveConvoPath && this.lastActiveConvoPath!==normalized?
+                this.lastActiveConvoPath
+            :undefined;
+            await this.selectDocumentAsync(fallback);
+        }else{
+            this.refresh();
+        }
+    }
+
+    public async switchToDocumentAsync(fsPath:string|undefined,revealDocument:boolean):Promise<void>
+    {
+        const normalized=fsPath?path.normalize(fsPath):undefined;
+        await this.selectDocumentAsync(normalized);
+
+        if(revealDocument && normalized){
+            const doc=await workspace.openTextDocument(Uri.file(normalized));
+            await window.showTextDocument(doc,{preview:false,preserveFocus:false});
+        }
+    }
+
+    public async pickAndSwitchDocumentAsync():Promise<void>
+    {
+        const docs=await this.getAvailableDocumentsAsync();
+        if(!docs.length){
+            void window.showInformationMessage('No Convo documents available.');
+            return;
+        }
+
+        const items=docs.map(doc=>{
+            const fsPath=doc.uri.fsPath;
+            return {
+                label:path.basename(fsPath),
+                description:getDocDescription(
+                    fsPath,
+                    this.isPinned(fsPath),
+                    this.isSelected(fsPath),
+                    this.isActive(fsPath),
+                ),
+                detail:fsPath,
+                doc,
+            };
+        });
+
+        const picked=await window.showQuickPick(items,{
+            placeHolder:'Select a Convo document for the Code Blocks view',
+        });
+
+        if(!picked){
+            return;
+        }
+
+        await this.switchToDocumentAsync(picked.doc.uri.fsPath,true);
+    }
+
+    public async openOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        try{
+            const doc=await workspace.openTextDocument(Uri.file(tag.targetPath));
+            await window.showTextDocument(doc,{preview:false});
+        }catch{
+            await this.writeOutputTagByArgsAsync(args);
+            const doc=await workspace.openTextDocument(Uri.file(tag.targetPath));
+            await window.showTextDocument(doc,{preview:false});
+        }
+    }
+
+    public async writeOutputTagByArgsAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        await writeOutputTagAsync(tag.targetPath,tag.content);
+    }
+
+    public async diffOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        await showOutputDiffAsync(tag.targetPath,tag.content);
+    }
+
+    public async copyOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag){
+            return;
+        }
+
+        await vscode.env.clipboard.writeText(tag.content);
+        void window.showInformationMessage(`Copied ${getItemLabel(tag)}`);
+    }
+
+    private async cleanupStateAsync():Promise<void>
+    {
+        const kept:string[]=[];
+        for(const p of this.pinnedPaths){
+            if(await this.fileExistsAsync(p)){
+                kept.push(p);
+            }
+        }
+        this.pinnedPaths=kept;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath && !await this.fileExistsAsync(this.selectedPath)){
+            this.selectedPath=undefined;
+            await this.context.workspaceState.update(selectedDocStateKey,undefined);
+        }
+    }
+
+    private async trySelectStartupDocumentAsync():Promise<void>
+    {
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(active.uri.fsPath);
+            if(!this.selectedPath){
+                await this.selectDocumentAsync(active.uri.fsPath);
+                return;
+            }
+        }
+
+        if(this.selectedPath){
+            return;
+        }
+
+        const openConvo=workspace.textDocuments.find(d=>d.languageId==='source.convo' && d.uri.scheme==='file');
+        if(openConvo){
+            this.lastActiveConvoPath=path.normalize(openConvo.uri.fsPath);
+            await this.selectDocumentAsync(openConvo.uri.fsPath);
+            return;
+        }
+
+        if(this.pinnedPaths[0]){
+            await this.selectDocumentAsync(this.pinnedPaths[0]);
+        }
+    }
+
+    private async getVisibleDocumentsAsync():Promise<vscode.TextDocument[]>
+    {
+        const result:vscode.TextDocument[]=[];
+        const added=new Set<string>();
+
+        const active=await this.getDocumentByPathAsync(this.lastActiveConvoPath);
+        if(active){
+            const normalized=path.normalize(active.uri.fsPath);
+            result.push(active);
+            added.add(normalized);
+        }
+
+        for(const pinnedPath of this.pinnedPaths){
+            const doc=await this.getDocumentByPathAsync(pinnedPath);
+            if(!doc){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            result.push(doc);
+            added.add(normalized);
+        }
+
+        const selected=await this.getDocumentByPathAsync(this.selectedPath);
+        if(selected){
+            const normalized=path.normalize(selected.uri.fsPath);
+            if(!added.has(normalized)){
+                result.push(selected);
+            }
+        }
+
+        return result;
+    }
+
+    private async getAvailableDocumentsAsync():Promise<vscode.TextDocument[]>
+    {
+        const docs:vscode.TextDocument[]=[];
+        const added=new Set<string>();
+
+        for(const doc of workspace.textDocuments){
+            if(doc.languageId!=='source.convo' || doc.uri.scheme!=='file'){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            docs.push(doc);
+            added.add(normalized);
+        }
+
+        for(const fsPath of this.pinnedPaths){
+            const doc=await this.getDocumentByPathAsync(fsPath);
+            if(!doc){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            docs.push(doc);
+            added.add(normalized);
+        }
+
+        docs.sort((a,b)=>a.uri.fsPath.localeCompare(b.uri.fsPath));
+        return docs;
+    }
+
+    private async getDocumentByPathAsync(fsPath:string|undefined):Promise<vscode.TextDocument|undefined>
+    {
+        if(!fsPath){
+            return undefined;
+        }
+
+        const normalized=path.normalize(fsPath);
+        const openDoc=workspace.textDocuments.find(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===normalized);
+        if(openDoc){
+            return openDoc.languageId==='source.convo'?openDoc:undefined;
+        }
+
+        try{
+            const doc=await workspace.openTextDocument(Uri.file(normalized));
+            return doc.languageId==='source.convo'?doc:undefined;
+        }catch{
+            return undefined;
+        }
+    }
+
+    private async getTagFromArgsAsync(args?:OutputTagCodeLensArgs):Promise<ParsedOutputTagInfo|undefined>
+    {
+        const targetPath=args?.targetPath;
+        const index=args?.index;
+        if(targetPath===undefined || index===undefined){
+            return undefined;
+        }
+
+        const docs=await this.getVisibleDocumentsAsync();
+        for(const doc of docs){
+            const groups=getParsedOutputTagGroups(doc);
+            for(const group of groups){
+                const match=group.tags.find(tag=>tag.index===index && tag.targetPath===targetPath);
+                if(match){
+                    return match;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    private async resolveDocumentPathAsync(fsPath?:string):Promise<string|undefined>
+    {
+        if(fsPath){
+            return fsPath;
+        }
+
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            return active.uri.fsPath;
+        }
+
+        if(this.selectedPath){
+            return this.selectedPath;
+        }
+
+        return this.lastActiveConvoPath;
+    }
+
+    private async selectDocumentAsync(fsPath:string|undefined):Promise<void>
+    {
+        const normalized=fsPath?path.normalize(fsPath):undefined;
+        this.selectedPath=normalized;
+        await this.context.workspaceState.update(selectedDocStateKey,normalized);
+        this.refresh();
+    }
+
+    private isPinned(fsPath:string):boolean
+    {
+        return this.pinnedPaths.includes(path.normalize(fsPath));
+    }
+
+    private isSelected(fsPath:string):boolean
+    {
+        return this.selectedPath===path.normalize(fsPath);
+    }
+
+    private isActive(fsPath:string):boolean
+    {
+        return this.lastActiveConvoPath===path.normalize(fsPath);
+    }
+
+    private async savePinnedPathsAsync():Promise<void>
+    {
+        await this.context.workspaceState.update(pinnedDocsStateKey,this.pinnedPaths);
+    }
+
+    private async fileExistsAsync(fsPath:string):Promise<boolean>
+    {
+        try{
+            await workspace.fs.stat(Uri.file(fsPath));
+            return true;
+        }catch{
+            return false;
+        }
+    }
+}
+
+abstract class ConvoCodeBlockTreeItem extends TreeItem
+{
+    public getChildren?():Promise<ConvoCodeBlockTreeItem[]>;
+}
+
+class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly doc:vscode.TextDocument,
+        isPinned:boolean,
+        isSelected:boolean,
+        isActive:boolean,
+    ){
+        super(path.basename(doc.uri.fsPath),TreeItemCollapsibleState.Expanded);
+        this.description=getDocDescription(doc.uri.fsPath,isPinned,isSelected,isActive);
+        this.tooltip=doc.uri.fsPath;
+        this.contextValue=isPinned?'code-block-doc-pinned':'code-block-doc';
+        this.iconPath=new vscode.ThemeIcon(
+            isPinned?
+                'pinned'
+            :isActive?
+                'file'
+            :
+                'symbol-file',
+        );
+        this.command={
+            title:'Switch Code Block View',
+            command:'convo.code-block-view-switch',
+            arguments:[this],
+        };
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        const groups=getParsedOutputTagGroups(this.doc);
+        return groups.map(group=>new ConvoCodeBlockGroupItem(group));
+    }
+}
+
+class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly group:ParsedOutputTagGroup,
+    ){
+        super(getGroupLabel(group),TreeItemCollapsibleState.Expanded);
+        this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
+        this.contextValue='code-block-group';
+        this.iconPath=new vscode.ThemeIcon('comment-discussion');
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return this.group.tags.map(tag=>new ConvoCodeBlockItem(tag));
+    }
+}
+
+class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly tag:ParsedOutputTagInfo,
+    ){
+        super(getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        this.description=getItemDescription(tag);
+        this.tooltip=getItemTooltip(tag);
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+
+        if(tag.type==='file'){
+            this.command={
+                title:'Open Output',
+                command:'convo.output-tag-open',
+                arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+            };
+            this.resourceUri=Uri.file(tag.targetPath);
+        }
+    }
+}
+
+const getGroupLabel=(group:ParsedOutputTagGroup):string=>{
+    const role=group.message.role ?? 'message';
+    const head=group.message.head?.trim();
+    return head?`> ${role} ${head}`:`> ${role}`;
+}
+
+const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
+    if(tag.type==='shell'){
+        return tag.codeBlock.attributes['script-name'] || 'script';
+    }
+
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+
+    return tag.codeBlock.tagName;
+}
+
+const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
+    const lang=tag.codeBlock.lang || 'text';
+    return tag.type==='shell'?
+        lang
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :
+        lang;
+}
+
+const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
+    const lines=[
+        `<${tag.codeBlock.tagName}>`,
+        tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+        `Lang: ${tag.codeBlock.lang || 'text'}`,
+    ].filter(Boolean);
+
+    return lines.join('\n');
+}
+
+const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isActive:boolean):string=>{
+    const parts:string[]=[];
+
+    if(isSelected){
+        parts.push('Selected');
+    }
+    if(isActive){
+        parts.push('Active');
+    }
+    if(isPinned){
+        parts.push('Pinned');
+    }
+
+    const dir=path.dirname(fsPath);
+    if(dir){
+        parts.push(dir);
+    }
+
+    return parts.join(' • ');
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="7c219fd97960a81b96bad809f064ede0a876b672" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.output-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.output-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.output-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.output-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+The commands registered in `output-tag-code-lens.ts` are conflicting since they are getting registered twice.
+The code block panel should use different command names such as `convo.code-block-panel-tag-diff`
+
+@time 2026-04-17T19:25:24-04:00
+@tokenUsage 44431 / 9060 / $0.1337275
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" dirty file-hash="cd78014d08146ebdc3684978b95639d67fe06e82" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```ts
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { getParsedOutputTagGroups, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+
+const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
+const selectedDocStateKey='convo.codeBlocks.selectedDoc';
+
+export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    const provider=new ConvoCodeBlockTreeProvider(context,ext);
+    const tree=window.createTreeView('convoCodeBlocks',{
+        treeDataProvider:provider,
+    });
+
+    context.subscriptions.push(tree);
+
+    context.subscriptions.push(commands.registerCommand('convo.code-blocks-refresh',async ()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeBlockGroupItem)=>{
+        await provider.applyAllAsync(item);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-pin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.pinDocumentAsync(item?.doc.uri.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-unpin',async (item?:ConvoCodeBlockDocItem)=>{
+        await provider.unpinDocumentAsync(item?.doc.uri.fsPath);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-view-switch',async (item?:ConvoCodeBlockDocItem)=>{
+        if(item){
+            await provider.switchToDocumentAsync(item.doc.uri.fsPath,true);
+        }else{
+            await provider.pickAndSwitchDocumentAsync();
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-open',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.openOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-write',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.writeOutputTagByArgsAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.diffOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
+        await provider.copyOutputTagAsync(args);
+    }));
+
+    context.subscriptions.push(window.onDidChangeActiveTextEditor((editor)=>{
+        void provider.handleActiveEditorChangedAsync(editor);
+    }));
+
+    context.subscriptions.push(workspace.onDidChangeTextDocument((e)=>{
+        provider.handleDocumentChanged(e.document);
+    }));
+
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        provider.handleDocumentChanged(document);
+    }));
+
+    void provider.initializeAsync();
+}
+
+class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlockTreeItem>
+{
+    private readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
+    public readonly onDidChangeTreeData=this.onDidChangeTreeDataEmitter.event;
+
+    private pinnedPaths:string[]=[];
+    private selectedPath:string|undefined;
+    private lastActiveConvoPath:string|undefined;
+
+    public constructor(
+        private readonly context:ExtensionContext,
+        private readonly ext:ConvoExt,
+    ){
+    }
+
+    public async initializeAsync():Promise<void>
+    {
+        const savedPinned=this.context.workspaceState.get<string[]>(pinnedDocsStateKey);
+        this.pinnedPaths=(savedPinned ?? []).map(p=>path.normalize(p));
+
+        const savedSelected=this.context.workspaceState.get<string>(selectedDocStateKey);
+        this.selectedPath=savedSelected?path.normalize(savedSelected):undefined;
+
+        await this.cleanupStateAsync();
+        await this.trySelectStartupDocumentAsync();
+        this.refresh();
+    }
+
+    public refresh():void
+    {
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    public getTreeItem(element:ConvoCodeBlockTreeItem):TreeItem
+    {
+        return element;
+    }
+
+    public async getChildren(element?:ConvoCodeBlockTreeItem):Promise<ConvoCodeBlockTreeItem[]>
+    {
+        if(element){
+            return element.getChildren?.() ?? [];
+        }
+
+        const docs=await this.getVisibleDocumentsAsync();
+        return docs.map(doc=>new ConvoCodeBlockDocItem(
+            doc,
+            this.isPinned(doc.uri.fsPath),
+            this.isSelected(doc.uri.fsPath),
+            this.isActive(doc.uri.fsPath),
+        ));
+    }
+
+    public async applyAllAsync(item?:ConvoCodeBlockGroupItem):Promise<void>
+    {
+        const target=item;
+        if(!target){
+            return;
+        }
+
+        const fileTags=target.group.tags.filter(t=>t.type==='file');
+        const shellTags=target.group.tags.filter(t=>t.type==='shell');
+
+        if(!fileTags.length && !shellTags.length){
+            return;
+        }
+
+        if(fileTags.length){
+            const action=await window.showWarningMessage(
+                `Apply ${fileTags.length} file output${fileTags.length===1?'':'s'} from this message?`,
+                {modal:true},
+                'Apply All',
+                'View First Diff',
+            );
+
+            if(action==='View First Diff'){
+                const first=fileTags[0];
+                if(first){
+                    await showOutputDiffAsync(first.targetPath,first.content);
+                }
+                return;
+            }
+
+            if(action!=='Apply All'){
+                return;
+            }
+
+            for(const tag of fileTags){
+                await writeOutputTagAsync(tag.targetPath,tag.content);
+            }
+        }
+
+        for(const tag of shellTags){
+            await commands.executeCommand('convo.output-tag-execute-shell',{
+                targetPath:tag.targetPath,
+                index:tag.index,
+                cwd:tag.cwd,
+            } satisfies OutputTagCodeLensArgs);
+        }
+    }
+
+    public async handleActiveEditorChangedAsync(editor:vscode.TextEditor|undefined):Promise<void>
+    {
+        const document=editor?.document;
+        if(document?.languageId==='source.convo' && document.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(document.uri.fsPath);
+            if(!this.selectedPath || !this.isPinned(this.selectedPath)){
+                await this.selectDocumentAsync(document.uri.fsPath);
+                return;
+            }
+        }
+
+        this.refresh();
+    }
+
+    public handleDocumentChanged(document:vscode.TextDocument):void
+    {
+        if(document.uri.scheme!=='file'){
+            return;
+        }
+
+        const normalized=path.normalize(document.uri.fsPath);
+        if(this.selectedPath===normalized || this.lastActiveConvoPath===normalized || this.pinnedPaths.includes(normalized)){
+            this.refresh();
+        }
+    }
+
+    public async pinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        if(!this.pinnedPaths.includes(normalized)){
+            this.pinnedPaths.push(normalized);
+            await this.savePinnedPathsAsync();
+        }
+
+        await this.selectDocumentAsync(normalized);
+        this.refresh();
+    }
+
+    public async unpinDocumentAsync(fsPath?:string):Promise<void>
+    {
+        const targetPath=await this.resolveDocumentPathAsync(fsPath);
+        if(!targetPath){
+            return;
+        }
+
+        const normalized=path.normalize(targetPath);
+        const nextPinned=this.pinnedPaths.filter(p=>p!==normalized);
+        if(nextPinned.length===this.pinnedPaths.length){
+            return;
+        }
+
+        this.pinnedPaths=nextPinned;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath===normalized){
+            const fallback=this.lastActiveConvoPath && this.lastActiveConvoPath!==normalized?
+                this.lastActiveConvoPath
+            :undefined;
+            await this.selectDocumentAsync(fallback);
+        }else{
+            this.refresh();
+        }
+    }
+
+    public async switchToDocumentAsync(fsPath:string|undefined,revealDocument:boolean):Promise<void>
+    {
+        const normalized=fsPath?path.normalize(fsPath):undefined;
+        await this.selectDocumentAsync(normalized);
+
+        if(revealDocument && normalized){
+            const doc=await workspace.openTextDocument(Uri.file(normalized));
+            await window.showTextDocument(doc,{preview:false,preserveFocus:false});
+        }
+    }
+
+    public async pickAndSwitchDocumentAsync():Promise<void>
+    {
+        const docs=await this.getAvailableDocumentsAsync();
+        if(!docs.length){
+            void window.showInformationMessage('No Convo documents available.');
+            return;
+        }
+
+        const items=docs.map(doc=>{
+            const fsPath=doc.uri.fsPath;
+            return {
+                label:path.basename(fsPath),
+                description:getDocDescription(
+                    fsPath,
+                    this.isPinned(fsPath),
+                    this.isSelected(fsPath),
+                    this.isActive(fsPath),
+                ),
+                detail:fsPath,
+                doc,
+            };
+        });
+
+        const picked=await window.showQuickPick(items,{
+            placeHolder:'Select a Convo document for the Code Blocks view',
+        });
+
+        if(!picked){
+            return;
+        }
+
+        await this.switchToDocumentAsync(picked.doc.uri.fsPath,true);
+    }
+
+    public async openOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        try{
+            const doc=await workspace.openTextDocument(Uri.file(tag.targetPath));
+            await window.showTextDocument(doc,{preview:false});
+        }catch{
+            await this.writeOutputTagByArgsAsync(args);
+            const doc=await workspace.openTextDocument(Uri.file(tag.targetPath));
+            await window.showTextDocument(doc,{preview:false});
+        }
+    }
+
+    public async writeOutputTagByArgsAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        await writeOutputTagAsync(tag.targetPath,tag.content);
+    }
+
+    public async diffOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag || tag.type!=='file'){
+            return;
+        }
+
+        await showOutputDiffAsync(tag.targetPath,tag.content);
+    }
+
+    public async copyOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    {
+        const tag=await this.getTagFromArgsAsync(args);
+        if(!tag){
+            return;
+        }
+
+        await vscode.env.clipboard.writeText(tag.content);
+        void window.showInformationMessage(`Copied ${getItemLabel(tag)}`);
+    }
+
+    private async cleanupStateAsync():Promise<void>
+    {
+        const kept:string[]=[];
+        for(const p of this.pinnedPaths){
+            if(await this.fileExistsAsync(p)){
+                kept.push(p);
+            }
+        }
+        this.pinnedPaths=kept;
+        await this.savePinnedPathsAsync();
+
+        if(this.selectedPath && !await this.fileExistsAsync(this.selectedPath)){
+            this.selectedPath=undefined;
+            await this.context.workspaceState.update(selectedDocStateKey,undefined);
+        }
+    }
+
+    private async trySelectStartupDocumentAsync():Promise<void>
+    {
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            this.lastActiveConvoPath=path.normalize(active.uri.fsPath);
+            if(!this.selectedPath){
+                await this.selectDocumentAsync(active.uri.fsPath);
+                return;
+            }
+        }
+
+        if(this.selectedPath){
+            return;
+        }
+
+        const openConvo=workspace.textDocuments.find(d=>d.languageId==='source.convo' && d.uri.scheme==='file');
+        if(openConvo){
+            this.lastActiveConvoPath=path.normalize(openConvo.uri.fsPath);
+            await this.selectDocumentAsync(openConvo.uri.fsPath);
+            return;
+        }
+
+        if(this.pinnedPaths[0]){
+            await this.selectDocumentAsync(this.pinnedPaths[0]);
+        }
+    }
+
+    private async getVisibleDocumentsAsync():Promise<vscode.TextDocument[]>
+    {
+        const result:vscode.TextDocument[]=[];
+        const added=new Set<string>();
+
+        const active=await this.getDocumentByPathAsync(this.lastActiveConvoPath);
+        if(active){
+            const normalized=path.normalize(active.uri.fsPath);
+            result.push(active);
+            added.add(normalized);
+        }
+
+        for(const pinnedPath of this.pinnedPaths){
+            const doc=await this.getDocumentByPathAsync(pinnedPath);
+            if(!doc){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            result.push(doc);
+            added.add(normalized);
+        }
+
+        const selected=await this.getDocumentByPathAsync(this.selectedPath);
+        if(selected){
+            const normalized=path.normalize(selected.uri.fsPath);
+            if(!added.has(normalized)){
+                result.push(selected);
+            }
+        }
+
+        return result;
+    }
+
+    private async getAvailableDocumentsAsync():Promise<vscode.TextDocument[]>
+    {
+        const docs:vscode.TextDocument[]=[];
+        const added=new Set<string>();
+
+        for(const doc of workspace.textDocuments){
+            if(doc.languageId!=='source.convo' || doc.uri.scheme!=='file'){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            docs.push(doc);
+            added.add(normalized);
+        }
+
+        for(const fsPath of this.pinnedPaths){
+            const doc=await this.getDocumentByPathAsync(fsPath);
+            if(!doc){
+                continue;
+            }
+
+            const normalized=path.normalize(doc.uri.fsPath);
+            if(added.has(normalized)){
+                continue;
+            }
+
+            docs.push(doc);
+            added.add(normalized);
+        }
+
+        docs.sort((a,b)=>a.uri.fsPath.localeCompare(b.uri.fsPath));
+        return docs;
+    }
+
+    private async getDocumentByPathAsync(fsPath:string|undefined):Promise<vscode.TextDocument|undefined>
+    {
+        if(!fsPath){
+            return undefined;
+        }
+
+        const normalized=path.normalize(fsPath);
+        const openDoc=workspace.textDocuments.find(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===normalized);
+        if(openDoc){
+            return openDoc.languageId==='source.convo'?openDoc:undefined;
+        }
+
+        try{
+            const doc=await workspace.openTextDocument(Uri.file(normalized));
+            return doc.languageId==='source.convo'?doc:undefined;
+        }catch{
+            return undefined;
+        }
+    }
+
+    private async getTagFromArgsAsync(args?:OutputTagCodeLensArgs):Promise<ParsedOutputTagInfo|undefined>
+    {
+        const targetPath=args?.targetPath;
+        const index=args?.index;
+        if(targetPath===undefined || index===undefined){
+            return undefined;
+        }
+
+        const docs=await this.getVisibleDocumentsAsync();
+        for(const doc of docs){
+            const groups=getParsedOutputTagGroups(doc);
+            for(const group of groups){
+                const match=group.tags.find(tag=>tag.index===index && tag.targetPath===targetPath);
+                if(match){
+                    return match;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    private async resolveDocumentPathAsync(fsPath?:string):Promise<string|undefined>
+    {
+        if(fsPath){
+            return fsPath;
+        }
+
+        const active=window.activeTextEditor?.document;
+        if(active?.languageId==='source.convo' && active.uri.scheme==='file'){
+            return active.uri.fsPath;
+        }
+
+        if(this.selectedPath){
+            return this.selectedPath;
+        }
+
+        return this.lastActiveConvoPath;
+    }
+
+    private async selectDocumentAsync(fsPath:string|undefined):Promise<void>
+    {
+        const normalized=fsPath?path.normalize(fsPath):undefined;
+        this.selectedPath=normalized;
+        await this.context.workspaceState.update(selectedDocStateKey,normalized);
+        this.refresh();
+    }
+
+    private isPinned(fsPath:string):boolean
+    {
+        return this.pinnedPaths.includes(path.normalize(fsPath));
+    }
+
+    private isSelected(fsPath:string):boolean
+    {
+        return this.selectedPath===path.normalize(fsPath);
+    }
+
+    private isActive(fsPath:string):boolean
+    {
+        return this.lastActiveConvoPath===path.normalize(fsPath);
+    }
+
+    private async savePinnedPathsAsync():Promise<void>
+    {
+        await this.context.workspaceState.update(pinnedDocsStateKey,this.pinnedPaths);
+    }
+
+    private async fileExistsAsync(fsPath:string):Promise<boolean>
+    {
+        try{
+            await workspace.fs.stat(Uri.file(fsPath));
+            return true;
+        }catch{
+            return false;
+        }
+    }
+}
+
+abstract class ConvoCodeBlockTreeItem extends TreeItem
+{
+    public getChildren?():Promise<ConvoCodeBlockTreeItem[]>;
+}
+
+class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly doc:vscode.TextDocument,
+        isPinned:boolean,
+        isSelected:boolean,
+        isActive:boolean,
+    ){
+        super(path.basename(doc.uri.fsPath),TreeItemCollapsibleState.Expanded);
+        this.description=getDocDescription(doc.uri.fsPath,isPinned,isSelected,isActive);
+        this.tooltip=doc.uri.fsPath;
+        this.contextValue=isPinned?'code-block-doc-pinned':'code-block-doc';
+        this.iconPath=new vscode.ThemeIcon(
+            isPinned?
+                'pinned'
+            :isActive?
+                'file'
+            :
+                'symbol-file',
+        );
+        this.command={
+            title:'Switch Code Block View',
+            command:'convo.code-block-view-switch',
+            arguments:[this],
+        };
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        const groups=getParsedOutputTagGroups(this.doc);
+        return groups.map(group=>new ConvoCodeBlockGroupItem(group));
+    }
+}
+
+class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly group:ParsedOutputTagGroup,
+    ){
+        super(getGroupLabel(group),TreeItemCollapsibleState.Expanded);
+        this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
+        this.contextValue='code-block-group';
+        this.iconPath=new vscode.ThemeIcon('comment-discussion');
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return this.group.tags.map(tag=>new ConvoCodeBlockItem(tag));
+    }
+}
+
+class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly tag:ParsedOutputTagInfo,
+    ){
+        super(getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        this.description=getItemDescription(tag);
+        this.tooltip=getItemTooltip(tag);
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+
+        if(tag.type==='file'){
+            this.command={
+                title:'Open Output',
+                command:'convo.code-block-panel-tag-open',
+                arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+            };
+            this.resourceUri=Uri.file(tag.targetPath);
+        }
+    }
+}
+
+const getGroupLabel=(group:ParsedOutputTagGroup):string=>{
+    const role=group.message.role ?? 'message';
+    const head=group.message.head?.trim();
+    return head?`> ${role} ${head}`:`> ${role}`;
+}
+
+const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
+    if(tag.type==='shell'){
+        return tag.codeBlock.attributes['script-name'] || 'script';
+    }
+
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+
+    return tag.codeBlock.tagName;
+}
+
+const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
+    const lang=tag.codeBlock.lang || 'text';
+    return tag.type==='shell'?
+        lang
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :
+        lang;
+}
+
+const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
+    const lines=[
+        `<${tag.codeBlock.tagName}>`,
+        tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+        `Lang: ${tag.codeBlock.lang || 'text'}`,
+    ].filter(Boolean);
+
+    return lines.join('\n');
+}
+
+const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isActive:boolean):string=>{
+    const parts:string[]=[];
+
+    if(isSelected){
+        parts.push('Selected');
+    }
+    if(isActive){
+        parts.push('Active');
+    }
+    if(isPinned){
+        parts.push('Pinned');
+    }
+
+    const dir=path.dirname(fsPath);
+    if(dir){
+        parts.push(dir);
+    }
+
+    return parts.join(' • ');
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="7c219fd97960a81b96bad809f064ede0a876b672" last-commit="a9ab0da8b7def39ba2e14ba482b585a9768fdba2">
+```json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
