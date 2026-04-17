@@ -8,6 +8,7 @@ import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessage
 import { convoRoles, convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
 import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoEmbeddingsService, ConvoMessage, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoViewTheme } from "./convo-view-theme.js";
+import { ConvoDb } from "./db/convo-db-types.js";
 import { LocalStorageConvoDataStore } from "./LocalStorageConvoDataStore.js";
 import { ConvoQueuedTextToSpeech, TtsCtrl } from "./TtsCtrl.js";
 
@@ -42,6 +43,7 @@ export interface ConversationUiCtrlOptions
     transcriptionService?:ConvoTranscriptionService;
     ttsService?:ConvoTtsService;
     embeddingsService?:ConvoEmbeddingsService;
+    db?:ConvoDb;
 }
 
 export class ConversationUiCtrl
@@ -58,6 +60,7 @@ export class ConversationUiCtrl
     public readonly transcriptionService?:ConvoTranscriptionService;
     public readonly ttsService?:ConvoTtsService;
     public readonly embeddingsService?:ConvoEmbeddingsService;
+    public readonly db?:ConvoDb;
 
     private readonly convoOptions?:ConversationOptions;
     private readonly initConvoCallback?:(convo:Conversation)=>void;
@@ -378,6 +381,7 @@ export class ConversationUiCtrl
         transcriptionService,
         ttsService,
         embeddingsService,
+        db,
     }:ConversationUiCtrlOptions={}){
 
         this.id=id??shortUuid();
@@ -392,6 +396,7 @@ export class ConversationUiCtrl
         this.transcriptionService=transcriptionService;
         this.ttsService=ttsService;
         this.embeddingsService=embeddingsService;
+        this.db=db;
 
         this._defaultVars=new BehaviorSubject<Record<string,any>>(defaultVars?{...defaultVars}:{});
         this._externFunctions=new BehaviorSubject(externFunctions?{...externFunctions}:{});
@@ -446,6 +451,9 @@ export class ConversationUiCtrl
         }
         for(const e in this.defaultVars){
             convo.defaultVars[e]=this.defaultVars[e];
+        }
+        if(this.db){
+            convo.unregisteredVars[convoVars.__db]=this.db;
         }
         for(const e in this.externFunctions){
             const f=this.externFunctions[e];

@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
@@ -337,6 +337,271 @@ export const getConvoHonoRoutes=({
         }
 
         return c.json(result.result,200);
+    });
+
+    routes.post('/db/:dbName/node/query',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        try{
+
+            const store=getDb(c.req.param('dbName'));
+            if(!store){
+                return c.json('No database found by name',404);
+            }
+
+            console.log('hio 👋 👋 👋 before');
+            const query:ConvoNodeQuery=await c.req.json();
+            console.log('hio 👋 👋 👋 query',query);
+            const result=await store.queryNodesAsync(query);
+            
+            if(!result.success){
+                return c.json(result.error,result.statusCode);
+            }
+
+            return c.json(result.result,200);
+        }catch(ex){
+            console.log('hio 👋 👋 👋',(ex as any).stack);
+            return c.json(ex,500);
+        }
+    });
+
+    routes.get('/db/:dbName/node/:path{.*}',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        let path=c.req.param('path');
+        if(!path.startsWith('/')){
+            path='/'+path;
+        }
+
+        const result=await store.queryNodesAsync({steps:[{path}]})
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        if(path.endsWith('*')){
+            const first=result.result.nodes[0];
+            if(!first){
+                return c.json('not found',404);
+            }
+            return c.json(first,200);
+        }else{
+            return c.json(result.result,200);
+        }
+    });
+
+    routes.post('/db/:dbName/node',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionInsertNode=await c.req.json();
+        const result=await store.insertNodeAsync(request.node,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.patch('/db/:dbName/node',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionUpdateNode=await c.req.json();
+        const result=await store.updateNodeAsync(request.node,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
+    });
+
+    routes.delete('/db/:dbName/node',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionDeleteNode=await c.req.json();
+        const result=await store.deleteNodeAsync(request.path,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
+    });
+
+    routes.get('/db/:dbName/edge/:id',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const result=await store.getEdgeByIdAsync(c.req.param('id'));
+
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.post('/db/:dbName/edge',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionInsertEdge=await c.req.json();
+        const result=await store.insertEdgeAsync(request.edge,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.patch('/db/:dbName/edge',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionUpdateEdge=await c.req.json();
+        const result=await store.updateEdgeAsync(request.update,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
+    });
+
+    routes.delete('/db/:dbName/edge',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionDeleteEdge=await c.req.json();
+        const result=await store.deleteEdgeAsync(request.id,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
+    });
+
+    routes.get('/db/:dbName/embedding/:id',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const result=await store.getEmbeddingByIdAsync(c.req.param('id'));
+
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.post('/db/:dbName/embedding',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionInsertEmbedding=await c.req.json();
+        const result=await store.insertEmbeddingAsync(request.embedding,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(result.result,200);
+    });
+
+    routes.patch('/db/:dbName/embedding',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionUpdateEmbedding=await c.req.json();
+        const result=await store.updateEmbeddingAsync(request.update,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
+    });
+
+    routes.delete('/db/:dbName/embedding',async (c)=>{
+
+        await initConvoHonoAsync();
+
+        const store=getDb(c.req.param('dbName'));
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const request:ConvoDbActionDeleteEmbedding=await c.req.json();
+        const result=await store.deleteEmbeddingAsync(request.id,request.options);
+        
+        if(!result.success){
+            return c.json(result.error,result.statusCode);
+        }
+
+        return c.json(null,201);
     });
 
     routes.post('/db/:dbName/stream',timeout(completionTimeoutMs),async (c)=>{
