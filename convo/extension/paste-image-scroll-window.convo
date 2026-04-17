@@ -1,4 +1,4 @@
-@import ./extension-rules.convo
+@import ./_extension.convo
 @import ../../packages/convo-lang-tools/lsp/client/src/register-image-paste-handler.ts !file
 @import ../../packages/convo-lang-tools/lsp/client/src/typing-handler.ts !file
 

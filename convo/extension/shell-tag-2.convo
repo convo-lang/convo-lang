@@ -1,4 +1,4 @@
-@import ./extension-rules.convo
+@import ./_extension.convo
 @import ../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts
 
 > user

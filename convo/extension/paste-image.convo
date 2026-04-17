@@ -1,4 +1,4 @@
-@import ./extension-rules.convo
+@import ./_extension.convo
 
 > user
 When a user pastes an image into a convo file I would like the image to be inserted directly into the code as a
