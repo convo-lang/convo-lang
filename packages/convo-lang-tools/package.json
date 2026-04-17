@@ -152,6 +152,11 @@
                     "command": "convo.refresh-make-targets",
                     "when": "view == convoMakeBuild",
                     "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
                 }
             ],
             "view/item/context": [
@@ -209,6 +214,41 @@
                     "command": "convo.make-target-open-convo",
                     "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
                     "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
                 }
             ]
         },
@@ -229,6 +269,46 @@
                 "command": "convo.refresh-make-targets",
                 "title": "Convo: Refresh make targets",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.output-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.output-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.output-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.output-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
             },
             {
                 "command": "convo.parse",
@@ -463,6 +543,11 @@
                     "id": "convoMakeBuild",
                     "name": "Make Build",
                     "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
                 }
             ]
         }

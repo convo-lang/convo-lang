@@ -11,6 +11,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
 import { extensionPublisher } from './build-const.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
+import { registerConvoCodeBlockView } from './convo-code-block-view.js';
 import { ConvoExt } from './ConvoExt.js';
 import { createFoldingProviders } from './folding-provider.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
@@ -70,6 +71,7 @@ export function activate(context:ExtensionContext){
     registerCommands(context,ext);
     registerTypingHandler(context);
     registerImagePasteHandler(context,ext);
+    registerConvoCodeBlockView(context,ext);
     startLsp(context);
 
     const treeView=window.createTreeView('convoMakeBuild',{

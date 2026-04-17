@@ -247,6 +247,14 @@ export interface ConvoMessage
     importMatch?:ConvoImportMatch;
 
     /**
+     * Array of code blocks found in the message. By default codeBlocks will always be undefined.
+     * Code block parsing must be enabled during convo source code parsing. Messages that define
+     * dynamic content will have code blocks parsed during the flatting of a conversation at 
+     * runtime.
+     */
+    codeBlocks?:ConvoCodeBlock[];
+
+    /**
      * Path to file where the message was defined in
      */
     [convoMessageSourcePathKey]?:string;
@@ -255,6 +263,47 @@ export interface ConvoMessage
      * A reference to the source code the message was parsed from.
      */
     [convoMessageSourceReferenceKey]?:ConvoSourceRef;
+}
+
+/**
+ * Represents an XML tagged block of code in the content of a message.
+ * @example
+ * <EXAMPLE_SCRIPT priority="0">
+ * ``` js
+ * console.log('hello');
+ * ```
+ * </EXAMPLE_SCRIPT>
+ */
+export interface ConvoCodeBlock
+{
+    tagName:string;
+
+    attributes:Record<string,string>;
+
+    /**
+     * The language of the code block defined by the markdown code fence wrapping the content of the block.
+     */
+    lang:string;
+    
+    /**
+     * Code content excluding the markdown code fences the content is wrapped in
+     */
+    content:string;
+
+    /**
+     * Start index of the XML tag of the block relative to the parsed source code.
+     */
+    startIndex:number;
+
+    /**
+     * Exclusive end index of the XML tag of the block relative to the parsed source code.
+     */
+    endIndex:number;
+
+    /**
+     * Index of the code block with a list of all other code blocks in the current conversation
+     */
+    index:number;
 }
 
 /**
@@ -1144,6 +1193,14 @@ export interface FlatConvoMessage
      * The index of the node step the message belongs to
      */
     nodeStepIndex?:number;
+
+    /**
+     * Array of code blocks found in the message. By default codeBlocks will always be undefined.
+     * Code block parsing must be enabled during convo source code parsing. Messages that define
+     * dynamic content will have code blocks parsed during the flatting of a conversation at 
+     * runtime.
+     */
+    codeBlocks?:ConvoCodeBlock[];
 
     /**
      * The ConvoMessage that the flat message was created from.
@@ -2110,6 +2167,7 @@ export interface ConvoImportService
 export interface ConvoParsingOptions extends CodeParsingOptions
 {
     logErrors?:boolean;
+    enableCodeBlocks?:boolean;
 }
 
 export interface InlineConvoParsingOptions extends ConvoParsingOptions

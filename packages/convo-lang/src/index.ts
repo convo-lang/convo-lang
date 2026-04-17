@@ -5,6 +5,7 @@ export * from './lib/Conversation.js';
 export * from './lib/ConversationUiCtrl.js';
 export * from './lib/convo-browser-types.js';
 export * from './lib/convo-cached-parsing.js';
+export * from './lib/convo-code-block-lib.js';
 export * from './lib/convo-completion-lib.js';
 export * from './lib/convo-component-lib.js';
 export * from './lib/convo-component-types.js';

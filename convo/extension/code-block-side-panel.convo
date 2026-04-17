@@ -1,0 +1,2933 @@
+@import ./_extension.convo
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../../packages/convo-lang-tools/lsp/client/src/extension.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/util.ts !file
+@import ../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts !file
+@import ../../packages/convo-lang/src/lib/convo-types.ts !file
+
+> user
+Add a side panel that displays a list of code blocks in the current open convo file. Each item
+in the list should have the same options as the code-lens items displayed for the blocks.
+
+Items should be grouped together by containing message.
+
+At the top of the of each group include a button for applying all code blocks
+
+use the `parseConvoCode` function to parse with options.enableCodeBlocks set to true
+the source code of content of the file and extract code blocks
+
+``` ts
+interface ConvoParsingResult{
+    result?: ConvoMessage[];
+    error?: CodeParsingError;
+    endIndex: number;
+}
+const parseConvoCode=(code:string,options:{enableCodeBlocks?:boolean}):ConvoParsingResult;
+```
+
+@time 2026-04-17T18:02:23-04:00
+@tokenUsage 41478 / 59 / $0.1038425
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate the changes, one clarification:
+
+Should the new side panel list only code blocks from files whose active editor language is `source.convo`, or should it also try to surface convo code blocks embedded in JS/TS/Markdown/Python files that the extension already highlights?
+
+
+> user
+only `source.convo` files
+
+@time 2026-04-17T18:11:08-04:00
+@tokenUsage 41551 / 15998 / $0.14387250000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="71ef6519c94a2575e7a256eb608d456a6e463c83">
+``` json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" dirty file-hash="dc0c43a7386b70dc712e38d5167007ad525b1ffd">
+``` ts
+import { ConvoCodeBlock, ConvoMessage, parseConvoCode } from '@convo-lang/convo-lang';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, Range, Uri, window, workspace } from "vscode";
+
+export interface OutputTagCodeLensArgs
+{
+    targetPath:string;
+    index:number;
+    cwd?:string;
+    complete?:boolean;
+}
+
+export interface OutputTagInfo
+{
+    targetPath:string;
+    content:string;
+    range:Range;
+    type:'file'|'shell'|'other';
+    cwd?:string;
+    index:number;
+    codeBlock:ConvoCodeBlock;
+}
+
+export interface ParsedOutputTagInfo extends OutputTagInfo
+{
+    message:ConvoMessage;
+    messageIndex:number;
+}
+
+export interface ParsedOutputTagGroup
+{
+    message:ConvoMessage;
+    messageIndex:number;
+    tags:ParsedOutputTagInfo[];
+}
+
+export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
+    return getOutputTagsFromSource(document.getText(),document.uri.scheme==='file'?document.uri.fsPath:undefined);
+}
+
+export const getOutputTagsFromSource=(source:string,filePath?:string):OutputTagInfo[]=>{
+    const baseDir=filePath?path.dirname(filePath):'';
+
+    const result=parseConvoCode(source,{
+        enableCodeBlocks:true,
+    });
+
+    const messages=result.result ?? [];
+    const tags:OutputTagInfo[]=[];
+
+    for(const message of messages){
+        const codeBlocks=message.codeBlocks;
+        if(!codeBlocks?.length){
+            continue;
+        }
+
+        for(const b of codeBlocks){
+            const type=(
+                ('target-output-path' in b.attributes)?
+                    'file'
+                :('target-shell-type' in b.attributes)?
+                    'shell'
+                :
+                    'other'
+            );
+            const start=new vscode.Position(message.ln?Math.max(0,message.ln-1):0,0);
+            const end=new vscode.Position(message.ln?Math.max(0,message.ln-1):0,0);
+            const targetPath=b.attributes['target-output-path']??'';
+
+            tags.push({
+                codeBlock:b,
+                targetPath:(baseDir && type==='file')?
+                        path.resolve(baseDir,targetPath)
+                    :type==='shell'?
+                        (b.attributes['script-name']??'script')
+                    :
+                        targetPath,
+                    content:b.content,
+                    type,
+                    range:new vscode.Range(start,end),
+                    index:b.index,
+                    cwd:b.attributes['cwd'],
+            });
+        }
+    }
+
+    return tags;
+}
+
+export const getParsedOutputTagGroups=(document:vscode.TextDocument):ParsedOutputTagGroup[]=>{
+    if(document.languageId!=='source.convo'){
+        return [];
+    }
+
+    const result=parseConvoCode(document.getText(),{
+        enableCodeBlocks:true,
+    });
+
+    const messages=result.result ?? [];
+    const baseDir=document.uri.scheme==='file'?path.dirname(document.uri.fsPath):'';
+    const groups:ParsedOutputTagGroup[]=[];
+
+    for(let messageIndex=0;messageIndex<messages.length;messageIndex++){
+        const message=messages[messageIndex];
+        const codeBlocks=message.codeBlocks;
+        if(!codeBlocks?.length){
+            continue;
+        }
+
+        const tags:ParsedOutputTagInfo[]=[];
+
+        for(const b of codeBlocks){
+            const type=(
+                ('target-output-path' in b.attributes)?
+                    'file'
+                :('target-shell-type' in b.attributes)?
+                    'shell'
+                :
+                    'other'
+            );
+            const start=document.positionAt(message.s ?? b.startIndex);
+            const end=document.positionAt(message.e ?? b.endIndex);
+            const targetPath=b.attributes['target-output-path']??'';
+
+            tags.push({
+                codeBlock:b,
+                message,
+                messageIndex,
+                targetPath:(baseDir && type==='file')?
+                        path.resolve(baseDir,targetPath)
+                    :type==='shell'?
+                        (b.attributes['script-name']??'script')
+                    :
+                        targetPath,
+                content:b.content,
+                type,
+                range:new vscode.Range(start,end),
+                index:b.index,
+                cwd:b.attributes['cwd'],
+            });
+        }
+
+        groups.push({
+            message,
+            messageIndex,
+            tags,
+        });
+    }
+
+    return groups;
+}
+
+export const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:string,index:number):OutputTagInfo|undefined=>{
+    const normalizedTargetPath=path.normalize(targetPath);
+    return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath && t.index===index);
+}
+
+export const getActiveOutputTag=(targetPath:string,index:number):OutputTagInfo|undefined=>{
+    const editor=window.activeTextEditor;
+    if(!editor){
+        return undefined;
+    }
+
+    return getOutputTagForTargetPath(editor.document,targetPath,index);
+}
+
+const createOutputPreviewUri=(targetPath:string):Uri=>{
+    return Uri.parse(`convo-output:${encodeURIComponent(targetPath)}`);
+}
+export const outputPreviewContent=new Map<string,string>();
+export const showOutputDiffAsync=async (
+    targetPath:string,
+    content:string,
+):Promise<boolean>=>{
+    const previewUri=createOutputPreviewUri(targetPath);
+    outputPreviewContent.set(previewUri.toString(),content);
+
+    let targetExists=true;
+    try{
+        await workspace.fs.stat(Uri.file(targetPath));
+    }catch{
+        targetExists=false;
+    }
+
+    const leftUri=targetExists?
+        Uri.file(targetPath)
+    :
+        Uri.parse('untitled:'+targetPath);
+
+    await commands.executeCommand(
+        'vscode.diff',
+        leftUri,
+        previewUri,
+        `Output Diff: ${path.basename(targetPath)}`,
+    );
+
+    return true;
+}
+
+export const writeOutputTagAsync=async (targetPath:string,content:string):Promise<void>=>{
+    await fs.mkdir(path.dirname(targetPath),{recursive:true});
+    await fs.writeFile(targetPath,content,'utf8');
+
+    const openEditors=workspace.textDocuments.filter(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===path.normalize(targetPath));
+    for(const doc of openEditors){
+        await doc.save();
+    }
+
+    void window.showInformationMessage(`Wrote output to ${targetPath}`);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="output-tag-code-lens.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts" dirty file-hash="61237ce8fb2181e7e36e663699bc8d4bbabfdd26" last-commit="a61f97bedfd7d4e31f4813e0c5fd1d245aeac109">
+``` ts
+import { spawn } from 'child_process';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt';
+import { getActiveOutputTag, getOutputTags, outputPreviewContent, OutputTagCodeLensArgs, OutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
+import { revealDocumentEndAsync } from './util';
+
+
+export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    context.subscriptions.push(workspace.registerTextDocumentContentProvider('convo-output',{
+        provideTextDocumentContent(uri:Uri):string{
+            return outputPreviewContent.get(uri.toString()) ?? '';
+        },
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-open',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+        const doc=await workspace.openTextDocument(Uri.file(targetPath));
+        await window.showTextDocument(doc);
+    }));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-write',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+
+        const tag=getActiveOutputTag(targetPath,args.index);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+
+        const action=await window.showWarningMessage(
+            `Write output to ${path.basename(targetPath)}?`,
+            { modal:true },
+            'Write File',
+            'View Diff',
+        );
+
+        if(action==='View Diff'){
+            await showOutputDiffAsync(targetPath,tag.content);
+            return;
+        }
+
+        if(action!=='Write File'){
+            return;
+        }
+
+        await writeOutputTagAsync(targetPath,tag.content);
+    }));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+
+        const tag=getActiveOutputTag(targetPath,args.index);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+
+        await showOutputDiffAsync(targetPath,tag.content);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+
+        const tag=getActiveOutputTag(targetPath,args.index);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+
+        await vscode.env.clipboard.writeText(tag.content);
+        void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell',async (args?:OutputTagCodeLensArgs)=>{
+        await executeShellOutputTagAsync(context,args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell-complete',async (args?:OutputTagCodeLensArgs)=>{
+        await executeShellOutputTagAsync(context,args?{...args,complete:true}:args);
+    }));
+}
+
+
+
+export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
+{
+    public provideCodeLenses(document:vscode.TextDocument):vscode.CodeLens[]
+    {
+        const lenses:vscode.CodeLens[]=[];
+        const outputTags=getOutputTags(document);
+
+        for(const tag of outputTags){
+            switch(tag.type){
+
+                case 'file':
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Open Output',
+                            command:'convo.output-tag-open',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Write Output',
+                            command:'convo.output-tag-write',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Open Diff',
+                            command:'convo.output-tag-diff',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Copy Output',
+                            command:'convo.output-tag-copy',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    break;
+
+                case 'shell':
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Run Script',
+                            command:'convo.output-tag-execute-shell',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Run Script and complete',
+                            command:'convo.output-tag-execute-shell-complete',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,complete:true} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    break;
+            }
+        }
+
+        return lenses;
+    }
+}
+
+export const executeShellOutputTagAsync=async (
+    context:ExtensionContext,
+    args?:OutputTagCodeLensArgs,
+):Promise<void>=>{
+    const targetPath=args?.targetPath;
+    if(!targetPath){
+        return;
+    }
+
+    const tag=getActiveOutputTag(targetPath,args.index);
+    if(!tag){
+        void window.showErrorMessage('Unable to find output tag content for the selected target.');
+        return;
+    }
+
+    const allowed=await confirmShellRunAsync(context,tag);
+    if(!allowed){
+        return;
+    }
+
+    const editor=window.activeTextEditor;
+    if(!editor){
+        return;
+    }
+
+    const document=editor.document;
+    const scriptName=escapeXmlAttr(targetPath);
+    const header=createScriptOutputHeader(document.getText(),scriptName);
+    const footer='\n```\n</SCRIPT_OUTPUT>\n';
+
+    await editor.edit(builder=>{
+        builder.insert(document.positionAt(document.getText().length),header);
+    });
+
+    await revealDocumentEndAsync(editor);
+
+    const processCwd=args.cwd || process.cwd();
+    const child=spawn('bash',['-lc',tag.content],{
+        cwd:processCwd,
+        env:process.env,
+    });
+
+    let appendQueue=Promise.resolve();
+    let killed=false;
+
+    const appendAsync=(value:string)=>{
+        if(!value){
+            return appendQueue;
+        }
+        return appendQueue=appendQueue.then(async ()=>{
+            const activeEditor=window.activeTextEditor;
+            if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
+                return;
+            }
+            await activeEditor.edit(builder=>{
+                builder.insert(
+                    activeEditor.document.positionAt(activeEditor.document.getText().length),
+                    value,
+                );
+            });
+            await revealDocumentEndAsync(activeEditor);
+        });
+    };
+
+    child.stdout.on('data',(data)=>{
+        void appendAsync(data.toString());
+    });
+
+    child.stderr.on('data',(data)=>{
+        void appendAsync(data.toString());
+    });
+
+    child.on('error',(err)=>{
+        void appendAsync(`\n[process error] ${err.message}\n`);
+    });
+
+    await window.withProgress({
+        location:vscode.ProgressLocation.Notification,
+        title:'Running script',
+        cancellable:true,
+    },async (progress,token)=>{
+        const pid=child.pid ?? 'unknown';
+        progress.report({message:`PID: ${pid}`});
+
+        token.onCancellationRequested(()=>{
+            killed=true;
+            try{
+                child.kill('SIGTERM');
+            }catch{
+            }
+        });
+
+        await new Promise<void>((resolve)=>{
+            child.on('close',(code,signal)=>{
+                let endNote='';
+                if(killed){
+                    endNote=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;
+                }else if(signal){
+                    endNote=`\n[process exited by signal ${signal}]\n`;
+                }else if(code!==0){
+                    endNote=`\n[process exited with code ${code}]\n`;
+                }
+                appendAsync(endNote).then(async ()=>{
+                    await appendQueue;
+                    const activeEditor=window.activeTextEditor;
+                    if(activeEditor && activeEditor.document.uri.toString()===document.uri.toString()){
+                        await activeEditor.edit(builder=>{
+                            builder.insert(
+                                activeEditor.document.positionAt(activeEditor.document.getText().length),
+                                footer,
+                            );
+                        });
+                        await revealDocumentEndAsync(activeEditor);
+                    }
+                    if(args.complete && !killed){
+                        await vscode.commands.executeCommand('convo.complete');
+                    }
+                    resolve();
+                });
+            });
+        });
+    });
+}
+
+
+const confirmShellRunAsync=async (
+    context:ExtensionContext,
+    tag:OutputTagInfo,
+):Promise<boolean>=>{
+    const config=workspace.getConfiguration('convo');
+    const alwaysRun=config.get<boolean>('alwaysRunOutputScripts') ?? false;
+    if(alwaysRun){
+        return true;
+    }
+
+    const detail=[
+        `Script: ${tag.targetPath}`,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+    ].filter(Boolean).join('\n');
+
+    const action=await window.showWarningMessage(
+        'Run shell script from convo output?',
+        { modal:true, detail },
+        'Run Script',
+        'Always Run Script',
+    );
+
+    if(action==='Always Run Script'){
+        await config.update('alwaysRunOutputScripts',true,vscode.ConfigurationTarget.Global);
+        return true;
+    }
+
+    return action==='Run Script';
+}
+
+
+const createScriptOutputHeader=(text:string,scriptName:string):string=>{
+    const trimmedEnd=text.trimEnd();
+    const endsWithUser=/>\s*user\s*$/m.test(trimmedEnd) && trimmedEnd.split(/\r?\n/).slice(-1)[0]?.trim()==='> user';
+    return `${text.length?'\n\n':''}${endsWithUser?'':'> user\n\n'}<SCRIPT_OUTPUT script-name="${scriptName}">\n\`\`\` output\n`;
+}
+
+const escapeXmlAttr=(value:string):string=>{
+    return value
+        .replace(/&/g,'&amp;')
+        .replace(/"/g,'&quot;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;');
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="4a1bdb774190dbeda9d12be110f003590d86cecc">
+``` ts
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
+import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
+import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, getErrorMessage, getFileExt, getFileName, joinPaths, normalizePath } from '@iyio/common';
+import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
+import { realpath } from 'fs/promises';
+import * as path from 'path';
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, languages, window, workspace } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { extensionPublisher } from './build-const.js';
+import { ConvoCliShell } from './ConvoCliShell.js';
+import { registerConvoCodeBlockView } from './convo-code-block-view.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
+import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider, registerOutTagCommands } from './output-tag-code-lens.js';
+import { registerImagePasteHandler } from './register-image-paste-handler.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+
+let client:LanguageClient;
+
+const example=/*convo*/`
+# Builds a vehicle for the user
+\> buildVehicle(
+
+    # A short description of the vehicle
+    description:string;
+
+    # The color of the vehicle
+    color?:string
+
+    # The type of the vehicle
+    type:enum('car' 'truck' 'van' 'boat')
+
+    # The top speed of the vehicle in miles per hour
+    topSpeed:number
+
+    # The max payload capcapty the vehicle can cary in pounds
+    payloadCapacity?:number;
+) -> (
+
+    return({
+        isTruck:eq(type,'truck')
+        isFast:gte(topSpeed,150)
+    })
+)
+
+\> system
+You are funny mechanical engineer helping a customer build a vehicle. Use the buildVehicle function
+to build vehicles.
+
+\> user
+I need a car that can do the quarter mile in 7 seconds or less
+
+\> user
+Use the buildVehicle function to build my vehicle
+
+`
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCommands(context,ext);
+    registerTypingHandler(context);
+    registerImagePasteHandler(context,ext);
+    registerConvoCodeBlockView(context,ext);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+
+
+const registerCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    registerOutTagCommands(context,ext);
+
+    context.subscriptions.push(commands.registerCommand('convo.parse', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const r=parseConvoCode(src);
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(r.result??r,null,4)
+        })
+
+        await window.showTextDocument(doc);
+
+
+    }));
+
+
+
+    context.subscriptions.push(commands.registerCommand('convo.new', async () => {
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:'> user\n',
+        });
+        const editor=await window.showTextDocument(doc);
+        const pos=doc.positionAt(doc.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }));
+
+    const getConvoEditorContextAsync=async (cliOptions:ConvoCliOptions={},docPath?:string):Promise<{cli:ConvoCli,src:string,convo:Conversation,document?:TextDocument,cwd:string|undefined}|undefined>=>{
+        const document=window.activeTextEditor?.document;
+        if(!document && !docPath){
+            return;
+        }
+
+        if(!docPath && document){
+            docPath=document.uri.scheme==='file'?document.uri.fsPath:undefined;
+        }
+        if(!docPath){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(docPath){
+            src=await readFileAsStringAsync(docPath);
+        }else if(document?.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document?.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cwd=docPath?path.dirname(docPath):undefined;
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:cwd,
+            sourcePath:docPath,
+            ...cliOptions
+        });
+
+        const convo=cli.convo;
+        convo.append(src,{disableAutoFlatten:true,filePath:docPath});
+
+        return {
+            cli,
+            convo,
+            src,
+            document,
+            cwd
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.modules', async () => {
+
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const src=ctx.convo.getDebuggingModulesCode();
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.text', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+        const flat=await ctx.convo.flattenAsync();
+
+        const src=flatConvoMessagesToTextView(flat.messages);
+
+        const doc=await workspace.openTextDocument({
+            language:'source.convo',
+            content:src
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.vars', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(flat.exe.getUserSharedVars(),createJsonRefReplacer(),4),
+        })
+
+        await window.showTextDocument(doc);
+    }));
+
+    const getFlat=async (options?:FlattenConvoOptions)=>{
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const flat=getSerializableFlatConvoConversation(await ctx.convo.flattenAsync(undefined,options),true);
+        const obj:any={}
+        for(const e in flat){
+            const v=(flat as any)[e];
+            if((typeof v !== 'object') || v===null){
+                obj[e]=v;
+            }
+        }
+        obj.messages=flat.messages;
+        obj.vars=(flat as any).vars;
+        for(const e in flat){
+            if(e in obj){
+                continue;
+            }
+            const v=(flat as any)[e];
+            if((typeof v === 'object') && v!==null){
+                obj[e]=v;
+            }
+        }
+        return obj;
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.flat-all', async () => {
+
+        const obj=await getFlat({nodeBehavior:'keepAll'});
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.flat', async () => {
+
+        const obj=await getFlat();
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(obj,null,4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.messages', async () => {
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx){
+            return;
+        }
+
+        const doc=await workspace.openTextDocument({
+            language:'json',
+            content:JSON.stringify(ctx.convo.messages,createJsonRefReplacer(),4),
+        });
+
+        await window.showTextDocument(doc);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-targets', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+        })
+        const ctx=await getConvoEditorContextAsync();
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        const options=getConvoMakeOptionsFromVars(
+            document.uri.fsPath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            browserInf:new ConvoBrowserCtrl(),
+        });
+        try{
+            const debugOutput=await ctrl.getDebugOutputAsync();
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(debugOutput,null,4),
+            });
+
+            await window.showTextDocument(doc);
+        }finally{
+            ctrl.dispose();
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-sync', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-sync', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,sync:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open-convo', async (target?:ConvoMakeExtTarget) => {
+        const convoFile=target?.obj.convoFile;
+        if(convoFile){
+            const document=await workspace.openTextDocument(Uri.file(convoFile));
+            const editor=await window.showTextDocument(document);
+            const pos=document.positionAt(document.getText().length);
+            editor.selection=new Selection(pos,pos);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-single-review', async (target?:ConvoMakeExtTarget) => {
+        const targetPath=target?.obj.outPath;
+        const ctrl=target?.ctrl;
+        if(!targetPath || !ctrl){
+            return;
+        }
+
+        await makeAsync({build:ctrl.filePath,rebuild:targetPath,forceReview:true});
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-open', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-delete-all', async (target?:ConvoMakeExtBuild) => {
+        const ctrl=target?.obj;
+        if(!ctrl){
+            return;
+        }
+
+        const confirm=await window.showWarningMessage(
+            `Delete outputs of ${getFileName(ctrl.filePath)}\n\nAre you sure you want to delete all outputs of "${ctrl.filePath}"?`,
+            {modal:true},
+            'Delete'
+        );
+        if(confirm === 'Delete'){
+            const targets=await target.getTargetsAsync(true);
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete ${targets.length} outputs?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm==='Delete'){
+                for(const t of targets){
+                    await workspace.fs.delete(Uri.file(t.obj.outPath),{useTrash:true});
+                }
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-target-delete', async (target?:ConvoMakeExtTarget|string) => {
+        const targetPath=(typeof target === 'string')?target:target?.obj.outPath;
+        if(targetPath){
+            const confirm=await window.showWarningMessage(
+                `Are you sure you want to delete "${targetPath}"?`,
+                {modal:true},
+                'Delete'
+            );
+            if(confirm === 'Delete'){
+                await workspace.fs.delete(Uri.file(targetPath),{useTrash:true});
+                await ext.scanMakeCtrlsAsync();
+            }
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-open', async (build?:ConvoMakeExtBuild|string) => {
+        const targetPath=(typeof build === 'string')?build:build?.ctrl.filePath;
+        if(targetPath){
+            const doc=await workspace.openTextDocument(Uri.file(targetPath));
+            await window.showTextDocument(doc);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.make-stop', async (build?:ConvoMakeExtBuild|string) => {
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        const ctrls=[...ext.makeCtrls];
+        for(const ctrl of ctrls){
+            if(!ctrl.preview){
+                ctrl.dispose();
+            }
+        }
+    }));
+
+    interface MakeOptions
+    {
+        build?:ConvoMakeExtBuild|string;
+        rebuild?:boolean|ConvoMakeTargetRebuild|string|(string|ConvoMakeTargetRebuild)[];
+        sync?:string|boolean;
+        forceReview?:boolean;
+    }
+    const makeAsync=async ({
+        build,
+        rebuild,
+        sync,
+        forceReview
+    }:MakeOptions) => {
+
+        const token=new CancelToken();
+
+        const document=window.activeTextEditor?.document;
+
+        const sourcePath=(typeof build ==='string')?build:(build?.ctrl.filePath??((document?.isUntitled || document?.uri.scheme!=='file')?undefined:document?.uri.fsPath));
+        if(!sourcePath){
+            return;
+        }
+
+        await initConvoCliAsync({
+            config:ext.getCliConfig(),
+            sourcePath:sourcePath,
+            bufferOutput:true,
+            exeCwd:path.dirname(sourcePath),
+        })
+        if(token.isCanceled){return}
+
+        const ctx=await getConvoEditorContextAsync(undefined,sourcePath);
+        if(token.isCanceled){return}
+
+        if(!ctx?.cwd){
+            return;
+        }
+
+        const flat=await ctx.convo.flattenAsync();
+        if(token.isCanceled){return}
+
+        const options=getConvoMakeOptionsFromVars(
+            sourcePath,
+            ctx.cwd,
+            flat.exe.sharedVars
+        );
+        if(!options){
+            return;
+        }
+        const ctrl=new ConvoMakeCtrl({
+            captureConsoleLogLevel:defaultMakeLogLevel,
+            ...options,
+            forceReview,
+            rebuild,
+            browserInf:new ConvoBrowserCtrl(),
+            shell:new ConvoCliShell(),
+        });
+        ext.addMakeCtrl(ctrl);
+        token.onCancel(()=>{
+            ctrl.dispose();
+        })
+        commands.executeCommand('convoMakeBuild.focus');
+        try{
+            if(sync===true){
+                await ctrl.syncAllTargetCachesWithOutput();
+            }else if(sync){
+                await ctrl.syncTargetCacheWithOutput(sync);
+            }else{
+                await ctrl.buildAsync();
+            }
+        }finally{
+            ctrl.dispose();
+        }
+        if(sync){
+            await ext.scanMakeCtrlsAsync();
+        }
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.make',v=>makeAsync({build:v})));
+
+    context.subscriptions.push(commands.registerCommand('convo.convert', async () => {
+        const document=window.activeTextEditor?.document;
+        if(!document){
+            return;
+        }
+
+        let src:string|undefined=undefined;
+
+        if(document.languageId==='source.convo'){
+            src=document?.getText();
+        }else{
+            const selection=window.activeTextEditor?.selection
+            if(selection){
+                src=document.getText(new Range(selection.start,selection.end));
+            }
+        }
+
+        if(!src){
+            return;
+        }
+
+        const cli=await createConvoCliAsync({
+            config:ext.getCliConfig(),
+            bufferOutput:true,
+            exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+            sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+        });
+
+        try{
+
+            const convo=cli.convo;
+            convo.append(src,{disableAutoFlatten:true,filePath:document.isUntitled?undefined:document.uri.fsPath});
+            const flat=await convo.flattenAsync();
+            const converted=await convo.toModelInputAsync(flat);
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(converted,createJsonRefReplacer(),4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    const completeAsync=async (cliOptions:ConvoCliOptions={}) => {
+
+        const document=window.activeTextEditor?.document;
+
+        if(document?.languageId!=='source.convo'){
+
+            let createdNew=false;
+
+            const selection=window.activeTextEditor?.selection
+            if(document && selection){
+                const text=document.getText(new Range(selection.start,selection.end));
+                if(text){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:text})
+                    await window.showTextDocument(doc);
+                    createdNew=true;
+                }
+            }
+
+            if(!createdNew){
+
+                const option=await window.showWarningMessage(
+                    'Conversation completion requires a .convo file', 'Complete example', 'Create empty', 'Dismiss'
+                );
+
+                if(option==='Create empty'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:'> system\nsystem prompt here\n\n> user\nprompt here\n'})
+                    await window.showTextDocument(doc);
+                    return;
+                }else if(option==='Complete example'){
+                    const doc=await workspace.openTextDocument({language:'source.convo',content:example})
+                    await window.showTextDocument(doc);
+                }else{
+                    return;
+                }
+            }
+
+        }
+
+        await window.withProgress({
+            location: ProgressLocation.Notification,
+            title: cliOptions.graph?"Completing Graph":"Completing conversation",
+            cancellable: true
+        }, async (progress, token) => {
+
+            const document=window.activeTextEditor?.document;
+            if(!document){
+                return;
+            }
+
+            const src=document?.getText();
+            if(!src){
+                return;
+            }
+            progress.report({ message:document.uri.path });
+
+            let done=false;
+
+            const startLength=src.length;
+            let tmpAppend='';
+
+            const lock=new Lock(1);
+
+            const setCodeAsync=async (code:string,isFinal:boolean,append:boolean)=>{
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const release=await lock.waitAsync();
+                try{
+                    if(done && !isFinal){
+                        return;
+                    }
+                    if(!isFinal && tmpAppend){
+                        code=tmpAppend+'\n\n'+code;
+                    }
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        const all=append?
+                            new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                            new Range(document.positionAt(0),document.positionAt(document.getText().length));
+                        builder.replace(all,code);
+                    })
+                }finally{
+                    release();
+                }
+            }
+
+            try{
+
+
+                let msg=`\n\n// completing...`;
+                await setCodeAsync(msg,false,true);
+
+                const cli=await createConvoCliAsync({
+                    config:ext.getCliConfig(),
+                    inline:src,
+                    sourcePath:document.isUntitled?undefined:document.uri.fsPath,
+                    bufferOutput:true,
+                    exeCwd:document.uri.scheme==='file'?path.dirname(document.uri.fsPath):undefined,
+                    allowExec:async (command)=>{
+                        if(token.isCancellationRequested){
+                            return false;
+                        }
+                        const option=await window.showWarningMessage(
+                            `exec > ${command}`, 'Deny', 'Allow'
+                        );
+                        tmpAppend+=`\n// exec > ${command.split('\n').join(' ')}`;
+                        await setCodeAsync(msg,false,true);
+                        return option==='Allow';
+                    },
+                    ...cliOptions,
+                });
+
+                token.onCancellationRequested(()=>{
+                    cli.convo.dispose();
+                })
+
+                let firstAppend=true;
+                cli.convo.onAppend.subscribe(v=>{
+                    if(firstAppend){
+                        firstAppend=false;
+                        return;
+                    }
+                    tmpAppend+='\n\n'+v.text
+                    setCodeAsync(msg,false,true);
+                })
+
+                await cli.executeAsync();
+                done=true;
+
+                if(token.isCancellationRequested){
+                    return;
+                }
+                const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+            }catch(ex){
+                const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
+                const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
+                const suggestConfig=/(401|403|unauthorized|denied|api\s*key)/i.test(err);
+                await setCodeAsync(`${src}\n\n> result\n${convoResultErrorName}=${err}${suggestConfig?`\n\n// ${tryMsg}\n// Click the settings (🛠️) icon above the top right of this file`:''}`,true,false);
+                if(suggestConfig){
+                    window.showInformationMessage(
+                        tryMsg,
+                        'Open Convo-Lang Settings'
+                    ).then(selection => {
+                        if (selection === 'Open Convo-Lang Settings') {
+                            commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+                        }
+                    });
+                }
+            }finally{
+                done=true;
+            }
+
+
+        });
+
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.open-settings',()=>{
+        commands.executeCommand('workbench.action.openSettings',`@ext:${extensionPublisher}.convo-lang-tools`);
+    }));
+
+    const rebuildAsync=async (document:TextDocument,getRebuildOptions:(outPath:string,makePath:string)=>ConvoMakeTargetRebuild)=>{
+        const text=document.getText();
+        const conversation=new Conversation();
+        conversation.append(text);
+        const vars=(await conversation.flattenAsync()).exe.sharedVars;
+        const root=vars[convoVars.__makeRoot];
+        const file=vars[convoVars.__makeFile];
+        const out=vars[convoVars.__makeOut];
+
+        const makePath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,file)));
+        const outPath=normalizePath(await realpath(joinPaths(getDirectoryName(document.fileName),root,out)));
+
+        await makeAsync({build:makePath,rebuild:getRebuildOptions(outPath,makePath)});
+
+        const editor=await window.showTextDocument(document);
+        const pos=document.positionAt(document.getText().length);
+        editor.selection=new Selection(pos,pos);
+    }
+
+    context.subscriptions.push(commands.registerCommand('convo.complete',async ()=>{
+
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                    continueConversation:true,
+                }));
+
+                break;
+            }
+
+            default:
+                await completeAsync();
+                break;
+        }
+
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
+    }));
+
+    const splitAsync=async (complete:boolean)=>{
+        const document=window.activeTextEditor?.document;
+        if(document?.languageId!=='source.convo'){
+            return;
+        }
+
+        const selection=window.activeTextEditor?.selection;
+        let text:string|undefined;
+        if(selection){
+            text=document.getText(new Range(selection.start,selection.end));
+        }
+
+        if(!text){
+            text=document.getText();
+        }
+
+        let saveTo:string|undefined;
+        if(!document.isUntitled && document.uri.scheme==='file'){
+            const dir=path.dirname(document.uri.path);
+
+            let fileName=path.basename(document.uri.path);
+            let n=1;
+            const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo/i.exec(fileName);
+            if(match){
+                n=Number(match[2])+1;
+                fileName=fileName.substring(0,match.index);
+            }else if(fileName.toLowerCase().endsWith('.convo')){
+                fileName=fileName.substring(0,fileName.length-6);
+            }
+            while(true){
+                const d=new Date();
+                const name=`${
+                    fileName
+                }-${
+                    d.getFullYear()
+                }-${
+                    (d.getMonth()+1).toString().padStart(2,'0')
+                }-${
+                    d.getDate().toString().padStart(2,'0')
+                }-${
+                    n.toString().padStart(4,'0')
+                }.convo`;
+                saveTo=path.join(dir,name);
+                if(!await pathExistsAsync(saveTo)){
+                    break;
+                }
+                n++;
+            }
+
+        }
+        let doc:TextDocument;
+
+        if(saveTo){
+            const uri=Uri.file(saveTo);
+            await workspace.fs.writeFile(Uri.file(saveTo),Buffer.from(text,'utf8') as Uint8Array);
+            doc=await workspace.openTextDocument(uri);
+        }else{
+            doc=await workspace.openTextDocument({language:'source.convo',content:text});
+        }
+
+        await window.showTextDocument(doc);
+
+        if(complete){
+            await completeAsync();
+        }
+    }
+    context.subscriptions.push(commands.registerCommand('convo.split-complete',async ()=>{
+        const document=window.activeTextEditor?.document;
+        const ext=getFileExt(document?.fileName,false,true);
+
+        switch(ext){
+
+            case 'convo-make-target':{
+
+                if(!document || !await document.save()){
+                    return;
+                }
+
+                await rebuildAsync(document,(outPath)=>({
+                    path:outPath,
+                }));
+
+                break;
+            }
+
+            default:
+                await splitAsync(true);
+                break;
+        }
+    }));
+    context.subscriptions.push(commands.registerCommand('convo.split',async ()=>{
+        await splitAsync(false);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.refresh-make-targets', async () => {
+        await ext.scanMakeCtrlsAsync();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.list-models', async () => {
+
+        const cli=await createConvoCliAsync({config:ext.getCliConfig()});
+        try{
+            const models=await cli.convo.getAllModelsAsync();
+
+            const doc=await workspace.openTextDocument({
+                language:'json',
+                content:JSON.stringify(models,null,4),
+            })
+
+            await window.showTextDocument(doc);
+        }finally{
+            cli.dispose();
+        }
+    }));
+
+    let configChangeIv:any;
+    let showingConfigChange=false;
+    workspace.onDidChangeConfiguration((e)=>{
+        if(showingConfigChange){
+            return;
+        }
+        if(e.affectsConfiguration('convo')){
+            clearTimeout(configChangeIv);
+            configChangeIv=setTimeout(()=>{
+                showingConfigChange=true;
+                window.showInformationMessage('Convo-Lang setting changed. Reload window to apply changes?','Reload').then(selection => {
+                    showingConfigChange=false;
+                    if(selection==='Reload'){
+                        commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            },1600);
+        }
+    })
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts">
+``` ts
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { getParsedOutputTagGroups, ParsedOutputTagGroup, ParsedOutputTagInfo, OutputTagCodeLensArgs, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+
+export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    const provider=new ConvoCodeBlockTreeProvider(context,ext);
+    const tree=window.createTreeView('convoCodeBlocks',{
+        treeDataProvider:provider,
+    });
+
+    context.subscriptions.push(tree);
+
+    context.subscriptions.push(commands.registerCommand('convo.code-blocks-refresh',async ()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeBlockGroupItem)=>{
+        await provider.applyAllAsync(item);
+    }));
+
+    context.subscriptions.push(window.onDidChangeActiveTextEditor(()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(workspace.onDidChangeTextDocument((e)=>{
+        const active=window.activeTextEditor?.document;
+        if(active && e.document.uri.toString()===active.uri.toString()){
+            provider.refresh();
+        }
+    }));
+
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        const active=window.activeTextEditor?.document;
+        if(active && document.uri.toString()===active.uri.toString()){
+            provider.refresh();
+        }
+    }));
+}
+
+class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlockTreeItem>
+{
+    private readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
+    public readonly onDidChangeTreeData=this.onDidChangeTreeDataEmitter.event;
+
+    public constructor(
+        private readonly context:ExtensionContext,
+        private readonly ext:ConvoExt,
+    ){
+    }
+
+    public refresh():void
+    {
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    public getTreeItem(element:ConvoCodeBlockTreeItem):TreeItem
+    {
+        return element;
+    }
+
+    public async getChildren(element?:ConvoCodeBlockTreeItem):Promise<ConvoCodeBlockTreeItem[]>
+    {
+        if(element){
+            return element.getChildren?.() ?? [];
+        }
+
+        const document=window.activeTextEditor?.document;
+        if(!document || document.languageId!=='source.convo'){
+            return [];
+        }
+
+        const groups=getParsedOutputTagGroups(document);
+        return groups.map(group=>new ConvoCodeBlockGroupItem(group));
+    }
+
+    public async applyAllAsync(item?:ConvoCodeBlockGroupItem):Promise<void>
+    {
+        const target=item ?? await this.getActiveGroupAsync();
+        if(!target){
+            return;
+        }
+
+        const fileTags=target.group.tags.filter(t=>t.type==='file');
+        const shellTags=target.group.tags.filter(t=>t.type==='shell');
+
+        if(!fileTags.length && !shellTags.length){
+            return;
+        }
+
+        if(fileTags.length){
+            const action=await window.showWarningMessage(
+                `Apply ${fileTags.length} file output${fileTags.length===1?'':'s'} from this message?`,
+                {modal:true},
+                'Apply All',
+                'View First Diff',
+            );
+
+            if(action==='View First Diff'){
+                const first=fileTags[0];
+                await showOutputDiffAsync(first.targetPath,first.content);
+                return;
+            }
+
+            if(action!=='Apply All'){
+                return;
+            }
+
+            for(const tag of fileTags){
+                await writeOutputTagAsync(tag.targetPath,tag.content);
+            }
+        }
+
+        for(const tag of shellTags){
+            await commands.executeCommand('convo.output-tag-execute-shell',{
+                targetPath:tag.targetPath,
+                index:tag.index,
+                cwd:tag.cwd,
+            } satisfies OutputTagCodeLensArgs);
+        }
+    }
+
+    private async getActiveGroupAsync():Promise<ConvoCodeBlockGroupItem|undefined>
+    {
+        const roots=await this.getChildren();
+        return roots[0] as ConvoCodeBlockGroupItem|undefined;
+    }
+}
+
+abstract class ConvoCodeBlockTreeItem extends TreeItem
+{
+    public getChildren?():Promise<ConvoCodeBlockTreeItem[]>;
+}
+
+class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly group:ParsedOutputTagGroup,
+    ){
+        super(getGroupLabel(group),TreeItemCollapsibleState.Expanded);
+        this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
+        this.contextValue='code-block-group';
+        this.iconPath=new vscode.ThemeIcon('comment-discussion');
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return this.group.tags.map(tag=>new ConvoCodeBlockItem(tag));
+    }
+}
+
+class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        public readonly tag:ParsedOutputTagInfo,
+    ){
+        super(getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        this.description=getItemDescription(tag);
+        this.tooltip=getItemTooltip(tag);
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+
+        if(tag.type==='file'){
+            this.command={
+                title:'Open Output',
+                command:'convo.output-tag-open',
+                arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+            };
+            this.resourceUri=Uri.file(tag.targetPath);
+        }
+    }
+}
+
+const getGroupLabel=(group:ParsedOutputTagGroup):string=>{
+    const role=group.message.role ?? 'message';
+    const head=group.message.head?.trim();
+    return head?`> ${role} ${head}`:`> ${role}`;
+}
+
+const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
+    if(tag.type==='shell'){
+        return tag.codeBlock.attributes['script-name'] || 'script';
+    }
+
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+
+    return tag.codeBlock.tagName;
+}
+
+const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
+    const lang=tag.codeBlock.lang || 'text';
+    return tag.type==='shell'?
+        lang
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :
+        lang;
+}
+
+const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
+    const lines=[
+        `<${tag.codeBlock.tagName}>`,
+        tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+        `Lang: ${tag.codeBlock.lang || 'text'}`,
+    ].filter(Boolean);
+
+    return lines.join('\n');
+}
+```
+</FILE_CONTENT>
+
+
+> user
+I see the following errors after VSCode with the extension enabled:
+
+- [IYIO.convo-lang-tools]: Menu item references a command `convo.output-tag-diff` which is not defined in the 'commands' section.
+- [IYIO.convo-lang-tools]: Menu item references a command `convo.output-tag-write` which is not defined in the 'commands' section.
+- [IYIO.convo-lang-tools]: Menu item references a command `convo.output-tag-open` which is not defined in the 'commands' section.
+
+@time 2026-04-17T18:28:32-04:00
+@tokenUsage 58883 / 4205 / $0.15772000000000003
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="ac4498ca6e4be042119f9e50b97101f9ccc3585b" last-commit="71ef6519c94a2575e7a256eb608d456a6e463c83">
+``` json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.output-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.output-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.output-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.output-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user

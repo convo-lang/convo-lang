@@ -7,6 +7,7 @@ import { ConvoExecutionContext } from "./ConvoExecutionContext.js";
 import { ConvoRoom } from "./ConvoRoom.js";
 import { HttpConvoCompletionService } from "./HttpConvoCompletionService.js";
 import { requireParseConvoCached } from "./convo-cached-parsing.js";
+import { parseConvoCodeBlocks } from "./convo-code-block-lib.js";
 import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, requireConvertConvoOutput } from "./convo-completion-lib.js";
 import { getConvoMessageComponent } from "./convo-component-lib.js";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types.js";
@@ -229,6 +230,12 @@ export interface ConversationOptions
      * A template used to wrap imported content such as markdown files.
      */
     defaultImportTemplate?:string;
+
+    /**
+     * If true flatten messages will be checked for code blocks and have their code blocks
+     * checked.
+     */
+    enableDynamicMessageCodeBlocks?:boolean;
 
     /**
      * If true the conversation will not able to call standard library functions to access external
@@ -3240,6 +3247,10 @@ export class Conversation
             flat.content=msg.content;
         }
 
+        if(msg.codeBlocks){
+            flat.codeBlocks=msg.codeBlocks;
+        }
+
         if(msg.name!==undefined){
             flat.name=msg.name;
         }
@@ -4853,6 +4864,15 @@ export class Conversation
                     continue endPass;
                 }
 
+                if(this.defaultOptions.enableDynamicMessageCodeBlocks && msg.content && (msg.isUser || msg.isAssistant)){
+                    const src=msg[convoFlatMessageSourceMessageKey];
+                    if(src?.statement){
+                        const blocks=parseConvoCodeBlocks(msg.content,src);
+                        if(blocks){
+                            msg.codeBlocks=blocks;
+                        }
+                    }
+                }
             }
 
             if(flat.transforms){

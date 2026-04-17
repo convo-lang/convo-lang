@@ -1,5 +1,6 @@
 import { CodeParser, CodeParsingResult, deepClone, getCodeParsingError, getErrorMessage, getLineNumber, parseMarkdown, safeParseNumberOrUndefined, starStringToRegex, strHashBase64Fs } from '@iyio/common';
 import { parseJson5 } from "@iyio/json5";
+import { parseConvoCodeBlocks } from './convo-code-block-lib.js';
 import { getConvoMessageComponentMode, parseConvoComponentTransform } from './convo-component-lib.js';
 import { allowedConvoDefinitionFunctions, collapseConvoPipes, convoAnonTypePrefix, convoAnonTypeTags, convoArgsName, convoBodyFnName, convoCallFunctionModifier, convoCaseFnName, convoDefaultFnName, convoDisableStatementEvalTags, convoDynamicTags, convoEvents, convoExternFunctionModifier, convoHandlerAllowedRoles, convoInvokeFunctionModifier, convoInvokeFunctionName, convoJsonArrayFnName, convoJsonMapFnName, convoLabeledTags, convoLocalFunctionModifier, convoRoles, convoSwitchFnName, convoTags, convoTestFnName, defaultConvoNodeId, getConvoMessageModificationAction, getConvoStatementSource, getConvoTag, localFunctionTags, parseConvoBooleanTag } from "./convo-lib.js";
 import { ConvoNodeRoute } from './convo-node-graph-types.js';
@@ -102,6 +103,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
     const sourceRef:ConvoSourceRef={source:code};
     const messages:ConvoMessage[]=[];
     const parseMd=options?.parseMarkdown??false;
+    const enableBlocks=options?.enableCodeBlocks;
 
     let inMsg=false;
     let inFnMsg=false;
@@ -1103,17 +1105,25 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         })
     }
 
-    const last=messages[messages.length];
+    const last=messages[messages.length-1];
     if(last){
         last.e=code.length;
     }
 
-
+    let blockIndex=0;
     finalPass: for(let i=0;i<messages.length;i++){
         const msg=messages[i];
         if(!msg){
             error=`Undefined message in result messages at index ${i}`;
             break;
+        }
+
+        if(enableBlocks && msg.content){
+            const blocks=parseConvoCodeBlocks(msg.content,msg,blockIndex);
+            if(blocks){
+                blockIndex+=blocks.length;
+                msg.codeBlocks=blocks;
+            }
         }
 
         switch(msg.role){
