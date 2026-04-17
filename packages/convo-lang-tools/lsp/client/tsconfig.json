@@ -10,5 +10,19 @@
 		"outDir": "out"
 	},
 	"include": ["src","lsp"],
-	"exclude": ["node_modules", ".vscode-test"]
+	"exclude": ["node_modules", ".vscode-test"],
+    "references": [
+        {
+            "path": "../../../convo-lang"
+        },
+        {
+            "path": "../../../convo-lang-bedrock"
+        },
+        {
+            "path": "../../../convo-lang-browser"
+        },
+        {
+            "path": "../../../convo-lang-cli"
+        }
+    ]
 }
