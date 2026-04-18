@@ -9,6 +9,7 @@ import { revealDocumentEndAsync } from './util';
 export interface OutputTagCodeLensArgs
 {
     targetPath:string;
+    documentUri:Uri;
     index:number;
     cwd?:string;
     complete?:boolean;
@@ -31,11 +32,13 @@ export interface ParsedOutputTagInfo extends OutputTagInfo
     messageIndex:number;
 }
 
-export interface ParsedOutputTagGroup
+export interface MessageTagGroup
 {
     message:ConvoMessage;
+    messageUri:Uri;
     messageIndex:number;
     tags:ParsedOutputTagInfo[];
+    isLast:boolean;
 }
 
 export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
@@ -93,7 +96,7 @@ export const getOutputTagsFromSource=(source:string,document:vscode.TextDocument
     return tags;
 }
 
-export const getParsedOutputTagGroups=(document:vscode.TextDocument):ParsedOutputTagGroup[]=>{
+export const getParsedOutputTagGroups=(document:vscode.TextDocument):MessageTagGroup[]=>{
     if(document.languageId!=='source.convo'){
         return [];
     }
@@ -104,7 +107,7 @@ export const getParsedOutputTagGroups=(document:vscode.TextDocument):ParsedOutpu
 
     const messages=result.result ?? [];
     const baseDir=document.uri.scheme==='file'?path.dirname(document.uri.fsPath):'';
-    const groups:ParsedOutputTagGroup[]=[];
+    const groups:MessageTagGroup[]=[];
 
     for(let messageIndex=0;messageIndex<messages.length;messageIndex++){
         const message=messages[messageIndex];
@@ -153,7 +156,14 @@ export const getParsedOutputTagGroups=(document:vscode.TextDocument):ParsedOutpu
             message,
             messageIndex,
             tags,
+            isLast:false,
+            messageUri:document.uri,
         });
+    }
+
+    const last=groups[groups.length-1];
+    if(last){
+        last.isLast=true;
     }
 
     return groups;
@@ -433,7 +443,7 @@ export const isHasArgs=(value:any):value is HasArgs=>{
     return typeof value?.args === 'object';
 }
 
-export const getFileBlockArgs=(args:OutputTagCodeLensArgs|HasArgs|undefined):OutputTagCodeLensArgs|undefined=>{
+export const getFileBlockArgs=(args:OutputTagCodeLensArgs|HasArgs):OutputTagCodeLensArgs=>{
     if(isHasArgs(args)){
         return args.args;
     }else{

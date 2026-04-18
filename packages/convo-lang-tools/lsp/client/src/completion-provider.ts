@@ -526,7 +526,10 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
         }
     }));
 
-    const completeAsync=async (cliOptions:ConvoCliOptions={}) => {
+    const completeAsync=async (cliOptions:ConvoCliOptions={},{
+        nextCommand,
+        preventDefaultNextCommand=false,
+    }:CompletionOptions={}) => {
 
         const document=window.activeTextEditor?.document;
 
@@ -664,6 +667,13 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                 }
                 const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
                 await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+
+                if(nextCommand){
+                    commands.executeCommand(nextCommand);
+                }
+                if(!preventDefaultNextCommand){
+                    commands.executeCommand('convo.code-blocks-refresh');
+                }
             }catch(ex){
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
@@ -877,6 +887,12 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
             },1600);
         }
     })
+}
+
+interface CompletionOptions
+{
+    nextCommand?:string;
+    preventDefaultNextCommand?:boolean;
 }
 
 

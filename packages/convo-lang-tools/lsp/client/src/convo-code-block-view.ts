@@ -1,12 +1,14 @@
+import { convoTags } from '@convo-lang/convo-lang';
+import { DisposeContainer } from '@iyio/common';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
-import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { timeSince, timeSinceNext } from './util.js';
 
 const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
 const selectedDocStateKey='convo.codeBlocks.selectedDoc';
-const codeBlockGroupDecorationPrefix='convo.codeBlocks.group';
 
 export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=>{
 
@@ -18,11 +20,38 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
     context.subscriptions.push(tree);
     context.subscriptions.push(provider);
 
+    context.subscriptions.push(commands.registerCommand('convo.code-block-open-message',async (uri:Uri,charIndex:number,block?:OutputTagCodeLensArgs|HasArgs)=>{
+        const doc=await workspace.openTextDocument(uri);
+        let range:vscode.Range;
+        if(block){
+            const args=getFileBlockArgs(block);
+            const tag=await getTagFromArgsAsync(args);
+            if(!tag){
+                return;
+            }
+            const pos=doc.positionAt(tag.codeBlock.startIndex);
+            range=new vscode.Range(pos,pos);
+        }else{
+            const txt=doc.getText();
+            if(txt[charIndex]!=='>'){
+                const reg=/((\n|^)[ \t]*)>/g;
+                reg.lastIndex=charIndex;
+                const match=reg.exec(txt);
+                if(match){
+                    charIndex=match.index+(match[1]?.length??0);
+                }
+            }
+            const pos=doc.positionAt(charIndex);
+            range=new vscode.Range(pos,pos);
+        }
+        await window.showTextDocument(doc,{preview:false,preserveFocus:false,selection:range});
+    }));
+
     context.subscriptions.push(commands.registerCommand('convo.code-blocks-refresh',async ()=>{
         provider.refresh();
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeBlockGroupItem)=>{
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeMessageItem)=>{
         await provider.applyAllAsync(item);
     }));
 
@@ -43,19 +72,27 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-open',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
-        await provider.openOutputTagAsync(getFileBlockArgs(args));
+        if(args){
+            await provider.openOutputTagAsync(getFileBlockArgs(args));
+        }
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-write',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
-        await provider.writeOutputTagByArgsAsync(getFileBlockArgs(args));
+        if(args){
+            await provider.writeOutputTagByArgsAsync(getFileBlockArgs(args));
+        }
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-diff',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
-        await provider.diffOutputTagAsync(getFileBlockArgs(args));
+        if(args){
+            await provider.diffOutputTagAsync(getFileBlockArgs(args));
+        }
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-copy',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
-        await provider.copyOutputTagAsync(getFileBlockArgs(args));
+        if(args){
+            await provider.copyOutputTagAsync(getFileBlockArgs(args));
+        }
     }));
 
     context.subscriptions.push(window.onDidChangeActiveTextEditor((editor)=>{
@@ -75,7 +112,7 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
 
 class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlockTreeItem>, vscode.FileDecorationProvider, vscode.Disposable
 {
-    private readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
+    public readonly onDidChangeTreeDataEmitter=new vscode.EventEmitter<ConvoCodeBlockTreeItem|undefined|void>();
     public readonly onDidChangeTreeData=this.onDidChangeTreeDataEmitter.event;
 
     private readonly onDidChangeFileDecorationsEmitter=new vscode.EventEmitter<Uri|Uri[]|undefined>();
@@ -93,6 +130,8 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
     public dispose():void
     {
+        this.clearRefreshQueue();
+        this.disposeContainer.dispose();
         this.onDidChangeTreeDataEmitter.dispose();
         this.onDidChangeFileDecorationsEmitter.dispose();
     }
@@ -112,8 +151,31 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         this.refresh();
     }
 
+    public disposeContainer=new DisposeContainer();
+
+    private clearDisposeContainer()
+    {
+        const c=this.disposeContainer;
+        this.disposeContainer=new DisposeContainer();
+        c.dispose();
+    }
+
+    private refreshQueueIv?:any;
+    public queueRefresh(){
+        this.clearRefreshQueue();
+        this.refreshQueueIv=setTimeout(()=>{
+            this.refresh();
+        },4000);
+    }
+
+    private clearRefreshQueue()
+    {
+        clearTimeout(this.refreshQueueIv);
+    }
+
     public refresh():void
     {
+        clearTimeout(this.refreshQueueIv);
         this.onDidChangeTreeDataEmitter.fire();
         this.onDidChangeFileDecorationsEmitter.fire(undefined);
     }
@@ -125,22 +187,43 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
     public provideFileDecoration(uri:Uri):vscode.ProviderResult<vscode.FileDecoration>
     {
-        if(uri.scheme!=='convo-code-block-group'){
-            return undefined;
+        switch(uri.scheme){
+
+            case 'convo-code-message-group':{
+                const indexText=uri.authority;
+                const index=Number(indexText);
+                if(!Number.isFinite(index)){
+                    return undefined;
+                }
+
+                let data:MessageGroupUriData;
+                try{
+                    data=JSON.parse(uri.path.startsWith('/')?uri.path.substring(1):uri.path);
+                }catch{
+                    return undefined;
+                }
+
+                return {
+                    badge:String(Math.max(0,Math.min(99,data.tagCount))),
+                    tooltip:`${index} code block${index===1?'':'s'}`,
+                    color:new vscode.ThemeColor(data.isLast?'notificationsInfoIcon.foreground':'disabledForeground'),
+                    propagate:false,
+                };
+            }
+
+            case 'convo-code-separator':{
+
+                return {
+                    color:new vscode.ThemeColor('disabledForeground'),
+                    propagate:false,
+                };
+            }
+
+            default:
+                return undefined;
         }
 
-        const contText=uri.authority;
-        const count=Number(contText);
-        if(!Number.isFinite(count)){
-            return undefined;
-        }
-
-        return {
-            badge:String(Math.max(0,Math.min(99,count))),
-            tooltip:`${count} code block${count===1?'':'s'}`,
-            color:new vscode.ThemeColor('notificationsInfoIcon.foreground'),
-            propagate:false,
-        };
+        
     }
 
     public async getChildren(element?:ConvoCodeBlockTreeItem):Promise<ConvoCodeBlockTreeItem[]>
@@ -149,8 +232,11 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             return element.getChildren?.() ?? [];
         }
 
+        this.clearDisposeContainer();
+        this.clearRefreshQueue();
         const docs=await this.getVisibleDocumentsAsync();
         return docs.map(doc=>new ConvoCodeBlockDocItem(
+            this,
             doc,
             this.isPinned(doc.uri.fsPath),
             this.isSelected(doc.uri.fsPath),
@@ -158,7 +244,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         ));
     }
 
-    public async applyAllAsync(item?:ConvoCodeBlockGroupItem):Promise<void>
+    public async applyAllAsync(item?:ConvoCodeMessageItem):Promise<void>
     {
         const target=item;
         if(!target){
@@ -195,6 +281,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
                 targetPath:tag.targetPath,
                 index:tag.index,
                 cwd:tag.cwd,
+                documentUri:target.group.messageUri,
             }
             if(tag.type==='file'){
                 writeOutputTagAsync()
@@ -227,7 +314,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
         const normalized=path.normalize(document.uri.fsPath);
         if(this.selectedPath===normalized || this.lastActiveConvoPath===normalized || this.pinnedPaths.includes(normalized)){
-            this.refresh();
+            this.queueRefresh();
         }
     }
 
@@ -245,7 +332,6 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         }
 
         await this.selectDocumentAsync(normalized);
-        this.refresh();
     }
 
     public async unpinDocumentAsync(fsPath?:string):Promise<void>
@@ -319,9 +405,9 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         await this.switchToDocumentAsync(picked.doc.uri.fsPath,true);
     }
 
-    public async openOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    public async openOutputTagAsync(args:OutputTagCodeLensArgs):Promise<void>
     {
-        const tag=await this.getTagFromArgsAsync(args);
+        const tag=await getTagFromArgsAsync(args);
         if(!tag || tag.type!=='file'){
             return;
         }
@@ -336,9 +422,9 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         }
     }
 
-    public async writeOutputTagByArgsAsync(args?:OutputTagCodeLensArgs):Promise<void>
+    public async writeOutputTagByArgsAsync(args:OutputTagCodeLensArgs):Promise<void>
     {
-        const tag=await this.getTagFromArgsAsync(args);
+        const tag=await getTagFromArgsAsync(args);
         if(!tag){
             return;
         }
@@ -347,6 +433,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             targetPath:tag.targetPath,
             index:tag.index,
             cwd:tag.cwd,
+            documentUri:args?.documentUri
         }
         if(tag.type==='file'){
             await writeOutputTagAsync(tArgs);
@@ -357,7 +444,10 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
     public async diffOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
     {
-        const tag=await this.getTagFromArgsAsync(args);
+        if(!args){
+            return;
+        }
+        const tag=await getTagFromArgsAsync(args);
         if(!tag || tag.type!=='file'){
             return;
         }
@@ -367,7 +457,10 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
     public async copyOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
     {
-        const tag=await this.getTagFromArgsAsync(args);
+        if(!args){
+            return;
+        }
+        const tag=await getTagFromArgsAsync(args);
         if(!tag){
             return;
         }
@@ -516,28 +609,6 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         }
     }
 
-    private async getTagFromArgsAsync(args?:OutputTagCodeLensArgs):Promise<ParsedOutputTagInfo|undefined>
-    {
-        const targetPath=args?.targetPath;
-        const index=args?.index;
-        if(targetPath===undefined || index===undefined){
-            return undefined;
-        }
-
-        const docs=await this.getVisibleDocumentsAsync();
-        for(const doc of docs){
-            const groups=getParsedOutputTagGroups(doc);
-            for(const group of groups){
-                const match=group.tags.find(tag=>tag.index===index && tag.targetPath===targetPath);
-                if(match){
-                    return match;
-                }
-            }
-        }
-
-        return undefined;
-    }
-
     private async resolveDocumentPathAsync(fsPath?:string):Promise<string|undefined>
     {
         if(fsPath){
@@ -597,18 +668,24 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
 
 abstract class ConvoCodeBlockTreeItem extends TreeItem
 {
+    public readonly provider:ConvoCodeBlockTreeProvider;
+    public constructor(provider:ConvoCodeBlockTreeProvider,label: string | vscode.TreeItemLabel|vscode.Uri, collapsibleState?: TreeItemCollapsibleState){
+        super(label as any,collapsibleState);
+        this.provider=provider;
+    }
     public getChildren?():Promise<ConvoCodeBlockTreeItem[]>;
 }
 
 class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
 {
     public constructor(
+        provider:ConvoCodeBlockTreeProvider,
         public readonly doc:vscode.TextDocument,
         isPinned:boolean,
         isSelected:boolean,
         isActive:boolean,
     ){
-        super(path.basename(doc.uri.fsPath),TreeItemCollapsibleState.Expanded);
+        super(provider,path.basename(doc.uri.fsPath),TreeItemCollapsibleState.Expanded);
         this.description=getDocDescription(doc.uri.fsPath,isPinned,isSelected,isActive);
         this.tooltip=doc.uri.fsPath;
         this.contextValue=isPinned?'code-block-doc-pinned':'code-block-doc';
@@ -631,29 +708,83 @@ class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
     {
         const items:ConvoCodeBlockTreeItem[]=[];
         const groups=getParsedOutputTagGroups(this.doc);
-        groups.reverse();
-        for(const group of groups){
-            items.push(new ConvoCodeBlockGroupItem(group));
-            for(const tag of group.tags){
-                items.push(new ConvoCodeBlockItem(tag))
+
+        for(let i=0;i<groups.length;i++){
+            const group=groups[i];
+            if(!group){
+                continue;
             }
+            items.push(new ConvoCodeMessageItem(this.provider,group));
+            for(const tag of group.tags){
+                items.push(new ConvoCodeBlockItem(this.provider,group,tag))
+            }
+            items.push(new ConvoSeparatorItem(this.provider));
         }
         return items;
     }
 }
 
-class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
+class ConvoSeparatorItem extends ConvoCodeBlockTreeItem
 {
     public constructor(
-        public readonly group:ParsedOutputTagGroup,
+        provider:ConvoCodeBlockTreeProvider,
+        title='----------------------',
     ){
-        super(getGroupLabel(group),TreeItemCollapsibleState.None);
+        super(provider,title,TreeItemCollapsibleState.None);
+        this.iconPath=new vscode.ThemeIcon('empty');
+        this.resourceUri=Uri.parse(`convo-code-separator://separator`);
+    }
+}
+
+class ConvoCodeMessageItem extends ConvoCodeBlockTreeItem
+{
+
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        public readonly group:MessageTagGroup,
+    ){
+        
+        super(provider,getGroupLabel(group),TreeItemCollapsibleState.None);
         this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
         this.contextValue='code-block-group';
         this.iconPath=new vscode.ThemeIcon('comment-discussion');
-        this.resourceUri=Uri.parse(`convo-code-block-group://${group.tags.length}/${encodeURIComponent(getGroupResourceKey(group))}`);
+        this.resourceUri=Uri.parse(`convo-code-message-group://${group.messageIndex}/${encodeURIComponent(getGroupResourceKey(group))}`);
+
+        this.command={
+            title:'Goto Message',
+            command:'convo.code-block-open-message',
+            arguments:[group.messageUri,group.message.s??1],
+        };
+
+        const time=group.message.tags?.find(t=>t.name===convoTags.time)?.value
+        if(time){
+            let first=true;
+            let iv:any;
+            let active=true;
+            const update=()=>{
+                if(!active){
+                    return;
+                }
+                const since=timeSinceNext(time);
+                if(first){
+                    first=false;
+                }else{
+                    this.label=getGroupLabel(group);
+                    this.provider.onDidChangeTreeDataEmitter.fire(this);
+                }
+                if(since.nextInterval!==undefined){
+                    iv=setTimeout(update,since.nextInterval);
+                }
+            }
+            update();
+            this.provider.disposeContainer.addCb(()=>{
+                active=false;
+                clearInterval(iv);
+            })
+        }
     }
 }
+
 
 class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
 {
@@ -661,9 +792,11 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
     public args?:OutputTagCodeLensArgs;
 
     public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        public readonly group:MessageTagGroup,
         public readonly tag:ParsedOutputTagInfo,
     ){
-        super(getItemLabel(tag),TreeItemCollapsibleState.None);
+        super(provider,getItemLabel(tag),TreeItemCollapsibleState.None);
 
         this.description=getItemDescription(tag);
         this.tooltip=getItemTooltip(tag);
@@ -671,29 +804,38 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
         this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
         
 
-        this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd};
+        this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:group.messageUri};
 
-        if(tag.type==='file'){
-            this.command={
-                title:'Open Output',
-                command:'convo.code-block-panel-tag-open',
-                arguments:[this.args],
-            };
-            this.resourceUri=Uri.file(tag.targetPath);
-        }
+        this.command={
+            title:'Open Block',
+            command:'convo.code-block-open-message',
+            arguments:[group.messageUri,group.message.s??1,this],
+        };
     }
 }
 
-const getGroupLabel=(group:ParsedOutputTagGroup):string=>{
+const getGroupLabel=(group:MessageTagGroup):string=>{
     const role=group.message.role ?? 'message';
-    const head=group.message.head?.trim();
-    return head?`> ${role} ${head}`:`> ${role}`;
+    const time=group.message.tags?.find(t=>t.name===convoTags.time);
+    return `> ${role}${time?.value?` ${timeSince(time.value)}`:''}`;
 }
 
-const getGroupResourceKey=(group:ParsedOutputTagGroup):string=>{
+const getGroupResourceKey=(group:MessageTagGroup):string=>{
     const role=group.message.role ?? 'message';
-    const head=group.message.head?.trim() ?? '';
-    return `${codeBlockGroupDecorationPrefix}:${role}:${head}:${group.tags.length}`;
+    return JSON.stringify({
+        role,
+        tagCount:group.tags.length,
+        messageIndex:group.messageIndex,
+        isLast:group.isLast,
+    } satisfies MessageGroupUriData);
+}
+
+interface MessageGroupUriData
+{
+    role:string;
+    tagCount:number;
+    messageIndex:number;
+    isLast:boolean;
 }
 
 const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
@@ -749,4 +891,26 @@ const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isAct
     }
 
     return parts.join(' • ');
+}
+
+
+const getTagFromArgsAsync=async (args:OutputTagCodeLensArgs):Promise<ParsedOutputTagInfo|undefined>=>
+{
+    const targetPath=args.targetPath;
+    const index=args.index;
+
+    const doc=await workspace.openTextDocument(args.documentUri);
+    if(!doc){
+        return;
+    }
+
+    const groups=getParsedOutputTagGroups(doc);
+    for(const group of groups){
+        const match=group.tags.find(tag=>tag.index===index && tag.targetPath===targetPath);
+        if(match){
+            return match;
+        }
+    }
+
+    return undefined;
 }
