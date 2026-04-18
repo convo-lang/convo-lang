@@ -350,9 +350,7 @@ export const getConvoHonoRoutes=({
                 return c.json('No database found by name',404);
             }
 
-            console.log('hio 👋 👋 👋 before');
             const query:ConvoNodeQuery=await c.req.json();
-            console.log('hio 👋 👋 👋 query',query);
             const result=await store.queryNodesAsync(query);
             
             if(!result.success){
@@ -361,7 +359,6 @@ export const getConvoHonoRoutes=({
 
             return c.json(result.result,200);
         }catch(ex){
-            console.log('hio 👋 👋 👋',(ex as any).stack);
             return c.json(ex,500);
         }
     });
