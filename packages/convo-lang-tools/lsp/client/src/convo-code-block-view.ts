@@ -595,8 +595,15 @@ class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
 
     public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
     {
+        const items:ConvoCodeBlockTreeItem[]=[];
         const groups=getParsedOutputTagGroups(this.doc);
-        return groups.map(group=>new ConvoCodeBlockGroupItem(group));
+        for(const group of groups){
+            items.push(new ConvoCodeBlockGroupItem(group));
+            for(const tag of group.tags){
+                items.push(new ConvoCodeBlockItem(tag))
+            }
+        }
+        return items;
     }
 }
 
@@ -605,15 +612,10 @@ class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
     public constructor(
         public readonly group:ParsedOutputTagGroup,
     ){
-        super(getGroupLabel(group),TreeItemCollapsibleState.Expanded);
+        super(getGroupLabel(group),TreeItemCollapsibleState.None);
         this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
         this.contextValue='code-block-group';
         this.iconPath=new vscode.ThemeIcon('comment-discussion');
-    }
-
-    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
-    {
-        return this.group.tags.map(tag=>new ConvoCodeBlockItem(tag));
     }
 }
 
