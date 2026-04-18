@@ -1,3 +1,31 @@
+@import ./_extension.convo
+@import ../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts !file
+
+> user
+Use a vscode.FileDecorationProvider to add a badge and a background color to the `ConvoCodeBlockGroupItem`
+tree item. use charts.blue for the background color. The badge should show the number of file block the 
+message has.
+
+Add the decorator to convo-code-block-view.ts
+
+@time 2026-04-17T21:05:09-04:00
+@tokenUsage 10928 / 67 / $0.0274875
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick question:
+
+Should the badge count only `file` output tags in the group, or all code blocks in the message? Your request says “number of file block[s]”, so I assume `group.tags.filter(t=>t.type==='file').length`, but I want to confirm.
+
+
+> user
+All
+
+@time 2026-04-17T21:14:23-04:00
+@tokenUsage 11012 / 4984 / $0.039990000000000005
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="1bf37449fdceca2946c78b0edb2468e064268031">
+``` ts
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
@@ -115,7 +143,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
     public refresh():void
     {
         this.onDidChangeTreeDataEmitter.fire();
-        this.onDidChangeFileDecorationsEmitter.fire(undefined);
+        this.onDidChangeFileDecorationsEmitter.fire();
     }
 
     public getTreeItem(element:ConvoCodeBlockTreeItem):TreeItem
@@ -129,8 +157,8 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             return undefined;
         }
 
-        const contText=uri.authority;
-        const count=Number(contText);
+        const countText=uri.authority;
+        const count=Number(countText);
         if(!Number.isFinite(count)){
             return undefined;
         }
@@ -138,7 +166,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         return {
             badge:String(Math.max(0,Math.min(99,count))),
             tooltip:`${count} code block${count===1?'':'s'}`,
-            color:new vscode.ThemeColor('notificationsInfoIcon.foreground'),
+            color:new vscode.ThemeColor('charts.blue'),
             propagate:false,
         };
     }
@@ -631,7 +659,6 @@ class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
     {
         const items:ConvoCodeBlockTreeItem[]=[];
         const groups=getParsedOutputTagGroups(this.doc);
-        groups.reverse();
         for(const group of groups){
             items.push(new ConvoCodeBlockGroupItem(group));
             for(const tag of group.tags){
@@ -750,3 +777,8 @@ const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isAct
 
     return parts.join(' • ');
 }
+```
+</FILE_CONTENT>
+
+
+> user
