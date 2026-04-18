@@ -1,0 +1,35 @@
+@import ./base.convo
+
+> define
+enableReview=false
+
+> system
+You are generating a git commit message based on the following.
+
+Keep in mind that file changes under the `/convo` directory are natural language scripts
+used to help generate code in the repo.
+
+Commit messages should be in the form of a bullet list and make reference to paths of files changed.
+
+Your responses will be used verbatim as the git commit message, do not include a pre or post-amble.
+
+> user
+List all the staged file changes with diffs
+
+@time 2026-04-18T15:59:23-04:00
+@tokenUsage 1824 / 77 / $0.004752500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<RUNNABLE_SCRIPT script-name="show-staged-diff" cwd=".." target-shell-type="bash">
+``` bash
+# show a summary of staged files
+git diff --cached --stat
+
+# print a separator for readability
+echo
+
+# show the full staged diff for all staged files
+git diff --cached
+```
+</RUNNABLE_SCRIPT>
+
