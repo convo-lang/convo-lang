@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
-import { getParsedOutputTagGroups, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, OutputTagCodeLensArgs, ParsedOutputTagGroup, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
 
 const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
 const selectedDocStateKey='convo.codeBlocks.selectedDoc';
@@ -40,20 +40,20 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
         }
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-open',async (args?:OutputTagCodeLensArgs)=>{
-        await provider.openOutputTagAsync(args);
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-open',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+        await provider.openOutputTagAsync(getFileBlockArgs(args));
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-write',async (args?:OutputTagCodeLensArgs)=>{
-        await provider.writeOutputTagByArgsAsync(args);
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-write',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+        await provider.writeOutputTagByArgsAsync(getFileBlockArgs(args));
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
-        await provider.diffOutputTagAsync(args);
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-diff',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+        await provider.diffOutputTagAsync(getFileBlockArgs(args));
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
-        await provider.copyOutputTagAsync(args);
+    context.subscriptions.push(commands.registerCommand('convo.code-block-panel-tag-copy',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+        await provider.copyOutputTagAsync(getFileBlockArgs(args));
     }));
 
     context.subscriptions.push(window.onDidChangeActiveTextEditor((editor)=>{
@@ -131,44 +131,43 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             return;
         }
 
-        const fileTags=target.group.tags.filter(t=>t.type==='file');
-        const shellTags=target.group.tags.filter(t=>t.type==='shell');
+        const tags=target.group.tags;
 
-        if(!fileTags.length && !shellTags.length){
+        if(!tags.length){
             return;
         }
 
-        if(fileTags.length){
-            const action=await window.showWarningMessage(
-                `Apply ${fileTags.length} file output${fileTags.length===1?'':'s'} from this message?`,
-                {modal:true},
-                'Apply All',
-                'View First Diff',
-            );
+        const action=await window.showWarningMessage(
+            `Apply ${tags.length} code block action${tags.length===1?'':'s'} from this message?`,
+            {modal:true},
+            'Apply All',
+            'View First Diff',
+        );
 
-            if(action==='View First Diff'){
-                const first=fileTags[0];
-                if(first){
-                    await showOutputDiffAsync(first.targetPath,first.content);
-                }
-                return;
+        if(action==='View First Diff'){
+            const first=tags[0];
+            if(first){
+                await showOutputDiffAsync(first.targetPath,first.content);
             }
-
-            if(action!=='Apply All'){
-                return;
-            }
-
-            for(const tag of fileTags){
-                await writeOutputTagAsync(tag.targetPath,tag.content);
-            }
+            return;
         }
 
-        for(const tag of shellTags){
-            await commands.executeCommand('convo.output-tag-execute-shell',{
+        if(action!=='Apply All'){
+            return;
+        }
+
+        for(const tag of tags){
+            const args:OutputTagCodeLensArgs={
                 targetPath:tag.targetPath,
                 index:tag.index,
                 cwd:tag.cwd,
-            } satisfies OutputTagCodeLensArgs);
+            }
+            if(tag.type==='file'){
+                writeOutputTagAsync()
+                await writeOutputTagAsync(args);
+            }else if(tag.type==='shell'){
+                await commands.executeCommand('convo.output-tag-execute-shell',args);
+            }
         }
     }
 
@@ -306,11 +305,20 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
     public async writeOutputTagByArgsAsync(args?:OutputTagCodeLensArgs):Promise<void>
     {
         const tag=await this.getTagFromArgsAsync(args);
-        if(!tag || tag.type!=='file'){
+        if(!tag){
             return;
         }
 
-        await writeOutputTagAsync(tag.targetPath,tag.content);
+        const tArgs:OutputTagCodeLensArgs={
+            targetPath:tag.targetPath,
+            index:tag.index,
+            cwd:tag.cwd,
+        }
+        if(tag.type==='file'){
+            await writeOutputTagAsync(tArgs);
+        }else if(tag.type==='shell'){
+            await commands.executeCommand('convo.output-tag-execute-shell', tArgs);
+        }
     }
 
     public async diffOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
@@ -611,6 +619,9 @@ class ConvoCodeBlockGroupItem extends ConvoCodeBlockTreeItem
 
 class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
 {
+
+    public args?:OutputTagCodeLensArgs;
+
     public constructor(
         public readonly tag:ParsedOutputTagInfo,
     ){
@@ -620,12 +631,15 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
         this.tooltip=getItemTooltip(tag);
         this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
         this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+        
+
+        this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd};
 
         if(tag.type==='file'){
             this.command={
                 title:'Open Output',
                 command:'convo.code-block-panel-tag-open',
-                arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                arguments:[this.args],
             };
             this.resourceUri=Uri.file(tag.targetPath);
         }
