@@ -3,7 +3,9 @@
 @import ../coding-style.md !tag:CODING_STYLE
 
 > define
-__model='gpt-5.4'
+openAiModel='gpt-5.4'
+claudeModel='open-router/anthropic/claude-opus-4.7'
+__model=openAiModel
 __trackModel=true
 __trackTokenUsage=true;
 __trackTime=true
