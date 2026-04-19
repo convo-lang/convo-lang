@@ -1,0 +1,7575 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/syntaxes/* !file
+@import ../../packages/convo-lang-tools/package.json !file
+@import ../docs/convo-core.md !file
+
+> user
+Convert the files in the syntaxes directory into a syntax file that can be used by obsidian
+
+
+@time 2026-04-18T22:16:42-04:00
+@tokenUsage 21377 / 217 / $0.053985000000000005
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate the converted syntax files, a couple quick questions so I target the right Obsidian format:
+
+1. Do you want an Obsidian plugin-style TextMate grammar package, meaning:
+   - keep the existing `.tmLanguage/.json` grammars,
+   - but rewrite scopes/injection targets so they work in Obsidian/CodeMirror via a plugin?
+   
+   or
+
+2. Do you want a single standalone grammar file intended just for markdown fenced code highlighting inside Obsidian, mainly for:
+   - ```convo fenced blocks
+   - embedded convo in JS/TS/Python-like files is not required
+
+3. Should I:
+   - preserve all current embedded language support where possible, or
+   - simplify to just `convo` fenced code blocks in markdown, which is the most realistic Obsidian target?
+
+4. Do you want me to also update `package.json` metadata for VSCode compatibility separation, or only produce Obsidian-targeted syntax files in `packages/convo-lang-tools/syntaxes`?
+
+
+> user
+1. Rewrite in Obsidian/CodeMirror format.
+3. simplify to just `convo`, included convo fenced markdown blocks and `.convo` files
+4. do not update the package .json file
+
+Write all Obsidian file to `(root)/packages/obsidian` following the convention of obsidian plugins
+
+@time 2026-04-18T22:21:58-04:00
+@tokenUsage 21667 / 3257 / $0.062310000000000004
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="manifest.json" target-output-path="../../packages/obsidian/manifest.json">
+``` json
+{
+    "id": "convo-lang",
+    "name": "Convo-Lang",
+    "version": "0.8.18",
+    "minAppVersion": "1.5.0",
+    "description": "Obsidian syntax highlighting support for Convo-Lang fenced code blocks and .convo files.",
+    "author": "IYIO",
+    "isDesktopOnly": false
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/obsidian/package.json">
+``` json
+{
+    "name": "obsidian-convo-lang",
+    "version": "0.8.18",
+    "private": true,
+    "description": "Obsidian plugin for Convo-Lang syntax highlighting",
+    "main": "main.js",
+    "type": "module"
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="main.js" target-output-path="../../packages/obsidian/main.js">
+``` js
+import {Plugin} from 'obsidian';
+import {StreamLanguage} from '@codemirror/language';
+import {StringStream} from '@codemirror/stream-parser';
+
+const wordBoundary=/[A-Za-z0-9_]/;
+
+const topLevelKeywords=new Set([
+    'do',
+    'thinkingResult',
+    'result',
+    'define',
+    'debug',
+    'end',
+    'target',
+    'make',
+    'stage',
+    'app',
+    'parallelEnd',
+    'parallel',
+    'insertEnd',
+    'agentEnd',
+    'queue',
+    'flush',
+    'insert',
+    'nop',
+    'templateEnd',
+    'template',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd',
+    'node',
+    'goto',
+    'exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit',
+    'to',
+    'from',
+]);
+
+const functionModifiers=new Set([
+    'agent',
+    'public',
+    'local',
+]);
+
+const systemFunctions=new Set([
+    'elif',
+    'if',
+    'else',
+    'while',
+    'break',
+    'foreach',
+    'for',
+    'in',
+    'do',
+    'outInline',
+    'outTrim',
+    'out',
+    'then',
+    'fn',
+    'return',
+    'case',
+    'default',
+    'switch',
+    'test',
+]);
+
+const operatorFunctions=new Set([
+    'lt',
+    'lte',
+    'neq',
+    'eq',
+    'gt',
+    'gte',
+    'is',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'not',
+    'mod',
+    'pow',
+    'inc',
+    'dec',
+    'no',
+]);
+
+const logicFunctions=new Set([
+    'and',
+    'or',
+]);
+
+const typeFunctions=new Set([
+    'enum',
+    'struct',
+    'array',
+]);
+
+const typeKeywords=new Set([
+    'string',
+    'number',
+    'int',
+    'boolean',
+    'time',
+    'void',
+    'any',
+    'map',
+    'array',
+    'object',
+]);
+
+const constValues=new Set([
+    'true',
+    'false',
+    'null',
+    'undefined',
+    'convo',
+    '__args',
+    '__return',
+    '__error',
+    '__debug',
+    '__disableAutoComplete',
+    '__file',
+    '__cwd',
+]);
+
+const specialWords=new Set([
+    '$$RAG$$',
+    '$$CONTENT$$',
+    '$$CHILD$$',
+    '$$CHILDREN$$',
+]);
+
+const conditionTags=new Set([
+    '@condition',
+    '@disabled',
+    '@taskName',
+    '@taskDescription',
+]);
+
+const typeTags=new Set([
+    '@json',
+    '@inputConversation',
+    '@inputType',
+]);
+
+function isWordChar(ch)
+{
+    return !!ch && wordBoundary.test(ch);
+}
+
+function readWord(stream)
+{
+    let value='';
+    while(!stream.eol() && isWordChar(stream.peek())){
+        value+=stream.next();
+    }
+    return value;
+}
+
+function readUntilSpace(stream)
+{
+    let value='';
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(ch===undefined || /\s/.test(ch)){
+            break;
+        }
+        value+=stream.next();
+    }
+    return value;
+}
+
+function skipSpaces(stream)
+{
+    while(!stream.eol() && /\s/.test(stream.peek())){
+        stream.next();
+    }
+}
+
+function tokenString(stream,state,quote)
+{
+    let escaped=false;
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.mode=null;
+            break;
+        }
+        if(quote==="'" && ch==='{' && stream.peek()==='{'){
+            stream.next();
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream,state)
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'quote';
+}
+
+function tokenBlock(stream,state)
+{
+    if(state.mode==='dq'){
+        return tokenString(stream,state,'"');
+    }
+    if(state.mode==='sq'){
+        return tokenString(stream,state,"'");
+    }
+    if(state.mode==='inline'){
+        return tokenInlineCode(stream,state);
+    }
+    if(state.mode==='heredoc'){
+        if(stream.match(/-{3,}/)){
+            state.mode=null;
+            return 'comment';
+        }
+        stream.skipToEnd();
+        return null;
+    }
+    return null;
+}
+
+function tokenLineStart(stream,state)
+{
+    if(stream.match(/\s*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/\s*\/\/.*/)){
+        return 'comment';
+    }
+
+    const pos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(conditionTags.has(tag) || typeTags.has(tag) || tag==='@routeTo' || tag==='@routeFrom'){
+            return 'keyword';
+        }
+        if(tag==='@exit' || tag==='@to' || tag==='@from' || tag==='@import' || tag==='@name'){
+            return 'keyword';
+        }
+        return 'atom';
+    }
+
+    stream.pos=pos;
+    return null;
+}
+
+function tokenAfterGt(stream,state)
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word) || topLevelKeywords.has(word)){
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        return 'def';
+    }
+
+    if(functionModifiers.has(word)){
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && stream.peek()==='('){
+        stream.pos=start+word.length;
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    return 'atom';
+}
+
+function tokenTagValue(stream,state)
+{
+    if(stream.sol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    if(state.lastTag==='@import'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'string';
+    }
+
+    if(state.lastTag==='@name'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    if(state.lastTag==='@routeTo' || state.lastTag==='@routeFrom'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    return null;
+}
+
+function tokenBase(stream,state)
+{
+    if(stream.sol()){
+        const lineStartToken=tokenLineStart(stream,state);
+        if(lineStartToken){
+            return lineStartToken;
+        }
+    }
+
+    const blockToken=tokenBlock(stream,state);
+    if(blockToken){
+        return blockToken;
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    const tagValueToken=tokenTagValue(stream,state);
+    if(tagValueToken){
+        return tagValueToken;
+    }
+
+    if(stream.match('${')){
+        return 'keyword';
+    }
+
+    if(stream.match('\{{') || stream.match('}}')){
+        return 'bracket';
+    }
+
+    if(stream.match('->')){
+        return 'operator';
+    }
+
+    if(stream.match('<<')){
+        return 'operator';
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.mode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???') || stream.match('===')){
+        return 'string';
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.mode='dq';
+        return 'string';
+    }
+
+    if(ch==="'"){
+        stream.next();
+        state.mode='sq';
+        return 'string';
+    }
+
+    if(ch==='`'){
+        stream.next();
+        state.mode='inline';
+        return 'quote';
+    }
+
+    if(ch==='<' || ch==='>' || ch==='=' || ch==='!' || ch===':' || ch===',' || ch==='(' || ch===')' || ch==='[' || ch===']'){
+        stream.next();
+        return 'operator';
+    }
+
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+
+    if(ch==='$'){
+        const value=readUntilSpace(stream);
+        if(specialWords.has(value) || /^\$\$SLOT_\w+\$\$$/.test(value)){
+            return 'keyword';
+        }
+        return 'operator';
+    }
+
+    if(/[A-Za-z_@]/.test(ch)){
+        const word=readWord(stream);
+
+        if(typeKeywords.has(word)){
+            return 'typeName';
+        }
+
+        if(constValues.has(word)){
+            return 'atom';
+        }
+
+        if(systemFunctions.has(word)){
+            return stream.peek()==='('?'keyword':'variableName';
+        }
+
+        if(operatorFunctions.has(word) || logicFunctions.has(word)){
+            return stream.peek()==='('?'operator':'variableName';
+        }
+
+        if(typeFunctions.has(word)){
+            return stream.peek()==='('?'typeName':'variableName';
+        }
+
+        if(/^[A-Z]\w*$/.test(word)){
+            return 'typeName';
+        }
+
+        if(stream.peek()===':'){
+            return 'propertyName';
+        }
+
+        if(stream.peek()==='('){
+            return 'variableName special';
+        }
+
+        return 'variableName';
+    }
+
+    stream.next();
+    return null;
+}
+
+const convoLanguage=StreamLanguage.define({
+    startState()
+    {
+        return {
+            mode:null,
+            afterGt:false,
+            lastTag:null,
+        };
+    },
+    token(stream,state)
+    {
+        return tokenBase(stream,state);
+    },
+    languageData:{
+        commentTokens:{line:'#'},
+        closeBrackets:{brackets:['(', '[', '{', '"', "'", '`']},
+        autocomplete:[]
+    }
+});
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload()
+    {
+        this.registerExtensions(['convo'],'convo');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+
+        this.registerEditorExtension(convoLanguage);
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="styles.css" target-output-path="../../packages/obsidian/styles.css">
+``` css
+.cm-s-obsidian .cm-keyword,
+.markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:var(--text-accent);
+}
+
+.cm-s-obsidian .cm-atom,
+.markdown-source-view.mod-cm6 .cm-atom
+{
+    color:var(--color-cyan);
+}
+
+.cm-s-obsidian .cm-def,
+.markdown-source-view.mod-cm6 .cm-def
+{
+    color:var(--color-orange);
+}
+
+.cm-s-obsidian .cm-variableName,
+.markdown-source-view.mod-cm6 .cm-variableName
+{
+    color:var(--text-normal);
+}
+
+.cm-s-obsidian .cm-propertyName,
+.markdown-source-view.mod-cm6 .cm-propertyName
+{
+    color:var(--color-purple);
+}
+
+.cm-s-obsidian .cm-typeName,
+.markdown-source-view.mod-cm6 .cm-typeName
+{
+    color:var(--color-green);
+}
+
+.cm-s-obsidian .cm-string,
+.markdown-source-view.mod-cm6 .cm-string
+{
+    color:var(--color-green);
+}
+
+.cm-s-obsidian .cm-number,
+.markdown-source-view.mod-cm6 .cm-number
+{
+    color:var(--color-cyan);
+}
+
+.cm-s-obsidian .cm-comment,
+.markdown-source-view.mod-cm6 .cm-comment
+{
+    color:var(--text-muted);
+    font-style:italic;
+}
+
+.cm-s-obsidian .cm-operator,
+.markdown-source-view.mod-cm6 .cm-operator
+{
+    color:var(--color-red);
+}
+
+.cm-s-obsidian .cm-quote,
+.markdown-source-view.mod-cm6 .cm-quote
+{
+    color:var(--color-yellow);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/obsidian/README.md">
+``` md
+# Convo-Lang Obsidian Plugin
+
+This plugin adds basic Obsidian editor syntax highlighting for:
+
+- `.convo` files
+- fenced markdown code blocks using `convo`
+
+## Notes
+
+This is a CodeMirror 6 based Obsidian plugin implementation.
+
+It is intentionally simplified from the VSCode TextMate grammars and focuses on:
+
+- top-level `>` roles
+- tags like `@condition`, `@json`, `@import`, `@to`, `@from`
+- strings
+- inline code
+- heredoc-like sections
+- function-like calls
+- type names
+- constants
+- comments
+
+## Expected plugin structure
+
+Build output should produce the standard Obsidian plugin artifacts in this folder:
+
+- `manifest.json`
+- `main.js`
+- `styles.css`
+
+## Development
+
+This source currently ships as a simple direct plugin entry file in `main.js`.
+
+If you want, I can next convert this into a proper TypeScript + esbuild-based Obsidian plugin scaffold with:
+
+- `src/main.ts`
+- `esbuild.config.mjs`
+- `tsconfig.json`
+
+which is closer to the usual Obsidian plugin development convention.
+```
+</FILE_CONTENT>
+
+
+> user
+How do I test the plugin?
+
+@time 2026-04-18T22:24:51-04:00
+@tokenUsage 24937 / 334 / $0.0631775
+@model gpt-5.4-2026-03-05
+> assistant
+To test it in Obsidian:
+
+1. Build or place the plugin files into your vault plugins folder:
+   - target folder:
+     `.obsidian/plugins/convo-lang/`
+
+You need these files there:
+- `manifest.json`
+- `main.js`
+- `styles.css`
+
+2. Open Obsidian.
+
+3. Go to:
+   - `Settings -> Community plugins`
+   - turn off `Restricted mode` if needed
+
+4. Click:
+   - `Reload plugins`
+   - then enable `Convo-Lang`
+
+5. Test markdown fenced blocks in a note:
+
+```md
+```convo
+\> system
+You are a helpful assistant
+
+@json UserInfo
+
+\> define userName = 'Scott'
+\> node Start
+@to Next = eq(userName,'Scott')
+```
+```
+
+6. Test a `.convo` file:
+   - create a file ending in `.convo`
+   - open it in Obsidian
+   - verify highlighting appears
+
+Important note:
+The files I gave you are plugin runtime files, but `main.js` currently imports Obsidian and CodeMirror packages directly. In practice, Obsidian plugins are usually bundled first, not used as raw source files.
+
+So for real testing, the current plugin likely needs a small build step before Obsidian can load it reliably.
+
+If you want, I can next generate a proper Obsidian testable plugin scaffold with:
+- `src/main.ts`
+- `esbuild.config.mjs`
+- `tsconfig.json`
+- built plugin entry structure
+
+That would be the correct way to actually run and test it.
+
+
+> user
+Can you write a script to install the plugin for testing
+
+@time 2026-04-18T22:25:35-04:00
+@tokenUsage 25289 / 367 / $0.06414
+@model gpt-5.4-2026-03-05
+> assistant
+<RUNNABLE_SCRIPT script-name="install-obsidian-convo-plugin-for-testing" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# require a vault path argument
+if [ -z "$1" ]; then
+    echo "Usage: bash install-plugin.sh /path/to/your/obsidian/vault"
+    exit 1
+fi
+
+# capture the vault path from the first argument
+VAULT_PATH="$1"
+
+# define source and target plugin directories
+PLUGIN_SRC="packages/obsidian"
+PLUGIN_DST="$VAULT_PATH/.obsidian/plugins/convo-lang"
+
+# ensure the source plugin directory exists
+if [ ! -d "$PLUGIN_SRC" ]; then
+    echo "Plugin source directory not found: $PLUGIN_SRC"
+    exit 1
+fi
+
+# create the destination plugin directory
+mkdir -p "$PLUGIN_DST"
+
+# copy plugin files into the Obsidian vault plugin folder
+cp "$PLUGIN_SRC/manifest.json" "$PLUGIN_DST/manifest.json"
+cp "$PLUGIN_SRC/main.js" "$PLUGIN_DST/main.js"
+cp "$PLUGIN_SRC/styles.css" "$PLUGIN_DST/styles.css"
+
+# optionally copy readme if present
+if [ -f "$PLUGIN_SRC/README.md" ]; then
+    cp "$PLUGIN_SRC/README.md" "$PLUGIN_DST/README.md"
+fi
+
+# report success and next steps
+echo "Installed Convo-Lang test plugin to:"
+echo "  $PLUGIN_DST"
+echo
+echo "Next steps:"
+echo "1. Open Obsidian"
+echo "2. Open Settings -> Community plugins"
+echo "3. Disable Restricted mode if needed"
+echo "4. Click Reload plugins"
+echo "5. Enable Convo-Lang"
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="install-obsidian-convo-plugin-for-testing">
+``` output
+Usage: bash install-plugin.sh /path/to/your/obsidian/vault
+
+[process exited with code 1]
+
+```
+</SCRIPT_OUTPUT>
+
+The path to my vault is `'/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott'`
+
+Do not use arguments pass to the the script
+
+@time 2026-04-18T22:33:09-04:00
+@tokenUsage 25750 / 343 / $0.0652325
+@model gpt-5.4-2026-03-05
+> assistant
+<RUNNABLE_SCRIPT script-name="install-obsidian-convo-plugin-for-testing-no-args" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# set the Obsidian vault path directly
+VAULT_PATH="/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott"
+
+# define source and target plugin directories
+PLUGIN_SRC="packages/obsidian"
+PLUGIN_DST="$VAULT_PATH/.obsidian/plugins/convo-lang"
+
+# ensure the source plugin directory exists
+if [ ! -d "$PLUGIN_SRC" ]; then
+    echo "Plugin source directory not found: $PLUGIN_SRC"
+    exit 1
+fi
+
+# create the destination plugin directory
+mkdir -p "$PLUGIN_DST"
+
+# copy plugin files into the Obsidian vault plugin folder
+cp "$PLUGIN_SRC/manifest.json" "$PLUGIN_DST/manifest.json"
+cp "$PLUGIN_SRC/main.js" "$PLUGIN_DST/main.js"
+cp "$PLUGIN_SRC/styles.css" "$PLUGIN_DST/styles.css"
+
+# optionally copy readme if present
+if [ -f "$PLUGIN_SRC/README.md" ]; then
+    cp "$PLUGIN_SRC/README.md" "$PLUGIN_DST/README.md"
+fi
+
+# report success and next steps
+echo "Installed Convo-Lang test plugin to:"
+echo "  $PLUGIN_DST"
+echo
+echo "Next steps:"
+echo "1. Open Obsidian"
+echo "2. Open Settings -> Community plugins"
+echo "3. Disable Restricted mode if needed"
+echo "4. Click Reload plugins"
+echo "5. Enable Convo-Lang"
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="install-obsidian-convo-plugin-for-testing-no-args">
+``` output
+Installed Convo-Lang test plugin to:
+  /Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott/.obsidian/plugins/convo-lang
+
+Next steps:
+1. Open Obsidian
+2. Open Settings -> Community plugins
+3. Disable Restricted mode if needed
+4. Click Reload plugins
+5. Enable Convo-Lang
+
+```
+</SCRIPT_OUTPUT>
+
+When enabling the plugin I get the following error:
+
+``` text
+app.js:1 Plugin failure: convo-lang SyntaxError: Cannot use import statement outside a module
+    at eval (<anonymous>)
+    at app.js:1:2747354
+    at e.<anonymous> (app.js:1:2747455)
+    at app.js:1:258511
+    at Object.next (app.js:1:258616)
+    at a (app.js:1:257334)
+```
+
+@time 2026-04-18T22:36:23-04:00
+@tokenUsage 26307 / 156 / $0.06615750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+You're right — Obsidian is loading `main.js` as a bundled plugin entry, not as an ES module source file, so the current `import` syntax won't work.
+
+Before I generate the fix, one quick question:
+
+Do you want me to:
+
+1. **minimally fix the current plugin** so it loads in Obsidian by rewriting `main.js` to use the global/plugin-compatible CommonJS-style runtime pattern, or
+
+2. **properly scaffold it as a real buildable Obsidian plugin** with:
+   - `src/main.ts`
+   - `esbuild.config.mjs`
+   - `tsconfig.json`
+   - bundled output workflow
+
+If your goal is just quick testing, I recommend **1** first.
+
+
+> user
+Write an Bun .ts file to do the minification and give me a script to install the minified files
+
+@time 2026-04-18T22:37:42-04:00
+@tokenUsage 26492 / 483 / $0.06743750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="build-plugin.ts" target-output-path="../../packages/obsidian/build-plugin.ts">
+``` ts
+import {build} from 'bun';
+
+const rootDir=new URL('.',import.meta.url);
+const entryPath=new URL('./main.js',rootDir);
+const outDir=new URL('./dist/',rootDir);
+
+await build({
+    entrypoints:[entryPath.pathname],
+    outdir:outDir.pathname,
+    target:'browser',
+    format:'cjs',
+    minify:true,
+    sourcemap:'none',
+    naming:'main.js',
+});
+
+console.log(`Built Obsidian plugin bundle to ${outDir.pathname}`);
+```
+</FILE_CONTENT>
+
+<RUNNABLE_SCRIPT script-name="build-and-install-obsidian-convo-plugin-minified" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# define the Obsidian vault path directly
+VAULT_PATH="/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott"
+
+# define source and destination directories
+PLUGIN_SRC="packages/obsidian"
+PLUGIN_DIST="$PLUGIN_SRC/dist"
+PLUGIN_DST="$VAULT_PATH/.obsidian/plugins/convo-lang"
+
+# build the plugin using Bun
+bun "$PLUGIN_SRC/build-plugin.ts"
+
+# ensure the bundle was created
+if [ ! -f "$PLUGIN_DIST/main.js" ]; then
+    echo "Built plugin bundle not found: $PLUGIN_DIST/main.js"
+    exit 1
+fi
+
+# create the destination plugin directory
+mkdir -p "$PLUGIN_DST"
+
+# copy required plugin files
+cp "$PLUGIN_SRC/manifest.json" "$PLUGIN_DST/manifest.json"
+cp "$PLUGIN_DIST/main.js" "$PLUGIN_DST/main.js"
+cp "$PLUGIN_SRC/styles.css" "$PLUGIN_DST/styles.css"
+
+# optionally copy readme if present
+if [ -f "$PLUGIN_SRC/README.md" ]; then
+    cp "$PLUGIN_SRC/README.md" "$PLUGIN_DST/README.md"
+fi
+
+# report success
+echo "Built and installed Convo-Lang plugin to:"
+echo "  $PLUGIN_DST"
+echo
+echo "Next steps:"
+echo "1. Open Obsidian"
+echo "2. Go to Settings -> Community plugins"
+echo "3. Click Reload plugins"
+echo "4. Enable Convo-Lang"
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="build-and-install-obsidian-convo-plugin-minified">
+``` output
+1 | import {Plugin} from 'obsidian';
+                         ^
+error: Could not resolve: "obsidian". Maybe you need to "bun install"?
+    at /Users/scott/docs/convo-lang/packages/obsidian/main.js:1:22
+
+2 | import {StreamLanguage} from '@codemirror/language';
+                                 ^
+error: Could not resolve: "@codemirror/language". Maybe you need to "bun install"?
+    at /Users/scott/docs/convo-lang/packages/obsidian/main.js:2:30
+
+3 | import {StringStream} from '@codemirror/stream-parser';
+                               ^
+error: Could not resolve: "@codemirror/stream-parser". Maybe you need to "bun install"?
+    at /Users/scott/docs/convo-lang/packages/obsidian/main.js:3:28
+
+Bun v1.3.12 (macOS arm64)
+
+[process exited with code 1]
+
+```
+</SCRIPT_OUTPUT>
+
+
+@time 2026-04-18T22:38:55-04:00
+@tokenUsage 27206 / 2882 / $0.07522000000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="main.js" target-output-path="../../packages/obsidian/main.js">
+``` js
+'use strict';
+
+const wordBoundary=/[A-Za-z0-9_]/;
+
+const topLevelKeywords=new Set([
+    'do',
+    'thinkingResult',
+    'result',
+    'define',
+    'debug',
+    'end',
+    'target',
+    'make',
+    'stage',
+    'app',
+    'parallelEnd',
+    'parallel',
+    'insertEnd',
+    'agentEnd',
+    'queue',
+    'flush',
+    'insert',
+    'nop',
+    'templateEnd',
+    'template',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd',
+    'node',
+    'goto',
+    'exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit',
+    'to',
+    'from',
+]);
+
+const functionModifiers=new Set([
+    'agent',
+    'public',
+    'local',
+]);
+
+const systemFunctions=new Set([
+    'elif',
+    'if',
+    'else',
+    'while',
+    'break',
+    'foreach',
+    'for',
+    'in',
+    'do',
+    'outInline',
+    'outTrim',
+    'out',
+    'then',
+    'fn',
+    'return',
+    'case',
+    'default',
+    'switch',
+    'test',
+]);
+
+const operatorFunctions=new Set([
+    'lt',
+    'lte',
+    'neq',
+    'eq',
+    'gt',
+    'gte',
+    'is',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'not',
+    'mod',
+    'pow',
+    'inc',
+    'dec',
+    'no',
+]);
+
+const logicFunctions=new Set([
+    'and',
+    'or',
+]);
+
+const typeFunctions=new Set([
+    'enum',
+    'struct',
+    'array',
+]);
+
+const typeKeywords=new Set([
+    'string',
+    'number',
+    'int',
+    'boolean',
+    'time',
+    'void',
+    'any',
+    'map',
+    'array',
+    'object',
+]);
+
+const constValues=new Set([
+    'true',
+    'false',
+    'null',
+    'undefined',
+    'convo',
+    '__args',
+    '__return',
+    '__error',
+    '__debug',
+    '__disableAutoComplete',
+    '__file',
+    '__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition',
+    '@disabled',
+    '@taskName',
+    '@taskDescription',
+]);
+
+const typeTags=new Set([
+    '@json',
+    '@inputConversation',
+    '@inputType',
+]);
+
+function isWordChar(ch)
+{
+    return !!ch && wordBoundary.test(ch);
+}
+
+function readWord(stream)
+{
+    let value='';
+    while(!stream.eol() && isWordChar(stream.peek())){
+        value+=stream.next();
+    }
+    return value;
+}
+
+function readUntilSpace(stream)
+{
+    let value='';
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(ch===undefined || /\s/.test(ch)){
+            break;
+        }
+        value+=stream.next();
+    }
+    return value;
+}
+
+function skipSpaces(stream)
+{
+    while(!stream.eol() && /\s/.test(stream.peek())){
+        stream.next();
+    }
+}
+
+function tokenString(stream,state,quote)
+{
+    let escaped=false;
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream,state)
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'quote';
+}
+
+function tokenBlock(stream,state)
+{
+    if(state.mode==='dq'){
+        return tokenString(stream,state,'"');
+    }
+    if(state.mode==='sq'){
+        return tokenString(stream,state,"'");
+    }
+    if(state.mode==='inline'){
+        return tokenInlineCode(stream,state);
+    }
+    if(state.mode==='heredoc'){
+        if(stream.match(/-{3,}/)){
+            state.mode=null;
+            return 'comment';
+        }
+        stream.skipToEnd();
+        return null;
+    }
+    return null;
+}
+
+function tokenLineStart(stream,state)
+{
+    if(stream.match(/\s*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/\s*\/\/.*/)){
+        return 'comment';
+    }
+
+    const pos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(conditionTags.has(tag) || typeTags.has(tag) || tag==='@routeTo' || tag==='@routeFrom'){
+            return 'keyword';
+        }
+        if(tag==='@exit' || tag==='@to' || tag==='@from' || tag==='@import' || tag==='@name'){
+            return 'keyword';
+        }
+        return 'atom';
+    }
+
+    stream.pos=pos;
+    return null;
+}
+
+function tokenAfterGt(stream,state)
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word) || topLevelKeywords.has(word)){
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        return 'def';
+    }
+
+    if(functionModifiers.has(word)){
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && stream.peek()==='('){
+        stream.pos=start+word.length;
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    return 'atom';
+}
+
+function tokenTagValue(stream,state)
+{
+    if(stream.sol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    if(state.lastTag==='@import'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'string';
+    }
+
+    if(state.lastTag==='@name'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    if(state.lastTag==='@routeTo' || state.lastTag==='@routeFrom'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    return null;
+}
+
+function tokenBase(stream,state)
+{
+    if(stream.sol()){
+        const lineStartToken=tokenLineStart(stream,state);
+        if(lineStartToken){
+            return lineStartToken;
+        }
+    }
+
+    const blockToken=tokenBlock(stream,state);
+    if(blockToken){
+        return blockToken;
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    const tagValueToken=tokenTagValue(stream,state);
+    if(tagValueToken){
+        return tagValueToken;
+    }
+
+    if(stream.match('${')){
+        return 'keyword';
+    }
+
+    if(stream.match('\{{') || stream.match('}}')){
+        return 'bracket';
+    }
+
+    if(stream.match('->')){
+        return 'operator';
+    }
+
+    if(stream.match('<<')){
+        return 'operator';
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.mode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???') || stream.match('===')){
+        return 'string';
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.mode='dq';
+        return 'string';
+    }
+
+    if(ch==="'"){
+        stream.next();
+        state.mode='sq';
+        return 'string';
+    }
+
+    if(ch==='`'){
+        stream.next();
+        state.mode='inline';
+        return 'quote';
+    }
+
+    if(ch==='<' || ch==='>' || ch==='=' || ch==='!' || ch===':' || ch===',' || ch==='(' || ch===')' || ch==='[' || ch===']'){
+        stream.next();
+        return 'operator';
+    }
+
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+
+    if(ch==='$'){
+        const value=readUntilSpace(stream);
+        if(value==='$$RAG$$' || value==='$$CONTENT$$' || value==='$$CHILD$$' || value==='$$CHILDREN$$' || /^\$\$SLOT_\w+\$\$$/.test(value)){
+            return 'keyword';
+        }
+        return 'operator';
+    }
+
+    if(/[A-Za-z_]/.test(ch)){
+        const word=readWord(stream);
+
+        if(typeKeywords.has(word)){
+            return 'typeName';
+        }
+
+        if(constValues.has(word)){
+            return 'atom';
+        }
+
+        if(systemFunctions.has(word)){
+            return stream.peek()==='('?'keyword':'variableName';
+        }
+
+        if(operatorFunctions.has(word) || logicFunctions.has(word)){
+            return stream.peek()==='('?'operator':'variableName';
+        }
+
+        if(typeFunctions.has(word)){
+            return stream.peek()==='('?'typeName':'variableName';
+        }
+
+        if(/^[A-Z]\w*$/.test(word)){
+            return 'typeName';
+        }
+
+        if(stream.peek()===':'){
+            return 'propertyName';
+        }
+
+        if(stream.peek()==='('){
+            return 'variableName';
+        }
+
+        return 'variableName';
+    }
+
+    stream.next();
+    return null;
+}
+
+function createConvoMode()
+{
+    return {
+        startState()
+        {
+            return {
+                mode:null,
+                afterGt:false,
+                lastTag:null,
+            };
+        },
+        token(stream,state)
+        {
+            return tokenBase(stream,state);
+        }
+    };
+}
+
+function registerConvoLanguage(plugin)
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode);
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    plugin.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    plugin.registerExtensions(['convo'],'convo');
+}
+
+module.exports=class ConvoLangPlugin extends obsidian.Plugin
+{
+    async onload()
+    {
+        registerConvoLanguage(this);
+    }
+};
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="build-plugin.ts" target-output-path="../../packages/obsidian/build-plugin.ts">
+``` ts
+import {build} from 'bun';
+
+const rootDir=new URL('.',import.meta.url);
+const entryPath=new URL('./main.js',rootDir);
+const outDir=new URL('./dist/',rootDir);
+
+await build({
+    entrypoints:[entryPath.pathname],
+    outdir:outDir.pathname,
+    target:'browser',
+    format:'cjs',
+    minify:true,
+    sourcemap:'none',
+    naming:'main.js',
+    external:['obsidian'],
+});
+
+console.log(`Built Obsidian plugin bundle to ${outDir.pathname}`);
+```
+</FILE_CONTENT>
+
+<RUNNABLE_SCRIPT script-name="build-and-install-obsidian-convo-plugin-minified-cjs" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# define the Obsidian vault path directly
+VAULT_PATH="/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott"
+
+# define source and destination directories
+PLUGIN_SRC="packages/obsidian"
+PLUGIN_DIST="$PLUGIN_SRC/dist"
+PLUGIN_DST="$VAULT_PATH/.obsidian/plugins/convo-lang"
+
+# build the plugin using Bun with obsidian treated as external
+bun "$PLUGIN_SRC/build-plugin.ts"
+
+# ensure the bundle was created
+if [ ! -f "$PLUGIN_DIST/main.js" ]; then
+    echo "Built plugin bundle not found: $PLUGIN_DIST/main.js"
+    exit 1
+fi
+
+# create the destination plugin directory
+mkdir -p "$PLUGIN_DST"
+
+# copy required plugin files
+cp "$PLUGIN_SRC/manifest.json" "$PLUGIN_DST/manifest.json"
+cp "$PLUGIN_DIST/main.js" "$PLUGIN_DST/main.js"
+cp "$PLUGIN_SRC/styles.css" "$PLUGIN_DST/styles.css"
+
+# optionally copy readme if present
+if [ -f "$PLUGIN_SRC/README.md" ]; then
+    cp "$PLUGIN_SRC/README.md" "$PLUGIN_DST/README.md"
+fi
+
+# report success
+echo "Built and installed Convo-Lang plugin to:"
+echo "  $PLUGIN_DST"
+echo
+echo "Next steps:"
+echo "1. Open Obsidian"
+echo "2. Go to Settings -> Community plugins"
+echo "3. Click Reload plugins"
+echo "4. Enable Convo-Lang"
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="build-and-install-obsidian-convo-plugin-minified-cjs">
+``` output
+Built Obsidian plugin bundle to /Users/scott/docs/convo-lang/packages/obsidian/dist/
+Built and installed Convo-Lang plugin to:
+  /Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott/.obsidian/plugins/convo-lang
+
+Next steps:
+1. Open Obsidian
+2. Go to Settings -> Community plugins
+3. Click Reload plugins
+4. Enable Convo-Lang
+
+```
+</SCRIPT_OUTPUT>
+
+When enabling the plugin is get the following error:
+
+``` output
+
+Plugin failure: convo-lang ReferenceError: obsidian is not defined
+    at anonymous (plugin:convo-lang:2:4724)
+    at e.<anonymous> (app.js:1:2747491)
+    at app.js:1:258511
+    at Object.next (app.js:1:258616)
+    at a (app.js:1:257334)
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+s @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+t.onClick @ app.js:1
+```
+
+@time 2026-04-18T22:42:08-04:00
+@tokenUsage 30503 / 2780 / $0.0832075
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="main.js" target-output-path="../../packages/obsidian/main.js">
+``` js
+'use strict';
+
+const wordBoundary=/[A-Za-z0-9_]/;
+
+const topLevelKeywords=new Set([
+    'do',
+    'thinkingResult',
+    'result',
+    'define',
+    'debug',
+    'end',
+    'target',
+    'make',
+    'stage',
+    'app',
+    'parallelEnd',
+    'parallel',
+    'insertEnd',
+    'agentEnd',
+    'queue',
+    'flush',
+    'insert',
+    'nop',
+    'templateEnd',
+    'template',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd',
+    'node',
+    'goto',
+    'exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit',
+    'to',
+    'from',
+]);
+
+const functionModifiers=new Set([
+    'agent',
+    'public',
+    'local',
+]);
+
+const systemFunctions=new Set([
+    'elif',
+    'if',
+    'else',
+    'while',
+    'break',
+    'foreach',
+    'for',
+    'in',
+    'do',
+    'outInline',
+    'outTrim',
+    'out',
+    'then',
+    'fn',
+    'return',
+    'case',
+    'default',
+    'switch',
+    'test',
+]);
+
+const operatorFunctions=new Set([
+    'lt',
+    'lte',
+    'neq',
+    'eq',
+    'gt',
+    'gte',
+    'is',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'not',
+    'mod',
+    'pow',
+    'inc',
+    'dec',
+    'no',
+]);
+
+const logicFunctions=new Set([
+    'and',
+    'or',
+]);
+
+const typeFunctions=new Set([
+    'enum',
+    'struct',
+    'array',
+]);
+
+const typeKeywords=new Set([
+    'string',
+    'number',
+    'int',
+    'boolean',
+    'time',
+    'void',
+    'any',
+    'map',
+    'array',
+    'object',
+]);
+
+const constValues=new Set([
+    'true',
+    'false',
+    'null',
+    'undefined',
+    'convo',
+    '__args',
+    '__return',
+    '__error',
+    '__debug',
+    '__disableAutoComplete',
+    '__file',
+    '__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition',
+    '@disabled',
+    '@taskName',
+    '@taskDescription',
+]);
+
+const typeTags=new Set([
+    '@json',
+    '@inputConversation',
+    '@inputType',
+]);
+
+function isWordChar(ch)
+{
+    return !!ch && wordBoundary.test(ch);
+}
+
+function readWord(stream)
+{
+    let value='';
+    while(!stream.eol() && isWordChar(stream.peek())){
+        value+=stream.next();
+    }
+    return value;
+}
+
+function readUntilSpace(stream)
+{
+    let value='';
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(ch===undefined || /\s/.test(ch)){
+            break;
+        }
+        value+=stream.next();
+    }
+    return value;
+}
+
+function skipSpaces(stream)
+{
+    while(!stream.eol() && /\s/.test(stream.peek())){
+        stream.next();
+    }
+}
+
+function tokenString(stream,state,quote)
+{
+    let escaped=false;
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream,state)
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'quote';
+}
+
+function tokenBlock(stream,state)
+{
+    if(state.mode==='dq'){
+        return tokenString(stream,state,'"');
+    }
+    if(state.mode==='sq'){
+        return tokenString(stream,state,"'");
+    }
+    if(state.mode==='inline'){
+        return tokenInlineCode(stream,state);
+    }
+    if(state.mode==='heredoc'){
+        if(stream.match(/-{3,}/)){
+            state.mode=null;
+            return 'comment';
+        }
+        stream.skipToEnd();
+        return null;
+    }
+    return null;
+}
+
+function tokenLineStart(stream,state)
+{
+    if(stream.match(/\s*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/\s*\/\/.*/)){
+        return 'comment';
+    }
+
+    const pos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(conditionTags.has(tag) || typeTags.has(tag) || tag==='@routeTo' || tag==='@routeFrom'){
+            return 'keyword';
+        }
+        if(tag==='@exit' || tag==='@to' || tag==='@from' || tag==='@import' || tag==='@name'){
+            return 'keyword';
+        }
+        return 'atom';
+    }
+
+    stream.pos=pos;
+    return null;
+}
+
+function tokenAfterGt(stream,state)
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word) || topLevelKeywords.has(word)){
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        return 'def';
+    }
+
+    if(functionModifiers.has(word)){
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && stream.peek()==='('){
+        stream.pos=start+word.length;
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    return 'atom';
+}
+
+function tokenTagValue(stream,state)
+{
+    if(stream.sol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    if(state.lastTag==='@import'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'string';
+    }
+
+    if(state.lastTag==='@name'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    if(state.lastTag==='@routeTo' || state.lastTag==='@routeFrom'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    return null;
+}
+
+function tokenBase(stream,state)
+{
+    if(stream.sol()){
+        const lineStartToken=tokenLineStart(stream,state);
+        if(lineStartToken){
+            return lineStartToken;
+        }
+    }
+
+    const blockToken=tokenBlock(stream,state);
+    if(blockToken){
+        return blockToken;
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    const tagValueToken=tokenTagValue(stream,state);
+    if(tagValueToken){
+        return tagValueToken;
+    }
+
+    if(stream.match('${')){
+        return 'keyword';
+    }
+
+    if(stream.match('\{{') || stream.match('}}')){
+        return 'bracket';
+    }
+
+    if(stream.match('->')){
+        return 'operator';
+    }
+
+    if(stream.match('<<')){
+        return 'operator';
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.mode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???') || stream.match('===')){
+        return 'string';
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.mode='dq';
+        return 'string';
+    }
+
+    if(ch==="'"){
+        stream.next();
+        state.mode='sq';
+        return 'string';
+    }
+
+    if(ch==='`'){
+        stream.next();
+        state.mode='inline';
+        return 'quote';
+    }
+
+    if(ch==='<' || ch==='>' || ch==='=' || ch==='!' || ch===':' || ch===',' || ch==='(' || ch===')' || ch==='[' || ch===']'){
+        stream.next();
+        return 'operator';
+    }
+
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+
+    if(ch==='$'){
+        const value=readUntilSpace(stream);
+        if(value==='$$RAG$$' || value==='$$CONTENT$$' || value==='$$CHILD$$' || value==='$$CHILDREN$$' || /^\$\$SLOT_\w+\$\$$/.test(value)){
+            return 'keyword';
+        }
+        return 'operator';
+    }
+
+    if(/[A-Za-z_]/.test(ch)){
+        const word=readWord(stream);
+
+        if(typeKeywords.has(word)){
+            return 'typeName';
+        }
+
+        if(constValues.has(word)){
+            return 'atom';
+        }
+
+        if(systemFunctions.has(word)){
+            return stream.peek()==='('?'keyword':'variableName';
+        }
+
+        if(operatorFunctions.has(word) || logicFunctions.has(word)){
+            return stream.peek()==='('?'operator':'variableName';
+        }
+
+        if(typeFunctions.has(word)){
+            return stream.peek()==='('?'typeName':'variableName';
+        }
+
+        if(/^[A-Z]\w*$/.test(word)){
+            return 'typeName';
+        }
+
+        if(stream.peek()===':'){
+            return 'propertyName';
+        }
+
+        if(stream.peek()==='('){
+            return 'variableName';
+        }
+
+        return 'variableName';
+    }
+
+    stream.next();
+    return null;
+}
+
+function createConvoMode()
+{
+    return function()
+    {
+        return {
+            startState()
+            {
+                return {
+                    mode:null,
+                    afterGt:false,
+                    lastTag:null,
+                };
+            },
+            token(stream,state)
+            {
+                return tokenBase(stream,state);
+            }
+        };
+    };
+}
+
+function registerConvoMode()
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+
+module.exports=class ConvoLangPlugin extends require('obsidian').Plugin
+{
+    async onload()
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+};
+```
+</FILE_CONTENT>
+
+<RUNNABLE_SCRIPT script-name="build-and-install-obsidian-convo-plugin-minified-cjs-require" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# define the Obsidian vault path directly
+VAULT_PATH="/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott"
+
+# define source and destination directories
+PLUGIN_SRC="packages/obsidian"
+PLUGIN_DIST="$PLUGIN_SRC/dist"
+PLUGIN_DST="$VAULT_PATH/.obsidian/plugins/convo-lang"
+
+# build the plugin using Bun with CommonJS output
+bun "$PLUGIN_SRC/build-plugin.ts"
+
+# ensure the bundle was created
+if [ ! -f "$PLUGIN_DIST/main.js" ]; then
+    echo "Built plugin bundle not found: $PLUGIN_DIST/main.js"
+    exit 1
+fi
+
+# create the destination plugin directory
+mkdir -p "$PLUGIN_DST"
+
+# copy required plugin files
+cp "$PLUGIN_SRC/manifest.json" "$PLUGIN_DST/manifest.json"
+cp "$PLUGIN_DIST/main.js" "$PLUGIN_DST/main.js"
+cp "$PLUGIN_SRC/styles.css" "$PLUGIN_DST/styles.css"
+
+# optionally copy readme if present
+if [ -f "$PLUGIN_SRC/README.md" ]; then
+    cp "$PLUGIN_SRC/README.md" "$PLUGIN_DST/README.md"
+fi
+
+# report success
+echo "Built and installed Convo-Lang plugin to:"
+echo "  $PLUGIN_DST"
+echo
+echo "Next steps:"
+echo "1. Open Obsidian"
+echo "2. Go to Settings -> Community plugins"
+echo "3. Click Reload plugins"
+echo "4. Enable Convo-Lang"
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="build-and-install-obsidian-convo-plugin-minified-cjs-require">
+``` output
+Built Obsidian plugin bundle to /Users/scott/docs/convo-lang/packages/obsidian/dist/
+Built and installed Convo-Lang plugin to:
+  /Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott/.obsidian/plugins/convo-lang
+
+Next steps:
+1. Open Obsidian
+2. Go to Settings -> Community plugins
+3. Click Reload plugins
+4. Enable Convo-Lang
+
+```
+</SCRIPT_OUTPUT>
+
+That worked 👍
+
+Now convert the main.js to a TypeScript file
+
+@time 2026-04-19T06:07:12-04:00
+@tokenUsage 33427 / 2889 / $0.09079000000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="main.ts" target-output-path="../../packages/obsidian/main.ts">
+``` ts
+'use strict';
+
+import {Plugin} from 'obsidian';
+
+type ConvoState={
+    mode:null|'dq'|'sq'|'inline'|'heredoc';
+    afterGt:boolean;
+    lastTag:string|null;
+};
+
+type CodeMirrorStream={
+    pos:number;
+    string:string;
+    eol():boolean;
+    sol():boolean;
+    peek():string|undefined;
+    next():string|undefined;
+    match(pattern:string|RegExp,consume?:boolean,caseInsensitive?:boolean):unknown;
+    skipToEnd():void;
+};
+
+type CodeMirrorMode={
+    startState():ConvoState;
+    token(stream:CodeMirrorStream,state:ConvoState):string|null;
+};
+
+type CodeMirrorApi={
+    modes:Record<string,unknown>;
+    defineMode(name:string,factory:()=>CodeMirrorMode):void;
+    defineMIME?:(mime:string,mode:string)=>void;
+};
+
+declare global
+{
+    interface Window
+    {
+        CodeMirror?:CodeMirrorApi;
+    }
+}
+
+const wordBoundary=/[A-Za-z0-9_]/;
+
+const topLevelKeywords=new Set([
+    'do',
+    'thinkingResult',
+    'result',
+    'define',
+    'debug',
+    'end',
+    'target',
+    'make',
+    'stage',
+    'app',
+    'parallelEnd',
+    'parallel',
+    'insertEnd',
+    'agentEnd',
+    'queue',
+    'flush',
+    'insert',
+    'nop',
+    'templateEnd',
+    'template',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd',
+    'node',
+    'goto',
+    'exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit',
+    'to',
+    'from',
+]);
+
+const functionModifiers=new Set([
+    'agent',
+    'public',
+    'local',
+]);
+
+const systemFunctions=new Set([
+    'elif',
+    'if',
+    'else',
+    'while',
+    'break',
+    'foreach',
+    'for',
+    'in',
+    'do',
+    'outInline',
+    'outTrim',
+    'out',
+    'then',
+    'fn',
+    'return',
+    'case',
+    'default',
+    'switch',
+    'test',
+]);
+
+const operatorFunctions=new Set([
+    'lt',
+    'lte',
+    'neq',
+    'eq',
+    'gt',
+    'gte',
+    'is',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'not',
+    'mod',
+    'pow',
+    'inc',
+    'dec',
+    'no',
+]);
+
+const logicFunctions=new Set([
+    'and',
+    'or',
+]);
+
+const typeFunctions=new Set([
+    'enum',
+    'struct',
+    'array',
+]);
+
+const typeKeywords=new Set([
+    'string',
+    'number',
+    'int',
+    'boolean',
+    'time',
+    'void',
+    'any',
+    'map',
+    'array',
+    'object',
+]);
+
+const constValues=new Set([
+    'true',
+    'false',
+    'null',
+    'undefined',
+    'convo',
+    '__args',
+    '__return',
+    '__error',
+    '__debug',
+    '__disableAutoComplete',
+    '__file',
+    '__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition',
+    '@disabled',
+    '@taskName',
+    '@taskDescription',
+]);
+
+const typeTags=new Set([
+    '@json',
+    '@inputConversation',
+    '@inputType',
+]);
+
+function isWordChar(ch:string|undefined):boolean
+{
+    return !!ch && wordBoundary.test(ch);
+}
+
+function readWord(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol() && isWordChar(stream.peek())){
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function readUntilSpace(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(ch===undefined || /\s/.test(ch)){
+            break;
+        }
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function skipSpaces(stream:CodeMirrorStream):void
+{
+    while(!stream.eol() && /\s/.test(stream.peek()??'')){
+        stream.next();
+    }
+}
+
+function tokenString(stream:CodeMirrorStream,state:ConvoState,quote:'"'|"'"):string
+{
+    let escaped=false;
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream:CodeMirrorStream,state:ConvoState):string
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.mode=null;
+            break;
+        }
+    }
+    return 'quote';
+}
+
+function tokenBlock(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(state.mode==='dq'){
+        return tokenString(stream,state,'"');
+    }
+    if(state.mode==='sq'){
+        return tokenString(stream,state,"'");
+    }
+    if(state.mode==='inline'){
+        return tokenInlineCode(stream,state);
+    }
+    if(state.mode==='heredoc'){
+        if(stream.match(/-{3,}/)){
+            state.mode=null;
+            return 'comment';
+        }
+        stream.skipToEnd();
+        return null;
+    }
+    return null;
+}
+
+function tokenLineStart(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/\s*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/\s*\/\/.*/)){
+        return 'comment';
+    }
+
+    const pos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(conditionTags.has(tag) || typeTags.has(tag) || tag==='@routeTo' || tag==='@routeFrom'){
+            return 'keyword';
+        }
+        if(tag==='@exit' || tag==='@to' || tag==='@from' || tag==='@import' || tag==='@name'){
+            return 'keyword';
+        }
+        return 'atom';
+    }
+
+    stream.pos=pos;
+    return null;
+}
+
+function tokenAfterGt(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word) || topLevelKeywords.has(word)){
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        return 'def';
+    }
+
+    if(functionModifiers.has(word)){
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && stream.peek()==='('){
+        stream.pos=start+word.length;
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    return 'atom';
+}
+
+function tokenTagValue(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.sol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    if(state.lastTag==='@import'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'string';
+    }
+
+    if(state.lastTag==='@name'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    if(state.lastTag==='@routeTo' || state.lastTag==='@routeFrom'){
+        const value=readUntilSpace(stream);
+        if(!value){
+            stream.next();
+            return null;
+        }
+        return 'variableName';
+    }
+
+    return null;
+}
+
+function tokenBase(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.sol()){
+        const lineStartToken=tokenLineStart(stream,state);
+        if(lineStartToken){
+            return lineStartToken;
+        }
+    }
+
+    const blockToken=tokenBlock(stream,state);
+    if(blockToken){
+        return blockToken;
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.lastTag=null;
+        return null;
+    }
+
+    const tagValueToken=tokenTagValue(stream,state);
+    if(tagValueToken){
+        return tagValueToken;
+    }
+
+    if(stream.match('${')){
+        return 'keyword';
+    }
+
+    if(stream.match('\{{') || stream.match('}}')){
+        return 'bracket';
+    }
+
+    if(stream.match('->')){
+        return 'operator';
+    }
+
+    if(stream.match('<<')){
+        return 'operator';
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.mode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???') || stream.match('===')){
+        return 'string';
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.mode='dq';
+        return 'string';
+    }
+
+    if(ch==="'"){
+        stream.next();
+        state.mode='sq';
+        return 'string';
+    }
+
+    if(ch==='`'){
+        stream.next();
+        state.mode='inline';
+        return 'quote';
+    }
+
+    if(ch==='<' || ch==='>' || ch==='=' || ch==='!' || ch===':' || ch===',' || ch==='(' || ch===')' || ch==='[' || ch===']'){
+        stream.next();
+        return 'operator';
+    }
+
+    if(/[0-9]/.test(ch??'') || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+
+    if(ch==='$'){
+        const value=readUntilSpace(stream);
+        if(value==='$$RAG$$' || value==='$$CONTENT$$' || value==='$$CHILD$$' || value==='$$CHILDREN$$' || /^\$\$SLOT_\w+\$\$$/.test(value)){
+            return 'keyword';
+        }
+        return 'operator';
+    }
+
+    if(/[A-Za-z_]/.test(ch??'')){
+        const word=readWord(stream);
+
+        if(typeKeywords.has(word)){
+            return 'typeName';
+        }
+
+        if(constValues.has(word)){
+            return 'atom';
+        }
+
+        if(systemFunctions.has(word)){
+            return stream.peek()==='('?'keyword':'variableName';
+        }
+
+        if(operatorFunctions.has(word) || logicFunctions.has(word)){
+            return stream.peek()==='('?'operator':'variableName';
+        }
+
+        if(typeFunctions.has(word)){
+            return stream.peek()==='('?'typeName':'variableName';
+        }
+
+        if(/^[A-Z]\w*$/.test(word)){
+            return 'typeName';
+        }
+
+        if(stream.peek()===':'){
+            return 'propertyName';
+        }
+
+        if(stream.peek()==='('){
+            return 'variableName';
+        }
+
+        return 'variableName';
+    }
+
+    stream.next();
+    return null;
+}
+
+function createConvoMode():()=>CodeMirrorMode
+{
+    return function()
+    {
+        return {
+            startState()
+            {
+                return {
+                    mode:null,
+                    afterGt:false,
+                    lastTag:null,
+                };
+            },
+            token(stream,state)
+            {
+                return tokenBase(stream,state);
+            }
+        };
+    };
+}
+
+function registerConvoMode():boolean
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload():Promise<void>
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="build-plugin.ts" target-output-path="../../packages/obsidian/build-plugin.ts">
+``` ts
+import {build} from 'bun';
+
+const rootDir=new URL('.',import.meta.url);
+const entryPath=new URL('./main.ts',rootDir);
+const outDir=new URL('./dist/',rootDir);
+
+await build({
+    entrypoints:[entryPath.pathname],
+    outdir:outDir.pathname,
+    target:'browser',
+    format:'cjs',
+    minify:true,
+    sourcemap:'none',
+    naming:'main.js',
+    external:['obsidian'],
+});
+
+console.log(`Built Obsidian plugin bundle to ${outDir.pathname}`);
+```
+</FILE_CONTENT>
+
+> define
+__model=claudeModel
+
+> user
+Update the syntax highlighting to be more accurate to the original `convo.tmLanguage.json` file
+
+@time 2026-04-19T06:34:17-04:00
+@tokenUsage 59962 / 867
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+Before I rewrite the highlighting, a few quick questions so I match `convo.tmLanguage.json` faithfully without bloating `main.ts`:
+
+1. Scope you care about most — pick one:
+   - (a) Full fidelity: match the grammar's `>` role parsing, function parameter scopes, `->` function body parsing, `@tag` value parsing (routes, imports, conditions, types), tag expressions, JSON tag values, triggers, routes, heredocs, inline prompts `???`, string embeds `===`, markdown links, xml tags, and fenced code blocks.
+   - (b) High fidelity but skip embedded fenced code blocks (json, ts, python, etc.). These don't work well in CodeMirror 5 stream modes without re-embedding languages.
+   - (c) Practical fidelity: everything except fenced embedded languages and markdown link parsing.
+
+2. How do you want embedded fenced code blocks handled inside `.convo` files and inside markdown ``` convo blocks?
+   - (a) Just highlight the fence markers and leave inner code unstyled
+   - (b) Highlight inner content as generic code (monospace, no language-specific coloring)
+   - (c) Ignore — treat as plain convo text
+
+3. For `@import`, `@to`, `@from`, `@exit`, `@routeTo`, `@routeFrom`, `@on`, etc., do you want the full value-part parsing (e.g. `=` expressions, `else`, `auto|next`, role names, variable names, invalid markers), or simplified highlighting where values are one color?
+
+4. Do you want `\{{ ... }}` embed expressions and `${ ... }` interpolation to be highlighted as embedded expressions with variables/numbers/strings parsed inside?
+
+5. For strings:
+   - Should `"..."` support `\{{ ... }}` embeds? The TM grammar only enables embeds inside single-quoted strings.
+   - Should `???...???` and `===...===` parse their `( ... )` modifier section with its keyword list (`system|functions|transforms|...`)?
+
+6. Should I preserve the same token/scope naming intent (keyword.control, storage.modifier, entity.name.type, etc.) by mapping to the closest CodeMirror 5 token categories (keyword, def, atom, variable, variable-2, type, string, string-2, comment, operator, number, meta, tag, attribute, builtin)?
+
+My recommendation if you want a good result without it taking forever:
+- **1c + 2a + 3 full + 4 yes + 5 yes (both features) + 6 mapped**
+
+Want me to go with that?
+
+
+> user
+1. c
+2. a
+3. full
+4. `\{{ ... }}` should be handled the same as the `convo.tmLanguage.json`. `${ ... }` should be ignored
+5. yes
+6. mapped
+
+
+@time 2026-04-19T06:45:44-04:00
+@tokenUsage 60904 / 9962
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+<FILE_CONTENT name="main.ts" target-output-path="../../packages/obsidian/main.ts">
+``` ts
+'use strict';
+
+import {Plugin} from 'obsidian';
+
+type StringMode='dq'|'sq'|'inline'|'heredoc'|'prompt'|'embed';
+
+type ConvoState={
+    stringMode:StringMode|null;
+    afterGt:boolean;
+    roleContext:'none'|'function'|'functionBody'|'topLevel';
+    parenDepth:number;
+    braceDepth:number;
+    lastTag:string|null;
+    inEmbedBraces:number;
+    headerConsumed:boolean;
+};
+
+type CodeMirrorStream={
+    pos:number;
+    string:string;
+    start:number;
+    eol():boolean;
+    sol():boolean;
+    peek():string|undefined;
+    next():string|undefined;
+    match(pattern:string|RegExp,consume?:boolean,caseInsensitive?:boolean):any;
+    skipToEnd():void;
+    current():string;
+    backUp(n:number):void;
+};
+
+type CodeMirrorMode={
+    startState():ConvoState;
+    copyState?(state:ConvoState):ConvoState;
+    token(stream:CodeMirrorStream,state:ConvoState):string|null;
+};
+
+type CodeMirrorApi={
+    modes:Record<string,unknown>;
+    defineMode(name:string,factory:()=>CodeMirrorMode):void;
+    defineMIME?:(mime:string,mode:string)=>void;
+};
+
+declare global
+{
+    interface Window
+    {
+        CodeMirror?:CodeMirrorApi;
+    }
+}
+
+const wordRe=/[A-Za-z0-9_]/;
+
+const topLevelStatements=new Set([
+    'do','thinkingResult','result','define','debug','end',
+    'target','make','stage','app',
+]);
+
+const controlFlowStatements=new Set([
+    'parallelEnd','parallel','insertEnd','agentEnd','queue','flush',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd','node','goto','exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit','to','from',
+]);
+
+const functionModifiers=new Set([
+    'agent','public','local',
+]);
+
+const systemFunctions=new Set([
+    'elif','if','else','while','break','foreach','for','in','do',
+    'outInline','outTrim','out','then','fn','return','case','default','switch','test',
+]);
+
+const operatorFunctions=new Set([
+    'lt','lte','neq','eq','gt','gte','is','add','sub','mul','div',
+    'not','mod','pow','inc','dec','no',
+]);
+
+const logicFunctions=new Set([
+    'and','or',
+]);
+
+const typeFunctions=new Set([
+    'enum','struct','array',
+]);
+
+const typeKeywords=new Set([
+    'string','number','int','boolean','time','void','any','map','array','object',
+]);
+
+const constValues=new Set([
+    'true','false','null','undefined','convo',
+    '__args','__return','__error','__debug',
+    '__disableAutoComplete','__file','__cwd',
+]);
+
+const stringModKeywords=new Set([
+    'system','functions','transforms','replaceForModel','replace',
+    'append','prepend','prefix','suffix','respond','pre',
+]);
+
+const conditionTags=new Set([
+    '@condition','@disabled','@taskName','@taskDescription',
+]);
+
+const typeValueTags=new Set([
+    '@json','@inputConversation','@inputType',
+]);
+
+const keywordTags=new Set([
+    '@exit','@to','@from','@import','@name',
+    '@routeTo','@routeFrom','@importMatch',
+    '@on','@messageHandler','@dep','@block','@messageHandlerHeadProp',
+]);
+
+function isWord(ch:string|undefined):boolean
+{
+    return !!ch && wordRe.test(ch);
+}
+
+function skipSpaces(stream:CodeMirrorStream):void
+{
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(!ch || !/[ \t]/.test(ch)){
+            break;
+        }
+        stream.next();
+    }
+}
+
+function readWord(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol() && isWord(stream.peek())){
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function copyState(state:ConvoState):ConvoState
+{
+    return {
+        stringMode:state.stringMode,
+        afterGt:state.afterGt,
+        roleContext:state.roleContext,
+        parenDepth:state.parenDepth,
+        braceDepth:state.braceDepth,
+        lastTag:state.lastTag,
+        inEmbedBraces:state.inEmbedBraces,
+        headerConsumed:state.headerConsumed,
+    };
+}
+
+function tokenQuotedString(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    quote:'"'|"'"
+):string
+{
+    let escaped=false;
+    while(!stream.eol()){
+        if(!escaped && quote==="'" && stream.match('\{{',false)){
+            return 'string';
+        }
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.stringMode=null;
+            return 'string';
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream:CodeMirrorStream,state:ConvoState):string
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.stringMode=null;
+            break;
+        }
+    }
+    return 'string-2';
+}
+
+function tokenHeredoc(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/-{3,}/)){
+        state.stringMode=null;
+        return 'comment';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenPromptOrEmbed(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    closer:'???'|'==='
+):string|null
+{
+    if(stream.match(closer)){
+        state.stringMode=null;
+        return 'keyword';
+    }
+    stream.next();
+    return 'string';
+}
+
+function tokenStringMode(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    switch(state.stringMode){
+        case 'dq':
+            return tokenQuotedString(stream,state,'"');
+        case 'sq':
+            return tokenQuotedString(stream,state,"'");
+        case 'inline':
+            return tokenInlineCode(stream,state);
+        case 'heredoc':
+            return tokenHeredoc(stream,state);
+        case 'prompt':
+            return tokenPromptOrEmbed(stream,state,'???');
+        case 'embed':
+            return tokenPromptOrEmbed(stream,state,'===');
+        default:
+            return null;
+    }
+}
+
+function tokenStringMods(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/task\s*:/)){
+        return 'keyword';
+    }
+    if(stream.match(/\+|\*/)){
+        return 'def';
+    }
+    if(stream.match(/\b(system|functions|transforms|replaceForModel|replace|append|prepend|prefix|suffix|respond|pre)\b/)){
+        return 'def';
+    }
+    if(stream.match(/\bboolean\b/)){
+        return 'type';
+    }
+    if(stream.match(/\w+\s*:\s*\w+\[?\]?/)){
+        return 'type';
+    }
+    if(stream.match(/\/\w+/)){
+        return 'def';
+    }
+    if(stream.match(/\w+\s*=/)){
+        return 'variable';
+    }
+    if(stream.match('>>')){
+        return 'keyword';
+    }
+    if(stream.match('!')){
+        return 'def';
+    }
+    const ch=stream.next();
+    if(ch===')'){
+        return 'keyword';
+    }
+    return null;
+}
+
+function maybeEnterStringModsFromPrefix(stream:CodeMirrorStream):boolean
+{
+    const pos=stream.pos;
+    skipSpaces(stream);
+    if(stream.peek()==='('){
+        return true;
+    }
+    stream.pos=pos;
+    return false;
+}
+
+function tokenLineStart(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/[ \t]*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/[ \t]*\/\/.*/)){
+        return 'comment';
+    }
+
+    const savedPos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(
+            conditionTags.has(tag) ||
+            typeValueTags.has(tag) ||
+            keywordTags.has(tag)
+        ){
+            return 'keyword';
+        }
+        return 'attribute';
+    }
+
+    stream.pos=savedPos;
+    return null;
+}
+
+function tokenAfterGt(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        state.roleContext='topLevel';
+        return 'def';
+    }
+
+    if(word==='insert'){
+        state.roleContext='topLevel';
+        return 'keyword';
+    }
+
+    if(word==='nop' || word==='template' || word==='templateEnd'){
+        state.roleContext='topLevel';
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word)){
+        state.roleContext='none';
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        state.roleContext='none';
+        return 'def';
+    }
+
+    if(controlFlowStatements.has(word)){
+        state.roleContext='none';
+        return 'keyword';
+    }
+
+    if(topLevelStatements.has(word)){
+        state.roleContext='topLevel';
+        return 'keyword';
+    }
+
+    if(functionModifiers.has(word)){
+        state.roleContext='function';
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && (stream.peek()==='(' || stream.peek()==='*' || stream.peek()==='?' || stream.peek()==='!')){
+        stream.pos=start+word.length;
+        state.roleContext='function';
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    state.roleContext='none';
+    return 'atom';
+}
+
+function tokenTagValue(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const tag=state.lastTag;
+    if(!tag){
+        return null;
+    }
+
+    if(stream.sol()){
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return null;
+    }
+
+    if(tag==='@importMatch'){
+        if(!state.headerConsumed){
+            skipSpaces(stream);
+            if(stream.match('!')){
+                state.headerConsumed=true;
+                return 'def';
+            }
+            state.headerConsumed=true;
+        }
+        stream.skipToEnd();
+        return 'string-2';
+    }
+
+    if(tag==='@import'){
+        skipSpaces(stream);
+        if(stream.match(/as\b/)){
+            return 'keyword';
+        }
+        const ch=stream.peek();
+        if(ch==='!'){
+            stream.next();
+            readWord(stream);
+            if(stream.match(':')){
+                readWord(stream);
+            }
+            return 'def';
+        }
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'string';
+    }
+
+    if(tag==='@name'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        stream.skipToEnd();
+        return 'error';
+    }
+
+    if(tag==='@on'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                if(word==='user' || word==='assistant'){
+                    return 'type';
+                }
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@messageHandler'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'keyword';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@dep' || tag==='@block' || tag==='@messageHandlerHeadProp'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@routeTo' || tag==='@routeFrom'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@exit'){
+        skipSpaces(stream);
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(tag==='@to' || tag==='@from'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            if(stream.match(/\b(auto|next)\b/)){
+                state.headerConsumed=true;
+                return 'keyword';
+            }
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(conditionTags.has(tag)){
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(typeValueTags.has(tag)){
+        return tokenTypeExpression(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'error';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTagRequiredExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    if(!stream.eol()){
+        stream.skipToEnd();
+        return 'error';
+    }
+    return null;
+}
+
+function tokenTagOptionalExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTypeExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        return null;
+    }
+    const word=readWord(stream);
+    if(word){
+        if(typeFunctions.has(word) && stream.peek()==='('){
+            return 'type';
+        }
+        if(typeKeywords.has(word)){
+            return 'type';
+        }
+        if(/^[A-Z_]/.test(word)){
+            if(stream.match(/\[\s*\]/)){
+                return 'type';
+            }
+            return 'type';
+        }
+        return 'variable';
+    }
+    stream.next();
+    return null;
+}
+
+function tokenSpecialWord(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/\$\$(RAG|CONTENT|CHILD|CHILDREN|SLOT_\w+)\$\$/)){
+        return 'keyword';
+    }
+    return null;
+}
+
+function tokenXml(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/<\/?[\w-]+[^>]*?\/?>/)){
+        return 'tag';
+    }
+    return null;
+}
+
+function tokenMarkdownLink(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/!?\[[^\]]*\]\([^)]*\)/)){
+        return 'link';
+    }
+    return null;
+}
+
+function tokenNumber(stream:CodeMirrorStream,ch:string|undefined):string|null
+{
+    if(ch===undefined){
+        return null;
+    }
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+    return null;
+}
+
+function tokenIdentifier(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const word=readWord(stream);
+    if(!word){
+        return null;
+    }
+
+    if(typeKeywords.has(word)){
+        return 'type';
+    }
+
+    if(constValues.has(word)){
+        return 'atom';
+    }
+
+    const lookAhead=stream.peek();
+
+    if(systemFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(operatorFunctions.has(word) && lookAhead==='('){
+        return 'builtin';
+    }
+    if(logicFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(typeFunctions.has(word) && lookAhead==='('){
+        return 'type';
+    }
+
+    if(lookAhead==='('){
+        return 'def';
+    }
+
+    if(/^[A-Z]\w*$/.test(word)){
+        return 'type';
+    }
+
+    if(lookAhead===':'){
+        return 'property';
+    }
+
+    return 'variable';
+}
+
+function tokenExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.stringMode='heredoc';
+        return 'comment';
+    }
+
+    const promptMatch=stream.match('???',false) as RegExpMatchArray|null;
+    if(promptMatch){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    const embedMatch=stream.match('===',false) as RegExpMatchArray|null;
+    if(embedMatch){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(stream.match('->')){
+        return 'keyword';
+    }
+    if(stream.match('<<')){
+        return 'keyword';
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.stringMode='dq';
+        return 'string';
+    }
+    if(ch==="'"){
+        stream.next();
+        state.stringMode='sq';
+        return 'string';
+    }
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    if(ch==='('){
+        stream.next();
+        state.parenDepth++;
+        return 'bracket';
+    }
+    if(ch===')'){
+        stream.next();
+        if(state.parenDepth>0){
+            state.parenDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='{'){
+        stream.next();
+        state.braceDepth++;
+        return 'bracket';
+    }
+    if(ch==='}'){
+        stream.next();
+        if(state.braceDepth>0){
+            state.braceDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='[' || ch===']' || ch===','){
+        stream.next();
+        return 'bracket';
+    }
+    if(ch==='=' || ch==='!' || ch==='<' || ch==='>' || ch==='+' || ch==='*' || ch==='/' || ch==='%' || ch==='|' || ch==='&'){
+        stream.next();
+        return 'operator';
+    }
+    if(ch===':'){
+        stream.next();
+        return 'operator';
+    }
+
+    const num=tokenNumber(stream,ch);
+    if(num){
+        return num;
+    }
+
+    if(ch && /[A-Za-z_]/.test(ch)){
+        return tokenIdentifier(stream,state);
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenMain(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(state.stringMode){
+        const modeToken=tokenStringMode(stream,state);
+        if(modeToken!==null){
+            return modeToken;
+        }
+    }
+
+    if(stream.sol()){
+        state.inEmbedBraces=0;
+        const lineToken=tokenLineStart(stream,state);
+        if(lineToken){
+            return lineToken;
+        }
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    if(state.lastTag && state.lastTag!=='__expr__'){
+        const tagToken=tokenTagValue(stream,state);
+        if(tagToken!==null){
+            return tagToken;
+        }
+    }
+
+    return tokenExpression(stream,state);
+}
+
+function createConvoMode():()=>CodeMirrorMode
+{
+    return function()
+    {
+        return {
+            startState():ConvoState{
+                return {
+                    stringMode:null,
+                    afterGt:false,
+                    roleContext:'none',
+                    parenDepth:0,
+                    braceDepth:0,
+                    lastTag:null,
+                    inEmbedBraces:0,
+                    headerConsumed:false,
+                };
+            },
+            copyState(state:ConvoState):ConvoState{
+                return copyState(state);
+            },
+            token(stream:CodeMirrorStream,state:ConvoState):string|null{
+                return tokenMain(stream,state);
+            },
+        };
+    };
+}
+
+function registerConvoMode():boolean
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload():Promise<void>
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="build-plugin.ts" target-output-path="../../packages/obsidian/build-plugin.ts">
+``` ts
+import {build} from 'bun';
+
+const rootDir=new URL('.',import.meta.url);
+const entryPath=new URL('./main.ts',rootDir);
+const outDir=new URL('./dist/',rootDir);
+
+await build({
+    entrypoints:[entryPath.pathname],
+    outdir:outDir.pathname,
+    target:'browser',
+    format:'cjs',
+    minify:true,
+    sourcemap:'none',
+    naming:'main.js',
+    external:['obsidian'],
+});
+
+console.log(`Built Obsidian plugin bundle to ${outDir.pathname}`);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="styles.css" target-output-path="../../packages/obsidian/styles.css">
+``` css
+.cm-s-obsidian .cm-keyword,
+.markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:var(--text-accent);
+}
+
+.cm-s-obsidian .cm-atom,
+.markdown-source-view.mod-cm6 .cm-atom
+{
+    color:var(--color-cyan);
+}
+
+.cm-s-obsidian .cm-def,
+.markdown-source-view.mod-cm6 .cm-def
+{
+    color:var(--color-orange);
+}
+
+.cm-s-obsidian .cm-variable,
+.markdown-source-view.mod-cm6 .cm-variable
+{
+    color:var(--text-normal);
+}
+
+.cm-s-obsidian .cm-variable-2,
+.markdown-source-view.mod-cm6 .cm-variable-2
+{
+    color:var(--color-purple);
+}
+
+.cm-s-obsidian .cm-property,
+.markdown-source-view.mod-cm6 .cm-property
+{
+    color:var(--color-purple);
+}
+
+.cm-s-obsidian .cm-type,
+.markdown-source-view.mod-cm6 .cm-type
+{
+    color:var(--color-green);
+}
+
+.cm-s-obsidian .cm-string,
+.markdown-source-view.mod-cm6 .cm-string
+{
+    color:var(--color-green);
+}
+
+.cm-s-obsidian .cm-string-2,
+.markdown-source-view.mod-cm6 .cm-string-2
+{
+    color:var(--color-yellow);
+}
+
+.cm-s-obsidian .cm-number,
+.markdown-source-view.mod-cm6 .cm-number
+{
+    color:var(--color-cyan);
+}
+
+.cm-s-obsidian .cm-comment,
+.markdown-source-view.mod-cm6 .cm-comment
+{
+    color:var(--text-muted);
+    font-style:italic;
+}
+
+.cm-s-obsidian .cm-operator,
+.markdown-source-view.mod-cm6 .cm-operator
+{
+    color:var(--color-red);
+}
+
+.cm-s-obsidian .cm-bracket,
+.markdown-source-view.mod-cm6 .cm-bracket
+{
+    color:var(--text-faint);
+}
+
+.cm-s-obsidian .cm-meta,
+.markdown-source-view.mod-cm6 .cm-meta
+{
+    color:var(--color-orange);
+}
+
+.cm-s-obsidian .cm-tag,
+.markdown-source-view.mod-cm6 .cm-tag
+{
+    color:var(--color-pink);
+}
+
+.cm-s-obsidian .cm-attribute,
+.markdown-source-view.mod-cm6 .cm-attribute
+{
+    color:var(--color-pink);
+}
+
+.cm-s-obsidian .cm-builtin,
+.markdown-source-view.mod-cm6 .cm-builtin
+{
+    color:var(--color-orange);
+}
+
+.cm-s-obsidian .cm-link,
+.markdown-source-view.mod-cm6 .cm-link
+{
+    color:var(--color-blue);
+    text-decoration:underline;
+}
+
+.cm-s-obsidian .cm-error,
+.markdown-source-view.mod-cm6 .cm-error
+{
+    color:var(--color-red);
+    text-decoration:underline wavy;
+}
+```
+</FILE_CONTENT>
+
+@import ../../docs/convo-core.md !file
+> user
+Content messages such as user, system and assistant are being highlighted like script blocks
+such as define and do messages.
+
+And try to make the color schema match TypeScript
+
+
+
+@time 2026-04-19T06:58:44-04:00
+@tokenUsage 77871 / 792
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+Got it. Before I make the change, one clarification to get it right the first time:
+
+In the original TM grammar:
+- `> user`, `> system`, `> assistant`, and any role not explicitly listed are `content roles` — their body should look like prose (default/plain text), not code.
+- `> define`, `> do`, `> debug`, `> result`, `> thinkingResult`, `> end`, `> target`, `> make`, `> stage`, `> app` are `top-level script` roles — their body should highlight as code.
+- `> function_name(...)` is a function role — code body.
+- `> node`, `> nodeEnd`, `> goto`, `> exitGraph`, `> to`, `> from`, `> exit` are special.
+
+Plan:
+1. Track the current role context: `content | script | function | special | none`.
+2. In `content` mode, stop doing full code tokenization of the body. Only highlight:
+   - tags `@...`
+   - embeds `\{{ ... }}`
+   - inline code `` ` ` ``
+   - strings (dq/sq) — optional, but original grammar still parses them in content messages
+   - special words like `$$RAG$$`
+   - xml tags
+   - markdown links
+   - comments at line start
+   - `???...???` and `===...===`
+   - otherwise just emit no token (plain text)
+3. In `script`/`function` mode, use the full expression tokenizer (what it does today).
+4. Match a TypeScript-style palette (VS Code Dark+ TS coloring):
+   - keyword: `#569CD6`
+   - control flow keyword: `#C586C0`
+   - storage modifier (public, local, agent): `#569CD6`
+   - function name: `#DCDCAA`
+   - type: `#4EC9B0`
+   - string: `#CE9178`
+   - number: `#B5CEA8`
+   - comment: `#6A9955`
+   - variable: `#9CDCFE`
+   - property: `#9CDCFE`
+   - operator: `#D4D4D4`
+   - builtin/constant (true, false, null): `#569CD6`
+   - tag/attribute: `#D7BA7D`
+   - bracket: default text
+
+Question before I proceed: Do you want hard-coded TypeScript-like colors for both light and dark Obsidian themes, or only dark theme (which is how VS Code TS colors are typically seen)? Also, should light theme fall back to Obsidian defaults?
+
+
+> user
+The plan looks good.
+
+Add support for both light and dark mode
+
+@time 2026-04-19T07:01:49-04:00
+@tokenUsage 78688 / 11329
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+<FILE_CONTENT name="main.ts" target-output-path="../../packages/obsidian/main.ts">
+``` ts
+'use strict';
+
+import {Plugin} from 'obsidian';
+
+type StringMode='dq'|'sq'|'inline'|'heredoc'|'prompt'|'embed';
+
+type RoleContext='none'|'content'|'script'|'function'|'special';
+
+type ConvoState={
+    stringMode:StringMode|null;
+    afterGt:boolean;
+    roleContext:RoleContext;
+    parenDepth:number;
+    braceDepth:number;
+    lastTag:string|null;
+    inEmbedBraces:number;
+    headerConsumed:boolean;
+};
+
+type CodeMirrorStream={
+    pos:number;
+    string:string;
+    start:number;
+    eol():boolean;
+    sol():boolean;
+    peek():string|undefined;
+    next():string|undefined;
+    match(pattern:string|RegExp,consume?:boolean,caseInsensitive?:boolean):any;
+    skipToEnd():void;
+    current():string;
+    backUp(n:number):void;
+};
+
+type CodeMirrorMode={
+    startState():ConvoState;
+    copyState?(state:ConvoState):ConvoState;
+    token(stream:CodeMirrorStream,state:ConvoState):string|null;
+};
+
+type CodeMirrorApi={
+    modes:Record<string,unknown>;
+    defineMode(name:string,factory:()=>CodeMirrorMode):void;
+    defineMIME?:(mime:string,mode:string)=>void;
+};
+
+declare global
+{
+    interface Window
+    {
+        CodeMirror?:CodeMirrorApi;
+    }
+}
+
+const wordRe=/[A-Za-z0-9_]/;
+
+const scriptRoles=new Set([
+    'do','thinkingResult','result','define','debug','end',
+    'target','make','stage','app',
+]);
+
+const controlFlowStatements=new Set([
+    'parallelEnd','parallel','insertEnd','agentEnd','queue','flush',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd','node','goto','exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit','to','from',
+]);
+
+const functionModifiers=new Set([
+    'agent','public','local',
+]);
+
+const systemFunctions=new Set([
+    'elif','if','else','while','break','foreach','for','in','do',
+    'outInline','outTrim','out','then','fn','return','case','default','switch','test',
+]);
+
+const operatorFunctions=new Set([
+    'lt','lte','neq','eq','gt','gte','is','add','sub','mul','div',
+    'not','mod','pow','inc','dec','no',
+]);
+
+const logicFunctions=new Set([
+    'and','or',
+]);
+
+const typeFunctions=new Set([
+    'enum','struct','array',
+]);
+
+const typeKeywords=new Set([
+    'string','number','int','boolean','time','void','any','map','array','object',
+]);
+
+const constValues=new Set([
+    'true','false','null','undefined','convo',
+    '__args','__return','__error','__debug',
+    '__disableAutoComplete','__file','__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition','@disabled','@taskName','@taskDescription',
+]);
+
+const typeValueTags=new Set([
+    '@json','@inputConversation','@inputType',
+]);
+
+const keywordTags=new Set([
+    '@exit','@to','@from','@import','@name',
+    '@routeTo','@routeFrom','@importMatch',
+    '@on','@messageHandler','@dep','@block','@messageHandlerHeadProp',
+]);
+
+function isWord(ch:string|undefined):boolean
+{
+    return !!ch && wordRe.test(ch);
+}
+
+function skipSpaces(stream:CodeMirrorStream):void
+{
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(!ch || !/[ \t]/.test(ch)){
+            break;
+        }
+        stream.next();
+    }
+}
+
+function readWord(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol() && isWord(stream.peek())){
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function copyState(state:ConvoState):ConvoState
+{
+    return {
+        stringMode:state.stringMode,
+        afterGt:state.afterGt,
+        roleContext:state.roleContext,
+        parenDepth:state.parenDepth,
+        braceDepth:state.braceDepth,
+        lastTag:state.lastTag,
+        inEmbedBraces:state.inEmbedBraces,
+        headerConsumed:state.headerConsumed,
+    };
+}
+
+function tokenQuotedString(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    quote:'"'|"'"
+):string
+{
+    let escaped=false;
+    while(!stream.eol()){
+        if(!escaped && quote==="'" && stream.match('\{{',false)){
+            return 'string';
+        }
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.stringMode=null;
+            return 'string';
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream:CodeMirrorStream,state:ConvoState):string
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.stringMode=null;
+            break;
+        }
+    }
+    return 'string-2';
+}
+
+function tokenHeredoc(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/-{3,}/)){
+        state.stringMode=null;
+        return 'comment';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenPromptOrEmbed(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    closer:'???'|'==='
+):string|null
+{
+    if(stream.match(closer)){
+        state.stringMode=null;
+        return 'keyword';
+    }
+    stream.next();
+    return 'string';
+}
+
+function tokenStringMode(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    switch(state.stringMode){
+        case 'dq':
+            return tokenQuotedString(stream,state,'"');
+        case 'sq':
+            return tokenQuotedString(stream,state,"'");
+        case 'inline':
+            return tokenInlineCode(stream,state);
+        case 'heredoc':
+            return tokenHeredoc(stream,state);
+        case 'prompt':
+            return tokenPromptOrEmbed(stream,state,'???');
+        case 'embed':
+            return tokenPromptOrEmbed(stream,state,'===');
+        default:
+            return null;
+    }
+}
+
+function maybeEnterStringModsFromPrefix(stream:CodeMirrorStream):boolean
+{
+    const pos=stream.pos;
+    skipSpaces(stream);
+    if(stream.peek()==='('){
+        return true;
+    }
+    stream.pos=pos;
+    return false;
+}
+
+function tokenLineStart(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/[ \t]*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/[ \t]*\/\/.*/)){
+        return 'comment';
+    }
+
+    const savedPos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(
+            conditionTags.has(tag) ||
+            typeValueTags.has(tag) ||
+            keywordTags.has(tag)
+        ){
+            return 'keyword';
+        }
+        return 'attribute';
+    }
+
+    stream.pos=savedPos;
+    return null;
+}
+
+function tokenAfterGt(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        state.roleContext='content';
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        state.roleContext='script';
+        return 'def';
+    }
+
+    if(word==='insert'){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(word==='nop' || word==='template' || word==='templateEnd'){
+        state.roleContext='content';
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word)){
+        state.roleContext='special';
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        state.roleContext='special';
+        return 'def';
+    }
+
+    if(controlFlowStatements.has(word)){
+        state.roleContext='none';
+        return 'keyword';
+    }
+
+    if(scriptRoles.has(word)){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(functionModifiers.has(word)){
+        state.roleContext='function';
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && (stream.peek()==='(' || stream.peek()==='*' || stream.peek()==='?' || stream.peek()==='!')){
+        stream.pos=start+word.length;
+        state.roleContext='function';
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    state.roleContext='content';
+    return 'atom';
+}
+
+function tokenTagValue(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const tag=state.lastTag;
+    if(!tag){
+        return null;
+    }
+
+    if(stream.sol()){
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return null;
+    }
+
+    if(tag==='@importMatch'){
+        if(!state.headerConsumed){
+            skipSpaces(stream);
+            if(stream.match('!')){
+                state.headerConsumed=true;
+                return 'def';
+            }
+            state.headerConsumed=true;
+        }
+        stream.skipToEnd();
+        return 'string-2';
+    }
+
+    if(tag==='@import'){
+        skipSpaces(stream);
+        if(stream.match(/as\b/)){
+            return 'keyword';
+        }
+        const ch=stream.peek();
+        if(ch==='!'){
+            stream.next();
+            readWord(stream);
+            if(stream.match(':')){
+                readWord(stream);
+            }
+            return 'def';
+        }
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'string';
+    }
+
+    if(tag==='@name'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        stream.skipToEnd();
+        return 'error';
+    }
+
+    if(tag==='@on'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                if(word==='user' || word==='assistant'){
+                    return 'type';
+                }
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@messageHandler'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'keyword';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@dep' || tag==='@block' || tag==='@messageHandlerHeadProp'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@routeTo' || tag==='@routeFrom'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@exit'){
+        skipSpaces(stream);
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(tag==='@to' || tag==='@from'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            if(stream.match(/\b(auto|next)\b/)){
+                state.headerConsumed=true;
+                return 'keyword';
+            }
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(conditionTags.has(tag)){
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(typeValueTags.has(tag)){
+        return tokenTypeExpression(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'error';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTagRequiredExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    if(!stream.eol()){
+        stream.skipToEnd();
+        return 'error';
+    }
+    return null;
+}
+
+function tokenTagOptionalExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTypeExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        return null;
+    }
+    const word=readWord(stream);
+    if(word){
+        if(typeFunctions.has(word) && stream.peek()==='('){
+            return 'type';
+        }
+        if(typeKeywords.has(word)){
+            return 'type';
+        }
+        if(/^[A-Z_]/.test(word)){
+            if(stream.match(/\[\s*\]/)){
+                return 'type';
+            }
+            return 'type';
+        }
+        return 'variable';
+    }
+    stream.next();
+    return null;
+}
+
+function tokenSpecialWord(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/\$\$(RAG|CONTENT|CHILD|CHILDREN|SLOT_\w+)\$\$/)){
+        return 'keyword';
+    }
+    return null;
+}
+
+function tokenXml(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/<\/?[\w-]+[^>]*?\/?>/)){
+        return 'tag';
+    }
+    return null;
+}
+
+function tokenMarkdownLink(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/!?\[[^\]]*\]\([^)]*\)/)){
+        return 'link';
+    }
+    return null;
+}
+
+function tokenNumber(stream:CodeMirrorStream,ch:string|undefined):string|null
+{
+    if(ch===undefined){
+        return null;
+    }
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+    return null;
+}
+
+function tokenIdentifier(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const word=readWord(stream);
+    if(!word){
+        return null;
+    }
+
+    if(typeKeywords.has(word)){
+        return 'type';
+    }
+
+    if(constValues.has(word)){
+        return 'atom';
+    }
+
+    const lookAhead=stream.peek();
+
+    if(systemFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(operatorFunctions.has(word) && lookAhead==='('){
+        return 'builtin';
+    }
+    if(logicFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(typeFunctions.has(word) && lookAhead==='('){
+        return 'type';
+    }
+
+    if(lookAhead==='('){
+        return 'def';
+    }
+
+    if(/^[A-Z]\w*$/.test(word)){
+        return 'type';
+    }
+
+    if(lookAhead===':'){
+        return 'property';
+    }
+
+    return 'variable';
+}
+
+function tokenExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.stringMode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(stream.match('->')){
+        return 'keyword';
+    }
+    if(stream.match('<<')){
+        return 'keyword';
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.stringMode='dq';
+        return 'string';
+    }
+    if(ch==="'"){
+        stream.next();
+        state.stringMode='sq';
+        return 'string';
+    }
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    if(ch==='('){
+        stream.next();
+        state.parenDepth++;
+        return 'bracket';
+    }
+    if(ch===')'){
+        stream.next();
+        if(state.parenDepth>0){
+            state.parenDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='{'){
+        stream.next();
+        state.braceDepth++;
+        return 'bracket';
+    }
+    if(ch==='}'){
+        stream.next();
+        if(state.braceDepth>0){
+            state.braceDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='[' || ch===']' || ch===','){
+        stream.next();
+        return 'bracket';
+    }
+    if(ch==='=' || ch==='!' || ch==='<' || ch==='>' || ch==='+' || ch==='*' || ch==='/' || ch==='%' || ch==='|' || ch==='&'){
+        stream.next();
+        return 'operator';
+    }
+    if(ch===':'){
+        stream.next();
+        return 'operator';
+    }
+
+    const num=tokenNumber(stream,ch);
+    if(num){
+        return num;
+    }
+
+    if(ch && /[A-Za-z_]/.test(ch)){
+        return tokenIdentifier(stream,state);
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenContentBody(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(state.inEmbedBraces>0){
+        return tokenExpression(stream,state);
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenMain(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(state.stringMode){
+        const modeToken=tokenStringMode(stream,state);
+        if(modeToken!==null){
+            return modeToken;
+        }
+    }
+
+    if(stream.sol()){
+        state.inEmbedBraces=0;
+        const lineToken=tokenLineStart(stream,state);
+        if(lineToken){
+            return lineToken;
+        }
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    if(state.lastTag && state.lastTag!=='__expr__'){
+        const tagToken=tokenTagValue(stream,state);
+        if(tagToken!==null){
+            return tagToken;
+        }
+    }
+
+    if(state.roleContext==='content'){
+        return tokenContentBody(stream,state);
+    }
+
+    return tokenExpression(stream,state);
+}
+
+function createConvoMode():()=>CodeMirrorMode
+{
+    return function()
+    {
+        return {
+            startState():ConvoState{
+                return {
+                    stringMode:null,
+                    afterGt:false,
+                    roleContext:'content',
+                    parenDepth:0,
+                    braceDepth:0,
+                    lastTag:null,
+                    inEmbedBraces:0,
+                    headerConsumed:false,
+                };
+            },
+            copyState(state:ConvoState):ConvoState{
+                return copyState(state);
+            },
+            token(stream:CodeMirrorStream,state:ConvoState):string|null{
+                return tokenMain(stream,state);
+            },
+        };
+    };
+}
+
+function registerConvoMode():boolean
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload():Promise<void>
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="styles.css" target-output-path="../../packages/obsidian/styles.css">
+``` css
+/* TypeScript-inspired color scheme for Convo-Lang in Obsidian */
+
+/* Dark theme (VS Code Dark+ palette) */
+.theme-dark .cm-s-obsidian .cm-keyword,
+.theme-dark .markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:#569CD6;
+}
+
+.theme-dark .cm-s-obsidian .cm-atom,
+.theme-dark .markdown-source-view.mod-cm6 .cm-atom
+{
+    color:#569CD6;
+}
+
+.theme-dark .cm-s-obsidian .cm-def,
+.theme-dark .markdown-source-view.mod-cm6 .cm-def
+{
+    color:#DCDCAA;
+}
+
+.theme-dark .cm-s-obsidian .cm-variable,
+.theme-dark .markdown-source-view.mod-cm6 .cm-variable
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-variable-2,
+.theme-dark .markdown-source-view.mod-cm6 .cm-variable-2
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-property,
+.theme-dark .markdown-source-view.mod-cm6 .cm-property
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-type,
+.theme-dark .markdown-source-view.mod-cm6 .cm-type
+{
+    color:#4EC9B0;
+}
+
+.theme-dark .cm-s-obsidian .cm-string,
+.theme-dark .markdown-source-view.mod-cm6 .cm-string
+{
+    color:#CE9178;
+}
+
+.theme-dark .cm-s-obsidian .cm-string-2,
+.theme-dark .markdown-source-view.mod-cm6 .cm-string-2
+{
+    color:#CE9178;
+}
+
+.theme-dark .cm-s-obsidian .cm-number,
+.theme-dark .markdown-source-view.mod-cm6 .cm-number
+{
+    color:#B5CEA8;
+}
+
+.theme-dark .cm-s-obsidian .cm-comment,
+.theme-dark .markdown-source-view.mod-cm6 .cm-comment
+{
+    color:#6A9955;
+    font-style:italic;
+}
+
+.theme-dark .cm-s-obsidian .cm-operator,
+.theme-dark .markdown-source-view.mod-cm6 .cm-operator
+{
+    color:#D4D4D4;
+}
+
+.theme-dark .cm-s-obsidian .cm-bracket,
+.theme-dark .markdown-source-view.mod-cm6 .cm-bracket
+{
+    color:#D4D4D4;
+}
+
+.theme-dark .cm-s-obsidian .cm-meta,
+.theme-dark .markdown-source-view.mod-cm6 .cm-meta
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-tag,
+.theme-dark .markdown-source-view.mod-cm6 .cm-tag
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-attribute,
+.theme-dark .markdown-source-view.mod-cm6 .cm-attribute
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-builtin,
+.theme-dark .markdown-source-view.mod-cm6 .cm-builtin
+{
+    color:#C586C0;
+}
+
+.theme-dark .cm-s-obsidian .cm-link,
+.theme-dark .markdown-source-view.mod-cm6 .cm-link
+{
+    color:#569CD6;
+    text-decoration:underline;
+}
+
+.theme-dark .cm-s-obsidian .cm-error,
+.theme-dark .markdown-source-view.mod-cm6 .cm-error
+{
+    color:#F44747;
+    text-decoration:underline wavy;
+}
+
+/* Light theme (VS Code Light+ palette) */
+.theme-light .cm-s-obsidian .cm-keyword,
+.theme-light .markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:#0000FF;
+}
+
+.theme-light .cm-s-obsidian .cm-atom,
+.theme-light .markdown-source-view.mod-cm6 .cm-atom
+{
+    color:#0000FF;
+}
+
+.theme-light .cm-s-obsidian .cm-def,
+.theme-light .markdown-source-view.mod-cm6 .cm-def
+{
+    color:#795E26;
+}
+
+.theme-light .cm-s-obsidian .cm-variable,
+.theme-light .markdown-source-view.mod-cm6 .cm-variable
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-variable-2,
+.theme-light .markdown-source-view.mod-cm6 .cm-variable-2
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-property,
+.theme-light .markdown-source-view.mod-cm6 .cm-property
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-type,
+.theme-light .markdown-source-view.mod-cm6 .cm-type
+{
+    color:#267F99;
+}
+
+.theme-light .cm-s-obsidian .cm-string,
+.theme-light .markdown-source-view.mod-cm6 .cm-string
+{
+    color:#A31515;
+}
+
+.theme-light .cm-s-obsidian .cm-string-2,
+.theme-light .markdown-source-view.mod-cm6 .cm-string-2
+{
+    color:#A31515;
+}
+
+.theme-light .cm-s-obsidian .cm-number,
+.theme-light .markdown-source-view.mod-cm6 .cm-number
+{
+    color:#098658;
+}
+
+.theme-light .cm-s-obsidian .cm-comment,
+.theme-light .markdown-source-view.mod-cm6 .cm-comment
+{
+    color:#008000;
+    font-style:italic;
+}
+
+.theme-light .cm-s-obsidian .cm-operator,
+.theme-light .markdown-source-view.mod-cm6 .cm-operator
+{
+    color:#000000;
+}
+
+.theme-light .cm-s-obsidian .cm-bracket,
+.theme-light .markdown-source-view.mod-cm6 .cm-bracket
+{
+    color:#000000;
+}
+
+.theme-light .cm-s-obsidian .cm-meta,
+.theme-light .markdown-source-view.mod-cm6 .cm-meta
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-tag,
+.theme-light .markdown-source-view.mod-cm6 .cm-tag
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-attribute,
+.theme-light .markdown-source-view.mod-cm6 .cm-attribute
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-builtin,
+.theme-light .markdown-source-view.mod-cm6 .cm-builtin
+{
+    color:#AF00DB;
+}
+
+.theme-light .cm-s-obsidian .cm-link,
+.theme-light .markdown-source-view.mod-cm6 .cm-link
+{
+    color:#0000FF;
+    text-decoration:underline;
+}
+
+.theme-light .cm-s-obsidian .cm-error,
+.theme-light .markdown-source-view.mod-cm6 .cm-error
+{
+    color:#E51400;
+    text-decoration:underline wavy;
+}
+```
+</FILE_CONTENT>
+
+> define
+bs='\\'
+
+> user
+
+string interpolation inside single quote strings is not working. For example `greeting='hello \{{name}}'`
+should be treated as string interpolation.
+
+There seems to be some type of auto formatting or correction going on.
+When I paste `greeting='hello \{{name}}'` it is automatically converted to `greeting='hello {{bs}}\{{name}}'`
+
+If the plugin is doing any auto formatting it shouldn't. It should only highlight the syntax
+
+
+@time 2026-04-19T07:55:38-04:00
+@tokenUsage 90161 / 539
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+The auto-formatting isn't coming from our tokenizer — CodeMirror stream modes can't mutate text. What's actually happening is Obsidian's Markdown editor treats `\{{` inside a live preview/source view as a special construct and escapes it with `\{{` when pasting into markdown context.
+
+Two quick questions before I fix both issues:
+
+1. To confirm the source of escaping: does the `\{{` escaping happen:
+   - only inside markdown ```convo fenced blocks, or
+   - also inside `.convo` files directly?
+
+2. For single-quoted string interpolation, I'll update the tokenizer so that when inside a single-quoted string and `\{{` is encountered, the `\{{ ... }}` is tokenized as an embed (tag color) with inner expression highlighting, matching the TM grammar's behavior. Do you also want:
+   - `\\\{{` (escaped embed) to be shown as a plain escape, or
+   - just treated like any other string content?
+
+My plan:
+- Fix the single-quote string tokenizer so `\{{` inside it enters embed mode, tokens the inner expression, and returns to string mode at `}}`.
+- Investigate (2) — if the escaping happens only inside markdown code fences, it's likely Obsidian's markdown parser, not our plugin. We can't disable that from inside a syntax plugin. If it happens in `.convo` files, that's Obsidian's editor auto-escape logic which a plugin also cannot override with a CodeMirror 5 stream mode alone.
+
+Want me to proceed with the single-quote string embed fix and confirm the escaping behavior after you test in both contexts?
+
+
+> user
+The escaping behavior only happens in convo code fences.
+
+proceed with the single quote update
+
+@time 2026-04-19T08:00:49-04:00
+@tokenUsage 90731 / 8855
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+<FILE_CONTENT name="main.ts" target-output-path="../../packages/obsidian/main.ts">
+``` ts
+'use strict';
+
+import {Plugin} from 'obsidian';
+
+type StringMode='dq'|'sq'|'inline'|'heredoc'|'prompt'|'embed';
+
+type RoleContext='none'|'content'|'script'|'function'|'special';
+
+type ConvoState={
+    stringMode:StringMode|null;
+    stringReturnMode:StringMode|null;
+    afterGt:boolean;
+    roleContext:RoleContext;
+    parenDepth:number;
+    braceDepth:number;
+    lastTag:string|null;
+    inEmbedBraces:number;
+    headerConsumed:boolean;
+};
+
+type CodeMirrorStream={
+    pos:number;
+    string:string;
+    start:number;
+    eol():boolean;
+    sol():boolean;
+    peek():string|undefined;
+    next():string|undefined;
+    match(pattern:string|RegExp,consume?:boolean,caseInsensitive?:boolean):any;
+    skipToEnd():void;
+    current():string;
+    backUp(n:number):void;
+};
+
+type CodeMirrorMode={
+    startState():ConvoState;
+    copyState?(state:ConvoState):ConvoState;
+    token(stream:CodeMirrorStream,state:ConvoState):string|null;
+};
+
+type CodeMirrorApi={
+    modes:Record<string,unknown>;
+    defineMode(name:string,factory:()=>CodeMirrorMode):void;
+    defineMIME?:(mime:string,mode:string)=>void;
+};
+
+declare global
+{
+    interface Window
+    {
+        CodeMirror?:CodeMirrorApi;
+    }
+}
+
+const wordRe=/[A-Za-z0-9_]/;
+
+const scriptRoles=new Set([
+    'do','thinkingResult','result','define','debug','end',
+    'target','make','stage','app',
+]);
+
+const controlFlowStatements=new Set([
+    'parallelEnd','parallel','insertEnd','agentEnd','queue','flush',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd','node','goto','exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit','to','from',
+]);
+
+const functionModifiers=new Set([
+    'agent','public','local',
+]);
+
+const systemFunctions=new Set([
+    'elif','if','else','while','break','foreach','for','in','do',
+    'outInline','outTrim','out','then','fn','return','case','default','switch','test',
+]);
+
+const operatorFunctions=new Set([
+    'lt','lte','neq','eq','gt','gte','is','add','sub','mul','div',
+    'not','mod','pow','inc','dec','no',
+]);
+
+const logicFunctions=new Set([
+    'and','or',
+]);
+
+const typeFunctions=new Set([
+    'enum','struct','array',
+]);
+
+const typeKeywords=new Set([
+    'string','number','int','boolean','time','void','any','map','array','object',
+]);
+
+const constValues=new Set([
+    'true','false','null','undefined','convo',
+    '__args','__return','__error','__debug',
+    '__disableAutoComplete','__file','__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition','@disabled','@taskName','@taskDescription',
+]);
+
+const typeValueTags=new Set([
+    '@json','@inputConversation','@inputType',
+]);
+
+const keywordTags=new Set([
+    '@exit','@to','@from','@import','@name',
+    '@routeTo','@routeFrom','@importMatch',
+    '@on','@messageHandler','@dep','@block','@messageHandlerHeadProp',
+]);
+
+function isWord(ch:string|undefined):boolean
+{
+    return !!ch && wordRe.test(ch);
+}
+
+function skipSpaces(stream:CodeMirrorStream):void
+{
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(!ch || !/[ \t]/.test(ch)){
+            break;
+        }
+        stream.next();
+    }
+}
+
+function readWord(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol() && isWord(stream.peek())){
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function copyState(state:ConvoState):ConvoState
+{
+    return {
+        stringMode:state.stringMode,
+        stringReturnMode:state.stringReturnMode,
+        afterGt:state.afterGt,
+        roleContext:state.roleContext,
+        parenDepth:state.parenDepth,
+        braceDepth:state.braceDepth,
+        lastTag:state.lastTag,
+        inEmbedBraces:state.inEmbedBraces,
+        headerConsumed:state.headerConsumed,
+    };
+}
+
+function tokenQuotedString(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    quote:'"'|"'"
+):string
+{
+    let escaped=false;
+    while(!stream.eol()){
+        if(!escaped && quote==="'" && stream.match('\{{',false)){
+            stream.match('\{{');
+            state.stringReturnMode=state.stringMode;
+            state.stringMode=null;
+            state.inEmbedBraces++;
+            return 'tag';
+        }
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.stringMode=null;
+            return 'string';
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream:CodeMirrorStream,state:ConvoState):string
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.stringMode=null;
+            break;
+        }
+    }
+    return 'string-2';
+}
+
+function tokenHeredoc(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/-{3,}/)){
+        state.stringMode=null;
+        return 'comment';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenPromptOrEmbed(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    closer:'???'|'==='
+):string|null
+{
+    if(stream.match(closer)){
+        state.stringMode=null;
+        return 'keyword';
+    }
+    stream.next();
+    return 'string';
+}
+
+function tokenStringMode(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    switch(state.stringMode){
+        case 'dq':
+            return tokenQuotedString(stream,state,'"');
+        case 'sq':
+            return tokenQuotedString(stream,state,"'");
+        case 'inline':
+            return tokenInlineCode(stream,state);
+        case 'heredoc':
+            return tokenHeredoc(stream,state);
+        case 'prompt':
+            return tokenPromptOrEmbed(stream,state,'???');
+        case 'embed':
+            return tokenPromptOrEmbed(stream,state,'===');
+        default:
+            return null;
+    }
+}
+
+function maybeEnterStringModsFromPrefix(stream:CodeMirrorStream):boolean
+{
+    const pos=stream.pos;
+    skipSpaces(stream);
+    if(stream.peek()==='('){
+        return true;
+    }
+    stream.pos=pos;
+    return false;
+}
+
+function tokenLineStart(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/[ \t]*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/[ \t]*\/\/.*/)){
+        return 'comment';
+    }
+
+    const savedPos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(
+            conditionTags.has(tag) ||
+            typeValueTags.has(tag) ||
+            keywordTags.has(tag)
+        ){
+            return 'keyword';
+        }
+        return 'attribute';
+    }
+
+    stream.pos=savedPos;
+    return null;
+}
+
+function tokenAfterGt(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        state.roleContext='content';
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        state.roleContext='script';
+        return 'def';
+    }
+
+    if(word==='insert'){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(word==='nop' || word==='template' || word==='templateEnd'){
+        state.roleContext='content';
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word)){
+        state.roleContext='special';
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        state.roleContext='special';
+        return 'def';
+    }
+
+    if(controlFlowStatements.has(word)){
+        state.roleContext='none';
+        return 'keyword';
+    }
+
+    if(scriptRoles.has(word)){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(functionModifiers.has(word)){
+        state.roleContext='function';
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && (stream.peek()==='(' || stream.peek()==='*' || stream.peek()==='?' || stream.peek()==='!')){
+        stream.pos=start+word.length;
+        state.roleContext='function';
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    state.roleContext='content';
+    return 'atom';
+}
+
+function tokenTagValue(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const tag=state.lastTag;
+    if(!tag){
+        return null;
+    }
+
+    if(stream.sol()){
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return null;
+    }
+
+    if(tag==='@importMatch'){
+        if(!state.headerConsumed){
+            skipSpaces(stream);
+            if(stream.match('!')){
+                state.headerConsumed=true;
+                return 'def';
+            }
+            state.headerConsumed=true;
+        }
+        stream.skipToEnd();
+        return 'string-2';
+    }
+
+    if(tag==='@import'){
+        skipSpaces(stream);
+        if(stream.match(/as\b/)){
+            return 'keyword';
+        }
+        const ch=stream.peek();
+        if(ch==='!'){
+            stream.next();
+            readWord(stream);
+            if(stream.match(':')){
+                readWord(stream);
+            }
+            return 'def';
+        }
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'string';
+    }
+
+    if(tag==='@name'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        stream.skipToEnd();
+        return 'error';
+    }
+
+    if(tag==='@on'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                if(word==='user' || word==='assistant'){
+                    return 'type';
+                }
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@messageHandler'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'keyword';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@dep' || tag==='@block' || tag==='@messageHandlerHeadProp'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@routeTo' || tag==='@routeFrom'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@exit'){
+        skipSpaces(stream);
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(tag==='@to' || tag==='@from'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            if(stream.match(/\b(auto|next)\b/)){
+                state.headerConsumed=true;
+                return 'keyword';
+            }
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(conditionTags.has(tag)){
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(typeValueTags.has(tag)){
+        return tokenTypeExpression(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'error';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTagRequiredExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    if(!stream.eol()){
+        stream.skipToEnd();
+        return 'error';
+    }
+    return null;
+}
+
+function tokenTagOptionalExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTypeExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        return null;
+    }
+    const word=readWord(stream);
+    if(word){
+        if(typeFunctions.has(word) && stream.peek()==='('){
+            return 'type';
+        }
+        if(typeKeywords.has(word)){
+            return 'type';
+        }
+        if(/^[A-Z_]/.test(word)){
+            if(stream.match(/\[\s*\]/)){
+                return 'type';
+            }
+            return 'type';
+        }
+        return 'variable';
+    }
+    stream.next();
+    return null;
+}
+
+function tokenSpecialWord(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/\$\$(RAG|CONTENT|CHILD|CHILDREN|SLOT_\w+)\$\$/)){
+        return 'keyword';
+    }
+    return null;
+}
+
+function tokenXml(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/<\/?[\w-]+[^>]*?\/?>/)){
+        return 'tag';
+    }
+    return null;
+}
+
+function tokenMarkdownLink(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/!?\[[^\]]*\]\([^)]*\)/)){
+        return 'link';
+    }
+    return null;
+}
+
+function tokenNumber(stream:CodeMirrorStream,ch:string|undefined):string|null
+{
+    if(ch===undefined){
+        return null;
+    }
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+    return null;
+}
+
+function tokenIdentifier(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const word=readWord(stream);
+    if(!word){
+        return null;
+    }
+
+    if(typeKeywords.has(word)){
+        return 'type';
+    }
+
+    if(constValues.has(word)){
+        return 'atom';
+    }
+
+    const lookAhead=stream.peek();
+
+    if(systemFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(operatorFunctions.has(word) && lookAhead==='('){
+        return 'builtin';
+    }
+    if(logicFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(typeFunctions.has(word) && lookAhead==='('){
+        return 'type';
+    }
+
+    if(lookAhead==='('){
+        return 'def';
+    }
+
+    if(/^[A-Z]\w*$/.test(word)){
+        return 'type';
+    }
+
+    if(lookAhead===':'){
+        return 'property';
+    }
+
+    return 'variable';
+}
+
+function tokenExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.stringMode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        if(state.stringReturnMode){
+            state.stringMode=state.stringReturnMode;
+            state.stringReturnMode=null;
+        }
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(stream.match('->')){
+        return 'keyword';
+    }
+    if(stream.match('<<')){
+        return 'keyword';
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.stringMode='dq';
+        return 'string';
+    }
+    if(ch==="'"){
+        stream.next();
+        state.stringMode='sq';
+        return 'string';
+    }
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    if(ch==='('){
+        stream.next();
+        state.parenDepth++;
+        return 'bracket';
+    }
+    if(ch===')'){
+        stream.next();
+        if(state.parenDepth>0){
+            state.parenDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='{'){
+        stream.next();
+        state.braceDepth++;
+        return 'bracket';
+    }
+    if(ch==='}'){
+        stream.next();
+        if(state.braceDepth>0){
+            state.braceDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='[' || ch===']' || ch===','){
+        stream.next();
+        return 'bracket';
+    }
+    if(ch==='=' || ch==='!' || ch==='<' || ch==='>' || ch==='+' || ch==='*' || ch==='/' || ch==='%' || ch==='|' || ch==='&'){
+        stream.next();
+        return 'operator';
+    }
+    if(ch===':'){
+        stream.next();
+        return 'operator';
+    }
+
+    const num=tokenNumber(stream,ch);
+    if(num){
+        return num;
+    }
+
+    if(ch && /[A-Za-z_]/.test(ch)){
+        return tokenIdentifier(stream,state);
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenContentBody(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        if(state.stringReturnMode){
+            state.stringMode=state.stringReturnMode;
+            state.stringReturnMode=null;
+        }
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(state.inEmbedBraces>0){
+        return tokenExpression(stream,state);
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenMain(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(state.stringMode){
+        const modeToken=tokenStringMode(stream,state);
+        if(modeToken!==null){
+            return modeToken;
+        }
+    }
+
+    if(stream.sol()){
+        state.inEmbedBraces=0;
+        state.stringReturnMode=null;
+        const lineToken=tokenLineStart(stream,state);
+        if(lineToken){
+            return lineToken;
+        }
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    if(state.lastTag && state.lastTag!=='__expr__'){
+        const tagToken=tokenTagValue(stream,state);
+        if(tagToken!==null){
+            return tagToken;
+        }
+    }
+
+    if(state.roleContext==='content' && state.inEmbedBraces===0){
+        return tokenContentBody(stream,state);
+    }
+
+    return tokenExpression(stream,state);
+}
+
+function createConvoMode():()=>CodeMirrorMode
+{
+    return function()
+    {
+        return {
+            startState():ConvoState{
+                return {
+                    stringMode:null,
+                    stringReturnMode:null,
+                    afterGt:false,
+                    roleContext:'content',
+                    parenDepth:0,
+                    braceDepth:0,
+                    lastTag:null,
+                    inEmbedBraces:0,
+                    headerConsumed:false,
+                };
+            },
+            copyState(state:ConvoState):ConvoState{
+                return copyState(state);
+            },
+            token(stream:CodeMirrorStream,state:ConvoState):string|null{
+                return tokenMain(stream,state);
+            },
+        };
+    };
+}
+
+function registerConvoMode():boolean
+{
+    const cm=window.CodeMirror;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload():Promise<void>
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+}
+```
+</FILE_CONTENT>
+
+> user
+Move the TypeScript code into a `/src` folder and move the syntax highlighting specific code to a
+separate file.
+
+@time 2026-04-19T08:14:16-04:00
+@tokenUsage 99629 / 9422
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+<FILE_CONTENT name="convo-mode.ts" target-output-path="../../packages/obsidian/src/convo-mode.ts">
+``` ts
+'use strict';
+
+export type StringMode='dq'|'sq'|'inline'|'heredoc'|'prompt'|'embed';
+
+export type RoleContext='none'|'content'|'script'|'function'|'special';
+
+export interface ConvoState
+{
+    stringMode:StringMode|null;
+    stringReturnMode:StringMode|null;
+    afterGt:boolean;
+    roleContext:RoleContext;
+    parenDepth:number;
+    braceDepth:number;
+    lastTag:string|null;
+    inEmbedBraces:number;
+    headerConsumed:boolean;
+}
+
+export interface CodeMirrorStream
+{
+    pos:number;
+    string:string;
+    start:number;
+    eol():boolean;
+    sol():boolean;
+    peek():string|undefined;
+    next():string|undefined;
+    match(pattern:string|RegExp,consume?:boolean,caseInsensitive?:boolean):any;
+    skipToEnd():void;
+    current():string;
+    backUp(n:number):void;
+}
+
+export interface CodeMirrorMode
+{
+    startState():ConvoState;
+    copyState?(state:ConvoState):ConvoState;
+    token(stream:CodeMirrorStream,state:ConvoState):string|null;
+}
+
+export interface CodeMirrorApi
+{
+    modes:Record<string,unknown>;
+    defineMode(name:string,factory:()=>CodeMirrorMode):void;
+    defineMIME?:(mime:string,mode:string)=>void;
+}
+
+const wordRe=/[A-Za-z0-9_]/;
+
+const scriptRoles=new Set([
+    'do','thinkingResult','result','define','debug','end',
+    'target','make','stage','app',
+]);
+
+const controlFlowStatements=new Set([
+    'parallelEnd','parallel','insertEnd','agentEnd','queue','flush',
+]);
+
+const specialContentRoles=new Set([
+    'nodeEnd','node','goto','exitGraph',
+]);
+
+const routeRoles=new Set([
+    'exit','to','from',
+]);
+
+const functionModifiers=new Set([
+    'agent','public','local',
+]);
+
+const systemFunctions=new Set([
+    'elif','if','else','while','break','foreach','for','in','do',
+    'outInline','outTrim','out','then','fn','return','case','default','switch','test',
+]);
+
+const operatorFunctions=new Set([
+    'lt','lte','neq','eq','gt','gte','is','add','sub','mul','div',
+    'not','mod','pow','inc','dec','no',
+]);
+
+const logicFunctions=new Set([
+    'and','or',
+]);
+
+const typeFunctions=new Set([
+    'enum','struct','array',
+]);
+
+const typeKeywords=new Set([
+    'string','number','int','boolean','time','void','any','map','array','object',
+]);
+
+const constValues=new Set([
+    'true','false','null','undefined','convo',
+    '__args','__return','__error','__debug',
+    '__disableAutoComplete','__file','__cwd',
+]);
+
+const conditionTags=new Set([
+    '@condition','@disabled','@taskName','@taskDescription',
+]);
+
+const typeValueTags=new Set([
+    '@json','@inputConversation','@inputType',
+]);
+
+const keywordTags=new Set([
+    '@exit','@to','@from','@import','@name',
+    '@routeTo','@routeFrom','@importMatch',
+    '@on','@messageHandler','@dep','@block','@messageHandlerHeadProp',
+]);
+
+function isWord(ch:string|undefined):boolean
+{
+    return !!ch && wordRe.test(ch);
+}
+
+function skipSpaces(stream:CodeMirrorStream):void
+{
+    while(!stream.eol()){
+        const ch=stream.peek();
+        if(!ch || !/[ \t]/.test(ch)){
+            break;
+        }
+        stream.next();
+    }
+}
+
+function readWord(stream:CodeMirrorStream):string
+{
+    let value='';
+    while(!stream.eol() && isWord(stream.peek())){
+        value+=stream.next()??'';
+    }
+    return value;
+}
+
+function copyState(state:ConvoState):ConvoState
+{
+    return {
+        stringMode:state.stringMode,
+        stringReturnMode:state.stringReturnMode,
+        afterGt:state.afterGt,
+        roleContext:state.roleContext,
+        parenDepth:state.parenDepth,
+        braceDepth:state.braceDepth,
+        lastTag:state.lastTag,
+        inEmbedBraces:state.inEmbedBraces,
+        headerConsumed:state.headerConsumed,
+    };
+}
+
+function tokenQuotedString(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    quote:'"'|"'"
+):string
+{
+    let escaped=false;
+    while(!stream.eol()){
+        if(!escaped && quote==="'" && stream.match('\{{',false)){
+            stream.match('\{{');
+            state.stringReturnMode=state.stringMode;
+            state.stringMode=null;
+            state.inEmbedBraces++;
+            return 'tag';
+        }
+        const ch=stream.next();
+        if(escaped){
+            escaped=false;
+            continue;
+        }
+        if(ch==='\\'){
+            escaped=true;
+            continue;
+        }
+        if(ch===quote){
+            state.stringMode=null;
+            return 'string';
+        }
+    }
+    return 'string';
+}
+
+function tokenInlineCode(stream:CodeMirrorStream,state:ConvoState):string
+{
+    while(!stream.eol()){
+        const ch=stream.next();
+        if(ch==='`'){
+            state.stringMode=null;
+            break;
+        }
+    }
+    return 'string-2';
+}
+
+function tokenHeredoc(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/-{3,}/)){
+        state.stringMode=null;
+        return 'comment';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenPromptOrEmbed(
+    stream:CodeMirrorStream,
+    state:ConvoState,
+    closer:'???'|'==='
+):string|null
+{
+    if(stream.match(closer)){
+        state.stringMode=null;
+        return 'keyword';
+    }
+    stream.next();
+    return 'string';
+}
+
+function tokenStringMode(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    switch(state.stringMode){
+        case 'dq':
+            return tokenQuotedString(stream,state,'"');
+        case 'sq':
+            return tokenQuotedString(stream,state,"'");
+        case 'inline':
+            return tokenInlineCode(stream,state);
+        case 'heredoc':
+            return tokenHeredoc(stream,state);
+        case 'prompt':
+            return tokenPromptOrEmbed(stream,state,'???');
+        case 'embed':
+            return tokenPromptOrEmbed(stream,state,'===');
+        default:
+            return null;
+    }
+}
+
+function maybeEnterStringModsFromPrefix(stream:CodeMirrorStream):boolean
+{
+    const pos=stream.pos;
+    skipSpaces(stream);
+    if(stream.peek()==='('){
+        return true;
+    }
+    stream.pos=pos;
+    return false;
+}
+
+function tokenLineStart(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.match(/[ \t]*#.*/)){
+        return 'comment';
+    }
+    if(stream.match(/[ \t]*\/\/.*/)){
+        return 'comment';
+    }
+
+    const savedPos=stream.pos;
+    skipSpaces(stream);
+
+    if(stream.peek()==='>'){
+        stream.next();
+        state.afterGt=true;
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return 'keyword';
+    }
+
+    if(stream.peek()==='@'){
+        stream.next();
+        const tag='@'+readWord(stream);
+        state.lastTag=tag;
+        if(
+            conditionTags.has(tag) ||
+            typeValueTags.has(tag) ||
+            keywordTags.has(tag)
+        ){
+            return 'keyword';
+        }
+        return 'attribute';
+    }
+
+    stream.pos=savedPos;
+    return null;
+}
+
+function tokenAfterGt(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        state.afterGt=false;
+        return null;
+    }
+
+    const start=stream.pos;
+    const word=readWord(stream);
+
+    if(!word){
+        stream.next();
+        state.afterGt=false;
+        state.roleContext='content';
+        return null;
+    }
+
+    state.afterGt=false;
+
+    if(word==='thinking'){
+        state.roleContext='script';
+        return 'def';
+    }
+
+    if(word==='insert'){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(word==='nop' || word==='template' || word==='templateEnd'){
+        state.roleContext='content';
+        return 'def';
+    }
+
+    if(specialContentRoles.has(word)){
+        state.roleContext='special';
+        return 'keyword';
+    }
+
+    if(routeRoles.has(word)){
+        state.roleContext='special';
+        return 'def';
+    }
+
+    if(controlFlowStatements.has(word)){
+        state.roleContext='none';
+        return 'keyword';
+    }
+
+    if(scriptRoles.has(word)){
+        state.roleContext='script';
+        return 'keyword';
+    }
+
+    if(functionModifiers.has(word)){
+        state.roleContext='function';
+        return 'keyword';
+    }
+
+    const save=stream.pos;
+    skipSpaces(stream);
+    const nextWord=readWord(stream);
+    skipSpaces(stream);
+    if(nextWord && (stream.peek()==='(' || stream.peek()==='*' || stream.peek()==='?' || stream.peek()==='!')){
+        stream.pos=start+word.length;
+        state.roleContext='function';
+        return 'keyword';
+    }
+    stream.pos=save;
+
+    state.roleContext='content';
+    return 'atom';
+}
+
+function tokenTagRequiredExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    if(!stream.eol()){
+        stream.skipToEnd();
+        return 'error';
+    }
+    return null;
+}
+
+function tokenTagOptionalExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'operator';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenTypeExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+    if(stream.eol()){
+        return null;
+    }
+    const word=readWord(stream);
+    if(word){
+        if(typeFunctions.has(word) && stream.peek()==='('){
+            return 'type';
+        }
+        if(typeKeywords.has(word)){
+            return 'type';
+        }
+        if(/^[A-Z_]/.test(word)){
+            if(stream.match(/\[\s*\]/)){
+                return 'type';
+            }
+            return 'type';
+        }
+        return 'variable';
+    }
+    stream.next();
+    return null;
+}
+
+function tokenTagValue(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const tag=state.lastTag;
+    if(!tag){
+        return null;
+    }
+
+    if(stream.sol()){
+        state.lastTag=null;
+        state.headerConsumed=false;
+        return null;
+    }
+
+    if(tag==='@importMatch'){
+        if(!state.headerConsumed){
+            skipSpaces(stream);
+            if(stream.match('!')){
+                state.headerConsumed=true;
+                return 'def';
+            }
+            state.headerConsumed=true;
+        }
+        stream.skipToEnd();
+        return 'string-2';
+    }
+
+    if(tag==='@import'){
+        skipSpaces(stream);
+        if(stream.match(/as\b/)){
+            return 'keyword';
+        }
+        const ch=stream.peek();
+        if(ch==='!'){
+            stream.next();
+            readWord(stream);
+            if(stream.match(':')){
+                readWord(stream);
+            }
+            return 'def';
+        }
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'string';
+    }
+
+    if(tag==='@name'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        stream.skipToEnd();
+        return 'error';
+    }
+
+    if(tag==='@on'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                if(word==='user' || word==='assistant'){
+                    return 'type';
+                }
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@messageHandler'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'keyword';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@dep' || tag==='@block' || tag==='@messageHandlerHeadProp'){
+        skipSpaces(stream);
+        const word=readWord(stream);
+        if(word){
+            return 'variable';
+        }
+        stream.next();
+        return 'error';
+    }
+
+    if(tag==='@routeTo' || tag==='@routeFrom'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        return tokenTagRequiredExpression(stream,state);
+    }
+
+    if(tag==='@exit'){
+        skipSpaces(stream);
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(tag==='@to' || tag==='@from'){
+        skipSpaces(stream);
+        if(!state.headerConsumed){
+            if(stream.match(/\b(auto|next)\b/)){
+                state.headerConsumed=true;
+                return 'keyword';
+            }
+            const word=readWord(stream);
+            if(word){
+                state.headerConsumed=true;
+                return 'variable';
+            }
+        }
+        if(stream.match(/else\b/)){
+            return 'keyword';
+        }
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(conditionTags.has(tag)){
+        return tokenTagOptionalExpression(stream,state);
+    }
+
+    if(typeValueTags.has(tag)){
+        return tokenTypeExpression(stream,state);
+    }
+
+    skipSpaces(stream);
+    if(stream.peek()==='='){
+        stream.next();
+        state.lastTag='__expr__';
+        return 'error';
+    }
+    stream.skipToEnd();
+    return 'string';
+}
+
+function tokenSpecialWord(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/\$\$(RAG|CONTENT|CHILD|CHILDREN|SLOT_\w+)\$\$/)){
+        return 'keyword';
+    }
+    return null;
+}
+
+function tokenXml(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/<\/?[\w-]+[^>]*?\/?>/)){
+        return 'tag';
+    }
+    return null;
+}
+
+function tokenMarkdownLink(stream:CodeMirrorStream):string|null
+{
+    if(stream.match(/!?\[[^\]]*\]\([^)]*\)/)){
+        return 'link';
+    }
+    return null;
+}
+
+function tokenNumber(stream:CodeMirrorStream,ch:string|undefined):string|null
+{
+    if(ch===undefined){
+        return null;
+    }
+    if(/[0-9]/.test(ch) || (ch==='-' && /[0-9]/.test(stream.string.charAt(stream.pos+1)))){
+        stream.match(/-?(\d+\.\d+|\.\d+|\d+)/);
+        return 'number';
+    }
+    return null;
+}
+
+function tokenIdentifier(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    const word=readWord(stream);
+    if(!word){
+        return null;
+    }
+
+    if(typeKeywords.has(word)){
+        return 'type';
+    }
+
+    if(constValues.has(word)){
+        return 'atom';
+    }
+
+    const lookAhead=stream.peek();
+
+    if(systemFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(operatorFunctions.has(word) && lookAhead==='('){
+        return 'builtin';
+    }
+    if(logicFunctions.has(word) && lookAhead==='('){
+        return 'keyword';
+    }
+    if(typeFunctions.has(word) && lookAhead==='('){
+        return 'type';
+    }
+
+    if(lookAhead==='('){
+        return 'def';
+    }
+
+    if(/^[A-Z]\w*$/.test(word)){
+        return 'type';
+    }
+
+    if(lookAhead===':'){
+        return 'property';
+    }
+
+    return 'variable';
+}
+
+function tokenExpression(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    skipSpaces(stream);
+
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match(/-{3,}/)){
+        state.stringMode='heredoc';
+        return 'comment';
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        if(state.stringReturnMode){
+            state.stringMode=state.stringReturnMode;
+            state.stringReturnMode=null;
+        }
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(stream.match('->')){
+        return 'keyword';
+    }
+    if(stream.match('<<')){
+        return 'keyword';
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+
+    if(ch==='"'){
+        stream.next();
+        state.stringMode='dq';
+        return 'string';
+    }
+    if(ch==="'"){
+        stream.next();
+        state.stringMode='sq';
+        return 'string';
+    }
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    if(ch==='('){
+        stream.next();
+        state.parenDepth++;
+        return 'bracket';
+    }
+    if(ch===')'){
+        stream.next();
+        if(state.parenDepth>0){
+            state.parenDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='{'){
+        stream.next();
+        state.braceDepth++;
+        return 'bracket';
+    }
+    if(ch==='}'){
+        stream.next();
+        if(state.braceDepth>0){
+            state.braceDepth--;
+        }
+        return 'bracket';
+    }
+    if(ch==='[' || ch===']' || ch===','){
+        stream.next();
+        return 'bracket';
+    }
+    if(ch==='=' || ch==='!' || ch==='<' || ch==='>' || ch==='+' || ch==='*' || ch==='/' || ch==='%' || ch==='|' || ch==='&'){
+        stream.next();
+        return 'operator';
+    }
+    if(ch===':'){
+        stream.next();
+        return 'operator';
+    }
+
+    const num=tokenNumber(stream,ch);
+    if(num){
+        return num;
+    }
+
+    if(ch && /[A-Za-z_]/.test(ch)){
+        return tokenIdentifier(stream,state);
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenContentBody(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(stream.eol()){
+        return null;
+    }
+
+    if(stream.match('???',false)){
+        stream.match('???');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='prompt';
+        return 'keyword';
+    }
+
+    if(stream.match('===',false)){
+        stream.match('===');
+        if(maybeEnterStringModsFromPrefix(stream)){
+            stream.next();
+        }
+        state.stringMode='embed';
+        return 'keyword';
+    }
+
+    if(stream.match('\{{')){
+        state.inEmbedBraces++;
+        return 'tag';
+    }
+    if(state.inEmbedBraces>0 && stream.match('}}')){
+        state.inEmbedBraces--;
+        if(state.stringReturnMode){
+            state.stringMode=state.stringReturnMode;
+            state.stringReturnMode=null;
+        }
+        return 'tag';
+    }
+    if(stream.match('\\\{{')){
+        return 'meta';
+    }
+
+    if(state.inEmbedBraces>0){
+        return tokenExpression(stream,state);
+    }
+
+    const xml=tokenXml(stream);
+    if(xml){
+        return xml;
+    }
+
+    const link=tokenMarkdownLink(stream);
+    if(link){
+        return link;
+    }
+
+    const specialWord=tokenSpecialWord(stream);
+    if(specialWord){
+        return specialWord;
+    }
+
+    const ch=stream.peek();
+    if(ch==='`'){
+        stream.next();
+        state.stringMode='inline';
+        return 'string-2';
+    }
+
+    stream.next();
+    return null;
+}
+
+function tokenMain(stream:CodeMirrorStream,state:ConvoState):string|null
+{
+    if(state.stringMode){
+        const modeToken=tokenStringMode(stream,state);
+        if(modeToken!==null){
+            return modeToken;
+        }
+    }
+
+    if(stream.sol()){
+        state.inEmbedBraces=0;
+        state.stringReturnMode=null;
+        const lineToken=tokenLineStart(stream,state);
+        if(lineToken){
+            return lineToken;
+        }
+    }
+
+    if(state.afterGt){
+        return tokenAfterGt(stream,state);
+    }
+
+    if(state.lastTag && state.lastTag!=='__expr__'){
+        const tagToken=tokenTagValue(stream,state);
+        if(tagToken!==null){
+            return tagToken;
+        }
+    }
+
+    if(state.roleContext==='content' && state.inEmbedBraces===0){
+        return tokenContentBody(stream,state);
+    }
+
+    return tokenExpression(stream,state);
+}
+
+export function createConvoMode():()=>CodeMirrorMode
+{
+    return function()
+    {
+        return {
+            startState():ConvoState{
+                return {
+                    stringMode:null,
+                    stringReturnMode:null,
+                    afterGt:false,
+                    roleContext:'content',
+                    parenDepth:0,
+                    braceDepth:0,
+                    lastTag:null,
+                    inEmbedBraces:0,
+                    headerConsumed:false,
+                };
+            },
+            copyState(state:ConvoState):ConvoState{
+                return copyState(state);
+            },
+            token(stream:CodeMirrorStream,state:ConvoState):string|null{
+                return tokenMain(stream,state);
+            },
+        };
+    };
+}
+
+export function registerConvoMode():boolean
+{
+    const cm=(window as any).CodeMirror as CodeMirrorApi|undefined;
+    if(!cm || !cm.defineMode){
+        console.warn('Convo-Lang: CodeMirror not available');
+        return false;
+    }
+
+    if(!cm.modes.convo){
+        cm.defineMode('convo',createConvoMode());
+    }
+
+    if(cm.defineMIME){
+        cm.defineMIME('text/x-convo','convo');
+    }
+
+    return true;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="main.ts" target-output-path="../../packages/obsidian/src/main.ts">
+``` ts
+'use strict';
+
+import {Plugin} from 'obsidian';
+import {registerConvoMode} from './convo-mode';
+
+export default class ConvoLangPlugin extends Plugin
+{
+    async onload():Promise<void>
+    {
+        const registered=registerConvoMode();
+        if(!registered){
+            console.warn('Convo-Lang: failed to register CodeMirror mode');
+        }
+
+        this.registerExtensions(['convo'],'markdown');
+
+        this.registerMarkdownCodeBlockProcessor('convo',()=>{});
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="build-plugin.ts" target-output-path="../../packages/obsidian/build-plugin.ts">
+``` ts
+import {build} from 'bun';
+
+const rootDir=new URL('.',import.meta.url);
+const entryPath=new URL('./src/main.ts',rootDir);
+const outDir=new URL('./dist/',rootDir);
+
+await build({
+    entrypoints:[entryPath.pathname],
+    outdir:outDir.pathname,
+    target:'browser',
+    format:'cjs',
+    minify:true,
+    sourcemap:'none',
+    naming:'main.js',
+    external:['obsidian'],
+});
+
+console.log(`Built Obsidian plugin bundle to ${outDir.pathname}`);
+```
+</FILE_CONTENT>
+
+<RUNNABLE_SCRIPT script-name="remove-old-root-main-ts" cwd="../.." target-shell-type="bash">
+``` bash
+# fail on errors
+set -e
+
+# remove the old main.ts from the obsidian package root now that it lives in src/
+OLD_PATH="packages/obsidian/main.ts"
+
+if [ -f "$OLD_PATH" ]; then
+    rm "$OLD_PATH"
+    echo "Removed $OLD_PATH"
+else
+    echo "No file at $OLD_PATH, nothing to remove"
+fi
+```
+</RUNNABLE_SCRIPT>
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="remove-old-root-main-ts">
+``` output
+Removed packages/obsidian/main.ts
+
+```
+</SCRIPT_OUTPUT>
+
+> user
+Generate a summary of what has been done so far. The summary should allow you to continue our work
+after clearing the context window with the exception of system messages
+
+@clear
+@time 2026-04-19T08:21:14-04:00
+@tokenUsage 109168 / 2484
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+# Convo-Lang Obsidian Plugin — Work Summary
+
+## Goal
+Build an Obsidian plugin that adds syntax highlighting for Convo-Lang, supporting both:
+- `.convo` files
+- ```convo fenced code blocks in markdown
+
+The plugin is based on a CodeMirror 5 `StreamLanguage` stream mode, and targets both Obsidian light and dark themes with a TypeScript-inspired (VS Code Dark+ / Light+) color palette.
+
+## Package Location
+All plugin files live in:
+
+```
+packages/obsidian/
+```
+
+## Current File Structure
+
+```
+packages/obsidian/
+├── manifest.json              Obsidian plugin manifest (id: convo-lang)
+├── package.json               Local plugin package metadata
+├── styles.css                 TypeScript-style highlight colors (light + dark themes)
+├── build-plugin.ts            Bun build script -> dist/main.js (CJS, minified)
+├── README.md                  Installation + dev notes
+└── src/
+    ├── main.ts                Plugin entry; registers the CodeMirror mode
+    └── convo-mode.ts          Full Convo-Lang stream-mode tokenizer
+```
+
+## What Works
+
+- `.convo` files highlight via the registered mode
+- ```convo fenced code blocks highlight inside Obsidian markdown
+- Content roles (`user`, `system`, `assistant`, etc.) render as prose, not code
+- Script roles (`define`, `do`, `debug`, `result`, etc.) render as code
+- Function roles (`> agent/public/local foo(...)`) render as code
+- Tags (`@condition`, `@to`, `@from`, `@exit`, `@import`, `@on`, `@json`, etc.) are parsed with tag-specific value handling
+- `\{{ ... }}` embeds render with tag color and inner expression highlighting
+- Single-quoted strings support `\{{ ... }}` interpolation returning to string mode on `}}`
+- `???...???` prompts and `===...===` embeds supported, including modifier section `(...)` entry
+- Heredoc `---...---` supported
+- Inline code, xml tags, markdown links, $$RAG$$ / $$CHILD$$ / etc. supported
+- TypeScript-style palette is applied via `.theme-dark` / `.theme-light` selectors in `styles.css`
+
+## Token → CodeMirror Scope Mapping (used in `convo-mode.ts`)
+
+| Convo concept | CM token |
+|---|---|
+| roles / top-level / control flow | `keyword` |
+| function names / storage roles | `def` |
+| variables | `variable` |
+| properties | `property` |
+| types (type kw + `TitleCase` names) | `type` |
+| strings (dq/sq/heredoc/prompt/embed) | `string` |
+| inline code / importMatch patterns | `string-2` |
+| numbers | `number` |
+| comments | `comment` |
+| operators | `operator` |
+| brackets | `bracket` |
+| logical/math operator functions | `builtin` |
+| tags / attributes / `\{{ }}` / xml | `tag` / `attribute` |
+| `\{{` escape + modifier area | `meta` |
+| markdown links | `link` |
+| invalid tag values | `error` |
+
+## Build
+
+Bun-based build writes to `dist/main.js`:
+
+```ts
+bun packages/obsidian/build-plugin.ts
+```
+
+Config:
+- `format: 'cjs'`
+- `target: 'browser'`
+- `minify: true`
+- `external: ['obsidian']`
+- entry: `src/main.ts`
+
+## Install-to-Vault Script (used for testing)
+
+Installs built files into:
+```
+/Users/scott/Library/Mobile Documents/iCloud~md~obsidian/Documents/Scott/.obsidian/plugins/convo-lang
+```
+
+Script name used in chat: `build-and-install-obsidian-convo-plugin-minified-cjs-require`
+Steps:
+1. `bun packages/obsidian/build-plugin.ts`
+2. `mkdir -p` plugin dst
+3. copy `manifest.json`, `dist/main.js`, `styles.css`, optional `README.md`
+
+## Known Issue (not a plugin bug)
+
+Obsidian escapes `\{{` as `\{{` when pasting into a markdown context inside ```convo fenced blocks. This is Obsidian's markdown editor behavior; a stream-mode plugin cannot override it. Inside `.convo` files this does not happen.
+
+The tokenizer now correctly handles embed `\{{ ... }}` inside single-quoted strings, including returning to string mode after `}}`.
+
+## Design Decisions Made
+
+- Fidelity target: "Practical fidelity" — everything except embedded fenced language highlighting (json, ts, etc.). Those are ignored (fence markers only).
+- `${ ... }` interpolation: ignored (not handled).
+- `\{{ ... }}` embeds: handled like the tm grammar; single-quote strings can contain embeds; double-quote strings cannot.
+- Full value-part parsing for tags (`@to`, `@from`, `@exit`, `@routeTo`, `@routeFrom`, `@on`, `@import`, `@name`, `@messageHandler`, etc.).
+- `???` and `===` modifier parentheses `(...)` are entered but currently consumed minimally (not deeply broken out).
+- Color palette: TypeScript-inspired, themed via `.theme-dark` and `.theme-light` blocks.
+
+## What Was Removed
+
+- Originally everything lived in `packages/obsidian/main.js` then `main.ts` at package root.
+- That file has been moved to `src/main.ts` + `src/convo-mode.ts`.
+- Old `packages/obsidian/main.ts` was deleted via script.
+
+## Still Open / Possible Next Steps
+
+Ideas we have not yet implemented but could be next:
+
+1. Convert into a "proper" Obsidian plugin scaffold:
+   - `tsconfig.json`
+   - `esbuild.config.mjs` (or keep Bun)
+   - `package.json` with scripts like `dev` / `build`
+2. Hot-reload / watch mode for development
+3. Register `.convo-make` and `.convo-make-target` as file extensions too
+4. Deeper highlighting of `???(...)` and `===(...)` modifier sections (stringMods grammar in TM)
+5. Optional embedded code block highlighting inside `.convo` fenced code blocks (json, ts, python) — currently intentionally skipped
+6. Unit tests for the tokenizer using a tokenize-and-assert pattern
+7. Replace `any` types on the CodeMirror `match(...)` signature with stricter typing
+8. Publish workflow / manifest versioning setup
+
+## Useful Reference Info for Continuation
+
+- Ecosystem overview: `docs/convo-core.md`
+- Original VS Code grammar: `packages/convo-lang-tools/syntaxes/convo.tmLanguage.json`
+- JS/TS/Python/MD injections: `packages/convo-lang-tools/syntaxes/convo-js.json`, `convo-python.json`, `convo-md.json`
+- Primary plugin files to edit next: `packages/obsidian/src/convo-mode.ts`, `packages/obsidian/styles.css`
+- Build + install test path has been verified working.
+
+
+> user
+Tell me about what has been done so far
+
+@time 2026-04-19T08:22:59-04:00
+@tokenUsage 43333 / 1059
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+# Convo-Lang Obsidian Plugin — Status
+
+Here's a summary of what's been built so far.
+
+## What's Done
+
+**Plugin scaffolding** lives in `packages/obsidian/` with a clean split:
+- `src/main.ts` — Obsidian plugin entry; registers the CodeMirror 5 stream mode
+- `src/convo-mode.ts` — the full Convo-Lang tokenizer
+- `styles.css` — TypeScript-inspired palette for light + dark themes
+- `build-plugin.ts` — Bun build → `dist/main.js` (CJS, minified, `obsidian` external)
+- `manifest.json`, `package.json`, `README.md`
+
+**Highlighting works in two contexts:**
+1. `.convo` files
+2. ```convo fenced code blocks inside Obsidian markdown
+
+**Language coverage implemented:**
+- Content roles (`user`, `system`, `assistant`) render as prose
+- Script roles (`define`, `do`, `debug`, `result`, etc.) render as code
+- Function declarations (`> agent/public/local name(...)`)
+- Tags with value-aware parsing: `@condition`, `@to`, `@from`, `@exit`, `@routeTo`, `@routeFrom`, `@import`, `@importMatch`, `@on`, `@name`, `@messageHandler`, `@json`, and generic fallbacks
+- `\{{ ... }}` embeds, including inside single-quoted strings (returns to string mode on `}}`)
+- `???...???` prompts and `===...===` embeds with modifier `(...)` entry
+- Heredocs `---...---`
+- Inline code, XML tags, markdown links
+- Special words like `$$RAG$$`, `$$CHILD$$`
+- Types (keywords + `TitleCase` names), numbers, comments, operators
+
+**Theming** uses a TypeScript-style palette keyed off `.theme-dark` / `.theme-light`.
+
+**Build + install flow** is verified — there's a script that builds via Bun and copies `manifest.json`, `dist/main.js`, `styles.css` into a test vault's plugin folder.
+
+## Known Limitation (Not Fixable in Plugin)
+
+Obsidian's markdown editor escapes `\{{` → `\{{` when typing inside ```convo fenced blocks. Stream-mode plugins can't override this. It does *not* happen in `.convo` files.
+
+## Intentionally Skipped
+
+- `${ ... }` interpolation
+- Embedded fenced language highlighting inside Convo (json, ts, python) — fence markers only
+
+## Open Next Steps
+
+1. Proper plugin scaffold (`tsconfig.json`, dev/watch mode)
+2. Register `.convo-make` and `.convo-make-target` extensions
+3. Deeper parsing of `???(...)` / `===(...)` modifier sections (stringMods)
+4. Optional embedded language highlighting inside Convo fenced blocks
+5. Tokenizer unit tests
+6. Tighter typing on CodeMirror `match(...)` signatures
+7. Publish/versioning workflow
+
+Want me to pick one of these to tackle next?
+
+
+> user

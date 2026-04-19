@@ -1,0 +1,237 @@
+/* TypeScript-inspired color scheme for Convo-Lang in Obsidian */
+
+/* Dark theme (VS Code Dark+ palette) */
+.theme-dark .cm-s-obsidian .cm-keyword,
+.theme-dark .markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:#569CD6;
+}
+
+.theme-dark .cm-s-obsidian .cm-atom,
+.theme-dark .markdown-source-view.mod-cm6 .cm-atom
+{
+    color:#569CD6;
+}
+
+.theme-dark .cm-s-obsidian .cm-def,
+.theme-dark .markdown-source-view.mod-cm6 .cm-def
+{
+    color:#DCDCAA;
+}
+
+.theme-dark .cm-s-obsidian .cm-variable,
+.theme-dark .markdown-source-view.mod-cm6 .cm-variable
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-variable-2,
+.theme-dark .markdown-source-view.mod-cm6 .cm-variable-2
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-property,
+.theme-dark .markdown-source-view.mod-cm6 .cm-property
+{
+    color:#9CDCFE;
+}
+
+.theme-dark .cm-s-obsidian .cm-type,
+.theme-dark .markdown-source-view.mod-cm6 .cm-type
+{
+    color:#4EC9B0;
+}
+
+.theme-dark .cm-s-obsidian .cm-string,
+.theme-dark .markdown-source-view.mod-cm6 .cm-string
+{
+    color:#CE9178;
+}
+
+.theme-dark .cm-s-obsidian .cm-string-2,
+.theme-dark .markdown-source-view.mod-cm6 .cm-string-2
+{
+    color:#CE9178;
+}
+
+.theme-dark .cm-s-obsidian .cm-number,
+.theme-dark .markdown-source-view.mod-cm6 .cm-number
+{
+    color:#B5CEA8;
+}
+
+.theme-dark .cm-s-obsidian .cm-comment,
+.theme-dark .markdown-source-view.mod-cm6 .cm-comment
+{
+    color:#6A9955;
+    font-style:italic;
+}
+
+.theme-dark .cm-s-obsidian .cm-operator,
+.theme-dark .markdown-source-view.mod-cm6 .cm-operator
+{
+    color:#D4D4D4;
+}
+
+.theme-dark .cm-s-obsidian .cm-bracket,
+.theme-dark .markdown-source-view.mod-cm6 .cm-bracket
+{
+    color:#D4D4D4;
+}
+
+.theme-dark .cm-s-obsidian .cm-meta,
+.theme-dark .markdown-source-view.mod-cm6 .cm-meta
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-tag,
+.theme-dark .markdown-source-view.mod-cm6 .cm-tag
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-attribute,
+.theme-dark .markdown-source-view.mod-cm6 .cm-attribute
+{
+    color:#D7BA7D;
+}
+
+.theme-dark .cm-s-obsidian .cm-builtin,
+.theme-dark .markdown-source-view.mod-cm6 .cm-builtin
+{
+    color:#C586C0;
+}
+
+.theme-dark .cm-s-obsidian .cm-link,
+.theme-dark .markdown-source-view.mod-cm6 .cm-link
+{
+    color:#569CD6;
+    text-decoration:underline;
+}
+
+.theme-dark .cm-s-obsidian .cm-error,
+.theme-dark .markdown-source-view.mod-cm6 .cm-error
+{
+    color:#F44747;
+    text-decoration:underline wavy;
+}
+
+/* Light theme (VS Code Light+ palette) */
+.theme-light .cm-s-obsidian .cm-keyword,
+.theme-light .markdown-source-view.mod-cm6 .cm-keyword
+{
+    color:#0000FF;
+}
+
+.theme-light .cm-s-obsidian .cm-atom,
+.theme-light .markdown-source-view.mod-cm6 .cm-atom
+{
+    color:#0000FF;
+}
+
+.theme-light .cm-s-obsidian .cm-def,
+.theme-light .markdown-source-view.mod-cm6 .cm-def
+{
+    color:#795E26;
+}
+
+.theme-light .cm-s-obsidian .cm-variable,
+.theme-light .markdown-source-view.mod-cm6 .cm-variable
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-variable-2,
+.theme-light .markdown-source-view.mod-cm6 .cm-variable-2
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-property,
+.theme-light .markdown-source-view.mod-cm6 .cm-property
+{
+    color:#001080;
+}
+
+.theme-light .cm-s-obsidian .cm-type,
+.theme-light .markdown-source-view.mod-cm6 .cm-type
+{
+    color:#267F99;
+}
+
+.theme-light .cm-s-obsidian .cm-string,
+.theme-light .markdown-source-view.mod-cm6 .cm-string
+{
+    color:#A31515;
+}
+
+.theme-light .cm-s-obsidian .cm-string-2,
+.theme-light .markdown-source-view.mod-cm6 .cm-string-2
+{
+    color:#A31515;
+}
+
+.theme-light .cm-s-obsidian .cm-number,
+.theme-light .markdown-source-view.mod-cm6 .cm-number
+{
+    color:#098658;
+}
+
+.theme-light .cm-s-obsidian .cm-comment,
+.theme-light .markdown-source-view.mod-cm6 .cm-comment
+{
+    color:#008000;
+    font-style:italic;
+}
+
+.theme-light .cm-s-obsidian .cm-operator,
+.theme-light .markdown-source-view.mod-cm6 .cm-operator
+{
+    color:#000000;
+}
+
+.theme-light .cm-s-obsidian .cm-bracket,
+.theme-light .markdown-source-view.mod-cm6 .cm-bracket
+{
+    color:#000000;
+}
+
+.theme-light .cm-s-obsidian .cm-meta,
+.theme-light .markdown-source-view.mod-cm6 .cm-meta
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-tag,
+.theme-light .markdown-source-view.mod-cm6 .cm-tag
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-attribute,
+.theme-light .markdown-source-view.mod-cm6 .cm-attribute
+{
+    color:#B58900;
+}
+
+.theme-light .cm-s-obsidian .cm-builtin,
+.theme-light .markdown-source-view.mod-cm6 .cm-builtin
+{
+    color:#AF00DB;
+}
+
+.theme-light .cm-s-obsidian .cm-link,
+.theme-light .markdown-source-view.mod-cm6 .cm-link
+{
+    color:#0000FF;
+    text-decoration:underline;
+}
+
+.theme-light .cm-s-obsidian .cm-error,
+.theme-light .markdown-source-view.mod-cm6 .cm-error
+{
+    color:#E51400;
+    text-decoration:underline wavy;
+}
