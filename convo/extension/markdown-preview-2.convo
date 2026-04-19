@@ -1,0 +1,1591 @@
+@import ./_extension.convo
+
+> user
+I would like extension to add syntax highlighting to Convo-Lang code fences in markdown previews.
+
+
+For example, the following should use the Convo-Lang syntax highlighting in markdown documents when opened in preview mode:
+``` convo
+\> user
+hi
+````
+
+@time 2026-04-19T10:55:20-04:00
+@tokenUsage 17778 / 89 / $0.044667500000000006
+@model gpt-5.4-2026-03-05
+> assistant
+Before I make the change, one quick question:
+
+Do you want this only for VS Code markdown preview rendering, or also for syntax highlighting in the markdown editor itself?
+
+From the files you shared, the markdown editor injection is already present via `syntaxes/convo-md.json`, so I suspect you specifically mean preview rendering. If so, I’ll wire the extension to register the `convo` fenced language with the markdown preview.
+
+
+> user
+Just for the preview. Highlighting in the editor is already implemented
+
+@time 2026-04-19T10:57:29-04:00
+@tokenUsage 17887 / 5224 / $0.0577775
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="b555d1ed59b2b9704bed2dde6ceca60d93f995ec">
+``` ts
+import * as path from 'path';
+import { ExtensionContext, languages, window } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCompletionCommands } from './completion-provider.js';
+import { registerConvoCodeBlockView } from './convo-code-block-view.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { registerMarkdownPreview } from './markdown-preview.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider } from './output-tag-code-lens.js';
+import { registerImagePasteHandler } from './register-image-paste-handler.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+let client:LanguageClient;
+
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCompletionCommands(context,ext);
+    registerTypingHandler(context);
+    registerImagePasteHandler(context,ext);
+    registerConvoCodeBlockView(context,ext);
+    registerMarkdownPreview(context,ext);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="markdown-preview.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/markdown-preview.ts">
+``` ts
+import { ExtensionContext } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+export const registerMarkdownPreview=(
+    context:ExtensionContext,
+    _ext:ConvoExt
+)=>{
+    context.subscriptions.push();
+};
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="03ae39949bc2b51835cfb96d0c87cde7c2e47ecb">
+``` json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "markdown": {
+            "languages": [
+                "convo"
+            ]
+        },
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
+That did not work. Do I need to add something like the following to package.json
+``` json
+{
+  "contributes": {
+    "markdown.markdownItPlugins": true
+  }
+}
+```
+
+@time 2026-04-19T11:03:02-04:00
+@tokenUsage 23260 / 367 / $0.05906750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Yes.
+
+For markdown preview, `contributes.markdown.languages` alone is not enough. That helps identify the fenced language label, but preview rendering/highlighting typically requires registering a Markdown extension entry point.
+
+In VS Code extensions, that is done with:
+
+```json
+"contributes": {
+  "markdown.markdownItPlugins": true
+}
+```
+
+and then exporting:
+
+- `activate(context)`
+- `extendMarkdownIt(md)`
+
+from the extension entry module used by VS Code for the extension.
+
+Because your extension already uses `main` for normal activation, the clean fix is to:
+1. add `markdown.markdownItPlugins:true` to `package.json`
+2. implement `extendMarkdownIt(...)` in the extension runtime
+3. add a markdown-it fence/highlight hook that maps `convo` code fences to the Convo grammar/classing expected by VS Code preview
+
+One important caveat:
+VS Code markdown preview syntax highlighting is not powered purely by your TextMate grammar the same way the editor is. Depending on VS Code version, the markdown preview uses markdown-it rendering plus code block highlighting behavior that may not automatically reuse arbitrary extension grammars just because a language exists. So the plugin may need to explicitly emit code blocks with the right `language-convo` class, and in some cases that is still not sufficient for full TextMate-based highlighting.
+
+Before I produce the patch, one question:
+
+Do you want me to implement the minimal standards-based fix first:
+- add `markdown.markdownItPlugins:true`
+- export `extendMarkdownIt`
+- ensure fenced `convo` blocks render as `language-convo`
+
+or do you want me to try a stronger custom preview renderer that injects explicit HTML/token styling for Convo fences if VS Code still does not apply the grammar automatically?
+
+
+> user
+Start with the minimal standards-based
+
+@time 2026-04-19T11:06:07-04:00
+@tokenUsage 23640 / 5511 / $0.07287750000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="44d4102b2ccfd33db3a91f08dc713aa3eab8ad17" last-commit="03ae39949bc2b51835cfb96d0c87cde7c2e47ecb">
+``` json
+{
+    "name": "convo-lang-tools",
+    "displayName": "convo-lang",
+    "description": "A conversational language 🤓",
+    "version": "0.8.18",
+    "type": "commonjs",
+    "sideEffects": false,
+    "publisher": "IYIO",
+    "icon": "assets/convo.png",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "license": "Apache-2.0",
+    "main": "./lsp/client/out/extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "source.convo",
+                "aliases": [
+                    "Convo",
+                    "convo"
+                ],
+                "extensions": [
+                    ".convo",
+                    ".convo-make",
+                    ".convo-make-target"
+                ],
+                "firstLine": "^[ \\t]*(>[ \\t]\\w+|@\\w+)",
+                "configuration": "./convo-language-configuration.json",
+                "icon": {
+                    "light": "assets/convo-icon.png",
+                    "dark": "assets/convo-icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "source.convo",
+                "scopeName": "source.convo",
+                "path": "./syntaxes/convo.tmLanguage.json"
+            },
+            {
+                "injectTo": [
+                    "source.js",
+                    "source.ts",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.tsx"
+                ],
+                "scopeName": "convo-js",
+                "path": "./syntaxes/convo-js.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo",
+                    "meta.embedded.line.ts": "typescript"
+                }
+            },
+            {
+                "injectTo": [
+                    "source.python"
+                ],
+                "scopeName": "convo-python",
+                "path": "./syntaxes/convo-python.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            },
+            {
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "scopeName": "convo-md",
+                "path": "./syntaxes/convo-md.json",
+                "embeddedLanguages": {
+                    "source.convo": "convo"
+                }
+            }
+        ],
+        "markdown": {
+            "languages": [
+                "convo"
+            ],
+            "markdownItPlugins": true
+        },
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "convo.complete",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.text",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+                {
+                    "command": "convo.vars",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@03"
+                },
+                {
+                    "command": "convo.convert",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@05"
+                },
+                {
+                    "command": "convo.split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@06"
+                },
+                {
+                    "command": "convo.complete-graph",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@07"
+                },
+                {
+                    "command": "convo.flat",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@08"
+                },
+                {
+                    "command": "convo.flat-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@09"
+                },
+                {
+                    "command": "convo.messages",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@10"
+                },
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "convo.refresh-make-targets",
+                    "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-refresh",
+                    "when": "view == convoCodeBlocks",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "convo.make",
+                    "when": "view == convoMakeBuild && viewItem == build",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-stop",
+                    "when": "view == convoMakeBuild && viewItem == build-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-delete-all",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^build/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-delete",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-exists.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-single-review",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target.*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-sync",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-(exists|list).*-preview/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.make-target-open-convo",
+                    "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-open",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-write",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-diff",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-panel-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.output-tag-execute-shell-complete",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-shell/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-switch",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-doc || viewItem == code-block-doc-pinned)",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-pin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-view-unpin",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-doc-pinned",
+                    "group": "inline"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "convo.complete",
+                "title": "Convo: Complete - Submits conversation to LLM and append response",
+                "shortTitle": "Convo: Complete",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+                "shortTitle": "Convo: Complete Graph",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.refresh-make-targets",
+                "title": "Convo: Refresh make targets",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-refresh",
+                "title": "Convo: Refresh code blocks",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-block-view-switch",
+                "title": "Convo: Switch Code Block View",
+                "icon": "$(list-selection)"
+            },
+            {
+                "command": "convo.code-block-view-pin",
+                "title": "Convo: Pin Code Block View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "convo.code-block-view-unpin",
+                "title": "Convo: Unpin Code Block View",
+                "icon": "$(close)"
+            },
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-open",
+                "title": "Convo: Open Output",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-write",
+                "title": "Convo: Write Output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-diff",
+                "title": "Convo: Open Output Diff",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "convo.code-block-panel-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell",
+                "title": "Convo: Run Script",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.output-tag-execute-shell-complete",
+                "title": "Convo: Run Script and Complete",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.parse",
+                "title": "Convo: Parse - Parses conversation returning message objects",
+                "shortTitle": "Convo: Parse"
+            },
+            {
+                "command": "convo.text",
+                "title": "Convo: Flatten - View of conversation with all expressions evaluated",
+                "shortTitle": "Convo: Flatten",
+                "icon": "$(chrome-restore)"
+            },
+            {
+                "command": "convo.flat",
+                "title": "Convo: Flat Message Objects - View of flat conversation as JSON message object. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.flat-all",
+                "title": "Convo: Flat Message Objects All - View of flat conversation as JSON message object with all messages ignoring node processing behavior. Useful for UI bindings.",
+                "shortTitle": "Convo: Flat Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.messages",
+                "title": "Convo: Message Objects - View of conversation as JSON message object. (internal message state).",
+                "shortTitle": "Convo: Message Objects",
+                "icon": "$(code-review)"
+            },
+            {
+                "command": "convo.vars",
+                "title": "Convo: Vars - Evaluates conversation and displaying resulting variables",
+                "shortTitle": "Convo: Vars",
+                "icon": "$(symbol-misc)"
+            },
+            {
+                "command": "convo.convert",
+                "title": "Convo: Convert - Converts the conversation into the native format of the target LLM",
+                "shortTitle": "Convo: Convert",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.split",
+                "title": "Convo: Fork - Creates a copy of the conversation and saves it to a new file",
+                "shortTitle": "Convo: Fork",
+                "icon": "$(repo-forked)"
+            },
+            {
+                "command": "convo.split-complete",
+                "title": "Convo: Complete Fork - Creates a fork of the conversation and submits it to the LLM",
+                "shortTitle": "Convo: Complete Fork"
+            },
+            {
+                "command": "convo.make-target-open",
+                "title": "Convo: Open Make Target",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-target-single",
+                "title": "Convo: Make Single File",
+                "icon": "$(play)"
+            },
+            {
+                "command": "convo.make-target-single-review",
+                "title": "Convo: Build Review Single File",
+                "icon": "$(debug-line-by-line)"
+            },
+            {
+                "command": "convo.make-target-sync",
+                "title": "Convo: Sync target with output",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.make-target-open-convo",
+                "title": "Convo: Open target convo",
+                "icon": "$(json)"
+            },
+            {
+                "command": "convo.make-target-delete",
+                "title": "Convo: Delete Make Target",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make-open",
+                "title": "Convo: Make Open",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "convo.make-sync",
+                "title": "Convo: Make Sync",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.make-delete-all",
+                "title": "Convo: Make Delete All - deletes all outputs",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "convo.make",
+                "title": "Convo: Make - Runs the Convo Make build system",
+                "shortTitle": "Convo: Make",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "convo.make-stop",
+                "title": "Convo: Make Stop - Stop active make",
+                "shortTitle": "Convo: Make Stop",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "convo.make-targets",
+                "title": "Convo: Make Targets - Parses a convo make file and displays its targets",
+                "shortTitle": "Convo: Make Targets",
+                "icon": "$(combine)"
+            },
+            {
+                "command": "convo.list-models",
+                "title": "Convo: List Models - Lists registered LLM models",
+                "shortTitle": "Convo: List Models",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "convo.open-settings",
+                "title": "Convo: Open Settings",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.modules",
+                "title": "Convo: Modules",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "convo.complete",
+                "key": "ctrl+r",
+                "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Convo-Lang",
+            "properties": {
+                "convo.defaultModel": {
+                    "type": "string",
+                    "default": "gpt-4.1",
+                    "description": "Default AI model to use for completions",
+                    "order": 1
+                },
+                "convo.openAiBaseUrl": {
+                    "type": "string",
+                    "default": "https://api.openai.com",
+                    "description": "API Base URL to an OpenAI compatible API",
+                    "order": 2
+                },
+                "convo.openAiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for authentication",
+                    "order": 3
+                },
+                "convo.awsBedrockProfile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock profile name for authentication",
+                    "order": 4
+                },
+                "convo.awsBedrockApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "AWS Bedrock API key for authentication",
+                    "order": 5
+                },
+                "convo.awsBedrockRegion": {
+                    "type": "string",
+                    "default": "us-east-1",
+                    "description": "AWS region to use with for Bedrock",
+                    "order": 6
+                },
+                "convo.openRouterBaseUrl": {
+                    "type": "string",
+                    "default": "https://openrouter.ai/api",
+                    "description": "API Base URL to OpenRouter",
+                    "order": 7
+                },
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "convo-lang-tools",
+                    "title": "Convo-Lang",
+                    "icon": "$(github-action)"
+                }
+            ]
+        },
+        "views": {
+            "convo-lang-tools": [
+                {
+                    "id": "convoMakeBuild",
+                    "name": "Make Build",
+                    "icon": "$(github-action)"
+                },
+                {
+                    "id": "convoCodeBlocks",
+                    "name": "Code Blocks",
+                    "icon": "$(symbol-snippet)"
+                }
+            ]
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" dirty file-hash="da3dae4e00c475c5dbde07afc41adeb6f9aa79d4" last-commit="b555d1ed59b2b9704bed2dde6ceca60d93f995ec">
+``` ts
+import type MarkdownIt from 'markdown-it';
+import * as path from 'path';
+import { ExtensionContext, languages, window } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCompletionCommands } from './completion-provider.js';
+import { registerConvoCodeBlockView } from './convo-code-block-view.js';
+import { ConvoExt } from './ConvoExt.js';
+import { createFoldingProviders } from './folding-provider.js';
+import { ConvoDocumentLinkProvider } from './link-provider.js';
+import { extendConvoMarkdownPreview, registerMarkdownPreview } from './markdown-preview.js';
+import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { OutputTagCodeLensProvider } from './output-tag-code-lens.js';
+import { registerImagePasteHandler } from './register-image-paste-handler.js';
+import { registerTypingHandler } from './typing-handler.js';
+
+let client:LanguageClient;
+
+
+export function activate(context:ExtensionContext){
+
+    const ext=new ConvoExt();
+
+    registerCompletionCommands(context,ext);
+    registerTypingHandler(context);
+    registerImagePasteHandler(context,ext);
+    registerConvoCodeBlockView(context,ext);
+    registerMarkdownPreview(context,ext);
+    startLsp(context);
+
+    const treeView=window.createTreeView('convoMakeBuild',{
+        treeDataProvider:new ConvoMakeExtTree({ext})
+    });
+    treeView.onDidChangeVisibility(e=>{
+        if(e.visible){
+            ext.scanMakeCtrlsAsync();
+        }
+    })
+    context.subscriptions.push(languages.registerDocumentLinkProvider(
+        'source.convo',
+        new ConvoDocumentLinkProvider()
+    ));
+    context.subscriptions.push(languages.registerCodeLensProvider(
+        'source.convo',
+        new OutputTagCodeLensProvider()
+    ));
+    context.subscriptions.push(languages.registerCompletionItemProvider(
+        {language:'source.convo',scheme:'file'},
+        createConvoPathCompletionProvider(),
+        '.',
+        '@',
+        '/',
+        '\\'
+    ));
+
+    context.subscriptions.push(...createFoldingProviders());
+}
+
+export function deactivate():Thenable<void>|undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
+}
+
+export const extendMarkdownIt=(md:MarkdownIt)=>{
+    return extendConvoMarkdownPreview(md);
+}
+
+const startLsp=(context:ExtensionContext)=>{
+
+	const serverModule=context.asAbsolutePath(
+		path.join('lsp','server','out','server.js')
+	);
+
+	const serverOptions:ServerOptions={
+		run:{module:serverModule,transport:TransportKind.ipc},
+		debug:{
+			module:serverModule,
+			transport:TransportKind.ipc,
+		}
+	};
+
+	const clientOptions:LanguageClientOptions={
+		documentSelector:[{scheme:'file',language:'source.convo'}],
+	};
+
+	client=new LanguageClient(
+		'convoLanguageServer',
+		'Convo Language Server',
+		serverOptions,
+		clientOptions
+	);
+
+	client.start();
+
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="markdown-preview.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/markdown-preview.ts">
+``` ts
+import type MarkdownIt from 'markdown-it';
+import { escapeHtml } from 'markdown-it/lib/common/utils.mjs';
+import { ExtensionContext } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+export const registerMarkdownPreview=(
+    context:ExtensionContext,
+    _ext:ConvoExt
+)=>{
+    context.subscriptions.push();
+};
+
+export const extendConvoMarkdownPreview=(md:MarkdownIt)=>{
+    const fence=md.renderer.rules.fence;
+
+    md.renderer.rules.fence=(tokens,idx,options,env,self)=>{
+        const token=tokens[idx];
+        const info=(token.info || '').trim();
+        const lang=info.split(/\s+/,1)[0]?.toLowerCase();
+
+        if(lang==='convo'){
+            const attrs=self.renderAttrs(token);
+            const code=escapeHtml(token.content);
+            return `<pre><code class="language-convo"${attrs}>${code}</code></pre>\n`;
+        }
+
+        return fence?
+            fence(tokens,idx,options,env,self)
+        :
+            self.renderToken(tokens,idx,options);
+    };
+
+    return md;
+};
+```
+</FILE_CONTENT>
+
+
+> user
+`extendConvoMarkdownPreview` is never called
+
+@time 2026-04-19T11:16:57-04:00
+@tokenUsage 29212 / 385 / $0.07399250000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="markdown-preview.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/markdown-preview.ts">
+``` ts
+import type MarkdownIt from 'markdown-it';
+import { escapeHtml } from 'markdown-it/lib/common/utils.mjs';
+import { ExtensionContext } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+export const registerMarkdownPreview=(
+    context:ExtensionContext,
+    _ext:ConvoExt
+)=>{
+    context.subscriptions.push();
+};
+
+export const extendConvoMarkdownPreview=(md:MarkdownIt)=>{
+    md.use(convoMarkdownPreviewPlugin);
+    return md;
+};
+
+const convoMarkdownPreviewPlugin=(md:MarkdownIt)=>{
+    const fence=md.renderer.rules.fence;
+
+    md.renderer.rules.fence=(tokens,idx,options,env,self)=>{
+        const token=tokens[idx];
+        const info=(token.info || '').trim();
+        const lang=info.split(/\s+/,1)[0]?.toLowerCase();
+
+        if(lang==='convo'){
+            const attrs=self.renderAttrs(token);
+            const code=escapeHtml(token.content);
+            return `<pre><code class="language-convo"${attrs}>${code}</code></pre>\n`;
+        }
+
+        return fence?
+            fence(tokens,idx,options,env,self)
+        :
+            self.renderToken(tokens,idx,options);
+    };
+};
+```
+</FILE_CONTENT>
+
+`extendConvoMarkdownPreview` is called indirectly by VS Code through the exported `extendMarkdownIt` function in `extension.ts`.
+
+The issue was that the previous version only wrapped logic in a helper and did not register a markdown-it plugin with `md.use(...)`, which is the standard pattern VS Code expects extension-side markdown preview customizations to use.
+
+This update makes `extendConvoMarkdownPreview(md)` actually install a plugin onto the markdown-it instance.
+
+
+> user

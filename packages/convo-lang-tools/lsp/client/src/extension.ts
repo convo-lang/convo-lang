@@ -1,3 +1,4 @@
+import type MarkdownIt from 'markdown-it';
 import * as path from 'path';
 import { ExtensionContext, languages, window } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
@@ -8,6 +9,7 @@ import { ConvoExt } from './ConvoExt.js';
 import { createFoldingProviders } from './folding-provider.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
+import { convoMarkdownPreviewPlugin } from './markdown-preview.js';
 import { OutputTagCodeLensProvider } from './output-tag-code-lens.js';
 import { registerImagePasteHandler } from './register-image-paste-handler.js';
 import { registerTypingHandler } from './typing-handler.js';
@@ -51,6 +53,11 @@ export function activate(context:ExtensionContext){
     ));
 
     context.subscriptions.push(...createFoldingProviders());
+    return {
+        extendMarkdownIt(md:MarkdownIt) {
+            return md.use(convoMarkdownPreviewPlugin);
+        }
+    }
 }
 
 export function deactivate():Thenable<void>|undefined {
@@ -59,6 +66,7 @@ export function deactivate():Thenable<void>|undefined {
 	}
 	return client.stop();
 }
+
 
 const startLsp=(context:ExtensionContext)=>{
 
@@ -88,4 +96,3 @@ const startLsp=(context:ExtensionContext)=>{
 	client.start();
 
 }
-

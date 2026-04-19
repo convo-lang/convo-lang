@@ -15,6 +15,7 @@
 	"dependencies": {
 		"@types/jsdom": "^21.1.4",
 		"jsdom": "^22.1.0",
+		"shiki": "^4.0.2",
 		"vscode-languageclient": "^8.1.0"
 	},
 	"devDependencies": {

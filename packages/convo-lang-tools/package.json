@@ -24,9 +24,14 @@
         "url": "https://github.com/convo-lang/convo-lang.git"
     },
     "extensionDependencies": [
-        "vscode.git"
+        "vscode.git",
+        "vscode.markdown-language-features"
     ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
     "contributes": {
+        "markdown.markdownItPlugins": true,
         "languages": [
             {
                 "id": "source.convo",
@@ -89,6 +94,12 @@
                 }
             }
         ],
+        "markdown": {
+            "languages": [
+                "convo"
+            ],
+            "markdownItPlugins": true
+        },
         "menus": {
             "editor/title": [
                 {
