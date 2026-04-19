@@ -1,3 +1,71 @@
+@import ../base.convo
+@import ../../docs/learn-convo-lang.md !file
+@import ../../docs/convo-core.md !file
+@import ../../docs/convo-dev-guide.md !file
+@import ../../README.md !file
+
+> define
+__model=claudeModel
+
+> user
+Update `convo-core.md` the add Convo-Lang examples but keep its structure and language.
+
+Include a witty Convo-Lang example with the use of a variable at the end of the first section. The
+example should welcome the reader to Convo-Lang.
+
+Keep all examples related to astronomy.
+
+Also add the following sections:
+
+    - "What Convo-Lang is not": It should be a short section about how Convo-Lang is not just a simple prompting technique but a full language and runtime that "compiles" down to the native format of a target LLM. And show a short code example of a simple Convo-Lang script converted into the OpenAI message format
+
+    - "Convo in JS": Section about how Convo-Lang can be used inside of JavaScript and TypeScript. Prioritize the user the the `convo` string template literal function `const result=await convo ...`. And mention that the VSCode extension gives you full syntax highlighting for convo embedded in javascript and typescript
+
+Update an technical inaccuracies based on the `convo-dev-guide.md` document.
+
+
+In the OpenAI comparison include the usage of a variable and definition of a function, but not the calling of the function. The example should be short.
+
+And in the Convo-in-JS example include using a zod object to return structured JSON
+
+
+
+@time 2026-04-19T17:09:43-04:00
+@tokenUsage 78563 / 557
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+I have a few clarifying questions before I update `convo-core.md`:
+
+1. **Placement of new sections** — Where should the two new sections go?
+   - "What Convo-Lang is not": I'm thinking right after the intro/"Why plain text matters" area, before "Transparency and the agent ledger". Good spot?
+   - "Convo in JS": Should this go near the end (after "Design principles to preserve") or alongside the ecosystem overview?
+
+2. **Witty astronomy welcome example** — You mentioned putting it "at the end of the first section." By "first section" do you mean the end of the **Overview** section (before "Why plain text matters")? I'll assume yes unless you say otherwise.
+
+3. **OpenAI comparison example** — Should I use the exact `chat.completions` JSON format (like `learn-convo-lang.md` does), and should the variable be something astronomy-flavored (e.g. a planet name) with a function definition like `getPlanetFacts`?
+
+4. **Convo-in-JS zod example** — Should I use `completeJsonSchemeAsync` with a zod schema (as shown in `convo-dev-guide.md`), or embed a zod-derived schema via the `convo` template literal? The dev guide shows both patterns — I'll lean toward the `convo` template literal for the primary example and mention `completeJsonSchemeAsync` as an alternative, unless you prefer otherwise.
+
+5. **Technical inaccuracies** — Any specific ones you've already spotted that you want me to prioritize, or should I do a full pass against `convo-dev-guide.md`?
+
+If you want, I can just make reasonable assumptions on all of the above and proceed — let me know.
+
+
+> user
+1. 
+  - "What Convo-Lang is not" after "Why plain text matters"
+  - "Convo in JS" after "Convo-CLI"
+2. Yes at the end of the overview
+3. something astronomy-flavored
+4. embed a zod-derived schema via the `convo` template literal
+5. full pass against `convo-dev-guide.md`
+
+@time 2026-04-19T17:15:05-04:00
+@tokenUsage 79242 / 9111
+@model open-router/anthropic/claude-4.7-opus-20260416
+> assistant
+<FILE_CONTENT name="convo-core.md" target-output-path="../../docs/convo-core.md">
+``` md
 # Convo-Lang Core Developer Documentation
 
 ## Overview
@@ -18,16 +86,18 @@ This document focuses on the core of Convo-Lang, how it works internally, and wh
 Here is a small taste of the language itself:
 
 ```convo
-@import ./tools.convo
+\> define
+astronomerName="Carl"
+planetCount=8
 
-> define
-langName="Convo-Lang"
+\> system
+You are \{{astronomerName}}, a slightly over-caffeinated astronomer
+welcoming a new stargazer to Convo-Lang.
 
-> system
-You are a friendly assistant introducing a user to {{langName}}
-
-> assistant
-Hi 👋, Welcome to {{langName}}
+\> assistant
+Welcome to Convo-Lang! I'm \{{astronomerName}}, and I'll be your
+guide across all \{{planetCount}} planets - give or take a Pluto,
+depending on who you ask. 🔭
 ```
 
 That snippet is already a complete, runnable agent. It has state, a persona, and a greeting - all in plain text.
@@ -62,6 +132,68 @@ A Convo script is not just prompt text. It can also express:
 
 Even with those capabilities, the system stays centered on text-first authoring.
 
+## What Convo-Lang is not
+
+It is tempting to look at Convo-Lang and assume it is "just another prompting technique" or a templating layer on top of an existing SDK. It is not.
+
+Convo-Lang is a full language with a parser, a type system, an execution context, a flattening pipeline, and provider-specific converters. At completion time, a Convo-Lang source is effectively "compiled" down to the native message format of the target LLM - OpenAI chat messages, Anthropic messages, Bedrock payloads, or whatever format the selected provider expects.
+
+Consider this short Convo-Lang source:
+
+```convo
+\> define
+planet="Jupiter"
+
+# Looks up facts about a planet
+\> getPlanetFacts(
+    name:string
+)
+
+\> system
+You are a concise astronomy assistant.
+
+\> user
+Tell me something interesting about \{{planet}}.
+```
+
+When that source is completed against OpenAI, the runtime parses it, evaluates top-level statements, resolves the variable, collects the function definition, flattens the messages, and then a converter produces a native OpenAI request that looks roughly like this:
+
+```json
+{
+    "model": "gpt-4.1",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are a concise astronomy assistant."
+        },
+        {
+            "role": "user",
+            "content": "Tell me something interesting about Jupiter."
+        }
+    ],
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "getPlanetFacts",
+                "description": "Looks up facts about a planet",
+                "parameters": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                        "name": { "type": "string" }
+                    }
+                }
+            }
+        }
+    ]
+}
+```
+
+The key idea is that Convo-Lang is not a wrapper around prompt strings. It is the source form, and the native provider payload is the compiled output. The same source can be targeted at different providers by swapping the converter, without rewriting the prompt.
+
+This is why Convo-Lang is described as AI-native rather than prompt-first.
+
 ## Transparency and the agent ledger
 
 A key design goal of Convo-Lang is transparency.
@@ -88,6 +220,26 @@ It gives developers a clear ledger of interactions with an LLM by representing b
 - what RAG context was injected
 - what node in a graph was active
 - what follow-up actions were appended
+
+For example, a tool call to look up a planet is represented directly in the conversation:
+
+```convo
+\> user
+How many moons does Jupiter have?
+
+@toolId call_9Ep8tg03DigprvvDuWVXQ0xC
+\> call getPlanetFacts(
+    "name": "Jupiter"
+)
+\> result
+__return={
+    "name": "Jupiter",
+    "moons": 95
+}
+
+\> assistant
+Jupiter has 95 known moons - it's practically running a solar system of its own.
+```
 
 This ledger-like quality is one of the most important architectural benefits of the project. It makes agentic systems easier to:
 
@@ -191,10 +343,10 @@ import { convo } from '@convo-lang/convo-lang';
 const favoritePlanet = 'Saturn';
 
 const result = await convo`
-    > system
+    \> system
     You are a concise astronomy assistant.
 
-    > user
+    \> user
     Give me one fun fact about ${favoritePlanet}.
 `;
 
@@ -215,85 +367,21 @@ const Planet = z.object({
     funFact: z.string(),
 });
 
-const planet = await convo`
-    > system
-    You are an astronomy assistant
+const planet = await convo(Planet)`
+    \> system
+    You are an astronomy assistant that always responds with valid JSON.
 
-    @json ${Planet}
-    > user
+    \> user
     Describe the planet Mars.
 `;
 
-console.log('Planet',planet);
+console.log(planet.name, planet.moons);
+console.log(planet.funFact);
 ```
 
 For more advanced scenarios - streaming, triggers, forks, function injection, and event observation - host code can drop down to the `Conversation` class directly. The template literal and the class share the same underlying runtime, so it is easy to start with the template literal and move to the full API when needed.
 
 The Convo-Lang VSCode extension provides full Convo-Lang syntax highlighting inside JavaScript and TypeScript template literals tagged with `convo`, so embedded scripts look and behave just like standalone `.convo` files while authoring.
-
-
-## What Convo-Lang is not
-
-It is tempting to look at Convo-Lang and assume it is "just another prompting technique" or a templating layer on top of an existing SDK. It is not.
-
-Convo-Lang is a full language with a parser, a type system, an execution context, a flattening pipeline, and provider-specific converters. At completion time, a Convo-Lang source is effectively "compiled" down to the native message format of the target LLM - OpenAI chat messages, Anthropic messages, Bedrock payloads, or whatever format the selected provider expects.
-
-Consider this short Convo-Lang source:
-
-```convo
-> define
-planet="Jupiter"
-
-# Looks up facts about a planet
-> getPlanetFacts(
-    name:string
-)
-
-> system
-You are a concise astronomy assistant.
-
-> user
-Tell me something interesting about {{planet}}.
-```
-
-When that source is completed against OpenAI, the runtime parses it, evaluates top-level statements, resolves the variable, collects the function definition, flattens the messages, and then a converter produces a native OpenAI request that looks roughly like this:
-
-```json
-{
-    "model": "gpt-4.1",
-    "messages": [
-        {
-            "role": "system",
-            "content": "You are a concise astronomy assistant."
-        },
-        {
-            "role": "user",
-            "content": "Tell me something interesting about Jupiter."
-        }
-    ],
-    "tools": [
-        {
-            "type": "function",
-            "function": {
-                "name": "getPlanetFacts",
-                "description": "Looks up facts about a planet",
-                "parameters": {
-                    "type": "object",
-                    "required": ["name"],
-                    "properties": {
-                        "name": { "type": "string" }
-                    }
-                }
-            }
-        }
-    ]
-}
-```
-
-The key idea is that Convo-Lang is not a wrapper around prompt strings. It is the source form, and the native provider payload is the compiled output. The same source can be targeted at different providers by swapping the converter, without rewriting the prompt.
-
-This is why Convo-Lang is described as AI-native rather than prompt-first.
-
 
 ## Core architecture
 
@@ -362,14 +450,14 @@ A message can represent:
 - a message with tags, markdown, code blocks, and metadata
 
 ```convo
-> define
+\> define
 orbitDays=687
 
-> system
+\> system
 You are an astronomy tutor.
 
-> user
-Mars orbits the Sun roughly every {{orbitDays}} Earth days. Is that right?
+\> user
+Mars orbits the Sun roughly every \{{orbitDays}} Earth days. Is that right?
 ```
 
 This unified message model is important because it lets the runtime treat conversation authoring, execution, and state mutation as parts of the same language.
@@ -433,11 +521,11 @@ A short example putting a few of these together:
 
 ```convo
 @edge
-> system
-Current mission target: {{target}}
+\> system
+Current mission target: \{{target}}
 
 @on user
-> onUserMessage() -> (
+\> onUserMessage() -> (
     // react to incoming user messages
 )
 ```
@@ -605,14 +693,14 @@ Top-level messages like `define` and `do` are executed during flattening.
 That means state is materialized before a model sees the final conversation.
 
 ```convo
-> define
+\> define
 lightMinutesFromSun=8
 
-> do
+\> do
 // side-effecting setup can live here, e.g. remote data fetches
 
-> system
-The Sun is about {{lightMinutesFromSun}} light-minutes from Earth.
+\> system
+The Sun is about \{{lightMinutesFromSun}} light-minutes from Earth.
 ```
 
 This is useful because it allows:
@@ -641,10 +729,10 @@ Functions can be defined in source or injected from code.
 
 ```convo
 # Looks up the mass of a planet in Earth masses
-> getPlanetMass(
+\> getPlanetMass(
     name:string
 ) -> (
-    return(httpGet('https://api.example.com/planet/{{name}}/mass'))
+    return(httpGet('https://api.example.com/planet/\{{name}}/mass'))
 )
 ```
 
@@ -695,7 +783,7 @@ Then it executes the function inside the current execution context.
 
 ```convo
 @on user
-> onUserMessage() -> (
+\> onUserMessage() -> (
     // inspect the latest user message and act on it
 )
 ```
@@ -804,10 +892,10 @@ Convo-Lang supports retrieval augmented generation through:
 - document references
 
 ```convo
-> define
+\> define
 enableRag("public/astronomy")
 
-> user
+\> user
 What's the current best estimate for the age of the universe?
 ```
 
@@ -933,3 +1021,8 @@ Its answer is:
 - let the ecosystem build on a shared transparent core
 
 That is why Convo-Lang is not just another prompt format. It is the foundation of an ecosystem for building understandable, inspectable, and operationally clear LLM systems.
+```
+</FILE_CONTENT>
+
+
+> user
