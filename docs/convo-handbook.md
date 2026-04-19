@@ -1,0 +1,966 @@
+# Convo-Lang Handbook
+
+## Overview
+
+Convo-Lang is both:
+
+- a prompt scripting language
+- a conversation runtime
+- an execution engine for functions, variables, transforms, triggers, and node graphs
+- an integration layer for LLMs, components, imports, RAG, and tooling
+
+This handbook is for developers working on Convo-Lang itself and for engineers integrating it into apps.
+
+The guide mixes language usage with implementation details from the current codebase so contributors can move between authoring, debugging, and extending the runtime with confidence.
+
+## Mental model
+
+A Convo-Lang conversation usually moves through these phases:
+
+1. source text is parsed into `ConvoMessage[]`
+2. messages are loaded into a `Conversation`
+3. the conversation is flattened into `FlatConvoConversation`
+4. top-level code, tags, conditions, imports, transforms, and graph behavior are applied
+5. a completion service is selected
+6. the flat conversation is converted to provider input
+7. the provider responds with text and/or function calls
+8. function calls are executed through `ConvoExecutionContext`
+9. result messages and setters are appended back into the conversation
+10. the cycle can continue until the conversation completes
+
+The core orchestration lives in:
+
+- `packages/convo-lang/src/lib/Conversation.ts`
+- `packages/convo-lang/src/lib/convo-parser.ts`
+- `packages/convo-lang/src/lib/convo-lib.ts`
+- `packages/convo-lang/src/lib/convo-types.ts`
+
+## Core concepts
+
+## Source model
+
+Convo source is parsed into `ConvoMessage` objects.
+
+A message can represent:
+
+- normal content with a role like `user`, `assistant`, or `system`
+- a function definition
+- a top-level block like `define`, `do`, `result`
+- a node or graph instruction
+- a modification message like `append`, `replace`, `suffix`
+- a component message
+- a message with tags, inline expressions, code blocks, markdown, and metadata
+
+Important types in `convo-types.ts`:
+
+- `ConvoMessage`
+- `ConvoFunction`
+- `ConvoStatement`
+- `ConvoTag`
+- `FlatConvoMessage`
+- `FlatConvoConversation`
+- `ConvoCompletion`
+- `ConvoTrigger`
+- `InlineConvoPrompt`
+
+## Runtime model
+
+`Conversation` is the central runtime object.
+
+It owns:
+
+- raw convo source strings
+- parsed messages
+- completion configuration
+- extern functions and components
+- imported modules
+- flattening state
+- active tasks
+- usage tracking
+- streaming state
+- child and forked conversations
+
+The class is intentionally large because it coordinates the full lifecycle.
+
+## Execution model
+
+Execution is split between authoring-time structures and runtime evaluation.
+
+- parser builds `ConvoStatement` trees
+- `Conversation.flattenAsync()` evaluates message state into `FlatConvoConversation`
+- `ConvoExecutionContext` executes statements and functions
+- completion output is converted back into messages and often appended into the conversation source
+
+This design lets Convo-Lang support both static prompt authoring and dynamic stateful execution.
+
+## Main files and responsibilities
+
+## `convo-types.ts`
+
+Defines the shared type system for the language and runtime.
+
+Notable areas:
+
+- message and function shapes
+- statement AST structures
+- flattening types
+- completion service interfaces
+- model metadata
+- import/module contracts
+- triggers, transforms, and graph-related types
+
+Read this file first if you want to understand the vocabulary of the system.
+
+## `convo-parser.ts`
+
+Parses raw Convo source text into `ConvoMessage[]`.
+
+It handles:
+
+- roles like `> user`
+- function definitions like `> myFn(`
+- top-level blocks like `> define`
+- tags like `@json`, `@condition`, `@import`
+- statement parsing
+- strings, heredocs, embeds, prompt strings, and static prompt strings
+- inline prompt parsing
+- message handler tags
+- route tags for graph nodes
+- markdown and code block extraction
+
+If a feature starts at syntax level, this is where to begin.
+
+## `convo-lib.ts`
+
+Holds shared constants and helpers used across the runtime.
+
+Important exports include:
+
+- `convoRoles`
+- `convoTags`
+- `convoFunctions`
+- `convoVars`
+- parsing helpers
+- tag helpers
+- message formatting helpers
+- flatten/display helpers
+- transform and JSON utilities
+- import tag formatting utilities
+
+This file effectively defines much of the language contract.
+
+## `Conversation.ts`
+
+The operational heart of the library.
+
+It implements:
+
+- append and parse workflows
+- flattening
+- import loading
+- completion orchestration
+- function execution
+- transforms
+- node graph traversal
+- component input handling
+- triggers
+- usage tracking
+- child, clone, and fork behavior
+
+For end-to-end behavior, this is the most important file.
+
+## Authoring basics
+
+## Messages
+
+A basic message looks like:
+
+```convo
+> system
+You are a helpful assistant.
+
+> user
+Summarize this document.
+```
+
+Roles are mapped through `Conversation.roleMap`, but the usual roles are:
+
+- `user`
+- `assistant`
+- `system`
+
+There are many special roles defined in `convoRoles`.
+
+## Tags
+
+Tags modify messages or runtime behavior:
+
+```convo
+@json Person
+> user
+Extract the user profile
+```
+
+Tags can:
+
+- control response format
+- assign values
+- set routing behavior
+- enable transforms
+- trigger imports
+- set visibility or rendering behavior
+- define task membership
+- change model/provider settings
+
+Relevant helpers:
+
+- `getConvoTag`
+- `containsConvoTag`
+- `convoTagsToMap`
+- `mapToConvoTags`
+
+## Define blocks
+
+Define blocks are top-level executable code:
+
+```convo
+> define
+Person=struct(name:string age:number)
+theme="dark"
+```
+
+During flattening, top-level statements are executed and shared variables are updated in the execution context.
+
+## Functions
+
+Functions can be:
+
+- local
+- extern
+- public
+- invoked directly
+- called by the model
+- used as handlers or triggers
+
+Example:
+
+```convo
+> local greet(name:string) -> string (
+    return `Hello ${name}`
+)
+```
+
+Function definitions appear as `ConvoMessage` objects with `fn`.
+
+## Parsing details
+
+The parser in `convo-parser.ts` is regex-driven and stateful.
+
+## What the parser recognizes
+
+The parser identifies:
+
+- function messages using `fnMessageReg`
+- top-level messages using `topLevelMessageReg`
+- role messages using `roleReg`
+- statements using `statementReg`
+
+It also tracks:
+
+- nested function call stacks
+- nested string/embed states
+- comments
+- tags
+- source indexes and line numbers
+
+## Inline prompts
+
+Inline prompts are parsed through `parseInlineConvoPrompt()`.
+
+These support behaviors like:
+
+- extending conversation context
+- continuing previous inline dialogue
+- wrapping prompt content in tags
+- assigning output
+- choosing JSON output types
+- appending prompt output back into the main conversation
+
+Prompt strings are represented on statements by `prompt?:InlineConvoPrompt`.
+
+## Code blocks
+
+If enabled with parsing options, message content can be scanned into `ConvoCodeBlock[]`.
+
+This is useful for:
+
+- XML tagged shell/code blocks
+- code execution flows
+- tooling integrations
+- extracting runnable snippets from messages
+
+## Conversation lifecycle
+
+## Creating a conversation
+
+A `Conversation` is initialized with `ConversationOptions`.
+
+Important options include:
+
+- completion services
+- converters
+- default variables
+- extern functions
+- extern scope functions
+- components
+- modules
+- caching
+- RAG callback
+- debug hooks
+- task and trigger behavior
+- model defaults
+- sandbox settings
+
+## Appending input
+
+There are two primary ways to add content:
+
+- `append()` for text or `ConvoObject`
+- `appendMessageObject()` for already-parsed messages
+
+`append()`:
+
+1. optionally transforms input via `beforeAppend`
+2. parses source with `parseConvoCode()`
+3. applies streaming/file/tag metadata
+4. stores original source fragments
+5. appends parsed messages
+6. triggers auto-flattening unless disabled
+
+## Flattening
+
+`flattenAsync()` turns source messages into `FlatConvoConversation`.
+
+This is where most runtime behavior is resolved.
+
+Flattening applies:
+
+- imports
+- top-level define/do execution
+- thread filtering
+- message conditions
+- markdown parsing and markdown variable capture
+- edge evaluation
+- message grouping
+- insertion/queue/parallel processing
+- task filtering
+- response format inference
+- model and endpoint selection
+- transforms
+- node graph ordering and filtering
+- RAG mode
+- dynamic message code block parsing
+
+The flattening output is the main LLM-facing representation.
+
+## Completion
+
+`completeAsync()` runs the main completion loop.
+
+High-level flow:
+
+1. flush queued variable changes
+2. flatten conversation
+3. resolve node state or special behavior
+4. possibly run parallel branches
+5. apply RAG
+6. detect direct function call/eval/component handling
+7. otherwise call completion service
+8. append returned text or function calls
+9. execute called functions
+10. append result setters and result messages
+11. recurse if auto-completion should continue
+12. evaluate triggers
+13. return `ConvoCompletion`
+
+The recursive loop is implemented in `_completeAsync()`.
+
+## Flattening in more detail
+
+## Why flattening exists
+
+Raw messages are too rich and too source-oriented to send directly to an LLM.
+
+Flattening converts authored conversation state into something execution-ready:
+
+- tags become explicit runtime state
+- statement-based messages become content
+- local function effects are materialized
+- hidden/render-only distinctions become visible
+- graph and task filtering are applied
+- message modifications are merged
+
+## Flat messages
+
+A `FlatConvoMessage` may include:
+
+- role and content
+- visibility metadata
+- function definitions or called function info
+- response format hints
+- model and endpoint hints
+- component flags
+- transform metadata
+- RAG references
+- node and graph metadata
+
+## Message modification merge
+
+`mergeConvoFlatContentMessages()` handles modification roles such as:
+
+- `replace`
+- `replaceForModel`
+- `append`
+- `prepend`
+- `prefix`
+- `suffix`
+- `appendUser`
+- `appendAssistant`
+- `appendSystem`
+
+This is important because modifications are authored as messages but consumed as mutations on previous content messages.
+
+## Tags and runtime state
+
+`applyTagsAndState()` interprets message tags during flattening.
+
+Examples:
+
+- `@assignTo` stores message content/json to vars
+- `@json` or `@responseFormat` configures expected output
+- `@responseModel` and `@responseEndpoint` steer completions
+- `@condition` removes messages when false
+- `@rag` enables retrieval behavior
+- `@enableTransform` marks optional transforms as enabled
+
+## Markdown variables
+
+If markdown parsing is enabled, markdown lines are captured into `__md`.
+
+This allows downstream expressions to reference parsed markdown content, images, links, headings, and tagged markdown segments.
+
+## Completion services and converters
+
+## Completion service contract
+
+A provider implements `ConvoCompletionService<TInput,TOutput>`.
+
+Key methods:
+
+- `canComplete()`
+- `completeConvoAsync()`
+- `getModelsAsync()`
+- optional `getSupportAsync()`
+- optional `relayConvertConvoToInputAsync()`
+
+This abstraction lets the runtime support multiple vendors and transport styles.
+
+## Converter contract
+
+Converters adapt between flat conversations and provider-specific inputs/outputs.
+
+`ConvoConversationConverter<TInput,TOutput>` defines:
+
+- `convertConvoToInput()`
+- `convertOutputToConvo()`
+
+This lets a completion service remain provider-focused while converters handle message formatting.
+
+## Model selection
+
+`Conversation.getCompletionServiceAsync()` and shared completion helpers select:
+
+- service
+- model
+- endpoint-specific service if configured
+
+Model metadata from `ConvoModelInfo` also drives:
+
+- JSON mode behavior
+- function calling behavior
+- required first message role behavior
+- instructions wrapping
+- tool filtering
+- provider-specific quirks
+
+## Function calling
+
+## Authoring
+
+Functions can be authored directly in convo source or injected through code.
+
+Injected functions typically use:
+
+- `defineFunction()`
+- `defineFunctions()`
+- `implementExternFunction()`
+- `defineLocalFunctions()`
+
+## Runtime execution
+
+When a completion returns `callFn`:
+
+1. a `> call` message is created if needed
+2. the target function is found
+3. `ConvoExecutionContext.executeFunctionResultAsync()` is called
+4. shared variable setters are collected
+5. result messages are appended
+6. autocomplete may continue unless disabled
+
+`appendFunctionSetters()` writes result/state back into the conversation.
+
+This mechanism is central to how Convo-Lang keeps conversations inspectable and replayable.
+
+## Important distinction
+
+- local/extern functions are for runtime execution
+- non-local visible functions are also part of the LLM tool surface
+- top-level functions like `define` and `do` execute during flattening rather than completion output handling
+
+## Triggers
+
+Triggers let messages invoke functions based on events.
+
+Current trigger authoring mainly comes from `@on` tags on functions.
+
+Example ideas:
+
+- react to user messages
+- react to assistant messages
+- conditionally augment conversation state
+
+Trigger processing happens in:
+
+- parser: `parseConvoMessageTrigger()`
+- runtime: `evalTriggersAsync()`
+
+A trigger checks:
+
+- matching role
+- optional condition
+- target function existence
+
+Then the target function executes in the current execution context.
+
+## Transforms
+
+Transforms let assistant output be post-processed into structured or component-friendly output.
+
+They are defined using transform tags like:
+
+- `@transform`
+- `@transformGroup`
+- `@transformDescription`
+- `@transformRequired`
+- `@transformOptional`
+- `@transformComponent`
+
+Runtime behavior:
+
+1. flatten collects transform messages into groups
+2. after a text completion, transforms may be selected
+3. transform prompts run against the assistant output
+4. transform outputs become additional completion messages
+5. source messages may be hidden or removed depending on transform conditions
+
+Selection logic is handled in `transformUsingFlatTransformersAsync()`.
+
+This is one of the more powerful extension points in the system because it bridges plain text generation and structured UI rendering.
+
+## Components
+
+Components turn messages into UI elements.
+
+A message may be:
+
+- render-only component output
+- input component requiring user interaction
+
+Component mode is stored as `ConvoComponentMode`:
+
+- `render`
+- `input`
+
+Runtime support includes:
+
+- component message detection
+- component indexes in flattened messages
+- `componentCompletionCallback`
+- `submitComponentData()`
+- `completeUsingComponentInputAsync()`
+
+This lets a conversation pause on a component input and resume once the app submits structured user data.
+
+## Imports and modules
+
+## Imports
+
+Imports are declared via `@import`.
+
+The runtime supports importing:
+
+- convo source
+- content
+- types
+- extern functions
+- extern scope functions
+- components
+- merged content from multiple files
+
+Import resolution uses:
+
+- inline modules registered on the conversation
+- std imports
+- custom import handler
+- import services
+
+Main flow:
+
+1. parser preserves import tags
+2. flattening sees import-tagged messages
+3. `loadImportsAsync()` calls `importAsync()`
+4. matching `ConvoModule` values are registered
+5. imported content is converted into messages and inserted
+
+## Modules
+
+A `ConvoModule` can contain:
+
+- source convo
+- text content
+- types
+- type schemes
+- extern functions
+- scope functions
+- components
+- file path metadata
+
+This is the main packaging mechanism for reusable extensions.
+
+## Import templates
+
+Import templates are special messages using role `importTemplate`.
+
+They let imported content be wrapped or slotted into authored templates.
+
+Useful for:
+
+- markdown ingestion
+- document wrapping
+- content normalization
+- multi-file aggregation
+
+## RAG
+
+Retrieval augmented generation is supported through:
+
+- `ragCallback`
+- `ConvoDocumentReference`
+- `@rag`
+- `@ragForMsg`
+- `ragPrefix`
+- `ragSuffix`
+- `ragTemplate`
+
+Flow:
+
+1. flatten or completion determines RAG is enabled
+2. last user or modification message is used as retrieval input
+3. callback returns one or more document references
+4. references are converted into `rag` messages
+5. rag messages may be visible to the user, the model, or both depending on mode
+
+`convoRagDocRefToMessage()` builds final rag messages.
+
+`applyRagMode()` controls whether rag messages are render-only.
+
+## Node graphs
+
+Node graphs let a conversation behave like a workflow or directed process.
+
+Relevant roles:
+
+- `node`
+- `nodeEnd`
+- `goto`
+- `to`
+- `from`
+- `exit`
+- `exitGraph`
+
+Capabilities include:
+
+- node-local context
+- routing conditions
+- natural language routing
+- route auto-selection
+- graph output summaries
+- direct invoke nodes
+- context depth controls
+- node tail messages
+- runtime node stack tracking
+
+Runtime node behavior is implemented mainly in:
+
+- flattening logic in `Conversation.flattenAsync()`
+- route evaluation in `evalNodeRouteAsync()`
+- graph summary logic in `completeAsync()`
+
+This feature is important for multi-step agents, workflows, and state-machine style interactions.
+
+## Parallel and queue behavior
+
+Convo-Lang supports advanced execution ordering.
+
+## Queue
+
+`queue` and `flush` let the runtime delay execution until a boundary is reached.
+
+This is used when content should be accumulated or reordered before being processed.
+
+## Insert blocks
+
+`insert` and `insertEnd` allow reordering message sequences in the flattened conversation.
+
+## Parallel
+
+`parallel` and `parallelEnd` create execution branches.
+
+At runtime, `completeParallelAsync()` and `completeParallelMessagesAsync()`:
+
+- clone the conversation
+- run branches separately
+- merge outputs back into the source conversation
+- optionally continue queued processing
+
+This is more workflow-like than provider-parallelization. It is implemented at the conversation level.
+
+## Debugging
+
+## Debug modes
+
+Debugging can be enabled through:
+
+- `Conversation.debugMode`
+- `__debug`
+- custom `debug` callback
+- writing debug info directly into conversation comments
+
+Useful methods:
+
+- `debugToConversation()`
+- `appendArgsAsComment()`
+- `getFlattenConversationDisplayString()`
+- `toModelInputStringAsync()`
+
+## Recommended debugging workflow
+
+When diagnosing a runtime issue:
+
+1. inspect parsed messages
+2. inspect flattened conversation
+3. inspect selected completion service/model
+4. inspect appended result messages
+5. inspect trigger and transform behavior
+6. inspect imported module registration
+7. inspect actual model input string
+
+## Common places bugs show up
+
+- parser regex edge cases
+- tag dynamic evaluation
+- message modification ordering
+- conditional message removal
+- transform selection loops
+- node route ambiguity
+- local vs visible function confusion
+- import template mismatch
+- JSON response parsing assumptions
+
+## Extension points
+
+## Add an extern function
+
+Use `implementExternFunction()` when you want a simple JS callback exposed as a convo function.
+
+Use `externScopeFunctions` or direct `externFunctions` mapping when you need full scope-aware behavior.
+
+Good for:
+
+- app APIs
+- file operations
+- side effects
+- domain services
+
+## Add a completion service
+
+Implement `ConvoCompletionService`.
+
+Good for:
+
+- custom providers
+- proxy backends
+- test fakes
+- provider-specific transports
+
+## Add a converter
+
+Implement `ConvoConversationConverter`.
+
+Good for:
+
+- custom provider message formats
+- non-chat providers
+- HTTP relay formats
+- debugging transports
+
+## Add a module/import source
+
+Use:
+
+- `modules` on `ConversationOptions`
+- `importHandler`
+- `importServices`
+
+Good for:
+
+- filesystem-backed convo libraries
+- generated modules
+- packaged prompt kits
+- content repositories
+
+## Add components
+
+Register `ConvoComponentDef` instances through `components` or modules.
+
+Good for:
+
+- custom rendering
+- structured input capture
+- transform-based UI generation
+
+## Add RAG
+
+Provide `ragCallback`.
+
+Good for:
+
+- vector search
+- file retrieval
+- MCP-backed knowledge
+- database-backed context injection
+
+## Practical contributor notes
+
+## Read types first
+
+Because the system is heavily type-driven, reading `convo-types.ts` before changing runtime behavior will usually save time.
+
+## Preserve appendability
+
+A major design goal is that runtime state can often be written back into the conversation as messages. Be careful not to break this property when adding features.
+
+## Be cautious with parser changes
+
+The parser is compact and powerful, but regex/state changes can have surprising effects. Test:
+
+- nested embeds
+- heredocs
+- inline prompts
+- tags with dynamic statements
+- top-level blocks
+- functions inside mixed content
+
+## Flattening is the semantic center
+
+If syntax is what authors write, flattening is what the runtime means. Most behavior changes should be reasoned about in terms of flattening output, not only parsed input.
+
+## Distinguish source messages from flat messages
+
+Source messages are authored structures.
+Flat messages are evaluated runtime structures.
+
+Many bugs come from confusing the two.
+
+## Be explicit about visibility
+
+Convo-Lang has multiple visibility channels:
+
+- shown to user
+- sent to model
+- hidden render target
+- render only
+- model-only replacement content
+
+When adding a feature, decide which channel it belongs to.
+
+## Suggested onboarding path
+
+For a new contributor, this order works well:
+
+1. read `convo-types.ts`
+2. scan `convo-lib.ts` constants:
+   - `convoRoles`
+   - `convoTags`
+   - `convoFunctions`
+   - `convoVars`
+3. read `parseConvoCode()` in `convo-parser.ts`
+4. read `Conversation.append()`
+5. read `Conversation.flattenAsync()`
+6. read `_completeAsync()`
+7. inspect transforms, triggers, imports, and nodes
+8. trace one example from source text to completion output
+
+## Minimal end-to-end mental example
+
+A user authors:
+
+```convo
+> define
+Person=struct(name:string)
+
+> extern extractPerson(text:string) -> Person
+
+@json Person
+> user
+Extract the person from: Jane
+```
+
+At runtime:
+
+1. parser creates a define message, function message, and user message
+2. flatten executes the define block and records response format expectations
+3. completion service is chosen
+4. model receives the flat conversation
+5. model may return JSON or a function call depending on model/config
+6. output is appended into the conversation
+7. assigned values and result messages are written back for later state
+
+That loop is the essence of Convo-Lang.
+
+## Final advice
+
+Convo-Lang is easiest to understand when you treat it as three systems layered together:
+
+- a syntax and AST system
+- a conversation state and execution system
+- a provider integration and orchestration system
+
+When modifying behavior, always ask:
+
+- is this a parse-time concern
+- a flatten-time concern
+- a completion-time concern
+- or a UI/render concern
+
+That one question usually points you to the right file and the right abstraction level.
