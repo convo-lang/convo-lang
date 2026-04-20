@@ -1,0 +1,965 @@
+# Convo-VSCode Developer Documentation
+
+## Overview
+
+Convo-VSCode is the VSCode extension for working with Convo-Lang directly inside the editor.
+
+It provides a practical authoring and execution environment for `.convo` files, Convo-Make workflows, embedded Convo regions inside other languages, code block tooling, markdown preview support, and direct interaction with LLM-backed conversations.
+
+The extension is designed around a simple idea:
+
+- keep AI workflows in normal source files
+- make conversations executable inside the editor
+- make generated outputs reviewable before applying them
+- keep file generation and script execution visible
+- support custom workflows without forcing developers into a black-box agent UI
+
+In practice, Convo-VSCode turns VSCode into a lightweight but powerful agent workbench for the Convo ecosystem.
+
+## Value proposition
+
+Convo-VSCode gives developers a text-first way to build, run, inspect, and evolve AI workflows directly in source control.
+
+Its main value comes from combining a language-aware editor experience with execution and review tools.
+
+### Why this extension is useful
+
+- You can author prompts, tools, workflows, and automation in plain text.
+- You can run conversations without leaving VSCode.
+- You can review generated file outputs before writing them.
+- You can execute runnable shell blocks from convo responses.
+- You can use Convo-Make as an AI-powered build and scaffolding system.
+- You can embed Convo in Markdown, JavaScript, TypeScript, and Python authoring flows.
+- You stay in control of your files, prompts, outputs, and execution steps.
+
+The extension is especially useful for developers who want LLM assistance without giving up the visibility and discipline of a normal code workflow.
+
+### Core value prop in one sentence
+
+Convo-VSCode brings prompt engineering, agent execution, file generation, and AI-assisted project workflows into normal editable files with reviewable outputs and developer-controlled execution.
+
+## What Convo-VSCode is for
+
+Convo-VSCode is built for workflows such as:
+
+- authoring and running `.convo` conversations
+- debugging prompt and tool behavior
+- inspecting flattened conversation state
+- browsing evaluated variables
+- converting authored convo into provider-native request payloads
+- generating files from structured code block outputs
+- running shell scripts emitted by AI responses
+- building project scaffolding with Convo-Make
+- creating custom agent harnesses from imports and file conventions
+- embedding Convo source in JS, TS, Python, and Markdown workflows
+
+It is not just a syntax highlighter. It is an editor-integrated environment for the Convo runtime.
+
+## Use cases
+
+## 1. Author and run normal Convo conversations
+
+The most direct use case is editing `.convo` files and running them from the editor.
+
+Example:
+
+```convo
+> system
+You are a concise engineering assistant.
+
+> user
+Summarize the tradeoffs between REST and GraphQL.
+```
+
+From the extension, you can run the conversation, append the result back into the file, inspect messages, inspect flattened output, and continue the conversation over time.
+
+This is useful for:
+
+- prompt iteration
+- agent design
+- tool-calling experiments
+- workflow prototyping
+- durable conversational specs stored in source control
+
+## 2. Review generated file outputs before applying them
+
+Convo responses can include XML file blocks that target real files.
+
+Example:
+
+```xml
+<FILE_CONTENT name="example.ts" target-output-path="./src/example.ts">
+``` ts
+export const value='hello';
+```
+</FILE_CONTENT>
+```
+
+The extension recognizes these blocks and exposes actions such as:
+
+- open output
+- open diff
+- write output
+- copy output
+
+This makes AI-generated file output much safer and more practical in real projects because generation is inspectable and reviewable before you change the file system.
+
+## 3. Run shell scripts from convo output
+
+Convo responses can include runnable shell script blocks.
+
+Example:
+
+```xml
+<RUNNABLE_SCRIPT script-name="list-project" cwd="." target-shell-type="bash">
+``` bash
+# list project files
+ls -la
+```
+</RUNNABLE_SCRIPT>
+```
+
+The extension lets you run the script, streams output into the conversation as a structured `SCRIPT_OUTPUT` block, and can optionally continue the conversation after script execution.
+
+This is useful for:
+
+- controlled environment inspection
+- guided refactoring flows
+- project introspection
+- code generation followed by shell validation
+- iterative agent loops where the user stays in control of each action
+
+## 4. Use Convo-Make for AI-powered build and scaffolding flows
+
+The extension includes first-class support for Convo-Make files and targets.
+
+This enables workflows such as:
+
+- generate project files
+- review target outputs
+- rebuild a single target
+- sync target cache with output files
+- inspect build targets
+- open associated convo sources
+- delete generated outputs
+
+This is useful for AI-assisted scaffolding, codebase modernization, documentation generation, and repeatable project automation.
+
+## 5. Build file-based custom agent harnesses with imports
+
+One of the strongest workflows supported by the extension is using imports and file-based conventions to create custom agent harnesses.
+
+Instead of being locked into a fixed agent UI, you can build your own harness in plain files.
+
+Example:
+
+```convo
+@import ./shared/system-prompt.convo
+@import ./shared/tools.convo
+@import ./harness/review-rules.convo
+
+> define
+targetFile="./src/app.ts"
+
+> system
+Use the imported rules and tools to review and improve {{targetFile}}.
+
+> user
+Refactor the target file for readability and return a file output block.
+```
+
+This approach is powerful because you can organize behavior into files such as:
+
+- shared system prompts
+- reusable tool declarations
+- review rules
+- generation policies
+- style guides
+- environment-specific instructions
+- target-specific harnesses
+
+With imports, your agent harness becomes a file-based system that is:
+
+- modular
+- composable
+- reviewable
+- version-controlled
+- easy to diff
+- easy to extend
+
+The extension supports this naturally because the authoring model is file-first.
+
+## Staying in full control
+
+A major benefit of this import-based harness model is that you stay in control.
+
+You decide:
+
+- which files are imported
+- what tools are available
+- what instructions are shared
+- what targets the workflow can write to
+- whether generated output is written
+- whether scripts are executed
+- whether diffs are reviewed first
+- how the conversation is forked and continued
+
+Nothing requires handing control over to a hidden orchestration layer.
+
+This means you can build highly capable agent behaviors while preserving developer authority over:
+
+- source structure
+- prompts
+- execution boundaries
+- file writes
+- shell execution
+- project conventions
+
+That control is one of the extension's biggest practical advantages over opaque AI coding tools.
+
+## 6. Use Convo in mixed-language projects
+
+The extension supports embedded Convo syntax in several contexts, including:
+
+- JavaScript
+- TypeScript
+- JSX
+- TSX
+- Python
+- Markdown
+
+This makes it possible to use Convo-Lang in application code, docs, notebooks, and mixed tooling environments while still getting syntax highlighting and editor-aware behavior.
+
+## Main features
+
+## Language support
+
+The extension registers the `source.convo` language and associates it with:
+
+- `.convo`
+- `.convo-make`
+- `.convo-make-target`
+
+It provides syntax highlighting, language configuration, completion integration, and editor commands for this language.
+
+## Syntax highlighting
+
+The extension includes grammar definitions for Convo-Lang and embedded/injected grammars for:
+
+- JS/TS/JSX/TSX
+- Python
+- Markdown
+
+This allows Convo source to remain readable both in standalone files and in embedded contexts.
+
+## Path autocomplete for imports and embeds
+
+The extension provides completion suggestions for:
+
+- `@import ./...`
+- `{{@./...`
+
+It scans the workspace, filters hidden/generated paths as needed, ranks fuzzy matches, and inserts either a plain path or a `!file` variant where appropriate.
+
+This helps file-based harness authoring feel much faster and more discoverable.
+
+## Commands for running and inspecting conversations
+
+The extension contributes commands such as:
+
+- Complete
+- Complete Graph
+- Parse
+- Flatten
+- Flat Message Objects
+- Message Objects
+- Vars
+- Convert
+- Fork
+- Complete Fork
+- List Models
+- Open Settings
+- Modules
+
+These commands support both everyday prompt iteration and deeper runtime debugging.
+
+## Convo code block tooling
+
+The extension can parse special output code blocks from convo files and present them in a dedicated Code Blocks view.
+
+Supported workflows include:
+
+- inspecting grouped blocks by message
+- opening block source
+- opening referenced outputs
+- writing file outputs
+- diffing file outputs
+- copying block contents
+- running shell scripts
+- applying all actions in a message
+
+This makes generated outputs practical to inspect and manage at scale.
+
+## Runnable shell blocks
+
+Shell blocks can be executed from code lenses or from the Code Blocks view.
+
+The extension:
+
+- prompts before execution unless configured otherwise
+- runs scripts through bash
+- supports a configurable cwd via the block attribute
+- streams stdout and stderr back into the convo file
+- appends a structured `SCRIPT_OUTPUT` block
+- can optionally trigger convo completion after the script finishes
+
+This makes shell-assisted agent workflows possible while still keeping the execution visible in source.
+
+## Output file review and write flows
+
+For file output blocks, the extension supports:
+
+- opening the target file
+- showing a diff against the proposed content
+- writing the proposed content
+- copying the generated output
+
+This review-first model is one of the core safety and usability features of the extension.
+
+## Code lenses on output blocks
+
+The extension adds code lenses over recognized output blocks, including actions for:
+
+- Open Output
+- Write Output
+- Open Diff
+- Copy Output
+- Run Script
+- Run Script and complete
+
+These actions reduce friction during iterative workflows.
+
+## Code Blocks tree view
+
+The Code Blocks view shows parsed output blocks grouped by message and document.
+
+It supports:
+
+- switching between convo documents
+- pinning documents
+- tracking active and selected docs
+- applying all actions in a message
+- opening the message that produced a block
+- copying or diffing generated content
+
+This gives users a structured control panel for generated outputs across one or more convo files.
+
+## Make Build tree view
+
+The Make Build view provides visibility into Convo-Make builds and targets.
+
+It supports actions such as:
+
+- refresh make targets
+- build a target
+- stop active make
+- open build or target output
+- sync outputs
+- rebuild a single target
+- review-build a single target
+- delete one or all outputs
+- open target convo files
+
+This turns VSCode into a practical front end for Convo-Make.
+
+## Folding support
+
+The extension provides custom folding support for:
+
+- conversation message blocks
+- XML tag regions
+
+This improves readability for longer convo files and output-heavy conversations.
+
+## Document links for imports
+
+The extension turns import paths into clickable links so authors can jump quickly to referenced files.
+
+This is especially useful in modular, imported harness setups.
+
+## Markdown preview highlighting
+
+The extension registers a markdown-it plugin and a Shiki-based highlighter for `convo` fenced blocks in Markdown preview.
+
+This helps when documentation or prompt design is done in Markdown rather than only in `.convo` files.
+
+## Embedded Convo support
+
+The extension injects Convo syntax into supported language scopes so that inline Convo regions in source files remain readable and maintain authoring ergonomics.
+
+This is especially relevant for:
+
+- JS/TS `convo` template literal workflows
+- Python embedded blocks
+- Markdown fenced convo blocks
+
+## Typing helpers
+
+The extension adds typing conveniences for Convo regions, including:
+
+- auto-closing XML tags in appropriate contexts
+- custom tab behavior for markdown image editing inside convo content
+
+These are small features, but they improve the authoring experience significantly.
+
+## Image paste support
+
+When editing Convo documents, image paste support can turn pasted images or file URIs into markdown data URL image references.
+
+This is useful for multimodal or reference-rich workflows where screenshots or diagram snippets need to be embedded directly in the conversation.
+
+## LSP-backed validation
+
+The extension starts a language server that parses Convo source and reports syntax errors as diagnostics.
+
+This gives immediate feedback for malformed convo code during authoring.
+
+## Settings
+
+The extension exposes configuration for core model/provider settings, including:
+
+- `convo.defaultModel`
+- `convo.openAiBaseUrl`
+- `convo.openAiApiKey`
+- `convo.awsBedrockProfile`
+- `convo.awsBedrockApiKey`
+- `convo.awsBedrockRegion`
+- `convo.openRouterBaseUrl`
+- `convo.openRouterApiKey`
+
+These settings allow the extension to operate against different model providers and compatible endpoints.
+
+## Key commands and workflows
+
+## Complete a conversation
+
+Runs the active conversation and appends the result.
+
+Primary command:
+
+- `convo.complete`
+
+Default keybinding:
+
+- `Ctrl+R`
+- `Cmd+R` on macOS
+
+## Complete a graph conversation
+
+Runs a convo using graph behavior.
+
+Primary command:
+
+- `convo.complete-graph`
+
+## Fork a conversation
+
+Creates a copy of the conversation in a new file.
+
+Primary commands:
+
+- `convo.split`
+- `convo.split-complete`
+
+Default keybinding for complete-fork:
+
+- `Ctrl+Shift+R`
+- `Cmd+Shift+R` on macOS
+
+## Create a new convo file
+
+Primary command:
+
+- `convo.new`
+
+## Inspect parsed or flattened state
+
+Useful commands:
+
+- `convo.parse`
+- `convo.text`
+- `convo.flat`
+- `convo.flat-all`
+- `convo.messages`
+- `convo.vars`
+- `convo.convert`
+- `convo.modules`
+
+These are especially valuable when debugging imports, transforms, tool exposure, graph logic, and variable evaluation.
+
+## How the extension fits into the ecosystem
+
+Convo-VSCode is the editor-facing tool in the broader Convo ecosystem.
+
+It sits on top of the core runtime and exposes that runtime in a developer workflow.
+
+## Relationship to Convo-Lang core
+
+The extension uses Convo-Lang itself for:
+
+- parsing
+- flattening
+- execution
+- conversation state management
+- model completion
+- code block extraction semantics
+
+This means the VSCode experience is not a separate approximation of the runtime. It is using the same language model and core behaviors as the rest of the ecosystem.
+
+## Relationship to Convo-Make
+
+Convo-Make support inside the extension makes AI-powered project generation and review workflows practical during normal development.
+
+The extension acts as the interactive frontend for inspecting targets, reviewing outputs, rebuilding files, and syncing generated state.
+
+## Relationship to Convo-CLI and services
+
+The extension creates and configures Convo CLI instances under the hood to run conversations and builds inside the editor process.
+
+That means local editor workflows align closely with CLI-driven workflows, which is important for consistency between local experimentation and automation.
+
+## Relationship to Convo-View and browser-facing tools
+
+Although Convo-View is a chat UI and the extension is an editor tool, both are built on the same Convo runtime concepts.
+
+In practice, the extension is the best environment for authorship, debugging, and generation review, while other tools can provide runtime UX for end users.
+
+## Why this ecosystem positioning matters
+
+Because the extension is attached to the same core architecture, you can:
+
+- prototype a workflow in VSCode
+- move it into CLI automation
+- reuse the same conversation files
+- reuse the same imports
+- reuse the same runtime assumptions
+- reuse the same model/provider configuration strategy
+
+That continuity is a major ecosystem strength.
+
+## Custom file-based agent harnesses with imports
+
+One of the best advanced patterns for Convo-VSCode is to build agents out of files rather than monolithic prompts.
+
+## Basic pattern
+
+A harness might be split into files like:
+
+- `base-system.convo`
+- `coding-rules.convo`
+- `repo-map.convo`
+- `review-tools.convo`
+- `task-harness.convo`
+
+Then the active task file imports them.
+
+```convo
+@import ./base-system.convo
+@import ./coding-rules.convo
+@import ./review-tools.convo
+@import ./repo-map.convo
+
+> define
+task="Refactor the auth flow"
+
+> user
+Complete the task: {{task}}
+Return file outputs as XML file blocks.
+```
+
+This pattern works especially well in VSCode because:
+
+- imports are linkable
+- paths can autocomplete
+- generated file outputs can be reviewed in-place
+- shell steps can be run from the same workflow
+- the whole harness remains visible as source files
+
+## Why this is better than hidden harnesses
+
+A hidden harness usually means some combination of:
+
+- invisible system prompts
+- secret middleware transforms
+- runtime-only tool wiring
+- behavior stored in opaque UI configuration
+
+A file-based harness means:
+
+- everything is inspectable
+- everything is reviewable
+- changes are diffable
+- prompt and tool evolution is explicit
+- teams can collaborate using normal source control practices
+
+## Full control as a design principle
+
+With Convo-VSCode, the extension helps execute the workflow, but the workflow remains yours.
+
+You control:
+
+- imported source files
+- prompt layering
+- tool exposure
+- target output conventions
+- script blocks
+- write approval
+- diff review
+- fork strategy
+- build structure
+- project-local harness evolution
+
+This makes the extension a developer-controlled environment rather than a prescriptive AI coding shell.
+
+## Feature list summary
+
+A concise feature list:
+
+- Convo language registration for `.convo`, `.convo-make`, and `.convo-make-target`
+- syntax highlighting for Convo-Lang
+- injected highlighting for JS/TS/JSX/TSX, Python, and Markdown
+- import and embed path autocomplete
+- LSP diagnostics
+- document links for imports
+- conversation execution commands
+- graph execution command
+- flatten/parse/vars/message inspection commands
+- model conversion command
+- fork and complete-fork commands
+- output block code lenses
+- file output diff/write/open/copy actions
+- runnable shell script blocks
+- structured `SCRIPT_OUTPUT` append flow
+- Code Blocks tree view
+- Make Build tree view
+- Convo-Make target actions
+- markdown preview highlighting for convo fences
+- typing helpers
+- image paste as markdown data URLs
+- settings for model/provider configuration
+
+## File-by-file guide
+
+This section lists the main extension files included in the `packages/convo-lang-tools` client and server implementation and explains their role.
+
+## Client package root
+
+### `packages/convo-lang-tools/package.json`
+
+Defines the VSCode extension manifest.
+
+It declares:
+
+- activation events
+- contributed commands
+- menus
+- keybindings
+- language registrations
+- grammar registrations
+- views
+- settings
+- markdown integration
+
+This file is the extension's public contract with VSCode.
+
+## Client entry and registration
+
+### `lsp/client/src/extension.ts`
+
+The main client-side extension entry point.
+
+It is responsible for:
+
+- activating the extension
+- creating the `ConvoExt` coordinator
+- registering commands
+- registering typing and paste handlers
+- registering the Code Blocks view
+- registering the Make Build view
+- starting the language server
+- registering document link, code lens, completion, and folding providers
+- wiring markdown preview integration
+
+This is the top-level file to read to understand how the extension starts.
+
+### `lsp/client/src/ConvoExt.ts`
+
+Central extension coordinator for shared runtime/editor integration state.
+
+It manages:
+
+- active Convo-Make controllers
+- build event publication
+- scanning for make files
+- creating build controllers
+- constructing CLI config from VSCode settings
+
+This file is important for understanding how extension settings become runtime behavior.
+
+### `lsp/client/src/build-const.ts`
+
+Contains extension metadata constants such as the publisher id used for settings lookup.
+
+## Completion and command flows
+
+### `lsp/client/src/completion-provider.ts`
+
+Registers and implements the main Convo commands.
+
+Despite its name, this file is much broader than autocomplete. It drives workflows such as:
+
+- complete
+- complete graph
+- parse
+- flatten
+- vars
+- messages
+- convert
+- fork
+- make actions
+- open settings
+- list models
+- module inspection
+
+This is one of the most important files in the extension.
+
+### `lsp/client/src/autocomplete-provider.ts`
+
+Provides path completion for import and embed contexts.
+
+It handles:
+
+- context detection for `@import` and embed paths
+- workspace file scanning
+- hidden/generated path filtering
+- fuzzy scoring and ranking
+- insertion text generation
+
+This file matters a lot for modular file-based harness authoring.
+
+## Code block and output workflows
+
+### `lsp/client/src/code-block-lib.ts`
+
+Core library for parsing, identifying, diffing, writing, and executing recognized output code blocks.
+
+It handles:
+
+- extracting file and shell output tags from parsed convo messages
+- grouping code blocks by message
+- output preview management
+- writing output files
+- executing shell blocks
+- prompting for shell execution approval
+- appending `SCRIPT_OUTPUT` blocks
+
+This is the key file behind the extension's output-action model.
+
+### `lsp/client/src/output-tag-code-lens.ts`
+
+Adds code lenses to recognized output blocks and registers related commands.
+
+It exposes actions such as:
+
+- open output
+- write output
+- open diff
+- copy output
+- run script
+- run script and complete
+
+### `lsp/client/src/convo-code-block-view.ts`
+
+Implements the Code Blocks tree view.
+
+It supports:
+
+- listing code blocks by convo document
+- grouping them by message
+- tracking active/selected/pinned docs
+- applying all actions in a message
+- opening related messages
+- diffing, writing, copying, and running outputs
+
+This file powers one of the extension's most workflow-oriented UI features.
+
+## Editing and authoring helpers
+
+### `lsp/client/src/link-provider.ts`
+
+Provides clickable document links for import paths inside convo files.
+
+### `lsp/client/src/folding-provider.ts`
+
+Provides folding ranges for:
+
+- conversation blocks
+- XML tag blocks
+
+### `lsp/client/src/typing-handler.ts`
+
+Provides typing-related UX enhancements.
+
+It implements:
+
+- XML tag auto-closing in Convo-aware contexts
+- special tab behavior for markdown image editing
+
+### `lsp/client/src/register-image-paste-handler.ts`
+
+Registers image paste handling for convo documents.
+
+It can convert pasted image content or file URI images into markdown data URL image references.
+
+### `lsp/client/src/util.ts`
+
+Contains small utility helpers used across the client, such as editor reveal helpers and relative time helpers.
+
+## Grammar and markdown support
+
+### `lsp/client/src/convoGrammar.ts`
+
+Defines the Convo grammar used for syntax highlighting and embedded language behavior.
+
+It includes patterns for:
+
+- roles
+- tags
+- expressions
+- strings
+- embeds
+- XML
+- markdown links
+- fenced code blocks
+- injected embedded language regions
+
+This is the central syntax definition file.
+
+### `lsp/client/src/markdown-preview.ts`
+
+Registers markdown preview behavior for `convo` fenced blocks.
+
+It uses Shiki-based highlighting and refreshes markdown preview once the grammar is ready.
+
+## Make and shell integration
+
+### `lsp/client/src/ConvoCliShell.ts`
+
+Provides shell execution behavior for Convo-Make integration.
+
+It wraps command execution and process output into the interface expected by the make runtime.
+
+## Git integration
+
+### `lsp/client/src/git-helper.ts`
+
+Utility helpers for interacting with the built-in VSCode Git extension, primarily to detect ignored files.
+
+### `lsp/client/src/git.d.ts`
+
+Local type declarations for the VSCode Git extension API used by the extension.
+
+## Language server
+
+### `lsp/server/src/server.ts`
+
+Implements the language server.
+
+It currently focuses on parsing document text and publishing syntax diagnostics based on `parseConvoCode()` results.
+
+This is the foundation of editor validation support.
+
+## Additional make-related files
+
+The extension also references make-related UI classes under:
+
+- `lsp/client/src/make/ConvoMakeExtTree.ts`
+- `lsp/client/src/make/ConvoMakeExtBuild.ts`
+- `lsp/client/src/make/ConvoMakeExtTarget.ts`
+
+These support the Make Build view and target-level interactions.
+
+## Typical workflow examples
+
+## Prompt and output review workflow
+
+1. Author a `.convo` file.
+2. Run `Convo: Complete`.
+3. Let the assistant emit `FILE_CONTENT` blocks.
+4. Review each output in the Code Blocks panel.
+5. Open diff.
+6. Write only the outputs you approve.
+
+This is a clean workflow for controlled AI-assisted editing.
+
+## Script-assisted workflow
+
+1. Ask the assistant to generate a `RUNNABLE_SCRIPT`.
+2. Review the script in the convo output.
+3. Run it from the code lens or Code Blocks view.
+4. Inspect the appended `SCRIPT_OUTPUT`.
+5. Continue the conversation based on the result.
+
+This keeps shell execution explicit and traceable.
+
+## Imported harness workflow
+
+1. Create reusable imported convo files for tools, prompts, and policies.
+2. Build a task-specific `.convo` file that imports them.
+3. Use path autocomplete and import links during authoring.
+4. Run the task.
+5. Review file outputs and scripts before applying them.
+
+This is one of the best ways to create team-friendly, source-controlled agent harnesses.
+
+## Design strengths of the extension
+
+The extension has several notable design strengths.
+
+## It is file-first
+
+The core unit of work is a source file, not a hidden chat session.
+
+## It is review-first
+
+Generated file changes can be diffed and selectively written.
+
+## It is modular
+
+Imports and file composition make it easy to build reusable harnesses.
+
+## It is transparent
+
+Shell execution, script output, and file output stay visible in source.
+
+## It aligns with the wider runtime
+
+The extension is not inventing a separate model. It exposes the same core runtime used elsewhere in the ecosystem.
+
+## Final takeaway
+
+Convo-VSCode is more than a syntax extension.
+
+It is a developer-facing workbench for Convo-Lang that combines:
+
+- language tooling
+- conversation execution
+- output review
+- shell integration
+- make/build flows
+- embedded language support
+- modular import-based harness authoring
+
+Its biggest practical advantage is that it lets you build powerful AI workflows in normal files while staying in full control of prompts, imports, tools, outputs, and execution steps.
+
+That makes it especially valuable for developers who want AI assistance without surrendering visibility, reviewability, or authorship.

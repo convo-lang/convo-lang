@@ -1,3 +1,33 @@
+@import ../base.convo
+@import ../../packages/convo-lang-tools/README.md !file
+@import ../../docs/convo-lang.md !file
+@import ../../docs/convo-vscode.md !file
+
+> user
+Update the README for the VSCode extension. Make it scoped to the extension. It currently is scoped 
+to Convo-Lang as a whole
+
+save to `../../packages/convo-lang-tools/README.md`
+
+
+@time 2026-04-19T18:43:23-04:00
+@tokenUsage 21068 / 62 / $0.052825000000000004
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick question:
+
+Do you want me to fully replace the current `packages/convo-lang-tools/README.md` with an extension-specific README, or keep some shared Convo-Lang sections like model support / JS usage / CLI usage if they still help extension users?
+
+
+> user
+keep some shared Convo-Lang sections like model support / JS usage / CLI usage if they still help extension users
+
+@time 2026-04-19T18:45:05-04:00
+@tokenUsage 21160 / 4280 / $0.0636
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT_ name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="14351946c18f29fddd88f1fee4486061d05052fb">
+```md
 # Convo-VSCode
 VSCode tools for Convo-Lang
 
@@ -70,10 +100,10 @@ Common settings include:
 ### 1. Create a `.convo` file
 
 ```convo
-> system
+\> system
 You are a concise engineering assistant.
 
-> user
+\> user
 Summarize the tradeoffs between REST and GraphQL.
 ```
 
@@ -163,11 +193,11 @@ Example:
 @import ./shared/system-prompt.convo
 @import ./shared/tools.convo
 
-> define
+\> define
 targetFile="./src/app.ts"
 
-> user
-Review and improve {{targetFile}} and return a FILE_CONTENT block.
+\> user
+Review and improve \{{targetFile}} and return a FILE_CONTENT block.
 ```
 
 ### Code Blocks view
@@ -204,13 +234,11 @@ When a convo response includes a `FILE_CONTENT` block, the extension can open, d
 
 Example:
 
-*(note - file blocks actually use triple backticks but the example show only 2 due to markdown formatting limitations)*
-
 ```xml
 <FILE_CONTENT name="example.ts" target-output-path="./src/example.ts">
-`` ts
+``` ts
 export const value='hello';
-``
+```
 </FILE_CONTENT>
 ```
 
@@ -224,10 +252,10 @@ Example:
 
 ```xml
 <RUNNABLE_SCRIPT script-name="list-project" cwd="." target-shell-type="bash">
-`` bash
+``` bash
 # list project files
 ls -la
-``
+```
 </RUNNABLE_SCRIPT>
 ```
 
@@ -349,10 +377,10 @@ import { initOpenAiBackend } from '@convo-lang/convo-lang';
 initOpenAiBackend();
 
 const planets=await convo`
-> system
+\> system
 You are a super smart and funny astronomer that love make funny quotes
 
-> define
+\> define
 Planet = struct(
     name: string
     moonCount: number
@@ -360,7 +388,7 @@ Planet = struct(
 )
 
 @json Planet[]
-> user
+\> user
 List the planets in our solar system
 `;
 
@@ -478,3 +506,8 @@ X - https://x.com/ConvoLang
 ## Change Log
 
 See repository history and releases for the latest extension changes.
+```
+</FILE_CONTENT_>
+
+
+> user

@@ -1,3 +1,40 @@
+@import ../base.convo
+@import ../../README.md !file
+@import ../../docs/convo-lang.md !file
+
+> user
+Update the README
+
+@time 2026-04-19T17:51:31-04:00
+@tokenUsage 15369 / 75 / $0.038610000000000005
+@model gpt-5.4-2026-03-05
+> assistant
+What would you like changed in the README?
+
+If helpful, I can:
+- improve wording/grammar only
+- rewrite sections for clarity/marketing
+- add missing docs sections
+- update version/change log entries
+- sync it with `docs/convo-lang.md`
+- shorten or reorganize it
+
+Please tell me the goal or specific edits you want.
+
+
+> user
+Do:
+- improve wording/grammar
+- rewrite sections for clarity/marketing
+- add missing docs sections
+- sync it with `docs/convo-lang.md`
+
+@time 2026-04-19T17:53:54-04:00
+@tokenUsage 15484 / 9023 / $0.0612675
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="README.md" target-output-path="../../README.md" last-commit="14351946c18f29fddd88f1fee4486061d05052fb">
+```md
 # Convo-Lang
 The language of AI
 
@@ -267,10 +304,10 @@ import { convo, initOpenAiBackend } from '@convo-lang/convo-lang';
 initOpenAiBackend();
 
 const planets = await convo`
-> system
+\> system
 You are a super smart and funny astronomer that loves making funny quotes
 
-> define
+\> define
 Planet = struct(
     name: string
     moonCount: number
@@ -278,7 +315,7 @@ Planet = struct(
 )
 
 @json Planet[]
-> user
+\> user
 List the planets in our solar system
 `;
 
@@ -358,11 +395,11 @@ const Planet = z.object({
 const planetName = 'Mars';
 
 const planet = await convo`
-> system
+\> system
 You are an astronomy assistant
 
 @json ${Planet}
-> user
+\> user
 Describe the planet ${planetName}.
 `;
 
@@ -819,3 +856,8 @@ X - https://x.com/ConvoLang
   - Import system
   - Caching
   - Stats tracking
+```
+</FILE_CONTENT>
+
+
+> user
