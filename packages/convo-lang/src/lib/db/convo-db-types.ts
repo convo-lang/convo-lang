@@ -719,6 +719,16 @@ export type ConvoNodeStreamItem<T extends keyof ConvoNode>={
     node:Pick<ConvoNode,T>;
 }|{
     /**
+     * Indicates all items in the current buffer have been sent / flushed
+     */
+    type:'flush',  
+}|{
+    /**
+     * Used to keep connections alive.
+     */
+    type:'ping',  
+}|{
+    /**
      * Sent after all initial nodes of a query have been sent and the query start watching for changes.
      */
     type:'watch-start',    

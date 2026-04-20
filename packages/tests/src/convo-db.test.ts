@@ -6,7 +6,7 @@ import { CancelToken, createPromiseSource, deepClone, uuid } from "@iyio/common"
 import { expect, test } from "bun:test";
 
 type Type='bun-sqlite'|'node'|'mem'|'http';
-const type:Type='bun-sqlite' as Type;
+const type:Type='mem' as Type;
 
 const createStore=()=>(
     type==='http'?
@@ -1111,7 +1111,6 @@ test("Should stream watch events",async ()=>{
             for(const node of insertNodesSrc){
                 await store.updateNodeAsync({path:node.path,data:{done:true}},{mergeData:true})
             }
-
             for(const node of insertNodesSrc){
                 await store.deleteNodeAsync(node.path);
             }

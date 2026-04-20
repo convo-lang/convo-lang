@@ -17,6 +17,7 @@ export * from './lib/ConvoSuggestionsView.js';
 export * from './lib/ConvoTaskView.js';
 export * from './lib/ConvoTaskViewLegacy.js';
 export * from './lib/ConvoView.js';
+export * from './lib/db/convo-db-hooks.js';
 export * from './lib/gen/createConvoVfsGenRenderer.js';
 export * from './lib/gen/gen-lib.js';
 export * from './lib/gen/Gen.js';

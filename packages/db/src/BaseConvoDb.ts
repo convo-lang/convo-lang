@@ -392,6 +392,20 @@ export abstract class BaseConvoDb implements ConvoDb
                         statusCode:item.statusCode,
                     }
 
+                case 'flush':
+                case 'ping':
+                    break;
+
+                case 'node-insert':
+                case 'node-update':
+                case 'node-delete':
+                case 'watch-start':
+                    return {
+                        success:false,
+                        error:`Unsupported command for non-streaming query - ${item.type}`,
+                        statusCode:500,
+                    }
+
                 default:
                     return {
                         success:false,
@@ -540,6 +554,13 @@ export abstract class BaseConvoDb implements ConvoDb
                     if(query.watch && !watcher && !query.steps[state.step]){
                         const lastStep=query.steps[query.steps.length-1];
                         if(lastStep){
+                            const iv=setInterval(()=>{
+                                if(watcher?.next){
+                                    const w=watcher.next;
+                                    delete watcher.next;
+                                    w('ping');
+                                }
+                            },60000);
                             watcher={
                                 condition:{
                                     path:lastStep.path,
@@ -548,7 +569,19 @@ export abstract class BaseConvoDb implements ConvoDb
                                 },
                                 itemMap:{},
                                 loopCount:0,
+                                lastSend:0,
                                 dispose:cancel.subscribe(()=>{
+                                    clearInterval(iv);
+                                    if(watcher){
+                                        if(watcher.next){
+                                            watcher.next([{type:'error'}]);
+                                        }else{
+                                            if(!watcher.queue){
+                                                watcher.queue=[];
+                                            }
+                                            watcher.queue.push({type:'error'})
+                                        }
+                                    }
                                     watcher?.next?.([{type:'error'}]);
                                 })
                             }
@@ -605,6 +638,9 @@ export abstract class BaseConvoDb implements ConvoDb
                                     }
                                 }
                                 state.returnedCount++;
+                                if(watcher){
+                                    watcher.lastSend=Date.now();
+                                }
                                 yield {type:'node',node:node as any,...watcher?.itemMap[node.path??''] as any};
                                 if(hasLimit && state.returnedCount>=limit){
                                     return;
@@ -612,6 +648,7 @@ export abstract class BaseConvoDb implements ConvoDb
                             }
                             if(cancel.isCanceled){return;}
                         }
+                        yield {type:'flush'}
                     }
                     state.flushIndex=undefined;
                 }
@@ -635,20 +672,19 @@ export abstract class BaseConvoDb implements ConvoDb
                         }
                         watcher.loopCount++;
 
-                        let update:WatcherUpdate[];
+                        let update:WatcherUpdate[]|'ping';
                         if(watcher.queue){
                             update=watcher.queue;
                             delete watcher.queue;
                         }else{
                             try{
-                                update=await new Promise<WatcherUpdate[]>((resolve,reject)=>{
+                                update=await new Promise<WatcherUpdate[]|'ping'>((resolve,reject)=>{
                                     if(!watcher){
                                         reject('watcher unset');
                                         return;
                                     }
                                     watcher.next=resolve;
                                 });
-                                if(cancel.isCanceled){return;}
                             }catch(ex){
                                 yield errorResultToConvoNodeStreamItem({
                                     success:false,
@@ -657,6 +693,11 @@ export abstract class BaseConvoDb implements ConvoDb
                                 },state);
                                 return;
                             }
+                        }
+                        if(cancel.isCanceled){return;}
+                        if(update==='ping'){
+                            yield {type:'ping'};
+                            continue;
                         }
                         let paths:string[]=[];
                         for(const i of update){
@@ -1736,7 +1777,7 @@ interface WatcherUpdate
 interface Watcher
 {
     condition:ConvoNodeWatchCondition;
-    next?:(items:WatcherUpdate[])=>void;
+    next?:(items:WatcherUpdate[]|'ping')=>void;
     /**
      * Stores stream items until next can be called.
      */
@@ -1746,4 +1787,5 @@ interface Watcher
     itemMap:Record<string,Partial<ConvoNodeStreamItem<any>>>;
 
     loopCount:number;
+    lastSend:number;
 }

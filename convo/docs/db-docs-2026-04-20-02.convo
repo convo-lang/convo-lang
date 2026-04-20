@@ -1,3 +1,35 @@
+@import .././base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang-react/src/lib/db/convo-db-hooks.ts !file
+@import ../../docs/convo-db.md !file
+
+
+> user
+Update the `convo-db.md` document to include information about `useConvoDbQuery` and `useConvoNodesAtPath`, 
+include an example using each hook.
+
+Include a note that they can be imported from `@convo-lang/convo-lang-react`
+
+
+@time 2026-04-20T11:14:05-04:00
+@tokenUsage 32664 / 50 / $0.08178500000000001
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick question:
+
+Do you want the new hook documentation added as a new React-specific section near the end of `convo-db.md`, or should I weave it into the existing querying/streaming sections?
+
+
+> user
+Include a dedicated section that details the props of the hooks and mention it in the intro
+
+@time 2026-04-20T11:17:41-04:00
+@tokenUsage 32738 / 7336 / $0.100185
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-db.md" last-commit="30a8f1a5a62fd1e6f6acc3f3699000b6b5c0305d" target-output-path="../../docs/convo-db.md">
+``` md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
@@ -929,6 +961,7 @@ Example query shape:
         },
     ],
     watch:true,
+    limit:20,
 }
 ```
 
@@ -997,12 +1030,12 @@ Additional state-specific fields include:
 #### Example using `useConvoDbQuery`
 
 ```tsx
+import { useMemo } from 'react';
 import { useConvoDbQuery } from '@convo-lang/convo-lang-react';
 
 export function ProUsersList()
 {
-
-    const result=useConvoDbQuery({
+    const query=useMemo(()=>({
         steps:[
             {
                 path:'/users/*',
@@ -1017,6 +1050,10 @@ export function ProUsersList()
             prop:'path',
             direction:'asc',
         },
+    }),[]);
+
+    const result=useConvoDbQuery(query,{
+        debounceMs:100,
     });
 
     if(result.state==='disabled' || result.state==='loading'){
@@ -1654,3 +1691,9 @@ import {
     LayeredConvoDb,
 } from '@convo-lang/db';
 ```
+
+```
+</FILE_CONTENT>
+
+
+> user

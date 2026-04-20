@@ -1,5 +1,5 @@
 import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
-import { minuteMs, uuid } from "@iyio/common";
+import { CancelToken, minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
 import { streamSSE } from 'hono/streaming';
@@ -608,6 +608,7 @@ export const getConvoHonoRoutes=({
             await initConvoHonoAsync();
 
             let id=0;
+            let ping=0;
 
             const store=getDb(c.req.param('dbName'));
             if(!store){
@@ -626,12 +627,67 @@ export const getConvoHonoRoutes=({
 
             const query=await c.req.json<ConvoNodeQuery>();
 
-            for await(const node of store.streamNodesAsync(query)){
-                await stream.writeSSE({
-                    event:'node',
-                    id:(id++).toString(),
-                    data:JSON.stringify(node)
-                })
+            let queue:ConvoNodeStreamItem<any>[]=[];
+            let isWriting=false;
+            const iv=setInterval(async ()=>{
+                if(isWriting){
+                    return;
+                }
+                isWriting=true;
+                try{
+                    await stream.writeSSE({
+                        event:'ping',
+                        id:'p'+(ping++),
+                        data:'null'
+                    });
+                    if(queue.length){
+                        const q=queue;
+                        queue=[];
+                        for(const item of q){
+                            await stream.writeSSE({
+                                event:'node',
+                                id:(id++).toString(),
+                                data:JSON.stringify(item)
+                            });
+                        }
+                    }
+                }catch(ex){
+                    console.error('Write SSE ping failed',ex);    
+                }finally{
+                    isWriting=false;
+                }
+            },7500);
+            try{
+                const cancel=new CancelToken();
+                stream.onAbort(()=>{
+                    cancel.cancelNow();
+                });
+                if(cancel.isCanceled){
+                    return;
+                }
+
+
+                for await(const item of store.streamNodesAsync(query,cancel)){
+                    if(isWriting){
+                        queue.push(item);
+                    }else{
+                        isWriting=true;
+                        try{
+                            await stream.writeSSE({
+                                event:'node',
+                                id:(id++).toString(),
+                                data:JSON.stringify(item)
+                            });
+                        }finally{
+                            isWriting=false;
+                        }
+                    }
+                    if(cancel.isCanceled){
+                        break;
+                    }
+                }
+            }finally{
+                clearInterval(iv);
             }
 
         });
