@@ -2,16 +2,16 @@ import { ConvoNodePermissionType, HttpConvoCompletionService, type ConvoNode, ty
 import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
 import { NodeSQLiteConvoDb } from "@convo-lang/db/NodeSQLiteConvoDb.js";
-import { uuid } from "@iyio/common";
+import { CancelToken, createPromiseSource, deepClone, uuid } from "@iyio/common";
 import { expect, test } from "bun:test";
 
-type Type='bun'|'node'|'mem'|'http';
-const type:Type='bun' as Type;
+type Type='bun-sqlite'|'node'|'mem'|'http';
+const type:Type='bun-sqlite' as Type;
 
 const createStore=()=>(
     type==='http'?
         new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
-    :type==='bun'?
+    :type==='bun-sqlite'?
         new BunSqliteConvoDb({})
     :type==='node'?
         new NodeSQLiteConvoDb({})
@@ -1015,4 +1015,129 @@ test("permission guarded edge and embedding update/delete operations allow acces
         permissionFrom:'/admin',
     });
     expect(embeddingDelete.success).toBe(true);
+});
+
+
+test("Should stream watch events",async ()=>{
+    const store=createStore();
+
+    const nodesSrc:ConvoNode[]=[
+        {path:'/users/bart',type:'user',data:{name:'Bart'}},
+        {path:'/users/jeff',type:'user',data:{name:'Jeff'}},
+        {path:'/users/kevin',type:'user',data:{name:'Kevin'}},
+    ]
+
+    const insertNodesSrc:ConvoNode[]=[
+        {path:'/users/alex',type:'user',data:{name:'Alex'}},
+        {path:'/users/bobby',type:'user',data:{name:'bobby'}},
+        {path:'/users/zander',type:'user',data:{name:'Zander'}},
+    ]
+
+    const updateNodesSrc:ConvoNode[]=[
+        {path:'/users/bill',type:'user',data:{name:'Blex'}},
+        {path:'/users/mater',type:'user',data:{name:'Mater'}},
+    ]
+
+    for(const node of nodesSrc){
+        await store.insertNodeAsync(deepClone(node));
+    }
+    await store.insertNodeAsync({path:'/tools/hammer',type:'tool',data:{weight:4}});
+
+    const cancel=new CancelToken();
+    cancel.cancelAfter(3000);
+
+    const startNodes:ConvoNode[]=[];
+    const insertNodes:ConvoNode[]=[];
+    const updateNodes:ConvoNode[]=[];
+    const deleteNodes:string[]=[];
+    let started=false;
+    let startCount=0;
+    let error:any=null;
+    const startInserts=createPromiseSource<void>();
+    const endInserts=createPromiseSource<void>();
+    await Promise.all([
+        (async ()=>{
+            for await(const item of store.streamNodesAsync({
+                keys:'*',
+                steps:[{
+                    path:'/users/*'
+                }],
+                watch:true,
+            },cancel)){
+                switch(item.type){
+
+                    case 'error':
+                        error=item;
+                        break;
+
+                    case 'node-insert':
+                        insertNodes.push(item.node);
+                        break;
+
+                    case 'node-update':
+                        updateNodes.push(item.node);
+                        break;
+
+                    case 'node-delete':
+                        deleteNodes.push(item.node.path);
+                        if(deleteNodes.length===insertNodesSrc.length){
+                            endInserts.resolve();
+                        }
+                        break;
+
+                    case 'node':
+                        startNodes.push(item.node);
+                        break;
+
+                    case 'watch-start':
+                        started=true;
+                        startCount++;
+                        startInserts.resolve();
+                        break;
+                        
+
+                }
+            }
+        })(),
+        (async ()=>{
+            await startInserts.promise;
+
+            for(const node of insertNodesSrc){
+                await store.insertNodeAsync(deepClone(node));
+            }
+
+            await store.insertNodeAsync({path:'/tools/nail-gun',type:'tool',data:{capacity:150}});
+
+            for(const node of insertNodesSrc){
+                await store.updateNodeAsync({path:node.path,data:{done:true}},{mergeData:true})
+            }
+
+            for(const node of insertNodesSrc){
+                await store.deleteNodeAsync(node.path);
+            }
+
+            await endInserts.promise;
+
+            cancel.cancelNow();
+        })(),
+    ]);
+
+    expect(error).toBeNull();
+    expect(started).toBeTrue();
+    expect(startCount).toBe(1);
+
+    startNodes.sort((a,b)=>a.path.localeCompare(b.path));
+    expect(startNodes).toEqual(nodesSrc);
+
+    insertNodes.sort((a,b)=>a.path.localeCompare(b.path));
+    expect(insertNodes).toEqual(insertNodesSrc);
+
+    updateNodes.sort((a,b)=>a.path.localeCompare(b.path));
+    expect(updateNodes).toEqual(insertNodesSrc.map(v=>({...v,data:{...v.data,done:true}})));
+
+    deleteNodes.sort();
+    expect(deleteNodes).toEqual(insertNodesSrc.map(v=>v.path));
+
+    
+
 });

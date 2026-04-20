@@ -1,5 +1,5 @@
-import { allConvoStepStages, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStreamItem, ConvoNodeUpdate, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
-import { CancelToken, getErrorMessage, getValueByPath } from "@iyio/common";
+import { allConvoStepStages, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeQueryStep, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
 
 
@@ -372,9 +372,10 @@ export abstract class BaseConvoDb implements ConvoDb
         const limitedQuery:ConvoNodeQuery<TKeys>={
             ...query,
             limit,
+            watch:false,
         };
 
-        streamLoop: for await(const item of this._streamNodesAsync<TKeys>(limitedQuery,stateResult)){
+        streamLoop: for await(const item of this._streamNodesAsync<TKeys>(false,limitedQuery,stateResult)){
             switch(item.type){
 
                 case 'node':
@@ -434,10 +435,12 @@ export abstract class BaseConvoDb implements ConvoDb
         :
             keyof ConvoNode
     >>{
-        return this._streamNodesAsync(query,parseToken(query.nextToken),cancel);
+        return this._streamNodesAsync(true,query,parseToken(query.nextToken),cancel);
     }
 
+    private readonly watchers:Watcher[]=[];
     private async *_streamNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
+        isStreaming:boolean,
         query:ConvoNodeQuery<TKeys>,
         stateResult:ResultType<QueryTraversalState>,
         cancel:CancelToken=new CancelToken()
@@ -487,16 +490,17 @@ export abstract class BaseConvoDb implements ConvoDb
         const orderBy=Array.isArray(ob)?ob:[ob];
         const batchSize=Math.max(1,query.readBatchSize??this.getBatchSize(query));
         const limit=query.limit===undefined?Number.MAX_SAFE_INTEGER:Math.max(0,query.limit);
+        const hasLimit=!(query.watch && query.limit===undefined);
         const keys=convoNodeKeySelectionToKeys(query.keys);
         if(keys!=='*' && !keys.includes('path')){
             keys.push('path');
         }
 
-        if(state.returnedCount>=limit){
+        if(hasLimit && state.returnedCount>=limit){
             return;
         }
 
-        const iterateStageAsync=async (getPaths:(offset:number)=>PromiseResultType<string[]>):PromiseResultType<string[]>=>{
+        const iteratePathsAsync=async (getPaths:(offset:number)=>PromiseResultType<string[]>):PromiseResultType<string[]>=>{
             let offset=0;
             const paths:string[]=[];
             while(!cancel.isCanceled){
@@ -527,174 +531,343 @@ export abstract class BaseConvoDb implements ConvoDb
             }
         }
 
-        while(!cancel.isCanceled){
+        let watcher:Watcher|undefined;
 
-            if(state.flushIndex!==undefined){
-                while(state.flushIndex<state.paths.length){
-                    const loadPaths=state.paths.slice(state.flushIndex,state.flushIndex+batchSize);
-                    if(!loadPaths.length){
-                        break;
-                    }
-                    const r=await this._selectNodesByPathsAsync(keys,loadPaths,orderBy);
-                    if(cancel.isCanceled){return;}
+        try{
+            while(!cancel.isCanceled){
 
-                    if(!r.success){
-                        yield errorResultToConvoNodeStreamItem(r,state);
-                        return;
+                if(state.flushIndex!==undefined){
+                    if(query.watch && !watcher && !query.steps[state.step]){
+                        const lastStep=query.steps[query.steps.length-1];
+                        if(lastStep){
+                            watcher={
+                                condition:{
+                                    path:lastStep.path,
+                                    condition:lastStep.condition,
+                                    baseNodePaths:query.steps.length>1?[...state.paths]:undefined,
+                                },
+                                itemMap:{},
+                                loopCount:0,
+                                dispose:cancel.subscribe(()=>{
+                                    watcher?.next?.([{type:'error'}]);
+                                })
+                            }
+                            if(watcher.condition.path?.endsWith('*')){
+                                watcher.condition.path=watcher.condition.path.substring(0,watcher.condition.path.length-1);
+                                watcher.condition.wildcardPath=true;
+                            }
+                            this.watchers.push(watcher);
+                        }
                     }
-                    if(!r.result.length){
-                        break;
-                    }
-                    const nodes=r.result;
-                    for(const node of nodes){
-                        state.flushIndex++;
-                        if(state.skip){
-                            state.skip--;
-                        }else{
-                            if(query.permissionFrom){
-                                if(!node.path){
-                                    continue;
-                                }
-                                const permission=await this.checkNodePermissionAsync(
-                                    query.permissionFrom,
-                                    node.path,
-                                    query.permissionRequired??ConvoNodePermissionType.all,
-                                );
-                                if(!permission.success){
-                                    if(permission.statusCode!==401){
-                                        yield errorResultToConvoNodeStreamItem(permission,state);
-                                        return;
-                                    }
+                    while(state.flushIndex<state.paths.length){
+                        const loadPaths=state.paths.slice(state.flushIndex,state.flushIndex+batchSize);
+                        if(!loadPaths.length){
+                            break;
+                        }
+                        const r=await this._selectNodesByPathsAsync(keys,loadPaths,orderBy);
+                        if(cancel.isCanceled){return;}
+
+                        if(!r.success){
+                            yield errorResultToConvoNodeStreamItem(r,state);
+                            return;
+                        }
+                        const nodes=r.result;
+                        if(watcher?.itemMap){
+                            for(const path in watcher.itemMap){
+                                const mapped=watcher.itemMap[path];
+                                if(mapped?.type==='node-delete'){
+                                    nodes.push({path})
                                 }
                             }
-                            state.returnedCount++;
-                            yield {type:'node',node:node as any};
-                            if(state.returnedCount>=limit){
+                        }
+                        if(!r.result.length){
+                            break;
+                        }
+                        for(const node of nodes){
+                            state.flushIndex++;
+                            if(state.skip){
+                                state.skip--;
+                            }else{
+                                if(query.permissionFrom){
+                                    if(!node.path){
+                                        continue;
+                                    }
+                                    const permission=await this.checkNodePermissionAsync(
+                                        query.permissionFrom,
+                                        node.path,
+                                        query.permissionRequired??ConvoNodePermissionType.all,
+                                    );
+                                    if(!permission.success){
+                                        if(permission.statusCode!==401){
+                                            yield errorResultToConvoNodeStreamItem(permission,state);
+                                            return;
+                                        }
+                                    }
+                                }
+                                state.returnedCount++;
+                                yield {type:'node',node:node as any,...watcher?.itemMap[node.path??''] as any};
+                                if(hasLimit && state.returnedCount>=limit){
+                                    return;
+                                }
+                            }
+                            if(cancel.isCanceled){return;}
+                        }
+                    }
+                    state.flushIndex=undefined;
+                }
+
+                const step=query.steps[state.step];
+                if(!step){
+
+                    if(query.watch){
+
+                        if(!watcher){
+                            yield errorResultToConvoNodeStreamItem({
+                                success:false,
+                                error:'Watcher not initialized before flush',
+                                statusCode:500,
+                            },state);
+                            return;
+                        }
+
+                        if(!watcher.loopCount){
+                            yield {type:'watch-start'};
+                        }
+                        watcher.loopCount++;
+
+                        let update:WatcherUpdate[];
+                        if(watcher.queue){
+                            update=watcher.queue;
+                            delete watcher.queue;
+                        }else{
+                            try{
+                                update=await new Promise<WatcherUpdate[]>((resolve,reject)=>{
+                                    if(!watcher){
+                                        reject('watcher unset');
+                                        return;
+                                    }
+                                    watcher.next=resolve;
+                                });
+                                if(cancel.isCanceled){return;}
+                            }catch(ex){
+                                yield errorResultToConvoNodeStreamItem({
+                                    success:false,
+                                    error:getErrorMessage(ex),
+                                    statusCode:500,
+                                },state);
                                 return;
                             }
                         }
-                        if(cancel.isCanceled){return;}
+                        let paths:string[]=[];
+                        for(const i of update){
+                            if(i.error){
+                                yield errorResultToConvoNodeStreamItem(i.error,state);
+                                return;
+
+                            }
+                            if(i.type==='error'){
+                                yield errorResultToConvoNodeStreamItem({
+                                    success:false,
+                                    error:'Watcher error',
+                                    statusCode:500,
+                                },state);
+                                return;
+                            }
+                            if(i.path){
+                                paths.push(i.path);
+                            }
+                        }
+                        const cond=watcher.condition.condition;
+                        if(cond){
+                            const r=await iteratePathsAsync((offset)=>this._selectNodePathsForConditionAsync({
+                                condition:cond,
+                            },paths,orderBy,batchSize,offset));
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            paths=[];
+                            for(const u of update){
+                                if(u.path && r.result.includes(u.path)){
+                                    paths.push(u.path);
+                                }
+                            }
+                        }
+                        for(const k in watcher.itemMap){
+                            delete watcher.itemMap[k];
+                        }
+                        for(const u of update){
+                            if(u.path && paths.includes(u.path)){
+                                watcher.itemMap[u.path]={type:u.type}
+                            }
+                        }
+                        if(cancel.isCanceled){
+                            return;
+                        }
+                        state.flushIndex=0;
+                        state.paths=paths;
+                        continue;
+                    }else{
+                        break;
                     }
                 }
-                state.flushIndex=undefined;
-            }
+                const paths=state.step===0?null:state.paths;
 
-            const step=query.steps[state.step];
-            if(!step){
-                break;
-            }
-            const paths=state.step===0?null:state.paths;
+                switch(state.stepStage){
 
-            switch(state.stepStage){
+                    case 'path':
+                        if(step.path){
+                            const p=step.path;
+                            const r=await iteratePathsAsync((offset)=>this._selectNodePathsForPathAsync({
+                                path:p
+                            },paths,orderBy,batchSize,offset));
+                            if(cancel.isCanceled){return;}
 
-                case 'path':
-                    if(step.path){
-                        const p=step.path;
-                        const r=await iterateStageAsync((offset)=>this._selectNodePathsForPathAsync({
-                            path:p
-                        },paths,orderBy,batchSize,offset));
-                        if(cancel.isCanceled){return;}
-
-                        if(!r.success){
-                            yield errorResultToConvoNodeStreamItem(r,state);
-                            return;
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            state.paths=r.result;
                         }
-                        state.paths=r.result;
-                    }
-                    break;
+                        break;
 
-                case 'condition':
-                    if(step.condition){
-                        const c=step.condition;
-                        const r=await iterateStageAsync((offset)=>this._selectNodePathsForConditionAsync({
-                            condition:c,
-                        },paths,orderBy,batchSize,offset));
-                        if(cancel.isCanceled){return;}
+                    case 'condition':
+                        if(step.condition){
+                            const c=step.condition;
+                            const r=await iteratePathsAsync((offset)=>this._selectNodePathsForConditionAsync({
+                                condition:c,
+                            },paths,orderBy,batchSize,offset));
+                            if(cancel.isCanceled){return;}
 
-                        if(!r.success){
-                            yield errorResultToConvoNodeStreamItem(r,state);
-                            return;
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            state.paths=r.result;
                         }
-                        state.paths=r.result;
-                    }
-                    break;
+                        break;
 
-                case 'permissions':
-                    if(step.permissionFrom){
-                        const f=step.permissionFrom;
-                        const r=await iterateStageAsync((offset)=>this._selectNodePathsForPermissionAsync({
-                            permissionFrom:f,
-                            permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
-                        },paths,orderBy,batchSize,offset));
-                        if(cancel.isCanceled){return;}
+                    case 'permissions':
+                        if(step.permissionFrom){
+                            const f=step.permissionFrom;
+                            const r=await iteratePathsAsync((offset)=>this._selectNodePathsForPermissionAsync({
+                                permissionFrom:f,
+                                permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
+                            },paths,orderBy,batchSize,offset));
+                            if(cancel.isCanceled){return;}
 
-                        if(!r.success){
-                            yield errorResultToConvoNodeStreamItem(r,state);
-                            return;
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            state.paths=r.result;
                         }
-                        state.paths=r.result;
-                    }
-                    break;
+                        break;
 
-                case 'embedding':
-                    if(step.embedding){
-                        const e=step.embedding;
-                        const r=await iterateStageAsync((offset)=>this._selectNodePathsForEmbeddingAsync({
-                            embedding:e
-                        },paths,orderBy,batchSize,offset));
-                        if(cancel.isCanceled){return;}
+                    case 'embedding':
+                        if(step.embedding){
+                            const e=step.embedding;
+                            const r=await iteratePathsAsync((offset)=>this._selectNodePathsForEmbeddingAsync({
+                                embedding:e
+                            },paths,orderBy,batchSize,offset));
+                            if(cancel.isCanceled){return;}
 
-                        if(!r.success){
-                            yield errorResultToConvoNodeStreamItem(r,state);
-                            return;
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            state.paths=r.result;
                         }
-                        state.paths=r.result;
-                    }
-                    break;
+                        break;
 
-                case 'edge':
-                    if(step.edge){
-                        const e=step.edge;
-                        const r=await iterateStageAsync((offset)=>this._selectEdgeNodePathsForConditionAsync({
-                            edge:e,
-                            edgeDirection:step.edgeDirection??'bi',
-                            edgeLimit:step.edgeLimit,
-                        },paths,orderBy,batchSize,offset));
-                        if(cancel.isCanceled){return;}
+                    case 'edge':
+                        if(step.edge){
+                            const e=step.edge;
+                            const r=await iteratePathsAsync((offset)=>this._selectEdgeNodePathsForConditionAsync({
+                                edge:e,
+                                edgeDirection:step.edgeDirection??'bi',
+                                edgeLimit:step.edgeLimit,
+                            },paths,orderBy,batchSize,offset));
+                            if(cancel.isCanceled){return;}
 
-                        if(!r.success){
-                            yield errorResultToConvoNodeStreamItem(r,state);
-                            return;
+                            if(!r.success){
+                                yield errorResultToConvoNodeStreamItem(r,state);
+                                return;
+                            }
+                            state.paths=r.result;
                         }
-                        state.paths=r.result;
-                    }
-                    break;
+                        break;
 
-                default:
-                    yield {
-                        type:'error',
-                        error:`Unknown step stage - ${(state as any).stepStage}`,
-                        statusCode:500,
-                    }
-                    return;
+                    default:
+                        yield {
+                            type:'error',
+                            error:`Unknown step stage - ${(state as any).stepStage}`,
+                            statusCode:500,
+                        }
+                        return;
 
-            }
-
-            const nextStage=getNextStepStage(state.stepStage);
-            if(nextStage===undefined){
-                state.step++;
-                state.stepStage=allConvoStepStages[0];
-                const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
-                if(scan){
-                    state.scanCount+=state.paths.length;
                 }
-                if(query.returnAllScanned?scan:!query.steps[state.step]){
-                    state.flushIndex=0;
-                }
-            }else{
-                state.stepStage=nextStage;
-            }
 
+                const nextStage=getNextStepStage(state.stepStage);
+                if(nextStage===undefined){
+                    state.step++;
+                    state.stepStage=allConvoStepStages[0];
+                    const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
+                    if(scan){
+                        state.scanCount+=state.paths.length;
+                    }
+                    if(query.returnAllScanned?scan:!query.steps[state.step]){
+                        state.flushIndex=0;
+                    }
+                }else{
+                    state.stepStage=nextStage;
+                }
+
+            }
+        }finally{
+            if(watcher){
+                aryRemoveItem(this.watchers,watcher);
+                watcher.dispose();
+            }
+        }
+    }
+
+    private triggerWatchEvent(type:Exclude<ConvoNodeStreamItemType,'error'>,nodePath:string){
+        if(!this.watchers.length){
+            return;
+        }
+        for(let i=0;i<this.watchers.length;i++){
+            const w=this.watchers[i];
+            if(!w){
+                continue;
+            }
+            try{
+                const c=w.condition;
+                if(c.baseNodePaths && !c.baseNodePaths.includes(nodePath)){
+                    continue;
+                }
+                if(c.path){
+                    if(c.wildcardPath){
+                        if(!nodePath.startsWith(c.path)){
+                            continue;
+                        }
+                    }else if(c.path!==nodePath){
+                        continue;
+                    }
+                }
+                if(w.next){
+                    const next=w.next;
+                    delete w.next;
+                    next([{type,path:nodePath}]);
+                }else{
+                    if(!w.queue){
+                        w.queue=[];
+                    }
+                    w.queue.push({type,path:nodePath});
+                }
+            }catch(ex){
+                console.error('ConvoDb watch trigger error',ex);
+            }
         }
     }
 
@@ -779,7 +952,11 @@ export abstract class BaseConvoDb implements ConvoDb
                 return permission;
             }
         }
-        return await this._insertNodeAsync(node,options);
+        const r=await this._insertNodeAsync(node,options);
+        if(r.success){
+            this.triggerWatchEvent('node-insert',node.path);
+        }
+        return r;
     }
 
 
@@ -820,7 +997,13 @@ export abstract class BaseConvoDb implements ConvoDb
             }
         }
 
-        return await this._updateNodeAsync(node,options);
+        const r=await this._updateNodeAsync(node,options);
+
+        if(r.success){
+            this.triggerWatchEvent('node-update',node.path);
+        }
+
+        return r;
     }
 
 
@@ -846,7 +1029,13 @@ export abstract class BaseConvoDb implements ConvoDb
                 return permission;
             }
         }
-        return this._deleteNodeAsync(path,options);
+        const r=await this._deleteNodeAsync(path,options);
+        
+        if(r.success){
+            this.triggerWatchEvent('node-delete',path);
+        }
+
+        return r;
     }
 
 
@@ -1535,4 +1724,26 @@ const errorResultToConvoNodeStreamItem=<T extends keyof ConvoNode>(result:Result
     }
 
     return r;
+}
+
+interface WatcherUpdate
+{
+    type:ConvoNodeStreamItemType;
+    error?:ResultTypeError;
+    path?:string;
+}
+
+interface Watcher
+{
+    condition:ConvoNodeWatchCondition;
+    next?:(items:WatcherUpdate[])=>void;
+    /**
+     * Stores stream items until next can be called.
+     */
+    queue?:WatcherUpdate[];
+    dispose:DisposeCallback;
+
+    itemMap:Record<string,Partial<ConvoNodeStreamItem<any>>>;
+
+    loopCount:number;
 }

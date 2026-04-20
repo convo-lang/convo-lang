@@ -337,7 +337,7 @@ export type ConvoNodeKeyOrAll=ConvoNodeKey|'*';
  */
 export type ConvoNodeKeySelection=ConvoNodeKeyOrAll|null|undefined|(ConvoNodeKeyOrAll|null|undefined)[]
 
-type ConvoNodeQueryKeysToSelection<T extends ConvoNodeKeySelection> =
+export type ConvoNodeQueryKeysToSelection<T extends ConvoNodeKeySelection> =
     T extends null|undefined ? keyof ConvoNode :
     T extends '*' ? keyof ConvoNode :
     T extends keyof ConvoNode ? T :
@@ -505,6 +505,20 @@ export const allConvoStepStages=['path','condition','permissions','embedding','e
 
 export type ConvoStepStage=typeof allConvoStepStages[number];
 
+export interface ConvoNodeWatchCondition extends Pick<ConvoNodeQueryStep,'path'|'condition'>
+{
+    /**
+     * Base set of node paths that that watched nodes must be in
+     */
+    baseNodePaths?:string[];
+
+    /**
+     * If true the condition uses a wildcard. The path will have its * removed from the end for
+     * non allocation comparisons during path checking.
+     */
+    wildcardPath?:boolean;
+}
+
 /**
  * Represents a single step in a node query. The first step is run against the full database of nodes.
  * A query step runs in 2 phases: the first phase filters nodes and the second phase selects
@@ -619,6 +633,20 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
     steps:ConvoNodeQueryStep[];
 
     /**
+     * If true changes to the final set of nodes will be watched and updates to the nodes will be
+     * continuously streamed by the query. This property only has an effect when used with
+     * `ConvoDb.streamNodesAsync`. Enabling watch will also disable the default limit but if an 
+     * explicit limit is set it will be honored. After then initial set of selected nodes are returned
+     * the stream will return stream items with type type set to 'node-update' or 'node-delete'.
+     *
+     * Step limitations:
+     * When enabling watching the last step of a query can only use the `path` and `condition`
+     * properties. This restriction is to allow efficient event by disabling operations that require
+     * complex lookups or awaiting async results.
+     */
+    watch?:boolean;
+
+    /**
      * Max number of nodes to return. This value may be exceeded since node queries select and return
      * nodes in batches.
      * @default 20
@@ -687,13 +715,20 @@ export interface ConvoNodeQueryResult<T extends keyof ConvoNode>
  * An item within a stream of ConvoNodes returned by `ConvoDb.streamNodesAsync`
  */
 export type ConvoNodeStreamItem<T extends keyof ConvoNode>={
-    type:'node';
+    type:'node'|'node-insert'|'node-update'|'node-delete';
     node:Pick<ConvoNode,T>;
+}|{
+    /**
+     * Sent after all initial nodes of a query have been sent and the query start watching for changes.
+     */
+    type:'watch-start',    
 }|{
     type:'error';
     error:string;
     statusCode:StatusCode;
 }
+
+export type ConvoNodeStreamItemType=ConvoNodeStreamItem<keyof ConvoNode>['type'];
 
 export interface ConvoNodeEmbeddingQueryResult
 {

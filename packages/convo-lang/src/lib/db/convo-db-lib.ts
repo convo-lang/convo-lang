@@ -1,4 +1,4 @@
-import { ConvoNodeCondition, ConvoNodeQuery, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
+import { ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
 /**
  * Normalizes a convo node path.
@@ -126,6 +126,22 @@ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined
             }
         }
         
+    }
+
+    if(query.watch){
+        const last=query.steps[query.steps.length-1];
+        if(last){
+            for(const e in last){
+                switch(e as keyof ConvoNodeQueryStep){
+                    case 'path':
+                    case 'condition':
+                        break;
+
+                    default:
+                        return 'The last step of a watch query can only use the path and condition properties';
+                }
+            }
+        }
     }
 
     return undefined;
