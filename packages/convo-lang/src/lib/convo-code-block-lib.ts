@@ -1,5 +1,6 @@
-import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, unescapeConvo } from '@convo-lang/convo-lang';
 import { unescapeHtml } from '@iyio/common';
+import { unescapeConvo } from './convo-parser.js';
+import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey } from './convo-types.js';
 
 
 const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```[ \t]*(?<lang>[\w-]+)(?<content>[\s\S]*?)```[ \t\r\n]*<\/\k<tagName>>/g;
