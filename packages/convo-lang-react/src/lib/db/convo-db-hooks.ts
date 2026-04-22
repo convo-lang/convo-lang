@@ -123,7 +123,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
     }:UseConvoDbOptions={}
 ):UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>=>{
 
-    query=disabled?undefined:useDeepCompareItem(query);
+    query=useDeepCompareItem(disabled?undefined:query);
 
     const [result,setResult]=useState<UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>>(
         {state:disabled?'disabled':'loading',nodes:[],node:undefined,lastNode:undefined,db,query:deepClone(query) as any,watch}
