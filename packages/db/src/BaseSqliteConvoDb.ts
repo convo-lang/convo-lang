@@ -188,667 +188,670 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
         ];
     }
 
-    protected async _selectEdgesByPathsAsync(keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>{
-        if(!fromPathsIn.length || !toPathsIn.length){
+    override _driver={
+
+        selectEdgesByPathsAsync:async (keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>=>{
+            if(!fromPathsIn.length || !toPathsIn.length){
+                return {
+                    success:true,
+                    result:[],
+                };
+            }
+
+            const select=getEdgeSelectColumns(keys);
+            const bind:any[]=[];
+            const where:string[]=[
+                `"from" IN (${fromPathsIn.map(()=>'?').join(',')})`,
+                `"to" IN (${toPathsIn.map(()=>'?').join(',')})`,
+            ];
+            bind.push(...fromPathsIn,...toPathsIn);
+
+            if(hasGrant){
+                where.push(`grant IS NOT NULL AND grant != ?`);
+                bind.push(ConvoNodePermissionType.none);
+            }
+
+            const sql=`SELECT ${select} FROM ${this.edgeTableName} WHERE ${where.join(' AND ')}`;
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
             return {
                 success:true,
-                result:[],
+                result:r.result.map(row=>deserializeEdgeRow(row,keys)),
             };
-        }
+        },
 
-        const select=getEdgeSelectColumns(keys);
-        const bind:any[]=[];
-        const where:string[]=[
-            `"from" IN (${fromPathsIn.map(()=>'?').join(',')})`,
-            `"to" IN (${toPathsIn.map(()=>'?').join(',')})`,
-        ];
-        bind.push(...fromPathsIn,...toPathsIn);
+        selectNodesByPathsAsync:async (keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>=>{
+            if(!paths.length){
+                return {
+                    success:true,
+                    result:[],
+                };
+            }
 
-        if(hasGrant){
-            where.push(`grant IS NOT NULL AND grant != ?`);
-            bind.push(ConvoNodePermissionType.none);
-        }
+            const select=getNodeSelectColumns(keys);
+            const bind:any[]=[...paths];
+            const sql=`SELECT ${select} FROM ${this.nodeTableName} WHERE path IN (${paths.map(()=>'?').join(',')}) ${buildNodeOrderByClause(orderBy)}`;
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
 
-        const sql=`SELECT ${select} FROM ${this.edgeTableName} WHERE ${where.join(' AND ')}`;
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(row=>deserializeEdgeRow(row,keys)),
-        };
-    }
-
-    protected async _selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>{
-        if(!paths.length){
             return {
                 success:true,
-                result:[],
+                result:r.result.map(row=>deserializeNodeRow(row,keys)),
             };
-        }
+        },
+        
+        selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+            const bind:any[]=[];
+            const where:string[]=[];
+            appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
 
-        const select=getNodeSelectColumns(keys);
-        const bind:any[]=[...paths];
-        const sql=`SELECT ${select} FROM ${this.nodeTableName} WHERE path IN (${paths.map(()=>'?').join(',')}) ${buildNodeOrderByClause(orderBy)}`;
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(row=>deserializeNodeRow(row,keys)),
-        };
-    }
-    
-    protected async _selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>{
-        const bind:any[]=[];
-        const where:string[]=[];
-        appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
-
-        if(step.path.endsWith('/*')){
-            const prefix=step.path.substring(0,step.path.length-1);
-            where.push(`path LIKE ?`);
-            bind.push(`${prefix}%`);
-            where.push(`path != ?`);
-            bind.push(prefix.substring(0,prefix.length-1));
-        }else{
-            where.push(`path = ?`);
-            bind.push(step.path);
-        }
-
-        const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
-        bind.push(limit,offset);
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(v=>String(v.path)),
-        };
-    }
-
-    protected async _selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>{
-        const bind:any[]=[];
-        const where:string[]=[];
-
-        appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
-
-        const conditionSql=buildConditionSql(step.condition,'node',bind);
-        where.push(conditionSql);
-
-        const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
-        bind.push(limit,offset);
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(v=>String(v.path)),
-        };
-    }
-
-    protected async _selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>{
-        const bind:any[]=[
-            step.permissionFrom,
-            ConvoNodePermissionType.none,
-        ];
-        const where:string[]=[];
-
-        appendCurrentNodePathsFilter(where,bind,currentNodePaths,'n.path');
-
-        const sql=`SELECT n.path, e.grant
-            FROM ${this.nodeTableName} n
-            LEFT JOIN ${this.edgeTableName} e
-                ON e."from" = ?
-                AND e.grant IS NOT NULL
-                AND e.grant != ?
-                AND (n.path = e."to" OR n.path LIKE (e."to" || '/%'))
-            ${where.length?`WHERE ${where.join(' AND ')}`:''}
-            GROUP BY n.path
-            ${buildNodeOrderByClause(orderBy,'n')}
-            LIMIT ? OFFSET ?`;
-        bind.push(limit,offset);
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.filter(v=>(v.grant&step.permissionRequired)===step.permissionRequired).map(v=>String(v.path)),
-        };
-    }
-
-    protected async _selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>{
-        const embeddingResult=await this.generateEmbeddingsAsync({
-            ...this.embeddingOptions,
-            text:step.embedding.text,
-        });
-        if(!embeddingResult.success){
-            return embeddingResult;
-        }
-
-        const queryVector=embeddingResult.result.embedding;
-        const bind:any[]=[];
-        const where:string[]=[];
-
-        if(step.embedding.type!==undefined){
-            where.push(`e.type = ?`);
-            bind.push(step.embedding.type);
-        }
-
-        appendCurrentNodePathsFilter(where,bind,currentNodePaths,'n.path');
-
-        const tolerance=step.embedding.tolerance??1;
-        const distanceExpr=`vec_distance_l2(e.vector, ?)`;
-        bind.unshift(queryVector);
-
-        where.push(`e.vector IS NOT NULL`);
-        where.push(`${distanceExpr} <= ?`);
-        bind.push(tolerance);
-
-        const sql=`SELECT DISTINCT n.path
-            FROM ${this.nodeTableName} n
-            INNER JOIN ${this.embeddingTableName} e ON e.path = n.path
-            WHERE ${where.join(' AND ')}
-            ORDER BY ${distanceExpr} ASC${buildOrderBySuffix(orderBy,'n')}
-            LIMIT ? OFFSET ?`;
-        bind.push(queryVector,limit,offset);
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(v=>String(v.path)),
-        };
-    }
-
-    protected async _selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>{
-        const bind:any[]=[];
-        const directionParts:string[]=[];
-
-        const currentSourceSql=currentNodePaths===null?
-            `SELECT path FROM ${this.nodeTableName}`
-        :
-            `SELECT path FROM ${this.nodeTableName} WHERE path IN (${currentNodePaths.map(()=>'?').join(',')})`;
-
-        if(currentNodePaths!==null){
-            bind.push(...currentNodePaths);
-        }
-
-        if(step.edgeDirection==='forward' || step.edgeDirection==='bi'){
-            directionParts.push(`SELECT e."to" AS path
-                FROM ${this.edgeTableName} e
-                INNER JOIN current_nodes c ON c.path = e."from"
-                ${buildEdgeConditionWhereClause(step.edge,bind,true)}`);
-        }
-
-        if(step.edgeDirection==='reverse' || step.edgeDirection==='bi'){
-            directionParts.push(`SELECT e."from" AS path
-                FROM ${this.edgeTableName} e
-                INNER JOIN current_nodes c ON c.path = e."to"
-                ${buildEdgeConditionWhereClause(step.edge,bind,true)}`);
-        }
-
-        const innerLimit=step.edgeLimit===undefined?'':` LIMIT ${Math.max(0,step.edgeLimit)} `;
-
-        const sql=`WITH current_nodes AS (${currentSourceSql}),
-            traversed AS (
-                ${directionParts.join(' UNION ')}
-            )
-            SELECT DISTINCT n.path
-            FROM ${this.nodeTableName} n
-            INNER JOIN (
-                SELECT DISTINCT path FROM traversed${innerLimit}
-            ) t ON t.path = n.path
-            ${buildNodeOrderByClause(orderBy,'n')}
-            LIMIT ? OFFSET ?`;
-        bind.push(limit,offset);
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:r.result.map(v=>String(v.path)),
-        };
-    }
-
-    protected async _insertNodeAsync(node:ConvoNode,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>{
-        const n=node;
-        const sql=`INSERT INTO ${this.nodeTableName} (
-            path, displayName, name, created, modified, description, instructions, type, data
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING path, displayName, name, created, modified, description, instructions, type, data`;
-        const bind=[
-            n.path,
-            n.displayName??null,
-            n.name??null,
-            n.created??null,
-            n.modified??null,
-            n.description??null,
-            n.instructions??null,
-            n.type??null,
-            serializeValue(n.data),
-        ];
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:deserializeNodeRow(r.result[0],'*') as ConvoNode,
-        };
-    }
-
-    protected async _updateNodeAsync(node:ConvoNodeUpdate,options:Omit<any,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
-        const sets:string[]=[];
-        const bind:any[]=[];
-
-        if(node.displayName!==undefined){
-            sets.push(`displayName = ?`);
-            bind.push(node.displayName);
-        }
-        if(node.modified!==undefined){
-            sets.push(`modified = ?`);
-            bind.push(node.modified);
-        }
-        if(node.description!==undefined){
-            sets.push(`description = ?`);
-            bind.push(node.description);
-        }
-        if(node.instructions!==undefined){
-            sets.push(`instructions = ?`);
-            bind.push(node.instructions);
-        }
-        if(node.data!==undefined){
-            sets.push(`data = ?`);
-            bind.push(serializeValue(node.data));
-        }
-
-        if(!sets.length){
-            return {success:true};
-        }
-
-        bind.push(node.path);
-
-        const sql=`UPDATE ${this.nodeTableName} SET ${sets.join(', ')} WHERE path = ?`;
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {success:true};
-    }
-
-    protected async _deleteNodeAsync(path:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
-        const sql=`DELETE FROM ${this.nodeTableName} WHERE path = ?`;
-        const r=await this.execSqlAsync(sql,[path]);
-        if(!r.success){
-            return r;
-        }
-        return {success:true};
-    }
-
-    protected async _insertEdgeAsync(edge:Omit<ConvoNodeEdge,"id">,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEdge>{
-        const id=uuid();
-        const e=deepClone(edge);
-        const sql=`INSERT INTO ${this.edgeTableName} (
-            id, displayName, name, description, created, modified, type, "from", "to", instructions, grant
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id, displayName, name, description, created, modified, type, "from", "to", instructions, grant`;
-        const bind=[
-            id,
-            e.displayName??null,
-            e.name??null,
-            e.description??null,
-            e.created??null,
-            e.modified??null,
-            e.type,
-            e.from,
-            e.to,
-            e.instructions??null,
-            e.grant??null,
-        ];
-
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {
-            success:true,
-            result:deserializeEdgeRow(r.result[0],'*') as ConvoNodeEdge,
-        };
-    }
-
-    protected async _updateEdgeAsync(update:ConvoNodeEdgeUpdate,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
-        const sets:string[]=[];
-        const bind:any[]=[];
-
-        if(update.displayName!==undefined){
-            sets.push(`displayName = ?`);
-            bind.push(update.displayName);
-        }
-        if(update.modified!==undefined){
-            sets.push(`modified = ?`);
-            bind.push(update.modified);
-        }
-        if(update.description!==undefined){
-            sets.push(`description = ?`);
-            bind.push(update.description);
-        }
-        if(update.instructions!==undefined){
-            sets.push(`instructions = ?`);
-            bind.push(update.instructions);
-        }
-        if(update.grant!==undefined){
-            sets.push(`grant = ?`);
-            bind.push(update.grant);
-        }
-
-        if(!sets.length){
-            return {success:true};
-        }
-
-        bind.push(update.id);
-
-        const sql=`UPDATE ${this.edgeTableName} SET ${sets.join(', ')} WHERE id = ?`;
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
-
-        return {success:true};
-    }
-
-    protected async _deleteEdgeAsync(id:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
-        const sql=`DELETE FROM ${this.edgeTableName} WHERE id = ?`;
-        const r=await this.execSqlAsync(sql,[id]);
-        if(!r.success){
-            return r;
-        }
-        return {success:true};
-    }
-
-    protected async _insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,"id">,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEmbedding>{
-        const id=uuid();
-        const e=deepClone(embedding);
-
-        let vector=e.vector;
-        if(vector===undefined && (options as any)?.generateVector!==false){
-            const vectorResult=await this.generateEmbeddingVectorAsync({
-                ...e,
-                id,
-            });
-            if(!vectorResult.success){
-                return vectorResult;
+            if(step.path.endsWith('/*')){
+                const prefix=step.path.substring(0,step.path.length-1);
+                where.push(`path LIKE ?`);
+                bind.push(`${prefix}%`);
+                where.push(`path != ?`);
+                bind.push(prefix.substring(0,prefix.length-1));
+            }else{
+                where.push(`path = ?`);
+                bind.push(step.path);
             }
-            vector=vectorResult.result;
-        }
 
-        const sql=`INSERT INTO ${this.embeddingTableName} (
-            id, prop, name, type, path, description, created, modified, instructions, vector
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id, prop, name, type, path, description, created, modified, instructions, vector`;
-        const bind=[
-            id,
-            e.prop,
-            e.name??null,
-            e.type,
-            e.path,
-            e.description??null,
-            e.created??null,
-            e.modified??null,
-            e.instructions??null,
-            serializeValue(vector),
-        ];
+            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
+            bind.push(limit,offset);
 
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
 
-        return {
-            success:true,
-            result:deserializeEmbeddingRow(r.result[0],true) as ConvoNodeEmbedding,
-        };
-    }
-
-    protected async _deleteEmbeddingAsync(id:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
-        const sql=`DELETE FROM ${this.embeddingTableName} WHERE id = ?`;
-        const r=await this.execSqlAsync(sql,[id]);
-        if(!r.success){
-            return r;
-        }
-        return {success:true};
-    }
-
-    protected async _updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid{
-        const currentResult=await this.getEmbeddingByIdAsync(update.id);
-        if(!currentResult.success){
-            return currentResult;
-        }
-
-        const sets:string[]=[];
-        const bind:any[]=[];
-
-        if(update.modified!==undefined){
-            sets.push(`modified = ?`);
-            bind.push(update.modified);
-        }
-        if(update.description!==undefined){
-            sets.push(`description = ?`);
-            bind.push(update.description);
-        }
-        if(update.instructions!==undefined){
-            sets.push(`instructions = ?`);
-            bind.push(update.instructions);
-        }
-
-        let vectorUpdated=false;
-        if(update.generateVector){
-            const nextEmbedding:ConvoNodeEmbedding={
-                ...currentResult.result,
-                modified:update.modified===undefined?currentResult.result.modified:update.modified??undefined,
-                description:update.description===undefined?currentResult.result.description:update.description??undefined,
-                instructions:update.instructions===undefined?currentResult.result.instructions:update.instructions??undefined,
+            return {
+                success:true,
+                result:r.result.map(v=>String(v.path)),
             };
-            const vectorResult=await this.generateEmbeddingVectorAsync(nextEmbedding);
-            if(!vectorResult.success){
-                return vectorResult;
+        },
+
+        selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+            const bind:any[]=[];
+            const where:string[]=[];
+
+            appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
+
+            const conditionSql=buildConditionSql(step.condition,'node',bind);
+            where.push(conditionSql);
+
+            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
+            bind.push(limit,offset);
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
             }
-            sets.push(`vector = ?`);
-            bind.push(serializeValue(vectorResult.result));
-            vectorUpdated=true;
-        }
 
-        if(!sets.length && !vectorUpdated){
-            return {success:true};
-        }
+            return {
+                success:true,
+                result:r.result.map(v=>String(v.path)),
+            };
+        },
 
-        bind.push(update.id);
+        selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+            const bind:any[]=[
+                step.permissionFrom,
+                ConvoNodePermissionType.none,
+            ];
+            const where:string[]=[];
 
-        const sql=`UPDATE ${this.embeddingTableName} SET ${sets.join(', ')} WHERE id = ?`;
-        const r=await this.execSqlAsync(sql,bind);
-        if(!r.success){
-            return r;
-        }
+            appendCurrentNodePathsFilter(where,bind,currentNodePaths,'n.path');
 
-        return {success:true};
-    }
-
-    public async queryEdgesAsync(query: ConvoNodeEdgeQuery): PromiseResultType<ConvoNodeEdgeQueryResult>{
-        const where:string[]=[];
-        const bind:any[]=[];
-
-        if(query.id!==undefined){
-            where.push(`id = ?`);
-            bind.push(query.id);
-        }
-        if(query.from!==undefined){
-            where.push(`"from" = ?`);
-            bind.push(query.from);
-        }
-        if(query.to!==undefined){
-            where.push(`"to" = ?`);
-            bind.push(query.to);
-        }
-        if(query.type!==undefined){
-            where.push(`type = ?`);
-            bind.push(query.type);
-        }
-        if(query.name!==undefined){
-            where.push(`name = ?`);
-            bind.push(query.name);
-        }
-
-        if(query.permissionFrom!==undefined){
-            where.push(`EXISTS (
-                SELECT 1
-                FROM ${this.edgeTableName} ef
-                WHERE ef."from" = ?
-                    AND ef.grant IS NOT NULL
-                    AND ef.grant != ?
-                    AND ((ef.grant & ?) = ?)
-                    AND ("from" = ef."to" OR "from" LIKE (ef."to" || '/%'))
-            )`);
-            bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
-
-            where.push(`EXISTS (
-                SELECT 1
-                FROM ${this.edgeTableName} et
-                WHERE et."from" = ?
-                    AND et.grant IS NOT NULL
-                    AND et.grant != ?
-                    AND ((et.grant & ?) = ?)
-                    AND ("to" = et."to" OR "to" LIKE (et."to" || '/%'))
-            )`);
-            bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
-        }
-
-        const limit=query.limit??50;
-        const offset=query.offset??0;
-
-        const sql=`SELECT id, displayName, name, description, created, modified, type, "from", "to", instructions, grant
-            FROM ${this.edgeTableName}
-            ${where.length?`WHERE ${where.join(' AND ')}`:''}
-            ORDER BY id ASC
-            LIMIT ? OFFSET ?`;
-        const r=await this.execSqlAsync(sql,[...bind,limit,offset]);
-        if(!r.success){
-            return r;
-        }
-
-        let total:number|undefined;
-        if(query.includeTotal){
-            const totalSql=`SELECT COUNT(*) AS total
-                FROM ${this.edgeTableName}
-                ${where.length?`WHERE ${where.join(' AND ')}`:''}`;
-            const totalResult=await this.execSqlAsync(totalSql,bind);
-            if(!totalResult.success){
-                return totalResult;
-            }
-            total=Number(totalResult.result[0]?.total??0);
-        }
-
-        return {
-            success:true,
-            result:{
-                edges:r.result.map(row=>deserializeEdgeRow(row,'*') as ConvoNodeEdge),
-                total,
-            }
-        };
-    }
-
-    public async queryEmbeddingsAsync(query: ConvoNodeEmbeddingQuery): PromiseResultType<ConvoNodeEmbeddingQueryResult>{
-        const where:string[]=[];
-        const bind:any[]=[];
-
-        if(query.id!==undefined){
-            where.push(`id = ?`);
-            bind.push(query.id);
-        }
-        if(query.path!==undefined){
-            where.push(`path = ?`);
-            bind.push(query.path);
-        }
-        if(query.type!==undefined){
-            where.push(`type = ?`);
-            bind.push(query.type);
-        }
-        if(query.name!==undefined){
-            where.push(`name = ?`);
-            bind.push(query.name);
-        }
-        if(query.prop!==undefined){
-            where.push(`prop = ?`);
-            bind.push(query.prop);
-        }
-
-        if(query.permissionFrom!==undefined){
-            where.push(`EXISTS (
-                SELECT 1
-                FROM ${this.edgeTableName} e
-                WHERE e."from" = ?
+            const sql=`SELECT n.path, e.grant
+                FROM ${this.nodeTableName} n
+                LEFT JOIN ${this.edgeTableName} e
+                    ON e."from" = ?
                     AND e.grant IS NOT NULL
                     AND e.grant != ?
-                    AND ((e.grant & ?) = ?)
-                    AND (path = e."to" OR path LIKE (e."to" || '/%'))
-            )`);
-            bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
-        }
+                    AND (n.path = e."to" OR n.path LIKE (e."to" || '/%'))
+                ${where.length?`WHERE ${where.join(' AND ')}`:''}
+                GROUP BY n.path
+                ${buildNodeOrderByClause(orderBy,'n')}
+                LIMIT ? OFFSET ?`;
+            bind.push(limit,offset);
 
-        const limit=query.limit??50;
-        const offset=query.offset??0;
-        const vectorSelect=query.includeVector?'vector':'NULL AS vector';
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
 
-        const sql=`SELECT id, prop, name, type, path, description, created, modified, instructions, ${vectorSelect}
-            FROM ${this.embeddingTableName}
-            ${where.length?`WHERE ${where.join(' AND ')}`:''}
-            ORDER BY id ASC
-            LIMIT ? OFFSET ?`;
-        const r=await this.execSqlAsync(sql,[...bind,limit,offset]);
-        if(!r.success){
-            return r;
-        }
+            return {
+                success:true,
+                result:r.result.filter(v=>(v.grant&step.permissionRequired)===step.permissionRequired).map(v=>String(v.path)),
+            };
+        },
 
-        let total:number|undefined;
-        if(query.includeTotal){
-            const totalSql=`SELECT COUNT(*) AS total
+        selectNodePathsForEmbeddingAsync:async (step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+            const embeddingResult=await this.generateEmbeddingsAsync({
+                ...this.embeddingOptions,
+                text:step.embedding.text,
+            });
+            if(!embeddingResult.success){
+                return embeddingResult;
+            }
+
+            const queryVector=embeddingResult.result.embedding;
+            const bind:any[]=[];
+            const where:string[]=[];
+
+            if(step.embedding.type!==undefined){
+                where.push(`e.type = ?`);
+                bind.push(step.embedding.type);
+            }
+
+            appendCurrentNodePathsFilter(where,bind,currentNodePaths,'n.path');
+
+            const tolerance=step.embedding.tolerance??1;
+            const distanceExpr=`vec_distance_l2(e.vector, ?)`;
+            bind.unshift(queryVector);
+
+            where.push(`e.vector IS NOT NULL`);
+            where.push(`${distanceExpr} <= ?`);
+            bind.push(tolerance);
+
+            const sql=`SELECT DISTINCT n.path
+                FROM ${this.nodeTableName} n
+                INNER JOIN ${this.embeddingTableName} e ON e.path = n.path
+                WHERE ${where.join(' AND ')}
+                ORDER BY ${distanceExpr} ASC${buildOrderBySuffix(orderBy,'n')}
+                LIMIT ? OFFSET ?`;
+            bind.push(queryVector,limit,offset);
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {
+                success:true,
+                result:r.result.map(v=>String(v.path)),
+            };
+        },
+
+        selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+            const bind:any[]=[];
+            const directionParts:string[]=[];
+
+            const currentSourceSql=currentNodePaths===null?
+                `SELECT path FROM ${this.nodeTableName}`
+            :
+                `SELECT path FROM ${this.nodeTableName} WHERE path IN (${currentNodePaths.map(()=>'?').join(',')})`;
+
+            if(currentNodePaths!==null){
+                bind.push(...currentNodePaths);
+            }
+
+            if(step.edgeDirection==='forward' || step.edgeDirection==='bi'){
+                directionParts.push(`SELECT e."to" AS path
+                    FROM ${this.edgeTableName} e
+                    INNER JOIN current_nodes c ON c.path = e."from"
+                    ${buildEdgeConditionWhereClause(step.edge,bind,true)}`);
+            }
+
+            if(step.edgeDirection==='reverse' || step.edgeDirection==='bi'){
+                directionParts.push(`SELECT e."from" AS path
+                    FROM ${this.edgeTableName} e
+                    INNER JOIN current_nodes c ON c.path = e."to"
+                    ${buildEdgeConditionWhereClause(step.edge,bind,true)}`);
+            }
+
+            const innerLimit=step.edgeLimit===undefined?'':` LIMIT ${Math.max(0,step.edgeLimit)} `;
+
+            const sql=`WITH current_nodes AS (${currentSourceSql}),
+                traversed AS (
+                    ${directionParts.join(' UNION ')}
+                )
+                SELECT DISTINCT n.path
+                FROM ${this.nodeTableName} n
+                INNER JOIN (
+                    SELECT DISTINCT path FROM traversed${innerLimit}
+                ) t ON t.path = n.path
+                ${buildNodeOrderByClause(orderBy,'n')}
+                LIMIT ? OFFSET ?`;
+            bind.push(limit,offset);
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {
+                success:true,
+                result:r.result.map(v=>String(v.path)),
+            };
+        },
+
+        insertNodeAsync:async (node:ConvoNode,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>=>{
+            const n=node;
+            const sql=`INSERT INTO ${this.nodeTableName} (
+                path, displayName, name, created, modified, description, instructions, type, data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING path, displayName, name, created, modified, description, instructions, type, data`;
+            const bind=[
+                n.path,
+                n.displayName??null,
+                n.name??null,
+                n.created??null,
+                n.modified??null,
+                n.description??null,
+                n.instructions??null,
+                n.type??null,
+                serializeValue(n.data),
+            ];
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {
+                success:true,
+                result:deserializeNodeRow(r.result[0],'*') as ConvoNode,
+            };
+        },
+
+        updateNodeAsync:async (node:ConvoNodeUpdate,options:Omit<any,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid=>{
+            const sets:string[]=[];
+            const bind:any[]=[];
+
+            if(node.displayName!==undefined){
+                sets.push(`displayName = ?`);
+                bind.push(node.displayName);
+            }
+            if(node.modified!==undefined){
+                sets.push(`modified = ?`);
+                bind.push(node.modified);
+            }
+            if(node.description!==undefined){
+                sets.push(`description = ?`);
+                bind.push(node.description);
+            }
+            if(node.instructions!==undefined){
+                sets.push(`instructions = ?`);
+                bind.push(node.instructions);
+            }
+            if(node.data!==undefined){
+                sets.push(`data = ?`);
+                bind.push(serializeValue(node.data));
+            }
+
+            if(!sets.length){
+                return {success:true};
+            }
+
+            bind.push(node.path);
+
+            const sql=`UPDATE ${this.nodeTableName} SET ${sets.join(', ')} WHERE path = ?`;
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {success:true};
+        },
+
+        deleteNodeAsync:async (path:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid=>{
+            const sql=`DELETE FROM ${this.nodeTableName} WHERE path = ?`;
+            const r=await this.execSqlAsync(sql,[path]);
+            if(!r.success){
+                return r;
+            }
+            return {success:true};
+        },
+
+        insertEdgeAsync:async (edge:Omit<ConvoNodeEdge,"id">,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEdge>=>{
+            const id=uuid();
+            const e=deepClone(edge);
+            const sql=`INSERT INTO ${this.edgeTableName} (
+                id, displayName, name, description, created, modified, type, "from", "to", instructions, grant
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, displayName, name, description, created, modified, type, "from", "to", instructions, grant`;
+            const bind=[
+                id,
+                e.displayName??null,
+                e.name??null,
+                e.description??null,
+                e.created??null,
+                e.modified??null,
+                e.type,
+                e.from,
+                e.to,
+                e.instructions??null,
+                e.grant??null,
+            ];
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {
+                success:true,
+                result:deserializeEdgeRow(r.result[0],'*') as ConvoNodeEdge,
+            };
+        },
+
+        updateEdgeAsync:async (update:ConvoNodeEdgeUpdate,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid=>{
+            const sets:string[]=[];
+            const bind:any[]=[];
+
+            if(update.displayName!==undefined){
+                sets.push(`displayName = ?`);
+                bind.push(update.displayName);
+            }
+            if(update.modified!==undefined){
+                sets.push(`modified = ?`);
+                bind.push(update.modified);
+            }
+            if(update.description!==undefined){
+                sets.push(`description = ?`);
+                bind.push(update.description);
+            }
+            if(update.instructions!==undefined){
+                sets.push(`instructions = ?`);
+                bind.push(update.instructions);
+            }
+            if(update.grant!==undefined){
+                sets.push(`grant = ?`);
+                bind.push(update.grant);
+            }
+
+            if(!sets.length){
+                return {success:true};
+            }
+
+            bind.push(update.id);
+
+            const sql=`UPDATE ${this.edgeTableName} SET ${sets.join(', ')} WHERE id = ?`;
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {success:true};
+        },
+
+        deleteEdgeAsync:async (id:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid=>{
+            const sql=`DELETE FROM ${this.edgeTableName} WHERE id = ?`;
+            const r=await this.execSqlAsync(sql,[id]);
+            if(!r.success){
+                return r;
+            }
+            return {success:true};
+        },
+
+        insertEmbeddingAsync:async (embedding:Omit<ConvoNodeEmbedding,"id">,options:Omit<any,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEmbedding>=>{
+            const id=uuid();
+            const e=deepClone(embedding);
+
+            let vector=e.vector;
+            if(vector===undefined && (options as any)?.generateVector!==false){
+                const vectorResult=await this.generateEmbeddingVectorAsync({
+                    ...e,
+                    id,
+                });
+                if(!vectorResult.success){
+                    return vectorResult;
+                }
+                vector=vectorResult.result;
+            }
+
+            const sql=`INSERT INTO ${this.embeddingTableName} (
+                id, prop, name, type, path, description, created, modified, instructions, vector
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, prop, name, type, path, description, created, modified, instructions, vector`;
+            const bind=[
+                id,
+                e.prop,
+                e.name??null,
+                e.type,
+                e.path,
+                e.description??null,
+                e.created??null,
+                e.modified??null,
+                e.instructions??null,
+                serializeValue(vector),
+            ];
+
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {
+                success:true,
+                result:deserializeEmbeddingRow(r.result[0],true) as ConvoNodeEmbedding,
+            };
+        },
+
+        deleteEmbeddingAsync:async (id:string,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid=>{
+            const sql=`DELETE FROM ${this.embeddingTableName} WHERE id = ?`;
+            const r=await this.execSqlAsync(sql,[id]);
+            if(!r.success){
+                return r;
+            }
+            return {success:true};
+        },
+
+        updateEmbeddingAsync:async (update:ConvoNodeEmbeddingUpdate,options:Omit<any,'permissionFrom'>|undefined):PromiseResultTypeVoid=>{
+            const currentResult=await this.getEmbeddingByIdAsync(update.id);
+            if(!currentResult.success){
+                return currentResult;
+            }
+
+            const sets:string[]=[];
+            const bind:any[]=[];
+
+            if(update.modified!==undefined){
+                sets.push(`modified = ?`);
+                bind.push(update.modified);
+            }
+            if(update.description!==undefined){
+                sets.push(`description = ?`);
+                bind.push(update.description);
+            }
+            if(update.instructions!==undefined){
+                sets.push(`instructions = ?`);
+                bind.push(update.instructions);
+            }
+
+            let vectorUpdated=false;
+            if(update.generateVector){
+                const nextEmbedding:ConvoNodeEmbedding={
+                    ...currentResult.result,
+                    modified:update.modified===undefined?currentResult.result.modified:update.modified??undefined,
+                    description:update.description===undefined?currentResult.result.description:update.description??undefined,
+                    instructions:update.instructions===undefined?currentResult.result.instructions:update.instructions??undefined,
+                };
+                const vectorResult=await this.generateEmbeddingVectorAsync(nextEmbedding);
+                if(!vectorResult.success){
+                    return vectorResult;
+                }
+                sets.push(`vector = ?`);
+                bind.push(serializeValue(vectorResult.result));
+                vectorUpdated=true;
+            }
+
+            if(!sets.length && !vectorUpdated){
+                return {success:true};
+            }
+
+            bind.push(update.id);
+
+            const sql=`UPDATE ${this.embeddingTableName} SET ${sets.join(', ')} WHERE id = ?`;
+            const r=await this.execSqlAsync(sql,bind);
+            if(!r.success){
+                return r;
+            }
+
+            return {success:true};
+        },
+
+        queryEdgesAsync:async (query: ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>=>{
+            const where:string[]=[];
+            const bind:any[]=[];
+
+            if(query.id!==undefined){
+                where.push(`id = ?`);
+                bind.push(query.id);
+            }
+            if(query.from!==undefined){
+                where.push(`"from" = ?`);
+                bind.push(query.from);
+            }
+            if(query.to!==undefined){
+                where.push(`"to" = ?`);
+                bind.push(query.to);
+            }
+            if(query.type!==undefined){
+                where.push(`type = ?`);
+                bind.push(query.type);
+            }
+            if(query.name!==undefined){
+                where.push(`name = ?`);
+                bind.push(query.name);
+            }
+
+            if(query.permissionFrom!==undefined){
+                where.push(`EXISTS (
+                    SELECT 1
+                    FROM ${this.edgeTableName} ef
+                    WHERE ef."from" = ?
+                        AND ef.grant IS NOT NULL
+                        AND ef.grant != ?
+                        AND ((ef.grant & ?) = ?)
+                        AND ("from" = ef."to" OR "from" LIKE (ef."to" || '/%'))
+                )`);
+                bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
+
+                where.push(`EXISTS (
+                    SELECT 1
+                    FROM ${this.edgeTableName} et
+                    WHERE et."from" = ?
+                        AND et.grant IS NOT NULL
+                        AND et.grant != ?
+                        AND ((et.grant & ?) = ?)
+                        AND ("to" = et."to" OR "to" LIKE (et."to" || '/%'))
+                )`);
+                bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
+            }
+
+            const limit=query.limit??50;
+            const offset=query.offset??0;
+
+            const sql=`SELECT id, displayName, name, description, created, modified, type, "from", "to", instructions, grant
+                FROM ${this.edgeTableName}
+                ${where.length?`WHERE ${where.join(' AND ')}`:''}
+                ORDER BY id ASC
+                LIMIT ? OFFSET ?`;
+            const r=await this.execSqlAsync(sql,[...bind,limit,offset]);
+            if(!r.success){
+                return r;
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const totalSql=`SELECT COUNT(*) AS total
+                    FROM ${this.edgeTableName}
+                    ${where.length?`WHERE ${where.join(' AND ')}`:''}`;
+                const totalResult=await this.execSqlAsync(totalSql,bind);
+                if(!totalResult.success){
+                    return totalResult;
+                }
+                total=Number(totalResult.result[0]?.total??0);
+            }
+
+            return {
+                success:true,
+                result:{
+                    edges:r.result.map(row=>deserializeEdgeRow(row,'*') as ConvoNodeEdge),
+                    total,
+                }
+            };
+        },
+
+        queryEmbeddingsAsync:async (query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>=>{
+            const where:string[]=[];
+            const bind:any[]=[];
+
+            if(query.id!==undefined){
+                where.push(`id = ?`);
+                bind.push(query.id);
+            }
+            if(query.path!==undefined){
+                where.push(`path = ?`);
+                bind.push(query.path);
+            }
+            if(query.type!==undefined){
+                where.push(`type = ?`);
+                bind.push(query.type);
+            }
+            if(query.name!==undefined){
+                where.push(`name = ?`);
+                bind.push(query.name);
+            }
+            if(query.prop!==undefined){
+                where.push(`prop = ?`);
+                bind.push(query.prop);
+            }
+
+            if(query.permissionFrom!==undefined){
+                where.push(`EXISTS (
+                    SELECT 1
+                    FROM ${this.edgeTableName} e
+                    WHERE e."from" = ?
+                        AND e.grant IS NOT NULL
+                        AND e.grant != ?
+                        AND ((e.grant & ?) = ?)
+                        AND (path = e."to" OR path LIKE (e."to" || '/%'))
+                )`);
+                bind.push(query.permissionFrom,ConvoNodePermissionType.none,ConvoNodePermissionType.read,ConvoNodePermissionType.read);
+            }
+
+            const limit=query.limit??50;
+            const offset=query.offset??0;
+            const vectorSelect=query.includeVector?'vector':'NULL AS vector';
+
+            const sql=`SELECT id, prop, name, type, path, description, created, modified, instructions, ${vectorSelect}
                 FROM ${this.embeddingTableName}
-                ${where.length?`WHERE ${where.join(' AND ')}`:''}`;
-            const totalResult=await this.execSqlAsync(totalSql,bind);
-            if(!totalResult.success){
-                return totalResult;
+                ${where.length?`WHERE ${where.join(' AND ')}`:''}
+                ORDER BY id ASC
+                LIMIT ? OFFSET ?`;
+            const r=await this.execSqlAsync(sql,[...bind,limit,offset]);
+            if(!r.success){
+                return r;
             }
-            total=Number(totalResult.result[0]?.total??0);
-        }
 
-        return {
-            success:true,
-            result:{
-                embeddings:r.result.map(row=>deserializeEmbeddingRow(row,!!query.includeVector) as ConvoNodeEmbedding),
-                total,
+            let total:number|undefined;
+            if(query.includeTotal){
+                const totalSql=`SELECT COUNT(*) AS total
+                    FROM ${this.embeddingTableName}
+                    ${where.length?`WHERE ${where.join(' AND ')}`:''}`;
+                const totalResult=await this.execSqlAsync(totalSql,bind);
+                if(!totalResult.success){
+                    return totalResult;
+                }
+                total=Number(totalResult.result[0]?.total??0);
             }
-        };
+
+            return {
+                success:true,
+                result:{
+                    embeddings:r.result.map(row=>deserializeEmbeddingRow(row,!!query.includeVector) as ConvoNodeEmbedding),
+                    total,
+                }
+            };
+        },
     }
 }
 

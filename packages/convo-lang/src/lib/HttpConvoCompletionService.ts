@@ -4,7 +4,7 @@ import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
-import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
+import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriverFunction, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
 import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -126,6 +126,18 @@ export class HttpConvoCompletionService implements
             return e??'';
         }else{
             return this.endpoint;
+        }
+    }
+
+    public async getNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
+    {
+        const r=await this.queryNodesAsync({steps:[{path}],limit:1,permissionFrom});
+        if(!r.success){
+            return r;
+        }
+        return {
+            success:true,
+            result:r.result.nodes[0],
         }
     }
 
@@ -590,6 +602,31 @@ export class HttpConvoCompletionService implements
     {
         const r=await this.executeCommandAsync<TKeys>({queryNodes:{query}});
         return r.success?{success:true,result:r.result.queryNodes!}:r;
+    }
+
+    private async proxyDriverCallAsync(fn:ConvoDbDriverFunction,args:any[]):Promise<any>{
+        const r=await this.executeCommandAsync({driverCmd:{fn,args:args as any}});
+        return r.success?{success:true,result:r.result.driverCmd}:r;
+    }
+    readonly _driver={
+        selectEdgesByPathsAsync:(...args:any[])=>this.proxyDriverCallAsync('selectEdgesByPathsAsync',args),
+        selectNodesByPathsAsync:(...args:any[])=>this.proxyDriverCallAsync('selectNodesByPathsAsync',args),
+        selectNodePathsForPathAsync:(...args:any[])=>this.proxyDriverCallAsync('selectNodePathsForPathAsync',args),
+        selectNodePathsForConditionAsync:(...args:any[])=>this.proxyDriverCallAsync('selectNodePathsForConditionAsync',args),
+        selectNodePathsForPermissionAsync:(...args:any[])=>this.proxyDriverCallAsync('selectNodePathsForPermissionAsync',args),
+        selectNodePathsForEmbeddingAsync:(...args:any[])=>this.proxyDriverCallAsync('selectNodePathsForEmbeddingAsync',args),
+        selectEdgeNodePathsForConditionAsync:(...args:any[])=>this.proxyDriverCallAsync('selectEdgeNodePathsForConditionAsync',args),
+        insertNodeAsync:(...args:any[])=>this.proxyDriverCallAsync('insertNodeAsync',args),
+        updateNodeAsync:(...args:any[])=>this.proxyDriverCallAsync('updateNodeAsync',args),
+        deleteNodeAsync:(...args:any[])=>this.proxyDriverCallAsync('deleteNodeAsync',args),
+        insertEdgeAsync:(...args:any[])=>this.proxyDriverCallAsync('insertEdgeAsync',args),
+        updateEdgeAsync:(...args:any[])=>this.proxyDriverCallAsync('updateEdgeAsync',args),
+        deleteEdgeAsync:(...args:any[])=>this.proxyDriverCallAsync('deleteEdgeAsync',args),
+        insertEmbeddingAsync:(...args:any[])=>this.proxyDriverCallAsync('insertEmbeddingAsync',args),
+        deleteEmbeddingAsync:(...args:any[])=>this.proxyDriverCallAsync('deleteEmbeddingAsync',args),
+        updateEmbeddingAsync:(...args:any[])=>this.proxyDriverCallAsync('updateEmbeddingAsync',args),
+        queryEdgesAsync:(...args:any[])=>this.proxyDriverCallAsync('queryEdgesAsync',args),
+        queryEmbeddingsAsync:(...args:any[])=>this.proxyDriverCallAsync('queryEmbeddingsAsync',args),
     }
 
     public async getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>

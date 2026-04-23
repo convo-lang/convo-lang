@@ -1,4 +1,5 @@
-import { ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
+import { ResultTypeError } from "../result-type.js";
+import { ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
 /**
  * Normalizes a convo node path.
@@ -145,4 +146,24 @@ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined
     }
 
     return undefined;
+}
+
+
+/**
+ * Calls a ConvoDbDriver function and ensures the specified function is an allowed function to be called
+ */
+export const callConvoDbDriverCmdAsync=<FN extends ConvoDbDriverFunction>(
+    driver:ConvoDbDriver,
+    fn:FN,
+    args:Parameters<ConvoDbDriver[FN]>
+):ReturnType<ConvoDbDriver[FN]>=>{
+    if(!convoDbDriverFunctions.includes(fn)){
+        const error:ResultTypeError={
+            success:false,
+            error:'Invalid ConvoDb driver function',
+            statusCode:400,
+        };
+        return Promise.resolve(error) as any;
+    }
+    return (driver[fn] as any)(...args);
 }
