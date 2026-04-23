@@ -105,6 +105,8 @@ export type UseConvoQueryState<TKeys extends ConvoNodeKeySelection='*'>=
     }
 );
 
+export type UseConvoQueryStateType=UseConvoQueryState['state'];
+
 /**
  * Returns nodes based on a `ConvoNodeQuery` and can optionally watch for realtime updates to
  * nodes when either query.watch or options.watch are set to true. The query prop is automatically
@@ -320,4 +322,21 @@ export const useConvoNodesAtPath=<TKeys extends ConvoNodeKeySelection='*'>(
     options?:UseConvoDbOptions
 ):UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>=>{
     return useConvoDbQuery({steps:[{path}]},options);
+}
+
+/**
+ * Returns a tuple containing a single node, query state and full query result.
+ * @example
+ * const [product,productLoadState,productResult]=useConvoNodeAtPath('/products/apple-sauce');
+ */
+export const useConvoNodeAtPath=<TKeys extends ConvoNodeKeySelection='*'>(
+    path:string|null|undefined,
+    options?:UseConvoDbOptions
+):[
+    Pick<ConvoNode,ConvoNodeQueryKeysToSelection<TKeys>>|undefined,
+    UseConvoQueryStateType,
+    UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>
+]=>{
+    const r=useConvoDbQuery<TKeys>((path===null || path===undefined)?undefined:{steps:[{path}],limit:1},options);
+    return [r?.node as any,r.state,r];
 }
