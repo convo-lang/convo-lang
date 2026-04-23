@@ -28,7 +28,6 @@
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
         "esModuleInterop": true,
-        "baseUrl": ".",
         "outDir": "./dist",
         "composite": true,
         "paths": {
