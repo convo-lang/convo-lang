@@ -18,6 +18,8 @@ npx esbuild \
     --platform=node \
     --format=cjs \
     --bundle \
+    --minify \
+    --tree-shaking=true\
     --external:'vscode' \
     --external:'bun' \
     --external:'bun:sqlite' \
@@ -32,6 +34,7 @@ npx esbuild \
     client/src/extension.ts \
     --platform=node \
     --format=cjs \
+    --minify \
     --tree-shaking=true\
     --bundle \
     --external:'vscode' \
