@@ -1,5 +1,5 @@
 import { ConvoDbMap } from "@convo-lang/convo-lang";
-import { getConvoHonoRoutes } from "@convo-lang/convo-lang-hono";
+import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
 import { serve } from '@hono/node-server';
 import { CancelToken, DisposeCallback } from "@iyio/common";
 import { Hono } from "hono";

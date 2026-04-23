@@ -25,6 +25,8 @@
         "types": [
             "node","bun"
         ],
+        "baseUrl": ".",
+        "ignoreDeprecations": "6.0",
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
         "esModuleInterop": true,
@@ -70,8 +72,8 @@
             "@convo-lang/convo-lang-react": [
                 "./packages/convo-lang-react/src/index.ts"
             ],
-            "@convo-lang/convo-lang-hono": [
-                "./packages/convo-lang-hono/src/index.ts"
+            "@convo-lang/hono/*": [
+                "./packages/hono/src/*"
             ],
             "@convo-lang/db/*": [
                 "./packages/db/src/*"

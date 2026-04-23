@@ -25,9 +25,6 @@
             "path": "../../packages/convo-lang-browser"
         },
         {
-            "path": "../../packages/convo-lang-hono"
-        },
-        {
             "path": "../../packages/convo-lang-make"
         },
         {
@@ -35,6 +32,9 @@
         },
         {
             "path": "../../packages/db"
+        },
+        {
+            "path": "../../packages/hono"
         }
     ]
 }
