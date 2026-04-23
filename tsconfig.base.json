@@ -32,49 +32,49 @@
         "composite": true,
         "paths": {
             "@convo-lang/convo-crawler": [
-                "packages/convo-crawler/src/index.ts"
+                "./packages/convo-crawler/src/index.ts"
             ],
             "@convo-lang/convo-lang": [
-                "packages/convo-lang/src/index.ts"
+                "./packages/convo-lang/src/index.ts"
             ],
             "@convo-lang/convo-lang-api-routes": [
-                "packages/convo-lang-api-routes/src/index.ts"
+                "./packages/convo-lang-api-routes/src/index.ts"
             ],
             "@convo-lang/convo-lang-aws-cdk": [
-                "packages/convo-lang-aws-cdk/src/index.ts"
+                "./packages/convo-lang-aws-cdk/src/index.ts"
             ],
             "@convo-lang/convo-lang-bedrock": [
-                "packages/convo-lang-bedrock/src/index.ts"
+                "./packages/convo-lang-bedrock/src/index.ts"
             ],
             "@convo-lang/convo-lang-browser": [
-                "packages/convo-lang-browser/src/index.ts"
+                "./packages/convo-lang-browser/src/index.ts"
             ],
             "@convo-lang/convo-lang-cli": [
-                "packages/convo-lang-cli/src/index.ts"
+                "./packages/convo-lang-cli/src/index.ts"
             ],
             "@convo-lang/convo-lang-doc-query": [
-                "packages/convo-lang-doc-query/src/index.ts"
+                "./packages/convo-lang-doc-query/src/index.ts"
             ],
             "@convo-lang/convo-lang-make": [
-                "packages/convo-lang-make/src/index.ts"
+                "./packages/convo-lang-make/src/index.ts"
             ],
             "@convo-lang/convo-lang-mcp-client": [
-                "packages/convo-lang-mcp-client/src/index.ts"
+                "./packages/convo-lang-mcp-client/src/index.ts"
             ],
             "@convo-lang/convo-lang-pdf": [
-                "packages/convo-lang-pdf/src/index.ts"
+                "./packages/convo-lang-pdf/src/index.ts"
             ],
             "@convo-lang/convo-lang-pinecone": [
-                "packages/convo-lang-pinecone/src/index.ts"
+                "./packages/convo-lang-pinecone/src/index.ts"
             ],
             "@convo-lang/convo-lang-react": [
-                "packages/convo-lang-react/src/index.ts"
+                "./packages/convo-lang-react/src/index.ts"
             ],
             "@convo-lang/convo-lang-hono": [
-                "packages/convo-lang-hono/src/index.ts"
+                "./packages/convo-lang-hono/src/index.ts"
             ],
             "@convo-lang/db/*": [
-                "packages/db/src/*"
+                "./packages/db/src/*"
             ]
         }
     },
