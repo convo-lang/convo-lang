@@ -55,12 +55,12 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell',async (args:OutputTagCodeLensArgs|HasArgs)=>{
         args=getFileBlockArgs(args);
         await executeShellOutputTagAsync(context,args);
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell-complete',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell-complete',async (args:OutputTagCodeLensArgs|HasArgs)=>{
         args=getFileBlockArgs(args);
         await executeShellOutputTagAsync(context,args?{...args,complete:true}:args);
     }));
@@ -83,22 +83,22 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                         new vscode.CodeLens(tag.range,{
                             title:'Open Output',
                             command:'convo.output-tag-open',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Write Output',
                             command:'convo.output-tag-write',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Open Diff',
                             command:'convo.output-tag-diff',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Copy Output',
                             command:'convo.output-tag-copy',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     break;
@@ -108,14 +108,14 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                         new vscode.CodeLens(tag.range,{
                             title:'Run Script',
                             command:'convo.output-tag-execute-shell',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     lenses.push(
                         new vscode.CodeLens(tag.range,{
                             title:'Run Script and complete',
                             command:'convo.output-tag-execute-shell-complete',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,complete:true} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,complete:true} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     break;

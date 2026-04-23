@@ -2,6 +2,7 @@ import { ConvoCodeBlock, ConvoMessage, parseConvoCode } from '@convo-lang/convo-
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { Readable } from 'stream';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, Range, Uri, window, workspace } from "vscode";
 import { revealDocumentEndAsync } from './util';
@@ -228,7 +229,7 @@ const _writeOutputTagAsync=async (targetPath:string,content:string):Promise<void
     void window.showInformationMessage(`Wrote output to ${targetPath}`);
 }
 
-export const writeOutputTagAsync=async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+export const writeOutputTagAsync=async (args:OutputTagCodeLensArgs|HasArgs)=>{
     args=getFileBlockArgs(args);
     const targetPath=args?.targetPath;
     if(!targetPath || !args){
@@ -263,7 +264,7 @@ export const writeOutputTagAsync=async (args?:OutputTagCodeLensArgs|HasArgs)=>{
 
 export const executeShellOutputTagAsync=async (
     context:ExtensionContext,
-    args?:OutputTagCodeLensArgs|HasArgs,
+    args:OutputTagCodeLensArgs|HasArgs,
 ):Promise<void>=>{
     args=getFileBlockArgs(args);
     const targetPath=args?.targetPath;
@@ -300,10 +301,54 @@ export const executeShellOutputTagAsync=async (
     await revealDocumentEndAsync(editor);
 
     const processCwd=args.cwd || process.cwd();
-    const child=spawn('bash',['-lc',tag.content],{
+    let command:string;
+    let commandArgs:string[];
+    let stdIn:string|undefined;
+    let exitCode:number|undefined;
+    const shellType=tag.codeBlock.attributes['target-shell-type'];
+    switch(shellType){
+
+        case 'bash':
+            command='bash';
+            commandArgs=[];
+            stdIn=tag.content;
+            break;
+
+        case 'node':
+            command='node';
+            commandArgs=['--input-type=module'];
+            stdIn=tag.content;
+            break;
+
+        case 'bun':
+            command='bun';
+            commandArgs=['run','-'];
+            stdIn=tag.content;
+            break;
+
+        case 'python':
+            command='python3';
+            commandArgs=['-'];
+            stdIn=tag.content;
+            break;
+
+        default:
+            command='echo';
+            commandArgs=[`Unknown shell type - ${JSON.stringify(shellType)}`];
+            exitCode=1;
+            break;
+
+    }
+    const child=spawn(command,commandArgs,{
         cwd:processCwd,
         env:process.env,
     });
+
+    if(stdIn!==undefined){
+        const stream=Readable.from(stdIn);
+        stream.pipe(child.stdin,{end:true});
+    }
+    
 
     let appendQueue=Promise.resolve();
     let killed=false;
@@ -357,6 +402,9 @@ export const executeShellOutputTagAsync=async (
 
         await new Promise<void>((resolve)=>{
             child.on('close',(code,signal)=>{
+                if(exitCode!==undefined){
+                    code=exitCode;
+                }
                 let endNote='';
                 if(killed){
                     endNote=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;

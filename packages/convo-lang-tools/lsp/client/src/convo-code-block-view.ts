@@ -284,7 +284,6 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
                 documentUri:target.group.messageUri,
             }
             if(tag.type==='file'){
-                writeOutputTagAsync()
                 await writeOutputTagAsync(args);
             }else if(tag.type==='shell'){
                 await commands.executeCommand('convo.output-tag-execute-shell',args);
@@ -433,7 +432,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             targetPath:tag.targetPath,
             index:tag.index,
             cwd:tag.cwd,
-            documentUri:args?.documentUri
+            documentUri:args?.documentUri,
         }
         if(tag.type==='file'){
             await writeOutputTagAsync(tArgs);
