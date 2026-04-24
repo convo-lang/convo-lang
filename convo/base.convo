@@ -5,7 +5,9 @@
 > define
 openAiModel='gpt-5.4'
 claudeModel='open-router/anthropic/claude-opus-4.7'
+
 __model=openAiModel
+
 __trackModel=true
 __trackTokenUsage=true;
 __trackTime=true
@@ -25,6 +27,7 @@ format unless told otherwise.
 
 Project root:{{__projectRoot}}
 
+@edge
 @condition=enableReview
 > system
 Before generating a response for the user ask them any questions you may have
