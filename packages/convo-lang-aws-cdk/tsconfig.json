@@ -19,13 +19,13 @@
             "path": "../../packages/convo-lang"
         },
         {
-            "path": "../../packages/convo-lang-api-routes"
-        },
-        {
             "path": "../../packages/convo-lang-bedrock"
         },
         {
             "path": "../../packages/convo-lang-pinecone"
+        },
+        {
+            "path": "../../packages/hono"
         }
     ]
 }

@@ -1,0 +1,5 @@
+{
+    "bundleDir":"src/lib/handlers",
+    "bundleOutDir":"handlers/ConvoLangApi",
+    "bundleOutName":"index.js"
+}

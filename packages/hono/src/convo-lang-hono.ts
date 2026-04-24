@@ -1,22 +1,58 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { CancelToken, minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
 import { streamSSE } from 'hono/streaming';
 import { timeout } from 'hono/timeout';
+import z from "zod";
 import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
+
+export const ConvoTokenQuotaScheme=z.object({
+    id:z.string(),
+    usage:z.number(),
+    cap:z.number().optional(),
+})
+export type ConvoTokenQuota=z.infer<typeof ConvoTokenQuotaScheme>;
+
+export interface ConvoCompletionRequestCtx{
+    requestContext:Context;
+    flat:FlatConvoConversation;
+    completionService?:ConvoCompletionService<any,any>;
+    result:ConvoCompletionMessage[];
+    error?:any;
+    success:boolean;
+}
 
 export interface ConvoHonoRoutesOptions
 {
     completionTimeoutMs?:number;
     enableLogging?:boolean;
     dbMap?:ConvoDbMap;
+    
+    onCompletion?:(requestCtx:ConvoCompletionRequestCtx)=>void;
+
+    beforeComplete?:(requestCtx:Context,service:ConvoCompletionService<any,any>,input:any,flat:FlatConvoConversationBase)=>void|Promise<void>;
+    afterComplete?:(requestCtx:Context,service:ConvoCompletionService<any,any>,output:any,input:any,flat:FlatConvoConversationBase)=>void|Promise<void>;
+
+    completionCtx?:ConvoCompletionCtx;
+
+    getUsage?:(ctx:Context)=>ConvoTokenQuota|undefined|Promise<ConvoTokenQuota|undefined>;
+
+    /**
+     * If true a mock route will be added for demoing purposes
+     */
+    enableMockRoute?:boolean;
 }
 
 export const getConvoHonoRoutes=({
     completionTimeoutMs=minuteMs*30,
     enableLogging,
-    dbMap
+    dbMap,
+    onCompletion,
+    beforeComplete,
+    afterComplete,
+    completionCtx,
+    getUsage,
 }:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
@@ -85,13 +121,14 @@ export const getConvoHonoRoutes=({
     });
 
     routes.post('/completion',timeout(completionTimeoutMs),async (c)=>{
-        return await completeAsync(c,true) as any;
+        return completeAsync(c,true,completionCtx) as any;
     });
 
     routes.post('/completion/stream',timeout(completionTimeoutMs),(c)=>{
         return streamSSE(c,async stream=>{
             let mid='';
             const result=await completeAsync(c,false,{
+                ...completionCtx,
                 onChunk:async (_service,chunk)=>{
                     mid=chunk.mid;
                     await stream.writeSSE({
@@ -130,17 +167,68 @@ export const getConvoHonoRoutes=({
                 flat,
                 service,
                 convoConversationConverterProvider.all(),
-                ctx
+                {
+                    ...ctx,
+
+                    beforeComplete:beforeComplete?(service,input,flat)=>{
+                        return beforeComplete(c,service,input,flat);
+                    }:ctx?.beforeComplete,
+                    
+                    afterComplete:afterComplete?(service,output,input,flat)=>{
+                        return afterComplete(c,service,output,input,flat);
+                    }:ctx?.afterComplete,
+
+                }
             );
+
+            if(onCompletion){
+                onCompletion({
+                    requestContext:c,
+                    flat,
+                    completionService:service,
+                    result,
+                    success:true,
+                })
+            }
 
             return returnJson?c.json(result):result;
         }catch(error){
+
+            if(onCompletion){
+                onCompletion({
+                    requestContext:c,
+                    flat,
+                    completionService:service,
+                    result:[],
+                    success:false,
+                    error,
+                })
+            }
+            
             console.error('completion failed',error);
             if(!returnJson){
                 throw error;
             }
             return c.json(error,500);
         }
+    }
+
+    if(getUsage){
+        routes.get('/usage',async c=>{
+            let usage:ConvoTokenQuota|undefined;
+            if(getUsage){
+                usage=await getUsage(c);
+            }
+
+            if(!usage){
+                usage={
+                    id:'_',
+                    usage:-1,
+                }
+            }
+
+            return c.json(usage);
+        });
     }
 
     routes.post('/convert',async (c)=>{
