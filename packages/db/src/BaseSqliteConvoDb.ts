@@ -1,4 +1,4 @@
-import { ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "@convo-lang/convo-lang";
+import { ConvoDbDriverPathsResult, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "@convo-lang/convo-lang";
 import { createPromiseSource, deepClone, getErrorMessage, PromiseSource, uuid } from "@iyio/common";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 
@@ -245,7 +245,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
             };
         },
         
-        selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const bind:any[]=[];
             const where:string[]=[];
             appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
@@ -271,11 +271,11 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:r.result.map(v=>String(v.path)),
+                result:{paths:r.result.map(v=>String(v.path))}
             };
         },
 
-        selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const bind:any[]=[];
             const where:string[]=[];
 
@@ -294,11 +294,11 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:r.result.map(v=>String(v.path)),
+                result:{paths:r.result.map(v=>String(v.path))}
             };
         },
 
-        selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const bind:any[]=[
                 step.permissionFrom,
                 ConvoNodePermissionType.none,
@@ -327,11 +327,11 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:r.result.filter(v=>(v.grant&step.permissionRequired)===step.permissionRequired).map(v=>String(v.path)),
+                result:{paths:r.result.filter(v=>(v.grant&step.permissionRequired)===step.permissionRequired).map(v=>String(v.path))}
             };
         },
 
-        selectNodePathsForEmbeddingAsync:async (step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForEmbeddingAsync:async (step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const embeddingResult=await this.generateEmbeddingsAsync({
                 ...this.embeddingOptions,
                 text:step.embedding.text,
@@ -374,11 +374,11 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:r.result.map(v=>String(v.path)),
+                result:{paths:r.result.map(v=>String(v.path))}
             };
         },
 
-        selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const bind:any[]=[];
             const directionParts:string[]=[];
 
@@ -427,7 +427,7 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:r.result.map(v=>String(v.path)),
+                result:{paths:r.result.map(v=>String(v.path))}
             };
         },
 

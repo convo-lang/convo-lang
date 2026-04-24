@@ -1133,6 +1133,27 @@ export interface ConvoDb
     readonly _driver:ConvoDbDriver;
 }
 
+
+/**
+ * Value returned by ConvoDbDriver select functions
+ */
+export interface ConvoDbDriverPathsResult extends ConvoDbDriverNextToken
+{
+    /**
+     * Paths selected
+     */
+    paths:string[];
+}
+
+export interface ConvoDbDriverNextToken
+{
+    /**
+     * Token passed and returned by various ConvoDbDriver functions. When undefined it does not
+     * mean there are no more items to select. Some ConvoDbDrivers do not use nextTokens
+     */
+    nextToken?:string;
+}
+
 /**
  * ConvoDbDrivers handle direct underlying database access. Db drivers do not handle authentication
  * or other higher level ConvoDb logic. All parameters passed to drivers will already be validated.
@@ -1197,8 +1218,9 @@ export interface ConvoDbDriver
      * @param orderBy Ordering to apply.
      * @param limit Max number of paths to return for this batch.
      * @param offset Offset for paged scanning within this traversal stage.
+     * @param nextToken The next token returned by the previous call. Not all drivers will return a next token when there are more paths to return.
      */
-    selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+    selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>;
 
     /**
      * Selects node paths matching a query step property or grouped condition filter.
@@ -1218,8 +1240,9 @@ export interface ConvoDbDriver
      * @param orderBy Ordering to apply.
      * @param limit Max number of paths to return for this batch.
      * @param offset Offset for paged scanning within this traversal stage.
+     * @param nextToken The next token returned by the previous call. Not all drivers will return a next token when there are more paths to return.
      */
-    selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+    selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>;
 
     /**
      * Selects node paths that satisfy a permission check for the current query step.
@@ -1240,8 +1263,9 @@ export interface ConvoDbDriver
      * @param orderBy Ordering to apply.
      * @param limit Max number of paths to return for this batch.
      * @param offset Offset for paged scanning within this traversal stage.
+     * @param nextToken The next token returned by the previous call. Not all drivers will return a next token when there are more paths to return.
      */
-    selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+    selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>;
 
     /**
      * Selects node paths matching an embedding search filter for the current query step.
@@ -1261,8 +1285,9 @@ export interface ConvoDbDriver
      * @param orderBy Ordering to apply.
      * @param limit Max number of paths to return for this batch.
      * @param offset Offset for paged scanning within this traversal stage.
+     * @param nextToken The next token returned by the previous call. Not all drivers will return a next token when there are more paths to return.
      */
-    selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+    selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>;
 
     /**
      * Selects destination node paths by traversing edges from the current query step.
@@ -1285,8 +1310,9 @@ export interface ConvoDbDriver
      * @param orderBy Ordering to apply to destination nodes.
      * @param limit Max number of paths to return for this batch.
      * @param offset Offset for paged scanning within this traversal stage.
+     * @param nextToken The next token returned by the previous call. Not all drivers will return a next token when there are more paths to return.
      */
-    selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>;
+    selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>;
 
     /**
      * Inserts a node into the backing store.
@@ -1397,12 +1423,12 @@ export interface ConvoDbDriver
     /**
      * Returns a set of edges based on a ConvoNodeEdgeQuery
      */
-    queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>;
+    queryEdgesAsync(query:ConvoNodeEdgeQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>;
 
     /**
      * Returns a set of embeddings based on a ConvoNodeEmbeddingQuery
      */
-    queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>;
+    queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>;
 }
 
 /**

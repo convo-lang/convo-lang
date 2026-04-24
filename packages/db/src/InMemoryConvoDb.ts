@@ -1,4 +1,4 @@
-import { ConvoDbExport, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
+import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
 import { deepClone, starStringToRegex, uuid } from "@iyio/common";
 import { BaseConvoDb } from "./BaseConvoDb.js";
 
@@ -77,7 +77,7 @@ export class InMemoryConvoDb extends BaseConvoDb
             }
         },
         
-        selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const regex=step.path.includes('*')?starStringToRegex(step.path):undefined;
             const nodes=this.getCandidateNodes(currentNodePaths);
 
@@ -89,11 +89,11 @@ export class InMemoryConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:matched.slice(offset,offset+limit).map(node=>node.path),
+                result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)}
             }
         },
 
-        selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const nodes=this.getCandidateNodes(currentNodePaths);
 
             const matched=nodes.filter(node=>evaluateCondition(node,step.condition));
@@ -102,11 +102,11 @@ export class InMemoryConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:matched.slice(offset,offset+limit).map(node=>node.path),
+                result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)}
             }
         },
 
-        selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const nodes=this.getCandidateNodes(currentNodePaths);
             const matched:ConvoNode[]=[];
 
@@ -121,11 +121,11 @@ export class InMemoryConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:matched.slice(offset,offset+limit).map(node=>node.path),
+                result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)}
             }
         },
 
-        selectNodePathsForEmbeddingAsync:async (step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectNodePathsForEmbeddingAsync:async (step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const allowedPaths=currentNodePaths?new Set(currentNodePaths):undefined;
             const matchedPaths:string[]=[];
 
@@ -154,11 +154,11 @@ export class InMemoryConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:matchedNodes.slice(offset,offset+limit).map(node=>node.path),
+                result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)}
             }
         },
 
-        selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<string[]>=>{
+        selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const currentSet=currentNodePaths?new Set(currentNodePaths):undefined;
             const condition:ConvoNodeCondition=(typeof step.edge==='string')?
                 {
@@ -215,7 +215,7 @@ export class InMemoryConvoDb extends BaseConvoDb
 
             return {
                 success:true,
-                result:matchedNodes.slice(offset,offset+limit).map(node=>node.path),
+                result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)}
             }
         },
 

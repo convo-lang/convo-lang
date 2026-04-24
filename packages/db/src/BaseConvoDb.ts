@@ -1,4 +1,4 @@
-import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
 
@@ -273,15 +273,17 @@ export abstract class BaseConvoDb implements ConvoDb
             return;
         }
 
-        const iteratePathsAsync=async (getPaths:(offset:number)=>PromiseResultType<string[]>):PromiseResultType<string[]>=>{
+        const iteratePathsAsync=async (getPaths:(offset:number,nextToken:string|undefined)=>PromiseResultType<ConvoDbDriverPathsResult>):PromiseResultType<string[]>=>{
             let offset=0;
             const paths:string[]=[];
+            let nextToken:string|undefined;
             while(!cancel.isCanceled){
-                const r=await getPaths(offset);
+                const r=await getPaths(offset,nextToken);
                 if(!r.success){
                     return r;
                 }
-                for(const p of r.result){
+                nextToken=r.result.nextToken;
+                for(const p of r.result.paths){
                     const np=normalizeConvoNodePath(p,'none');
                     if(!np){
                         return {
@@ -292,8 +294,8 @@ export abstract class BaseConvoDb implements ConvoDb
                     }
                     paths.push(np);
                 }
-                offset+=r.result.length;
-                if(r.result.length<batchSize){
+                offset+=r.result.paths.length;
+                if(r.result.paths.length<batchSize){
                     break;
                 }
             }
@@ -479,9 +481,9 @@ export abstract class BaseConvoDb implements ConvoDb
                         }
                         const cond=watcher.condition.condition;
                         if(cond){
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectNodePathsForConditionAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForConditionAsync({
                                 condition:cond,
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
@@ -518,9 +520,9 @@ export abstract class BaseConvoDb implements ConvoDb
                     case 'path':
                         if(step.path){
                             const p=step.path;
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectNodePathsForPathAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPathAsync({
                                 path:p
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
@@ -534,9 +536,9 @@ export abstract class BaseConvoDb implements ConvoDb
                     case 'condition':
                         if(step.condition){
                             const c=step.condition;
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectNodePathsForConditionAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForConditionAsync({
                                 condition:c,
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
@@ -550,10 +552,10 @@ export abstract class BaseConvoDb implements ConvoDb
                     case 'permissions':
                         if(step.permissionFrom){
                             const f=step.permissionFrom;
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectNodePathsForPermissionAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
                                 permissionFrom:f,
                                 permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
@@ -567,9 +569,9 @@ export abstract class BaseConvoDb implements ConvoDb
                     case 'embedding':
                         if(step.embedding){
                             const e=step.embedding;
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectNodePathsForEmbeddingAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForEmbeddingAsync({
                                 embedding:e
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
@@ -583,11 +585,11 @@ export abstract class BaseConvoDb implements ConvoDb
                     case 'edge':
                         if(step.edge){
                             const e=step.edge;
-                            const r=await iteratePathsAsync((offset)=>this._driver.selectEdgeNodePathsForConditionAsync({
+                            const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectEdgeNodePathsForConditionAsync({
                                 edge:e,
                                 edgeDirection:step.edgeDirection??'bi',
                                 edgeLimit:step.edgeLimit,
-                            },paths,orderBy,batchSize,offset));
+                            },paths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
