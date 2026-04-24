@@ -1,3 +1,44 @@
+@import .././base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../docs/convo-db.md !file
+
+
+> user
+Update the convo-db.md document.
+
+I Refactored ConvoDb around a dedicated ConvoDbDriver interface. The ConvoDbDriver interface is meant
+to handle direct communication with an underlying database while the ConvoDb interface handler
+higher level functionality.
+    
+- update `convo-db-types.ts` to add `ConvoDbDriver`, driver command types, allowed driver function list, `getNodeByPathAsync`, `_driver`, and permission override support for command execution
+- update `convo-db-lib.ts` to add `callConvoDbDriverCmdAsync` for validated driver function dispatch
+- update `BaseConvoDb.ts` to route low-level DB operations through `_driver`, expose `queryEdgesAsync` and `queryEmbeddingsAsync` via the driver, add `getNodeByPathAsync`, and support `driverCmd` execution
+- update `BaseSqliteConvoDb.ts` to move sqlite-backed low-level operations into the `_driver` implementation
+- update `InMemoryConvoDb.ts` to move in-memory low-level operations into the `_driver` implementation
+- update `HttpConvoCompletionService.ts` to expose `getNodeByPathAsync` and proxy allowed `_driver` calls over `executeCommandAsync`
+
+Add a new section about ConvoDbDriver
+
+
+> assistant
+Before I update it, a couple quick clarifications:
+
+1. Do you want me to update only `../../docs/convo-db.md`, or also propose edits to any other docs/examples that reference the old architecture?
+2. For the new `ConvoDbDriver` section, should it be:
+   - user-facing/high-level only, or
+   - include some implementer details about `_driver`, `driverCmd`, and the separation of responsibilities between `ConvoDb` and `ConvoDbDriver`?
+3. Should the doc explicitly mention `permissionFromOverride` on command execution and how it applies to `executeCommandAsync` / `executeCommandsAsync`?
+
+
+> user
+1. You can propose edits to any other docs/examples that reference the old architecture
+2. user-facing/high-level
+3. ignore permissionFromOverride
+
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md">
+```md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
@@ -138,7 +179,7 @@ Embeddings point to a node and usually reference a property like `data`.
 
 ## ConvoDb and ConvoDbDriver
 
-ConvoDb uses a dedicated `ConvoDbDriver` architecture.
+ConvoDb now uses a dedicated `ConvoDbDriver` architecture.
 
 At a high level:
 
@@ -1285,7 +1326,7 @@ Different agent systems need different storage setups:
 
 With adapters, you can switch storage without redesigning your domain model.
 
-Because adapters build on a dedicated `ConvoDbDriver`, high-level behavior can stay shared while low-level persistence stays backend-specific.
+Because adapters now build on a dedicated `ConvoDbDriver`, high-level behavior can stay shared while low-level persistence stays backend-specific.
 
 ---
 
@@ -1731,3 +1772,13 @@ import {
     LayeredConvoDb,
 } from '@convo-lang/db';
 ```
+```
+</FILE_CONTENT>
+
+Suggested follow-up doc edits in other files:
+- Search for any adapter docs that describe `BaseConvoDb`, `BaseSqliteConvoDb`, or `InMemoryConvoDb` as directly implementing all low-level persistence logic and update them to mention the `ConvoDbDriver` split.
+- Search for HTTP docs/examples mentioning only `getNodesByPathAsync` and add `getNodeByPathAsync` where relevant.
+- Search for command-execution docs/examples and mention that supported driver calls can also be proxied through command execution in HTTP-backed scenarios.
+
+
+> user
