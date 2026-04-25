@@ -1,3 +1,59 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+
+> user
+Update the `convo-db.md`
+
+I just add a new feature to call functions stored in ConvoDb.
+
+Add a new section about function calling and include a note about
+it in the intro
+
+Commit Message for feature
+<COMMIT_MESSAGE>
+Add Convo DB function execution support and tests
+    
+- add `convo-db-function-executor.ts` to compile, validate, and execute stored ConvoDb functions with JS, convo, uri, and streaming handler support
+- export function execution APIs from `index.ts` and add shared promise/result aliases in `result-type.ts`
+- extend query and function typing in `convo-db-types.ts` with `call` steps, function definitions, execution context, cached compilation, and query metadata
+- wire function-call query stage and function next-token handling into `BaseConvoDb.ts`
+- add comprehensive function execution coverage in `convo-db-functions.test.ts` and add shared test DB setup in `createTestDb.ts`
+- refactor `convo-db.test.ts` to use `createTestDb.ts`
+- remove temporary debug logging from `code-block-lib.ts`
+- add `update-tests-2026-04-24.convo` conversation script documenting the generated DB function tests
+</COMMIT_MESSAGE>
+
+@time 2026-04-24T21:06:30-04:00
+@tokenUsage 40383 / 143 / $0.101315
+@model gpt-5.4-2026-03-05
+> assistant
+Before I update it, one quick question:
+
+Do you want the new function-calling section to stay fairly high-level and user-facing in `convo-db.md`, or should I also document implementation-oriented details like:
+
+- supported function formats: `convo`, `javascript`, `uri`
+- JS entry points: `handler`, `nodeHandler`, `resultHandler`, `streamHandler`
+- argument validation via `argsType`
+- how query `steps[].call` works alongside traversal and returned nodes
+- function execution effects: `pure`, `readOnly`, `readWrite`
+
+If you want, I can include all of that, but I want to match the level of detail you prefer.
+
+
+> user
+Stay high level in the intro and include a more detailed section at the end of the document
+
+@time 2026-04-24T21:09:08-04:00
+@tokenUsage 40551 / 9361 / $0.12478000000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md" last-commit="2249c357ddf9f9435280cd7bfbf8909a5ccfdcc5">
+``` md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
@@ -2029,3 +2085,8 @@ import {
     LayeredConvoDb,
 } from '@convo-lang/db';
 ```
+```
+</FILE_CONTENT>
+
+
+> user
