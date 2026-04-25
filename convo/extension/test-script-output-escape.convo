@@ -1,0 +1,48 @@
+@import ../base.convo
+
+> user
+Cat the file ./test-script-output-escape.txt
+
+@time 2026-04-24T19:56:52-04:00
+@tokenUsage 1704 / 56 / $0.004400000000000001
+@model gpt-5.4-2026-03-05
+> assistant
+<RUNNABLE_SCRIPT script-name="cat-test-script-output-escape" cwd="." target-shell-type="bash">
+``` bash
+# print the contents of the requested file
+cat ./test-script-output-escape.txt
+
+echo 'ok bob'
+
+printf '>abc 123'
+printf 'xyz nnn'
+printf "fkfkf\nfasdf"
+printf "\n\n"
+printf "\n\n"
+printf "\n\n\{{stuff}}"
+echo "end"
+```
+</RUNNABLE_SCRIPT>
+
+
+
+@time 2026-04-24T20:15:30-04:00
+@tokenUsage 1811 / 51 / $0.004655
+@model gpt-5.4-2026-03-05
+> assistant
+<SCRIPT_OUTPUT script-name="cat-test-script-output-escape">
+```output
+tthh
+
+ok bob
+\>abc 123xyz nnnfkfkf
+fasdf
+
+
+
+\{{stuff}}end
+```
+</SCRIPT_OUTPUT>
+
+
+> user

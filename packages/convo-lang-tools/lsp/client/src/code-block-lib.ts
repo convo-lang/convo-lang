@@ -1,4 +1,4 @@
-import { ConvoCodeBlock, ConvoMessage, parseConvoCode } from '@convo-lang/convo-lang';
+import { ConvoCodeBlock, ConvoMessage, escapeConvo, parseConvoCode } from '@convo-lang/convo-lang';
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -352,36 +352,52 @@ export const executeShellOutputTagAsync=async (
 
     let appendQueue=Promise.resolve();
     let killed=false;
-
-    const appendAsync=(value:string)=>{
-        if(!value){
-            return appendQueue;
-        }
+    let prevEnd:string='';
+    const appendAsync=(value:string,end:boolean)=>{
         return appendQueue=appendQueue.then(async ()=>{
             const activeEditor=window.activeTextEditor;
             if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
+                console.log('hio 👋 👋 👋 IGNORE',
+                 activeEditor?.document.uri.toString(),
+                 document.uri.toString());
                 return;
             }
-            await activeEditor.edit(builder=>{
-                builder.insert(
-                    activeEditor.document.positionAt(activeEditor.document.getText().length),
-                    value,
-                );
-            });
-            await revealDocumentEndAsync(activeEditor);
+            let v=prevEnd+value;
+            if(end){
+                prevEnd='';
+            }else{
+                const ei=v.lastIndexOf('\n');
+                if(ei===-1){
+                    prevEnd+=v;
+                    return;
+                }
+                prevEnd=v.substring(ei+1);
+                v=v.substring(0,ei+1);
+            }
+            console.log('hio 👋 👋 👋',JSON.stringify({prevEnd,v}));
+            if(v){
+                await activeEditor.edit(builder=>{
+                    builder.insert(
+                        activeEditor.document.positionAt(activeEditor.document.getText().length),
+                        escapeConvo(v),
+                    );
+                });
+                await revealDocumentEndAsync(activeEditor);
+            }
         });
     };
 
     child.stdout.on('data',(data)=>{
-        void appendAsync(data.toString());
+        console.log('hio 👋 👋 👋 DATA',JSON.stringify(data.toString()));
+        void appendAsync(data.toString(),false);
     });
 
     child.stderr.on('data',(data)=>{
-        void appendAsync(data.toString());
+        void appendAsync(data.toString(),false);
     });
 
     child.on('error',(err)=>{
-        void appendAsync(`\n[process error] ${err.message}\n`);
+        void appendAsync(`\n[process error] ${err.message}\n`,false);
     });
 
     await window.withProgress({
@@ -402,18 +418,19 @@ export const executeShellOutputTagAsync=async (
 
         await new Promise<void>((resolve)=>{
             child.on('close',(code,signal)=>{
+                console.log('hio 👋 👋 👋 CLOSE',);
                 if(exitCode!==undefined){
                     code=exitCode;
                 }
                 let endNote='';
                 if(killed){
-                    endNote=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;
+                    endNote+=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;
                 }else if(signal){
-                    endNote=`\n[process exited by signal ${signal}]\n`;
+                    endNote+=`\n[process exited by signal ${signal}]\n`;
                 }else if(code!==0){
-                    endNote=`\n[process exited with code ${code}]\n`;
+                    endNote+=`\n[process exited with code ${code}]\n`;
                 }
-                appendAsync(endNote).then(async ()=>{
+                appendAsync(endNote,true).then(async ()=>{
                     await appendQueue;
                     const activeEditor=window.activeTextEditor;
                     if(activeEditor && activeEditor.document.uri.toString()===document.uri.toString()){
