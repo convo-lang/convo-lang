@@ -1,4 +1,4 @@
-import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
 import z from "zod";
 
@@ -12,6 +12,11 @@ const QueryTraversalStateSchema=z.object({
     step:z.number(),
 
     stepStage:z.enum(allConvoStepStages),
+
+    /**
+     * Used by ConvoDbFunctions as a next token.
+     */
+    fnNextToken:z.string().optional(),
 
     /**
      * The index in paths that is currently getting loaded and written to the stream. If undefined
@@ -122,7 +127,7 @@ export abstract class BaseConvoDb implements ConvoDb
             watch:false,
         };
 
-        streamLoop: for await(const item of this._streamNodesAsync<TKeys>(false,limitedQuery,stateResult)){
+        streamLoop: for await(const item of this._streamNodesAsync<TKeys>(limitedQuery,stateResult)){
             switch(item.type){
 
                 case 'node':
@@ -208,12 +213,11 @@ export abstract class BaseConvoDb implements ConvoDb
         :
             keyof ConvoNode
     >>{
-        return this._streamNodesAsync(true,query,parseToken(query.nextToken),cancel);
+        return this._streamNodesAsync(query,parseToken(query.nextToken),cancel);
     }
 
     private readonly watchers:Watcher[]=[];
     private async *_streamNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
-        isStreaming:boolean,
         query:ConvoNodeQuery<TKeys>,
         stateResult:ResultType<QueryTraversalState>,
         cancel:CancelToken=new CancelToken()
@@ -582,6 +586,103 @@ export abstract class BaseConvoDb implements ConvoDb
                         }
                         break;
 
+                    case 'call':
+                        if(step.call){
+                            // check permission
+                            if(query.permissionFrom){
+                                const f=query.permissionFrom;
+                                const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
+                                    permissionFrom:f,
+                                    permissionRequired:ConvoNodePermissionType.execute,
+                                },paths,orderBy,batchSize,offset,nextToken));
+                                if(cancel.isCanceled){return;}
+
+                                if(!r.success){
+                                    yield errorResultToConvoNodeStreamItem(r,state);
+                                    return;
+                                }
+                            }
+                            const fnPaths=state.paths;
+                            state.paths=[];
+                            for(const path of fnPaths){
+                                const r=await this.selectNodeByPathAsync(path,'*');
+                                if(cancel.isCanceled){return;}
+
+                                if(!r.success){
+                                    yield errorResultToConvoNodeStreamItem(r,state);
+                                    return;
+                                }
+                                const fnNode=r.result as ConvoNode|undefined;
+                                if(!fnNode){
+                                    continue;
+                                }
+                                const fn:ConvoDbFunction|undefined=fnNode.data['function'];
+                                const isExecutable=fnNode.data['isExecutable'];
+                                if(!fn || (typeof fn !== 'object') || isExecutable!==true){
+                                    continue;
+                                }
+                                try{
+                                    const ctxResult=await createConvoDbFunctionExecutionContextAsync(
+                                        true,
+                                        fnNode,
+                                        keys,
+                                        step.call,
+                                        this,
+                                        query as any,
+                                        step,
+                                        state.paths,
+                                        state.fnNextToken,
+                                        cancel,
+                                    );
+                                    if(!ctxResult.success){
+                                        yield errorResultToConvoNodeStreamItem(ctxResult,state);
+                                        return;
+                                    }
+                                    const ctx=ctxResult.result.ctx;
+                                    if(ctxResult.result.argsTypeWereParsed || ctxResult.result.mainWasCompiled){
+                                        try{
+                                            fn.argsTypeParsed=ctx.argsTypeParsed;
+                                            fn.mainCompiled=ctx.mainCompiled;
+                                            const r=await this._driver.updateNodeAsync({
+                                                path:fnNode.path,
+                                                data:{function:{...fn}}
+
+                                            },{});
+                                            if(!r.success){
+                                                console.error('Failed to stored parsed function values, but will continue execution',r.error);
+                                            }
+                                        }catch(ex){
+                                            console.error('Failed to stored parsed function values, but will continue execution',ex);
+                                        }
+                                    }
+                                    for await(const resultNode of executeConvoDbFunction(ctx)){
+                                        state.fnNextToken=ctx.nextToken;
+                                        if(cancel.isCanceled){return;}
+                                        if(resultNode.type==='error'){
+                                            yield errorResultToConvoNodeStreamItem({
+                                                success:false,
+                                                error:resultNode.error,
+                                                statusCode:resultNode.statusCode
+                                            },state);
+                                            return;
+                                        }
+                                        yield resultNode;
+                                        if(cancel.isCanceled){return;}
+                                    }
+                                    delete state.fnNextToken;
+                                }catch(ex){
+                                    console.error('ConvoNode execution failed',ex);
+                                    yield errorResultToConvoNodeStreamItem({
+                                        success:false,
+                                        error:'ConvoNode execution failed',
+                                        statusCode:500
+                                    },state);
+                                    return;
+                                }
+                            }
+                        }
+                        break;
+
                     case 'edge':
                         if(step.edge){
                             const e=step.edge;
@@ -613,6 +714,7 @@ export abstract class BaseConvoDb implements ConvoDb
                 const nextStage=getNextStepStage(state.stepStage);
                 if(nextStage===undefined){
                     state.step++;
+                    delete state.fnNextToken;
                     state.stepStage=allConvoStepStages[0];
                     const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
                     if(scan){

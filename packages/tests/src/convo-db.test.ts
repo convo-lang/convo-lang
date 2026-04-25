@@ -1,23 +1,10 @@
-import { ConvoNodePermissionType, HttpConvoCompletionService, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
-import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
-import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
-import { NodeSQLiteConvoDb } from "@convo-lang/db/NodeSQLiteConvoDb.js";
-import { CancelToken, createPromiseSource, deepClone, uuid } from "@iyio/common";
+import { ConvoNodePermissionType, type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
+import { CancelToken, createPromiseSource, deepClone } from "@iyio/common";
 import { expect, test } from "bun:test";
+import { createTestDb } from "./createTestDb.js";
 
-type Type='bun-sqlite'|'node'|'mem'|'http';
-const type:Type='mem' as Type;
 
-const createStore=()=>(
-    type==='http'?
-        new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
-    :type==='bun-sqlite'?
-        new BunSqliteConvoDb({})
-    :type==='node'?
-        new NodeSQLiteConvoDb({})
-    :
-        new InMemoryConvoDb({})
-);
+const createDb=()=>createTestDb('mem');
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
     path,
@@ -49,7 +36,7 @@ const collectStreamAsync=async <T>(iter:AsyncIterable<T>):Promise<T[]>=>{
 };
 
 test("queryNodesAsync returns validation error for invalid query",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const result=await store.queryNodesAsync({
         steps:[
@@ -68,7 +55,7 @@ test("queryNodesAsync returns validation error for invalid query",async ()=>{
 });
 
 test("queryNodesAsync returns invalid token parse error",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const result=await store.queryNodesAsync({
         steps:[],
@@ -84,7 +71,7 @@ test("queryNodesAsync returns invalid token parse error",async ()=>{
 });
 
 test("queryNodesAsync returns invalid token schema error",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const result=await store.queryNodesAsync({
         steps:[],
@@ -101,7 +88,7 @@ test("queryNodesAsync returns invalid token schema error",async ()=>{
 });
 
 test("queryNodesAsync returns invalid token path error",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const result=await store.queryNodesAsync({
         steps:[],
@@ -123,7 +110,7 @@ test("queryNodesAsync returns invalid token path error",async ()=>{
 });
 
 test("streamNodesAsync returns stored error from token state",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const items=await collectStreamAsync(
         store.streamNodesAsync({
@@ -150,7 +137,7 @@ test("streamNodesAsync returns stored error from token state",async ()=>{
 });
 
 test("insertNodeAsync and getNodesByPathAsync work for exact path and wildcard path",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     expect((await store.insertNodeAsync(createNode('/users'))).success).toBe(true);
     expect((await store.insertNodeAsync(createNode('/users/a',{displayName:'A'}))).success).toBe(true);
@@ -178,7 +165,7 @@ test("insertNodeAsync and getNodesByPathAsync work for exact path and wildcard p
 });
 
 test("queryNodesAsync supports keys selection, orderBy, skip, limit, and nextToken pagination",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/k/1',{displayName:'one',data:{rank:2}}));
     await store.insertNodeAsync(createNode('/k/2',{displayName:'two',data:{rank:1}}));
@@ -237,7 +224,7 @@ test("queryNodesAsync supports keys selection, orderBy, skip, limit, and nextTok
 });
 
 test("queryNodesAsync returns all props when keys is omitted, null, or contains star",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/all/1',{
         displayName:'all1',
@@ -281,7 +268,7 @@ test("queryNodesAsync returns all props when keys is omitted, null, or contains 
 });
 
 test("streamNodesAsync returns nodes and respects limit zero",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/stream/a'));
     await store.insertNodeAsync(createNode('/stream/b'));
@@ -295,7 +282,7 @@ test("streamNodesAsync returns nodes and respects limit zero",async ()=>{
 });
 
 test("queryNodesAsync supports condition filtering",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/cond/1',{displayName:'Alpha',data:{tags:['a','b'],count:3}}));
     await store.insertNodeAsync(createNode('/cond/2',{displayName:'Beta',data:{tags:['b'],count:1}}));
@@ -348,7 +335,7 @@ test("queryNodesAsync supports condition filtering",async ()=>{
 });
 
 test("queryNodesAsync supports edge traversal forward reverse and bi",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/graph/a'));
     await store.insertNodeAsync(createNode('/graph/b'));
@@ -396,7 +383,7 @@ test("queryNodesAsync supports edge traversal forward reverse and bi",async ()=>
 });
 
 test("queryNodesAsync supports returnAllScanned",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/scan/a'));
     await store.insertNodeAsync(createNode('/scan/b'));
@@ -423,7 +410,7 @@ test("queryNodesAsync supports returnAllScanned",async ()=>{
 });
 
 test("permission APIs work including inheritance from ancestor path and denial",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/users/admin'));
     await store.insertNodeAsync(createNode('/docs'));
@@ -465,7 +452,7 @@ test("permission APIs work including inheritance from ancestor path and denial",
 });
 
 test("queryNodesAsync supports step permission filtering and final query permission filtering",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/principal'));
     await store.insertNodeAsync(createNode('/perm/a'));
@@ -520,7 +507,7 @@ test("queryNodesAsync supports step permission filtering and final query permiss
 });
 
 test("insertNodeAsync updateNodeAsync and deleteNodeAsync validate bad paths and permissionFrom",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const badInsert=await store.insertNodeAsync(createNode('bad-path'));
     expect(badInsert.success).toBe(false);
@@ -596,7 +583,7 @@ test("insertNodeAsync updateNodeAsync and deleteNodeAsync validate bad paths and
 });
 
 test("updateNodeAsync supports mergeData option",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/node/merge',{
         data:{
@@ -649,7 +636,7 @@ test("updateNodeAsync supports mergeData option",async ()=>{
 });
 
 test("queryEdgesAsync getEdgeByIdAsync insertEdgeAsync updateEdgeAsync deleteEdgeAsync work and validate inputs",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/edge/from'));
     await store.insertNodeAsync(createNode('/edge/to'));
@@ -763,7 +750,7 @@ test("queryEdgesAsync getEdgeByIdAsync insertEdgeAsync updateEdgeAsync deleteEdg
 });
 
 test("queryEmbeddingsAsync getEmbeddingByIdAsync insertEmbeddingAsync updateEmbeddingAsync deleteEmbeddingAsync work and validate inputs",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/embed/node'));
 
@@ -872,7 +859,7 @@ test("queryEmbeddingsAsync getEmbeddingByIdAsync insertEmbeddingAsync updateEmbe
 });
 
 test("deleteNodeAsync cascades to edges and embeddings",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/cascade/a'));
     await store.insertNodeAsync(createNode('/cascade/b'));
@@ -907,7 +894,7 @@ test("deleteNodeAsync cascades to edges and embeddings",async ()=>{
 });
 
 test("permission guarded write operations deny access",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/actors/user'));
     await store.insertNodeAsync(createNode('/secure/node1'));
@@ -963,7 +950,7 @@ test("permission guarded write operations deny access",async ()=>{
 });
 
 test("permission guarded edge and embedding update/delete operations allow access when grants exist",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     await store.insertNodeAsync(createNode('/admin'));
     await store.insertNodeAsync(createNode('/secured/from'));
@@ -1019,7 +1006,7 @@ test("permission guarded edge and embedding update/delete operations allow acces
 
 
 test("Should stream watch events",async ()=>{
-    const store=createStore();
+    const store=createDb();
 
     const nodesSrc:ConvoNode[]=[
         {path:'/users/bart',type:'user',data:{name:'Bart'}},

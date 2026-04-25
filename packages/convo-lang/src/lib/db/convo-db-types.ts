@@ -1,5 +1,6 @@
 import { CancelToken, Scope } from "@iyio/common";
-import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
+import { ZodType } from "zod";
+import { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
 
 /**
  * A unique node within a collection or graph of nodes.
@@ -501,7 +502,7 @@ export enum ConvoNodePermissionType
 
 export type ConvoNodeEdgeDirection='forward'|'reverse'|'bi';
 
-export const allConvoStepStages=['path','condition','permissions','embedding','edge'] as const;
+export const allConvoStepStages=['path','condition','permissions','embedding','call','edge'] as const;
 
 export type ConvoStepStage=typeof allConvoStepStages[number];
 
@@ -587,6 +588,13 @@ export interface ConvoNodeQueryStep
     embedding?:ConvoEmbeddingSearch;
 
     /**
+     * Triggers a function call of the currently selected nodes. Executing functions can return values
+     * as nodes return by the query and can select node paths for navigation.
+     * @stepStage 5 - function
+     */
+    call?:ConvoDbFunctionCall;
+
+    /**
      * Selects the next node or nodes to move to by selecting connected edges.
      * A string value will be treated as type equal comparisons equivalent to
      * `{target:"type",op:"=",value:edgeStringValue}`.
@@ -595,7 +603,7 @@ export interface ConvoNodeQueryStep
      * to express nested `and` and `or` logic.
      * 
      * Traversal direction is controlled by `edgeDirection`.
-     * @stepStage 5 - edge
+     * @stepStage 6 - edge
      */
     edge?:string|ConvoNodeCondition;
 
@@ -606,18 +614,225 @@ export interface ConvoNodeQueryStep
      * - `bi` traverses in both directions
      * 
      * @default "bi"
-     * @stepStage 5 - edge
+     * @stepStage 6 - edge
      */
     edgeDirection?:ConvoNodeEdgeDirection;
 
     /**
      * Controls the max number of matching destination nodes to move through after destination nodes
      * have been deduplicated. If undefined all matching nodes will be traversed.
-     * @stepStage 5 - edge
+     * @stepStage 6 - edge
      */
     edgeLimit?:number;
 
 }
+
+/**
+ * Represents the request to execute a node
+ */
+export interface ConvoDbFunctionCall
+{
+    /**
+     * Arguments to pass to the target function
+     */
+    args?:Record<string,any>;
+}
+
+/**
+ * Describes the effect a function has on a database or external state.
+ * - `pure`: Execution does not read or write from the database or external sources, has no side effects and only relies on the arguments passed to it. Data define on the node of the function is allowed to be read.
+ * - `readOnly`: Execution may read from the database or external sources but does not modify its state.
+ * - `readWrite`: Execution may both read from and write to the database or external sources.
+ */
+export type ConvoDbFunctionEffects='pure'|'readOnly'|'readWrite'
+
+/**
+ * A executable function stored in the data of a ConvoNode. A ConvoDbFunction is defined by setting
+ * the `function` and `isExecutable` data properties of a ConvoNode. The `function` data property
+ * should be an object that implements `ConvoDbFunction` interface and `isExecutable` should be set to true.
+ */
+export interface ConvoDbFunction
+{
+    /**
+     * The format the function is stored in. Common formats include:
+     * - `convo`: Convo-Lang stored as a string
+     * - `js`: Javascript stored as string
+     * - `uri`: URI of a referenced function. Referenced functions are often defined by plugins.
+     * 
+     * ## Format Details
+     *
+     * ### convo
+     * Functions stored as Convo-Lang can return data in 1 of 3 ways:
+     * 1. Define a user message to be responded to by an LLM. The LLM will respond with 1 of the following results
+     *   - text content
+     *   - JSON value
+     *   - Function call result
+     * 2. Define the last message of the source as a `> do` message and set the `__return` global variable to desired return value.
+     *
+     * Convo functions can manipulate the traversal path buy directly mutating the ctx.paths array.
+     * Convo functions will return a single node with a path set to `/null` and data set to `{value:__RESULT_VALUE__}`
+     */
+    format:string;
+
+    /**
+     * Describes the effect the function has on the database or external state.
+     * - `pure`: No database access or side effects. Data define on the node of the function is allowed to be read.
+     * - `readOnly`: May read from, but not write to, the database or external sources.
+     * - `readWrite`: May both read and write to the database or external sources.
+     */
+    effects:ConvoDbFunctionEffects;
+
+    /**
+     * The schema of the arguments to pass to the function written as a Convo-Lang struct.
+     *
+     * @example
+     * ``` convo
+     * struct(
+     *     # Name of user
+     *     name:string
+     *     
+     *     # Age of user
+     *     age:number
+     * )
+     * ```
+     */
+    argsType?:string;
+
+    /**
+     * The `argsType` property per-parsed
+     */
+    argsTypeParsed?:ParsedConvoDbFunctionArgsType;
+
+    /**
+     * The content of the function. In most cases this will be source code stored as a string or a
+     * URI that points to a function outside of the database such as a function defined by a plugin.
+     */
+    main:any;
+
+    /**
+     * A cached compilation of main. For example, for Convo-Lang this will be the parsing result
+     * from `parseConvoCode`
+     */
+    mainCompiled?:CompliedConvoDbFunction
+
+}
+
+/**
+ * A cached compilation of the main source of a ConvoDbFunction. 
+ */
+export interface CompliedConvoDbFunction
+{
+    /**
+     * A hash of the main source code. Can be used to verify the source code used for compilation
+     * has not changed.
+     */
+    sourceHash:string;
+
+    /**
+     * Compilation result
+     */
+    compiled:any;
+
+    /**
+     * A runtime cached implementation function
+     */
+    [convoDbRuntimeCacheKey]?:ConvoDbFunctionImplementation;
+}
+
+
+/**
+ * The parsed `argsType` of a ConvoDbFunction 
+ */
+export interface ParsedConvoDbFunctionArgsType
+{
+    /**
+     * A hash of the main source code. Can be used to verify the source code used for compilation
+     * has not changed.
+     */
+    sourceHash:string;
+
+    /**
+     * Parsed args struct
+     */
+    parsedArgs:Record<string,any>;
+
+    /**
+     * A runtime cached version of `parsedArgs` converted into a ZodType
+     */
+    [convoDbRuntimeCacheKey]?:ZodType;
+}
+export const convoDbRuntimeCacheKey=Symbol('convoDbRunCacheKey');
+
+/**
+ * A context object passed to ConvoDbFunctions
+ */
+export interface ConvoDbFunctionExecutionContext<TArgs extends Record<string,any>=Record<string,any>>
+{
+    /**
+     * Arguments passed to the function
+     */
+    args:TArgs;
+
+    /**
+     * The function being executed
+     */
+    function:ConvoDbFunction;
+
+    /**
+     * The node function is defined on
+     */
+    node:ConvoNode;
+
+    keys:ConvoNodeKeySelection;
+
+    /**
+     * The effects the function is allowed
+     */
+    effects:ConvoDbFunctionEffects;
+
+    /**
+     * The current paths of the current query. `paths` are allowed to be modified. This allows
+     * functions to control query traversal.
+     */
+    paths:string[];
+
+    /**
+     * The query being executed
+     */
+    query:ConvoNodeQuery;
+
+    /**
+     * The current step of the query
+     */
+    step:ConvoNodeQueryStep;
+
+    /**
+     * The database executing the query and function
+     */
+    db:ConvoDb;
+
+    argsTypeParsed?:ParsedConvoDbFunctionArgsType;
+
+    mainCompiled:CompliedConvoDbFunction;
+
+    /**
+     * Can be used by functions to support result pagination. Functions should set the value
+     * of `fnNextToken` as they enumerate and emit values.
+     */
+    nextToken:string|undefined;
+
+    cancel:CancelToken;
+
+
+}
+
+export type PartialNode=Pick<ConvoNode,'path'> & Omit<ConvoNode,'path'>;
+export interface ConvoDbFunctionResult{
+    node?:PartialNode;
+    nodes?:PartialNode[];
+    stream?:AsyncIterable<PartialNode>;
+}
+export type ConvoDbFunctionImplementation=(ctx:ConvoDbFunctionExecutionContext)=>PromiseOrResultType<ConvoDbFunctionResult>;
 
 export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
 {
@@ -694,6 +909,11 @@ export interface ConvoNodeQuery<TKeys extends ConvoNodeKeySelection=undefined>
      * including nested properties in the `data` property.
      */
     orderBy?:ConvoNodeOrderBy|ConvoNodeOrderBy[];
+
+    /**
+     * Arbitrary metadata the can be passed to the query.
+     */
+    metadata?:Record<string,any>;
 }
 
 export interface ConvoNodeQueryResult<T extends keyof ConvoNode>

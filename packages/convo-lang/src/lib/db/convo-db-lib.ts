@@ -1,5 +1,5 @@
 import { ResultTypeError } from "../result-type.js";
-import { ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
+import { ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNode, ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
 /**
  * Normalizes a convo node path.
@@ -166,4 +166,9 @@ export const callConvoDbDriverCmdAsync=<FN extends ConvoDbDriverFunction>(
         return Promise.resolve(error) as any;
     }
     return (driver[fn] as any)(...args);
+}
+
+
+export const executeConvoNode=(node:ConvoNode)=>{
+
 }

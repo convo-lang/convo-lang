@@ -48,3 +48,14 @@ export type PromiseResultType<T>=Promise<ResultType<T>>;
  */
 export type PromiseResultTypeVoid=Promise<ResultTypeVoid>;
 
+
+/**
+ * An alias for `Promise<ResultType<T>>`
+ */
+export type PromiseOrResultType<T>=Promise<ResultType<T>>|ResultType<T>;
+
+/**
+ * An alias for `Promise<ResultTypeVoid>`
+ */
+export type PromiseOrResultTypeVoid=Promise<ResultTypeVoid>|ResultTypeVoid;
+

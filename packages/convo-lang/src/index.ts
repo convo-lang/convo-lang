@@ -58,6 +58,7 @@ export * from './lib/ConvoUserVfsCache.js';
 export * from './lib/ConvoVfsCache.js';
 export * from './lib/ConvoVfsImportService.js';
 export * from './lib/db/convo-db-const.js';
+export * from './lib/db/convo-db-function-executor.js';
 export * from './lib/db/convo-db-lib.js';
 export * from './lib/db/convo-db-types.js';
 export * from './lib/git/convo-git-types.js';

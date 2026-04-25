@@ -357,9 +357,6 @@ export const executeShellOutputTagAsync=async (
         return appendQueue=appendQueue.then(async ()=>{
             const activeEditor=window.activeTextEditor;
             if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
-                console.log('hio 👋 👋 👋 IGNORE',
-                 activeEditor?.document.uri.toString(),
-                 document.uri.toString());
                 return;
             }
             let v=prevEnd+value;
@@ -374,7 +371,6 @@ export const executeShellOutputTagAsync=async (
                 prevEnd=v.substring(ei+1);
                 v=v.substring(0,ei+1);
             }
-            console.log('hio 👋 👋 👋',JSON.stringify({prevEnd,v}));
             if(v){
                 await activeEditor.edit(builder=>{
                     builder.insert(
@@ -388,7 +384,6 @@ export const executeShellOutputTagAsync=async (
     };
 
     child.stdout.on('data',(data)=>{
-        console.log('hio 👋 👋 👋 DATA',JSON.stringify(data.toString()));
         void appendAsync(data.toString(),false);
     });
 
@@ -418,7 +413,6 @@ export const executeShellOutputTagAsync=async (
 
         await new Promise<void>((resolve)=>{
             child.on('close',(code,signal)=>{
-                console.log('hio 👋 👋 👋 CLOSE',);
                 if(exitCode!==undefined){
                     code=exitCode;
                 }
