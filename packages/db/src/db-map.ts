@@ -15,13 +15,13 @@ export const getConvoDbMapFromStrings=(mappings:string[]):ResultType<ConvoDbMap>
             
             case 'mem':{
                 let db:InMemoryConvoDb|undefined;
-                mapped[name]=()=>(noCache?null:db)??(db=new InMemoryConvoDb());
+                mapped[name]=(name)=>(noCache?null:db)??(db=new InMemoryConvoDb({name}));
                 break;
             }
 
             case 'sqlite':{
                 let db:BunSqliteConvoDb|undefined;
-                mapped[name]=()=>(noCache?null:db)??(db=new BunSqliteConvoDb({dbPath:args[0]}));
+                mapped[name]=(name)=>(noCache?null:db)??(db=new BunSqliteConvoDb({dbPath:args[0],name}));
                 break;
             }
         }

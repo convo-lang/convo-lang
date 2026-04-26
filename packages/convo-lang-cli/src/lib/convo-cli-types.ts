@@ -1,3 +1,4 @@
+import { ConvoDbCommand, ConvoNodeQuery } from "@convo-lang/convo-lang";
 
 export type ConvoExecAllowMode='disable'|'ask'|'allow'
 
@@ -331,6 +332,59 @@ export interface ConvoCliOptions
      * @default 'default:sqlite'
      */
     dbMap?:string[];
+
+    /**
+     * List of function file to load into the ConvoDb. Each item in the list is a colon separated
+     * database name, node path, file path tuple. For example to load `functions/calculate.ts` in to the 
+     * prd database and store the function at `/bin/calculate` you would use `prd:/bin/calculate:functions/calculate.ts`.
+     * Wildcards can be used in the source path to load all functions in a directory: `prd:/bin:functions/*`.
+     * Wildcards are not recursive.
+     * Use `dbMap` to define databases. 
+     */
+    loadDbFunction?:string[];
+
+    /**
+     * If true bundled function will have their ending export dropped.
+     */
+    loadDbFunctionDropExport?:boolean;
+
+    /**
+     * A shell command to bundle db function. The `$dbFunctionSrcFilePath` variable will contain the 
+     * path to the function file. bun build is used by default.
+     * @default 'bun build "$dbFunctionSrcFilePath"'
+     */
+    dbFunctionBundleCommand?:string;
+
+    /**
+     * Path to a db function to call
+     */
+    callDbFunction?:string;
+
+    /**
+     * Args to pass to called db function
+     */
+    callDbFunctionArgs?:Record<string,any>;
+
+    /**
+     * A convo db node query
+     */
+    queryDb?:ConvoNodeQuery&{dbName:string};
+
+    /**
+     * Executes db commands
+     */
+    executeDbCommands?:{dbName:string,commands:ConvoDbCommand<any>[]};
+
+    /**
+     * If true authentication for api calls to the db will be disabled.
+     */
+    disableApiDbAuth?:boolean;
+
+    /**
+     * Indentation value passed to JSON.stringify when outputting JSON.
+     * @default 4
+     */
+    jsonFormat?:number;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

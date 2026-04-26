@@ -11,9 +11,9 @@ export const createTestDb=(type:DbType)=>{
     return (type==='http'?
         new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
     :type==='bun-sqlite'?
-        new BunSqliteConvoDb({})
+        new BunSqliteConvoDb({name:'default'})
     :type==='node'?
-        new NodeSQLiteConvoDb({})
+        new NodeSQLiteConvoDb({name:'default'})
     :
-        new InMemoryConvoDb({}))
+        new InMemoryConvoDb({name:'default'}))
 }

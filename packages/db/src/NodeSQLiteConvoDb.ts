@@ -1,5 +1,5 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
-import { getErrorMessage } from "@iyio/common";
+import { getErrorMessage, getFileName } from "@iyio/common";
 import type { DatabaseSync } from "node:sqlite";
 import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
 
@@ -15,7 +15,7 @@ export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
 {
 
     public static fromConnectionString(connectionString?:string){
-        return new NodeSQLiteConvoDb({dbPath:connectionString})
+        return new NodeSQLiteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
     }
 
     private readonly dbPath?:string;

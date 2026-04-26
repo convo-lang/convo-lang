@@ -1,9 +1,13 @@
+import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
 import { getConvoDbMapFromStrings } from "@convo-lang/db/db-map.js";
 import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumber, safeParseNumberOrUndefined } from "@iyio/common";
+import { parseJson5 } from "@iyio/json5";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
 import { realpath } from "node:fs/promises";
 import { createConvoCliAsync, initConvoCliAsync } from "../lib/ConvoCli.js";
 import { runConvoCliApiAsync } from "../lib/convo-cli-api-server.js";
+import { loadCliDbFunctionsAsync } from "../lib/convo-cli-db-function-loader.js";
+import { executeCliCallConvoDbFunction, executeCliConvoDbCommands, executeCliConvoDbQuery, parseQuery } from "../lib/convo-cli-db-util.js";
 import { generateEmbeddingAsync } from "../lib/convo-cli-embeddings.js";
 import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
@@ -90,6 +94,15 @@ const args=parseCliArgsT<Args>({
         embeddingProvider:args=>args[0],
         embeddingDimensions:args=>safeParseNumberOrUndefined(args[0]),
         dbMap:args=>args,
+        loadDbFunction:args=>args,
+        loadDbFunctionDropExport:args=>args.length?true:false,
+        dbFunctionBundleCommand:args=>args[0],
+        callDbFunction:args=>args[0],
+        callDbFunctionArgs:args=>parseJson5(args[0]??'{}'),
+        queryDb:args=>parseQuery(args[0]??'{}'),
+        jsonFormat:args=>safeParseNumberOrUndefined(args[0]),
+        executeDbCommands:args=>parseJson5(args[0]??'{}'),
+        disableApiDbAuth:args=>args.length?true:false,
     }
 }).parsed as Args;
 
@@ -131,6 +144,7 @@ const main=async()=>{
     args.exeCwd=normalizePath(args.exeCwd?await realpath(args.exeCwd):globalThis.process.cwd());
 
     let toolPromises:Promise<any>[]=[];
+    let disableREPL=false;
 
     if(!getObjKeyCount(args)){
         args.repl=true;
@@ -157,25 +171,72 @@ const main=async()=>{
         toolPromises.push(generateEmbeddingAsync(args.generateEmbedding,args));
     }
 
-    if(args.api){
+    let dbMap:ConvoDbInstanceMap|undefined;
+    if(args.dbMap){
         await initConvoCliAsync(args);
-        const r=args.dbMap?getConvoDbMapFromStrings(args.dbMap):undefined;
-        if(r?.success===false){
+        const r=getConvoDbMapFromStrings(args.dbMap);
+        if(r.success===false){
             console.error(r.error);
             process.exit(1);
         }
+        dbMap=new ConvoDbInstanceMap(r.result);
+    }
+
+    if(args.loadDbFunction){
+        await initConvoCliAsync(args);
+        if(!dbMap){
+            console.error('loadDbFunction requires a dbMap be defined');
+            process.exit(1);
+        }
+        await loadCliDbFunctionsAsync(dbMap,args);
+        disableREPL=true;
+    }
+
+    if(args.executeDbCommands){
+        await initConvoCliAsync(args);
+        if(!dbMap){
+            console.error('callDbFunction requires a dbMap be defined');
+            process.exit(1);
+        }
+        console.log(JSON.stringify(await executeCliConvoDbCommands(dbMap,args),null,args.jsonFormat??4))
+        disableREPL=true;
+    }
+
+    if(args.queryDb){
+        await initConvoCliAsync(args);
+        if(!dbMap){
+            console.error('callDbFunction requires a dbMap be defined');
+            process.exit(1);
+        }
+        console.log(JSON.stringify(await executeCliConvoDbQuery(dbMap,args),null,args.jsonFormat??4))
+        disableREPL=true;
+    }
+
+    if(args.callDbFunction){
+        await initConvoCliAsync(args);
+        if(!dbMap){
+            console.error('callDbFunction requires a dbMap be defined');
+            process.exit(1);
+        }
+        console.log(JSON.stringify(await executeCliCallConvoDbFunction(dbMap,args),null,args.jsonFormat??4));
+        disableREPL=true;
+    }
+
+    if(args.api){
+        await initConvoCliAsync(args);
         toolPromises.push(runConvoCliApiAsync({
             port:args.apiPort,
             reusePort:args.apiReusePort,
             cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
             enableLogging:args.apiLogging,
-            dbMap:r?.success?r.result:undefined,
+            dbMap,
+            disableApiDbAuth:args.disableApiDbAuth,
         },cancel));
     }
 
     await Promise.all(toolPromises);
 
-    if(!toolPromises.length){
+    if(!toolPromises.length && !disableREPL){
         const cli=await createConvoCliAsync(args);
         try{
             if(args.listModels){

@@ -5,7 +5,7 @@ export const convoDbModule=(scope:ScopeRegistration)=>{
 
     scope.implement(convoDbProvider,()=>async (connectionString?:string)=>{
         const {InMemoryConvoDb}=await import('./InMemoryConvoDb.js');
-        return new InMemoryConvoDb();
+        return new InMemoryConvoDb({name:'default'});
     },'mem');
 
     scope.implement(convoDbProvider,()=>async (connectionString?:string)=>{

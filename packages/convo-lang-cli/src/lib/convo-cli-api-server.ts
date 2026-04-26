@@ -1,4 +1,4 @@
-import { ConvoDbMap } from "@convo-lang/convo-lang";
+import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
 import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
 import { serve } from '@hono/node-server';
 import { CancelToken, DisposeCallback } from "@iyio/common";
@@ -13,7 +13,8 @@ export interface ConvoCliApiServerOptions
     baseRoute?:string;
     cors?:boolean|string[];
     enableLogging?:boolean;
-    dbMap?:ConvoDbMap;
+    dbMap?:ConvoDbInstanceMap;
+    disableApiDbAuth?:boolean;
 }
 
 export const runConvoCliApiAsync=async ({
@@ -23,11 +24,12 @@ export const runConvoCliApiAsync=async ({
     cors,
     enableLogging,
     dbMap,
+    disableApiDbAuth,
 }:ConvoCliApiServerOptions,cancel?:CancelToken)=>{
 
     const app=new Hono();
 
-    const routes=getConvoHonoRoutes({enableLogging,dbMap});
+    const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth});
 
     if(cors){
         app.use('/*',_cors({

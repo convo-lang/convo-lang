@@ -1,4 +1,4 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDb, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbInstanceMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { CancelToken, minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { logger } from 'hono/logger';
@@ -6,6 +6,7 @@ import { streamSSE } from 'hono/streaming';
 import { timeout } from 'hono/timeout';
 import z from "zod";
 import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
+import { JwtVerifier } from "./JwtVerifiery.js";
 
 export const ConvoTokenQuotaScheme=z.object({
     id:z.string(),
@@ -27,7 +28,7 @@ export interface ConvoHonoRoutesOptions
 {
     completionTimeoutMs?:number;
     enableLogging?:boolean;
-    dbMap?:ConvoDbMap;
+    dbMap?:ConvoDbInstanceMap;
     
     onCompletion?:(requestCtx:ConvoCompletionRequestCtx)=>void;
 
@@ -42,6 +43,8 @@ export interface ConvoHonoRoutesOptions
      * If true a mock route will be added for demoing purposes
      */
     enableMockRoute?:boolean;
+
+    disableDbAuth?:boolean;
 }
 
 export const getConvoHonoRoutes=({
@@ -53,10 +56,12 @@ export const getConvoHonoRoutes=({
     afterComplete,
     completionCtx,
     getUsage,
+    disableDbAuth=false,
 }:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
     const routes=new Hono();
+    const jwtVerifier=new JwtVerifier();
 
     let modelCache:ConvoModelInfo[]|undefined;
 
@@ -390,28 +395,31 @@ export const getConvoHonoRoutes=({
         return c.json(false);
     });
 
-    const getDb=(name:string)=>{
-        if(!dbMap){
-            return name==='default'?convoDbService.get():undefined;
+    const getDbAsync=async (c:Context):Promise<ConvoDb|undefined>=>{
+        const name=c.req.param('dbName');
+        if(!name){
+            return undefined;
         }
-        const named=dbMap[name];
-        if(named){
-            return named();
+
+        await initConvoHonoAsync();
+
+        const db=dbMap?.getDb(name);
+        if(!db){
+            return undefined;
         }
-        const fallback=dbMap['*'];
-        if(fallback){
-            let db=fallback();
-            dbMap[name]=()=>db;
+
+        if(disableDbAuth){
             return db;
         }
-        return undefined;
+
+        const token=await jwtVerifier.getDbTokenAsync(c,db);
+
+        return db.auth.createBoundary(token.identityPath);
     }
 
     routes.post('/db/:dbName',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -429,11 +437,9 @@ export const getConvoHonoRoutes=({
 
     routes.post('/db/:dbName/node/query',async (c)=>{
 
-        await initConvoHonoAsync();
-
         try{
 
-            const store=getDb(c.req.param('dbName'));
+            const store=await getDbAsync(c);
             if(!store){
                 return c.json('No database found by name',404);
             }
@@ -453,9 +459,7 @@ export const getConvoHonoRoutes=({
 
     routes.get('/db/:dbName/node/:path{.*}',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -484,9 +488,7 @@ export const getConvoHonoRoutes=({
 
     routes.post('/db/:dbName/node',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -503,9 +505,7 @@ export const getConvoHonoRoutes=({
 
     routes.patch('/db/:dbName/node',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -522,9 +522,7 @@ export const getConvoHonoRoutes=({
 
     routes.delete('/db/:dbName/node',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -541,9 +539,7 @@ export const getConvoHonoRoutes=({
 
     routes.get('/db/:dbName/edge/:id',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -559,9 +555,7 @@ export const getConvoHonoRoutes=({
 
     routes.post('/db/:dbName/edge',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -578,9 +572,7 @@ export const getConvoHonoRoutes=({
 
     routes.patch('/db/:dbName/edge',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -597,9 +589,7 @@ export const getConvoHonoRoutes=({
 
     routes.delete('/db/:dbName/edge',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -616,9 +606,7 @@ export const getConvoHonoRoutes=({
 
     routes.get('/db/:dbName/embedding/:id',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -634,9 +622,7 @@ export const getConvoHonoRoutes=({
 
     routes.post('/db/:dbName/embedding',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -653,9 +639,7 @@ export const getConvoHonoRoutes=({
 
     routes.patch('/db/:dbName/embedding',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -672,9 +656,7 @@ export const getConvoHonoRoutes=({
 
     routes.delete('/db/:dbName/embedding',async (c)=>{
 
-        await initConvoHonoAsync();
-
-        const store=getDb(c.req.param('dbName'));
+        const store=await getDbAsync(c);
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -693,12 +675,10 @@ export const getConvoHonoRoutes=({
 
         return streamSSE(c,async stream=>{
 
-            await initConvoHonoAsync();
-
             let id=0;
             let ping=0;
 
-            const store=getDb(c.req.param('dbName'));
+            const store=await getDbAsync(c);
             if(!store){
                 const item:ConvoNodeStreamItem<any>={
                     type:'error',

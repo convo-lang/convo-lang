@@ -1,6 +1,7 @@
-import { CancelToken, Scope } from "@iyio/common";
-import { ZodType } from "zod";
-import { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
+import type { CancelToken, Scope } from "@iyio/common";
+import type { ZodType } from "zod";
+import type { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
+import type { ConvoDbAuthManager } from "./ConvoDbAuthManager.js";
 
 /**
  * A unique node within a collection or graph of nodes.
@@ -1218,6 +1219,40 @@ export type ConvoDbFactory=(scope:Scope)=>ConvoDb;
  */
 export interface ConvoDb
 {
+
+    /**
+     * Name of the database.
+     */
+    readonly dbName:string;
+
+    /**
+     * An auth helper class. Auth is not directly handled by ConvoDbAuth, it relies on stored database
+     * function for auth operations.
+     */
+    readonly auth:ConvoDbAuthManager;
+
+    /**
+     * Convenience function for calling `queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom})`.
+     * Returns the data of the first node returned by the called function or undefined if the function
+     * returns no nodes. If you need to call a node that return multiple nodes use `queryNodesAsync`.
+     * If you need access to the full node returned use `callFunctionReturnNodeAsync`.
+     */
+    callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>;
+
+    callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>;
+
+    /**
+     * Similar to `callFunctionAsync` but required a node to be returned from the called function
+     * for a success result.
+     */
+    callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>;
+
+    /**
+     * Similar to `callFunctionAsync` but returns the full node returned by the called function instead
+     * of just its data.
+     */
+    callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>;
+
     /**
      * Queries the database for nodes
      */
@@ -1335,17 +1370,13 @@ export interface ConvoDb
      * Calls one of the functions of this interface based on the action of the command
      * @param command The command to execute
      */
-    executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>,permissionFromOverride?:string):PromiseResultType<ConvoDbCommandResult<TKeys>>;
+    executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>):PromiseResultType<ConvoDbCommandResult<TKeys>>;
 
     /**
      * Calls an array of the functions of this interface based on the action of the command
      * @param commands The commands to execute
-     * @param permissionFromOverride A permissionFrom path that will override the permissionFrom of
-     *                               any of the given commands. Commonly used to enforce permissions
-     *                               of external clients such as a REST API using JWTs to authenticate
-     *                               users.
      */
-    executeCommandsAsync(commands:ConvoDbCommand<any>[],permissionFromOverride?:string):PromiseResultType<ConvoDbCommandResult<any>[]>;
+    executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>;
 
     /**
      * DB Driver
@@ -2165,4 +2196,4 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
  * the same cached db after called the first name. There is one exception to the caching rule.
  * '*' should return a new database every time called.
  */
-export type ConvoDbMap=Record<string,()=>ConvoDb>;
+export type ConvoDbMap=Record<string,(name:string)=>ConvoDb>;

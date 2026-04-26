@@ -1,6 +1,6 @@
-import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbAuthManager, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
-import z from "zod";
+import z, { ZodType } from "zod";
 
 
 
@@ -12,6 +12,11 @@ const QueryTraversalStateSchema=z.object({
     step:z.number(),
 
     stepStage:z.enum(allConvoStepStages),
+
+    /**
+     * If true the first defined stage of the current step is being evaluated.
+     */
+    initState:z.boolean().optional(),
 
     /**
      * Used by ConvoDbFunctions as a next token.
@@ -66,6 +71,11 @@ export interface BaseConvoDbOptions
      * Options used to create Conversation instances for natural language processing
      */
     convoOptions?:ConversationOptions;
+
+    /**
+     * Name of the database
+     */
+    name:string;
 }
 
 
@@ -76,15 +86,22 @@ export abstract class BaseConvoDb implements ConvoDb
     protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
     protected convoOptions?:ConversationOptions;
 
+    public readonly auth:ConvoDbAuthManager;
+
+    public readonly dbName:string;
+
     public constructor({
         embeddingsService,
         embeddingOptions,
         convoOptions,
-    }:BaseConvoDbOptions={})
+        name,
+    }:BaseConvoDbOptions)
     {
         this.embeddingsService=embeddingsService;
         this.embeddingOptions=embeddingOptions;
         this.convoOptions=convoOptions;
+        this.dbName=name;
+        this.auth=new ConvoDbAuthManager(this);
     }
 
     abstract readonly _driver: ConvoDbDriver;
@@ -94,6 +111,85 @@ export abstract class BaseConvoDb implements ConvoDb
     public enableLogging()
     {
         this.loggingEnabled=true;
+    }
+
+    public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
+    {
+        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
+        if(!r.success){
+            return r;
+        }
+        return {
+            success:true,
+            result:r.result?.data as T|undefined,
+        }
+    }
+
+    public async callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>
+    {
+        const inputParsed=inputSchema.safeParse(args);
+        if(inputParsed.error){
+            return {
+                success:false,
+                error:inputParsed.error.message,
+                statusCode:400
+            }
+        }
+
+        const r=await this.callFunctionReturnValueAsync(path,inputParsed.data as any);
+        if(!r.success){
+            return r;
+        }
+
+        const outputParsed=outputSchema.safeParse(r.result);
+        if(outputParsed.error){
+            return {
+                success:false,
+                error:outputParsed.error.message,
+                statusCode:500,
+            }
+        }
+
+        return {
+            success:true,
+            result:outputParsed.data,
+        }
+    }
+
+
+    public async callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>
+    {
+        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
+        if(!r.success){
+            return r;
+        }
+        const data=r.result?.data;
+        if(!data){
+            return {
+                success:false,
+                error:'Called function did not return a value',
+                statusCode:500,
+            }
+        }
+
+        return {
+            success:true,
+            result:data as T,
+        }
+    }
+
+    
+    public async callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
+    {
+        const r=await this.queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom});
+        if(!r.success){
+            return r;
+        }
+        const node=r.result.nodes[0];
+        return {
+            success:true,
+            result:node,
+        }
     }
 
     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
@@ -517,7 +613,7 @@ export abstract class BaseConvoDb implements ConvoDb
                         break;
                     }
                 }
-                const paths=state.step===0?null:state.paths;
+                let stagePaths=state.step===0 && (state.initState===true || state.initState===undefined)?null:state.paths;
 
                 switch(state.stepStage){
 
@@ -526,14 +622,14 @@ export abstract class BaseConvoDb implements ConvoDb
                             const p=step.path;
                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPathAsync({
                                 path:p
-                            },paths,orderBy,batchSize,offset,nextToken));
+                            },stagePaths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
                             }
-                            state.paths=r.result;
+                            state.paths=stagePaths=r.result;
                         }
                         break;
 
@@ -542,14 +638,14 @@ export abstract class BaseConvoDb implements ConvoDb
                             const c=step.condition;
                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForConditionAsync({
                                 condition:c,
-                            },paths,orderBy,batchSize,offset,nextToken));
+                            },stagePaths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
                             }
-                            state.paths=r.result;
+                            state.paths=stagePaths=r.result;
                         }
                         break;
 
@@ -559,14 +655,14 @@ export abstract class BaseConvoDb implements ConvoDb
                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
                                 permissionFrom:f,
                                 permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
-                            },paths,orderBy,batchSize,offset,nextToken));
+                            },stagePaths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
                             }
-                            state.paths=r.result;
+                            state.paths=stagePaths=r.result;
                         }
                         break;
 
@@ -575,14 +671,14 @@ export abstract class BaseConvoDb implements ConvoDb
                             const e=step.embedding;
                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForEmbeddingAsync({
                                 embedding:e
-                            },paths,orderBy,batchSize,offset,nextToken));
+                            },stagePaths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
                             }
-                            state.paths=r.result;
+                            state.paths=stagePaths=r.result;
                         }
                         break;
 
@@ -594,7 +690,7 @@ export abstract class BaseConvoDb implements ConvoDb
                                 const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
                                     permissionFrom:f,
                                     permissionRequired:ConvoNodePermissionType.execute,
-                                },paths,orderBy,batchSize,offset,nextToken));
+                                },stagePaths,orderBy,batchSize,offset,nextToken));
                                 if(cancel.isCanceled){return;}
 
                                 if(!r.success){
@@ -603,7 +699,7 @@ export abstract class BaseConvoDb implements ConvoDb
                                 }
                             }
                             const fnPaths=state.paths;
-                            state.paths=[];
+                            state.paths=stagePaths=[];
                             for(const path of fnPaths){
                                 const r=await this.selectNodeByPathAsync(path,'*');
                                 if(cancel.isCanceled){return;}
@@ -645,7 +741,10 @@ export abstract class BaseConvoDb implements ConvoDb
                                             fn.mainCompiled=ctx.mainCompiled;
                                             const r=await this._driver.updateNodeAsync({
                                                 path:fnNode.path,
-                                                data:{function:{...fn}}
+                                                data:{
+                                                    ...fnNode.data,
+                                                    function:{...fn}
+                                                }
 
                                             },{});
                                             if(!r.success){
@@ -690,14 +789,14 @@ export abstract class BaseConvoDb implements ConvoDb
                                 edge:e,
                                 edgeDirection:step.edgeDirection??'bi',
                                 edgeLimit:step.edgeLimit,
-                            },paths,orderBy,batchSize,offset,nextToken));
+                            },stagePaths,orderBy,batchSize,offset,nextToken));
                             if(cancel.isCanceled){return;}
 
                             if(!r.success){
                                 yield errorResultToConvoNodeStreamItem(r,state);
                                 return;
                             }
-                            state.paths=r.result;
+                            state.paths=stagePaths=r.result;
                         }
                         break;
 
@@ -711,9 +810,12 @@ export abstract class BaseConvoDb implements ConvoDb
 
                 }
 
+                state.initState=false;
+
                 const nextStage=getNextStepStage(state.stepStage);
                 if(nextStage===undefined){
                     state.step++;
+                    state.initState=true;
                     delete state.fnNextToken;
                     state.stepStage=allConvoStepStages[0];
                     const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
@@ -1556,6 +1658,7 @@ const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>
             success:true,
             result:{
                 step:0,
+                initState:true,
                 stepStage:allConvoStepStages[0],
                 returnedCount:0,
                 scanCount:0,

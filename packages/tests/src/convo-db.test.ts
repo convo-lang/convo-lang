@@ -490,7 +490,6 @@ test("queryNodesAsync supports step permission filtering and final query permiss
             {path:'/perm/*'},
         ],
         permissionFrom:'/principal',
-        permissionRequired:ConvoNodePermissionType.read,
         orderBy:{prop:'path',direction:'asc'},
     });
 

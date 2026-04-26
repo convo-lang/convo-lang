@@ -73,6 +73,7 @@ interface LayerInst extends ConvoDbLayerConfig
 export interface LayeredConvoDbOptions extends BaseConvoDbOptions
 {
     layers:ConvoDbLayerConfig[];
+    dbId?:string;
 }
 
 export class LayeredConvoDb extends BaseConvoDb

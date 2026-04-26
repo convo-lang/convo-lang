@@ -1,10 +1,12 @@
 import { CancelToken, HttpClientRequestOptions, HttpMethod, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, deleteUndefined, getErrorMessage, getObjKeyCount, getSortedObjectHash, httpClient, joinPaths, objectToQueryParams } from "@iyio/common";
+import type { ZodType } from "zod";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
 import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
 import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriverFunction, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
+import { ConvoDbAuthManager } from "./db/ConvoDbAuthManager.js";
 import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
@@ -69,6 +71,8 @@ export class HttpConvoCompletionService implements
 
     public readonly serviceId='http';
 
+    public readonly auth:ConvoDbAuthManager;
+
     public static fromScope(scope:Scope,endpoint?:string|string[],getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>){
         if(!endpoint){
             const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
@@ -89,7 +93,7 @@ export class HttpConvoCompletionService implements
 
     private readonly endpoint:string|string[];
 
-    private readonly dbName:string;
+    public readonly dbName:string;
 
     private readonly getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
 
@@ -103,8 +107,29 @@ export class HttpConvoCompletionService implements
             aryRandomize(endpoint);
         }
         this.endpoint=endpoint;
-        this.getRequestOptions=getRequestOptions;
         this.dbName=dbName;
+
+        this.getRequestOptions=async ()=>{
+            let options:HttpClientRequestOptions={};
+            if(!getRequestOptions && !this.auth.jwt){
+                return options;
+            }
+
+            if(this.auth.jwt){
+                options.headers={
+                    Authorization:`Bearer ${this.auth.jwt.jwt}`,
+                }
+            }
+            
+            if(getRequestOptions){
+                const o=await getRequestOptions();
+                options={...options,...o,headers:{...options.headers,...o.headers}};
+                
+            }
+
+            return options;
+        }
+        this.auth=new ConvoDbAuthManager(this);
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -726,5 +751,84 @@ export class HttpConvoCompletionService implements
     {
         const r=await this.executeCommandAsync({deleteEmbedding:{id,options}});
         return r.success?{success:true}:r;
+    }
+
+    public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
+    {
+        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
+        if(!r.success){
+            return r;
+        }
+        return {
+            success:true,
+            result:r.result?.data as T|undefined,
+        }
+    }
+
+    public async callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>
+    {
+        const inputParsed=inputSchema.safeParse(args);
+        if(inputParsed.error){
+            return {
+                success:false,
+                error:inputParsed.error.message,
+                statusCode:400
+            }
+        }
+
+        const r=await this.callFunctionReturnValueAsync(path,inputParsed.data as any);
+        if(!r.success){
+            return r;
+        }
+
+        const outputParsed=outputSchema.safeParse(r.result);
+        if(outputParsed.error){
+            return {
+                success:false,
+                error:outputParsed.error.message,
+                statusCode:500,
+            }
+        }
+
+        return {
+            success:true,
+            result:outputParsed.data,
+        }
+    }
+
+
+    public async callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>
+    {
+        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
+        if(!r.success){
+            return r;
+        }
+        const data=r.result?.data;
+        if(!data){
+            return {
+                success:false,
+                error:'Called function did not return a value',
+                statusCode:500,
+            }
+        }
+
+        return {
+            success:true,
+            result:data as T,
+        }
+    }
+
+    
+    public async callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
+    {
+        const r=await this.queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom});
+        if(!r.success){
+            return r;
+        }
+        const node=r.result.nodes[0];
+        return {
+            success:true,
+            result:node,
+        }
     }
 }

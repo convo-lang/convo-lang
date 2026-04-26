@@ -1,5 +1,5 @@
-import { ResultTypeError } from "../result-type.js";
-import { ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNode, ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
+import { ResultTypeError, ResultTypeVoid } from "../result-type.js";
+import { ConvoDbCommand, ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNodeCondition, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
 /**
  * Normalizes a convo node path.
@@ -97,6 +97,7 @@ export const validateConvoNodeCondition=(condition:ConvoNodeCondition):string|un
     }
     return undefined;
 }
+
 export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined=>{
     if(query.permissionFrom!==undefined && normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom){
         return `Invalid query permissionFrom. permissionFrom:${query.permissionFrom}`
@@ -168,7 +169,187 @@ export const callConvoDbDriverCmdAsync=<FN extends ConvoDbDriverFunction>(
     return (driver[fn] as any)(...args);
 }
 
+/**
+ * Sets the `permissionFrom` and `permissionRequired` based on `identityPath` and the action being
+ * taken by the step. The `permissionFrom` of the query will be updated if it is defined but does
+ * not match the `identityPath`
+ */
+export const applyIdentityToConvoDbQuery=(identityPath:string,query:ConvoNodeQuery<any>):ConvoNodeQuery=>{
+    if(query.permissionFrom && query.permissionFrom!==identityPath){
+        query.permissionFrom=identityPath;
+    }
 
-export const executeConvoNode=(node:ConvoNode)=>{
+    for(const step of query.steps){
+        step.permissionFrom=identityPath;
+        step.permissionRequired=(
+            (step.permissionRequired??ConvoNodePermissionType.none)|
+            (step.call?ConvoNodePermissionType.execute:ConvoNodePermissionType.read)
+        );
+    }
+    return query;
+}
 
+/**
+ * Sets the permissionFrom of the given object to `identityPath` If the given `permissionObject`
+ */
+export const applyIdentityToPermission=<T extends {permissionFrom?:string}>(
+    identityPath:string,
+    permissionObject:T
+):T=>{
+    permissionObject.permissionFrom=identityPath;
+    return permissionObject;
+}
+
+/**
+ * Applies the identityPath to all properties of all commands. Changes to the commands are made in-place,
+ * mutating the commands.
+ */
+export const applyIdentityToConvoDbCommands=(identityPath:string,cmds:ConvoDbCommand[]):ResultTypeVoid=>{
+    for(const cmd of cmds){
+        const r=applyIdentityToConvoDbCommand(identityPath,cmd);
+        if(!r.success){
+            return r;
+        }
+    }
+    return {success:true}
+}
+
+/**
+ * Applies the identityPath to all properties of the command. Changes to the command are made in-place,
+ * mutating the command.
+ */
+export const applyIdentityToConvoDbCommand=(identityPath:string,cmd:ConvoDbCommand<any>):ResultTypeVoid=>{
+    for(const e in cmd){
+        switch(e as keyof ConvoDbCommand){
+
+            case 'queryNodes':
+                if(cmd.queryNodes){
+                    applyIdentityToConvoDbQuery(identityPath,cmd.queryNodes.query);
+                }
+                break;
+
+            case 'getNodesByPath':
+                if(cmd.getNodesByPath){
+                    applyIdentityToPermission(identityPath,cmd.getNodesByPath);
+                }
+                break;
+
+            case 'getNodePermission':
+                if(cmd.getNodePermission){
+                    if(cmd.getNodePermission.fromPath!==identityPath && cmd.getNodePermission.toPath!==identityPath){
+                        return {
+                            success:false,
+                            error:'getNodePermission fromPath or toPath must point to identityPath',
+                            statusCode:401,
+                        }
+                    }
+                }
+                break;
+
+            case 'checkNodePermission':
+                if(cmd.checkNodePermission){
+                    if(cmd.checkNodePermission.fromPath!==identityPath && cmd.checkNodePermission.toPath!==identityPath){
+                        return {
+                            success:false,
+                            error:'checkNodePermissions fromPath or toPath must point to identityPath',
+                            statusCode:401,
+                        }
+                    }
+                }
+                break;
+
+            case 'insertNode':
+                if(cmd.insertNode){
+                    cmd.insertNode.options=applyIdentityToPermission(identityPath,cmd.insertNode.options??{});
+                }
+                break;
+
+            case 'updateNode':
+                if(cmd.updateNode){
+                    cmd.updateNode.options=applyIdentityToPermission(identityPath,cmd.updateNode.options??{});
+                }
+                break;
+
+            case 'deleteNode':
+                if(cmd.deleteNode){
+                    cmd.deleteNode.options=applyIdentityToPermission(identityPath,cmd.deleteNode.options??{});
+                }
+                break;
+
+            case 'queryEdges':
+                if(cmd.queryEdges){
+                    applyIdentityToPermission(identityPath,cmd.queryEdges.query);
+                }
+                break;
+
+            case 'getEdgeById':
+                if(cmd.getEdgeById){
+                    applyIdentityToPermission(identityPath,cmd.getEdgeById);
+                }
+                break;
+
+            case 'insertEdge':
+                if(cmd.insertEdge){
+                    cmd.insertEdge.options=applyIdentityToPermission(identityPath,cmd.insertEdge.options??{});
+                }
+                break;
+
+            case 'updateEdge':
+                if(cmd.updateEdge){
+                    cmd.updateEdge.options=applyIdentityToPermission(identityPath,cmd.updateEdge.options??{});
+                }
+                break;
+
+            case 'deleteEdge':
+                if(cmd.deleteEdge){
+                    cmd.deleteEdge.options=applyIdentityToPermission(identityPath,cmd.deleteEdge.options??{});
+                }
+                break;
+
+            case 'queryEmbeddings':
+                if(cmd.queryEmbeddings){
+                    applyIdentityToPermission(identityPath,cmd.queryEmbeddings.query);
+                }
+                break;
+
+            case 'getEmbeddingById':
+                if(cmd.getEmbeddingById){
+                    applyIdentityToPermission(identityPath,cmd.getEmbeddingById);
+                }
+                break;
+
+            case 'insertEmbedding':
+                if(cmd.insertEmbedding){
+                    cmd.insertEmbedding.options=applyIdentityToPermission(identityPath,cmd.insertEmbedding.options??{});
+                }
+                break;
+
+            case 'updateEmbedding':
+                if(cmd.updateEmbedding){
+                    cmd.updateEmbedding.options=applyIdentityToPermission(identityPath,cmd.updateEmbedding.options??{});
+                }
+                break;
+
+            case 'deleteEmbedding':
+                if(cmd.deleteEmbedding){
+                    cmd.deleteEmbedding.options=applyIdentityToPermission(identityPath,cmd.deleteEmbedding.options??{});
+                }
+                break;
+
+            case 'driverCmd':
+                return {
+                    success:false,
+                    error:'Driver commands are not allowed to passed between permission boundaries',
+                    statusCode:401,
+                }
+
+            default:
+                return {
+                    success:false,
+                    error:`Unknown ConvoDbCommand property: ${e}`,
+                    statusCode:400
+                }
+        }
+    }
+    return {success:true}
 }
