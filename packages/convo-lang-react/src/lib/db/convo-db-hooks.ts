@@ -1,4 +1,4 @@
-import { ConvoDb, convoDbService, ConvoNode, ConvoNodeKeySelection, ConvoNodeQuery, ConvoNodeQueryKeysToSelection, ConvoNodeQueryResult, StatusCode } from "@convo-lang/convo-lang";
+import { ConvoDb, convoDbService, ConvoNode, ConvoNodeCondition, ConvoNodeKeySelection, ConvoNodeQuery, ConvoNodeQueryKeysToSelection, ConvoNodeQueryResult, StatusCode } from "@convo-lang/convo-lang";
 import { CancelToken, createPromiseSource, deepClone, delayAsync, getErrorMessage, PromiseSource } from "@iyio/common";
 import { useDeepCompareItem } from "@iyio/react-common";
 import { useEffect, useRef, useState } from "react";
@@ -31,6 +31,16 @@ export interface UseConvoDbOptions
      * Provided a default value for the `watch` value of the query the options are paired with.
      */
     watch?:boolean;
+
+    /**
+     * Sets the default condition of the first step in the query. Useful when used with `useConvoNodesAtPath`
+     */
+    type?:string;
+
+    /**
+     * Sets the default condition of the first step in the query. Useful when used with `useConvoNodesAtPath`
+     */
+    condition?:ConvoNodeCondition;
 
     /**
      * Debouncing timeout in milliseconds. Useful for queries tied to user input such as a search bar.
@@ -122,10 +132,13 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
         watch=query?.watch??false,
         stream=watch,
         debounceMs=1,
+        type,
+        condition,
     }:UseConvoDbOptions={}
 ):UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>=>{
 
     query=useDeepCompareItem(disabled?undefined:query);
+    condition=useDeepCompareItem(disabled?undefined:condition);
 
     const [result,setResult]=useState<UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>>(
         {state:disabled?'disabled':'loading',nodes:[],node:undefined,lastNode:undefined,db,query:deepClone(query) as any,watch}
@@ -150,7 +163,36 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
             try{
                 let nextToken=query.nextToken;
                 let errorCount=0;
-                const getQuery=()=>({...queryClone,watch,nextToken});
+                const getQuery=()=>{
+                    const q={...queryClone,watch,nextToken};
+                    if(type || condition){
+                        const first=q.steps[0];
+                        if(first && !first.condition){
+                            if(type && condition){
+                                q.steps[0]={...first,condition:{
+                                    groupOp:'and',
+                                    conditions:[
+                                        {
+                                            target:'type',
+                                            op:'=',
+                                            value:type,
+                                        },
+                                        condition
+                                    ]
+                                }};
+                            }else if(type){
+                                q.steps[0]={...first,condition:{
+                                    target:'type',
+                                    op:'=',
+                                    value:type,
+                                }}
+                            }else if(condition){
+                                q.steps[0]={...first,condition}
+                            }
+                        }
+                    }
+                    return q;
+                }
                 const next=()=>{
                     nextPromise?.resolve();
                 }
@@ -158,15 +200,21 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
                     nextPromise=createPromiseSource<void>();
                     if(stream){
                         const nodes:Partial<ConvoNode>[]=[];
+                        let stateNodes=[...nodes];
+                        let nodesChanged=false;
                         let watchingChanges=false;
                         const flush=()=>{
+                            if(nodesChanged){
+                                nodesChanged=false;
+                                stateNodes=[...nodes];
+                            }
                             setResult({
                                 state:'streaming',
                                 watch,
                                 watchingChanges,
-                                node:nodes[0] as any,
-                                lastNode:nodes[nodes.length-1] as any,
-                                nodes:nodes as any,
+                                node:stateNodes[0] as any,
+                                lastNode:stateNodes[stateNodes.length-1] as any,
+                                nodes:stateNodes as any,
                                 query:queryClone as any,
                                 db,
                                 next,
@@ -186,6 +234,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
                                     case 'node-insert':
                                         if(!nodes.some(n=>n.path && n.path===(item.node as ConvoNode).path)){
                                             nodes.push(item.node);
+                                            nodesChanged=true;
                                         }
                                         break;
 
@@ -196,6 +245,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
                                         }else{
                                             nodes[index]=item.node;
                                         }
+                                        nodesChanged=true;
                                         break;
                                     }
 
@@ -203,6 +253,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
                                         const index=nodes.findIndex(n=>n.path && n.path===(item.node as ConvoNode).path);
                                         if(index!==-1){
                                             nodes.splice(index,1);
+                                            nodesChanged=true;
                                         }
                                         break;
                                     }
@@ -307,7 +358,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
             cancel.cancelNow();
             nextPromise?.resolve();
         }
-    },[query,refresh,db,stream,watch,debounceMs]);
+    },[query,refresh,db,stream,watch,debounceMs,type,condition]);
 
     return result;
 }
@@ -318,10 +369,10 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
  * This hook is shorthand for `useConvoDbQuery({steps:[{path}]},options)`
  */
 export const useConvoNodesAtPath=<TKeys extends ConvoNodeKeySelection='*'>(
-    path:string,
+    path:string|undefined|null,
     options?:UseConvoDbOptions
 ):UseConvoQueryState<ConvoNodeQueryKeysToSelection<TKeys>>=>{
-    return useConvoDbQuery({steps:[{path}]},options);
+    return useConvoDbQuery(path?{steps:[{path}]}:undefined,options);
 }
 
 /**
