@@ -3,7 +3,7 @@
 @import ../coding-style.md !tag:CODING_STYLE
 
 > define
-openAiModel='gpt-5.4'
+openAiModel='gpt-5.5'
 claudeModel='open-router/anthropic/claude-opus-4.7'
 
 __model=openAiModel
