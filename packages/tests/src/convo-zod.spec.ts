@@ -1,9 +1,10 @@
 import { zodTypeToJsonScheme } from '@iyio/common';
+import { describe, expect, test } from "bun:test";
 import { z } from 'zod';
 
 describe('convo-zod',()=>{
 
-    it('should convert zod enum',()=>{
+    test('should convert zod enum',()=>{
 
         const scheme=z.object({
             enumProp:z.enum(['a','b','c'])
@@ -16,7 +17,7 @@ describe('convo-zod',()=>{
         expect(json?.properties?.['enumProp']?.enum).toEqual(['a','b','c']);
     })
 
-    it('should convert lazy zod enum',()=>{
+    test('should convert lazy zod enum',()=>{
 
 
         const scheme=z.object({

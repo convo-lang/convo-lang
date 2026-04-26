@@ -1,16 +1,11 @@
+import { CallbackConvoCompletionService, Conversation, ConvoComponent, ConvoComponentMode, ConvoDocumentReference, ConvoError, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation, convoDocRefToTagValue, convoTags, getConvoMetadata } from "@convo-lang/convo-lang";
 import { asType, deepClone, valueIsZodObject } from '@iyio/common';
+import { describe, expect, test } from "bun:test";
 import { ZodEnum, ZodObject, z } from 'zod';
-import { CallbackConvoCompletionService } from './CallbackConvoCompletionService.js';
-import { Conversation } from "./Conversation.js";
-import { ConvoError } from './ConvoError.js';
-import { ConvoComponent } from './convo-component-types.js';
-import { convoDocRefToTagValue, convoTags, getConvoMetadata } from './convo-lib.js';
-import { ConvoDocumentReference } from './convo-rag-types.js';
-import { ConvoComponentMode, ConvoErrorType, ConvoThreadFilter, FlatConvoConversation } from "./convo-types.js";
 
 describe('conversation',()=>{
 
-    it('should complete',async ()=>{
+    test('should complete',async ()=>{
 
         let _flat:FlatConvoConversation|null=null;
         const responseText='Turn left';
@@ -43,7 +38,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should call function',async ()=>{
+    test('should call function',async ()=>{
 
         const speed=150;
 
@@ -96,7 +91,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should eval top level statements',async ()=>{
+    test('should eval top level statements',async ()=>{
 
         const cs=new CallbackConvoCompletionService(async ()=>{
             return [{
@@ -119,7 +114,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should validate user defined return type',async ()=>{
+    test('should validate user defined return type',async ()=>{
 
         const convo=new Conversation();
 
@@ -162,7 +157,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should validate user defined args type',async ()=>{
+    test('should validate user defined args type',async ()=>{
 
         const convo=new Conversation();
 
@@ -200,7 +195,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should validate enum',async ()=>{
+    test('should validate enum',async ()=>{
 
         const convo=new Conversation();
 
@@ -260,7 +255,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should check type with is operator',async ()=>{
+    test('should check type with is operator',async ()=>{
 
         const convo=new Conversation();
 
@@ -328,7 +323,7 @@ describe('conversation',()=>{
 
 
 
-    it('should create metadata',async ()=>{
+    test('should create metadata',async ()=>{
 
         const convo=new Conversation();
 
@@ -398,7 +393,7 @@ describe('conversation',()=>{
         }
     })
 
-    it('should sleep',async ()=>{
+    test('should sleep',async ()=>{
 
         const convo=new Conversation();
 
@@ -415,7 +410,7 @@ describe('conversation',()=>{
         expect(v).toBe(1);
     })
 
-    it('should return promise',async ()=>{
+    test('should return promise',async ()=>{
 
         const convo=new Conversation();
 
@@ -434,7 +429,7 @@ describe('conversation',()=>{
 
 
 
-    it('should pipe',async ()=>{
+    test('should pipe',async ()=>{
 
         const convo=new Conversation();
 
@@ -461,7 +456,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should pipe with map',async ()=>{
+    test('should pipe with map',async ()=>{
 
         const convo=new Conversation();
 
@@ -500,7 +495,7 @@ describe('conversation',()=>{
 
     })
 
-    it('should call extern defined function',async ()=>{
+    test('should call extern defined function',async ()=>{
 
         const convo=new Conversation();
 
@@ -531,7 +526,7 @@ describe('conversation',()=>{
         expect(lastParams.turn).toBe('left');
     })
 
-    it('should enforce def overrides',async ()=>{
+    test('should enforce def overrides',async ()=>{
 
         const convo=new Conversation();
 
@@ -551,7 +546,7 @@ describe('conversation',()=>{
 
 
 
-    it('should complete multiple suspensions',async ()=>{
+    test('should complete multiple suspensions',async ()=>{
 
         const convo=new Conversation();
 
@@ -573,7 +568,7 @@ describe('conversation',()=>{
 
 
 
-    it('should assign message content',async ()=>{
+    test('should assign message content',async ()=>{
 
         const convo=new Conversation();
 
@@ -603,7 +598,7 @@ describe('conversation',()=>{
 
 
 
-    it('Should parse JSON with single curly bracket',async ()=>{
+    test('Should parse JSON with single curly bracket',async ()=>{
 
         const convo=new Conversation();
 
@@ -645,7 +640,7 @@ describe('conversation',()=>{
 
 
 
-    it('Should use RAG',async ()=>{
+    test('Should use RAG',async ()=>{
 
         let ragParams:any;
 
@@ -697,7 +692,7 @@ describe('conversation',()=>{
     })
 
 
-    it('Should use RAG with prefix and suffix',async ()=>{
+    test('Should use RAG with prefix and suffix',async ()=>{
 
         const convo=new Conversation({
             ragCallback:()=>({
@@ -737,7 +732,7 @@ describe('conversation',()=>{
     })
 
 
-    it('Should use threads',async ()=>{
+    test('Should use threads',async ()=>{
 
         const convo=new Conversation();
 
@@ -819,7 +814,7 @@ describe('conversation',()=>{
     })
 
 
-    it('Should import',async ()=>{
+    test('Should import',async ()=>{
         let handlerCallCount=0;
         const convo=new Conversation({
             disableAutoFlatten:true,
@@ -913,7 +908,7 @@ describe('conversation',()=>{
     });
 
 
-    it('Should concat',async ()=>{
+    test('Should concat',async ()=>{
 
         const getMsgAsync=async (content:string)=>{
             const convo=new Conversation({
@@ -1027,7 +1022,7 @@ describe('conversation',()=>{
     });
 
 
-    it('Should create component using code block',async ()=>{
+    test('Should create component using code block',async ()=>{
         const test=async (blockType:string,mode:ConvoComponentMode|null)=>{
             let comp:ConvoComponent|undefined;
             const convo=new Conversation({
@@ -1090,7 +1085,7 @@ describe('conversation',()=>{
     });
 
 
-    it('Should create component using code block',async ()=>{
+    test('Should create component using code block',async ()=>{
 
         const convo=new Conversation({
             disableAutoFlatten:true,

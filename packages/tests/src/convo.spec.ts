@@ -1,10 +1,7 @@
+import { ConvoError, ConvoErrorType, ConvoExecutionContext, ConvoParsingResult, escapeConvo, escapeConvoMessageContent, executeConvoFunction, parseConvoCode } from '@convo-lang/convo-lang';
 import { asType } from '@iyio/common';
+import { describe, expect, test } from "bun:test";
 import { ZodObject } from 'zod';
-import { ConvoError } from './ConvoError.js';
-import { ConvoExecutionContext, executeConvoFunction } from './ConvoExecutionContext.js';
-import { escapeConvo, escapeConvoMessageContent } from './convo-lib.js';
-import { parseConvoCode } from './convo-parser.js';
-import { ConvoErrorType, ConvoParsingResult } from './convo-types.js';
 
 const varShouldBe=(convo:ConvoParsingResult,varName:string,value:string)=>{
     const statement=convo.result?.[1]?.fn?.body?.find(s=>s.set===varName);
@@ -183,11 +180,11 @@ describe('convo',()=>{
         return r;
     }
 
-    it('should parse',()=>{
+    test('should parse',()=>{
         parse(8,defaultPrompt);
     })
 
-    it('should double escape',()=>{
+    test('should double escape',()=>{
         const src='<div style={{backgroundColor:"green"}}/>';
         const expectedEscape='<div style=\\{{backgroundColor:"green"}}/>';
         const escaped=escapeConvo(src);
@@ -196,7 +193,7 @@ describe('convo',()=>{
         expect(escapeConvo(escaped)).toBe(expectedEscape);
     });
 
-    it('should generate function scheme',async ()=>{
+    test('should generate function scheme',async ()=>{
 
         const convo=parse(1,/*convo*/`
 
@@ -291,7 +288,7 @@ describe('convo',()=>{
 
 
 
-    it('should eval or statement',async ()=>{
+    test('should eval or statement',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -318,7 +315,7 @@ describe('convo',()=>{
 
 
 
-    it('should eval or statement with no args',async ()=>{
+    test('should eval or statement with no args',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -340,7 +337,7 @@ describe('convo',()=>{
 
 
 
-    it('should add numbers',async ()=>{
+    test('should add numbers',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -367,7 +364,7 @@ describe('convo',()=>{
 
 
 
-    it('should escape single quotes in strings',async ()=>{
+    test('should escape single quotes in strings',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -390,7 +387,7 @@ describe('convo',()=>{
 
 
 
-    it('should escape double quotes in strings',async ()=>{
+    test('should escape double quotes in strings',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -413,7 +410,7 @@ describe('convo',()=>{
 
 
 
-    it('should parse string with no statement',async ()=>{
+    test('should parse string with no statement',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > user
@@ -430,7 +427,7 @@ describe('convo',()=>{
         expect(msg.statement).toBeUndefined();
     })
 
-    it('should embed strings',async ()=>{
+    test('should embed strings',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -448,7 +445,7 @@ describe('convo',()=>{
         expect(executeConvoFunction(fn)).toBe("1 + 1 = 2");
     })
 
-    it('should not embed double quote strings',async ()=>{
+    test('should not embed double quote strings',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -470,7 +467,7 @@ describe('convo',()=>{
 
 
 
-    it('should add compare negative numbers',async ()=>{
+    test('should add compare negative numbers',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -497,7 +494,7 @@ describe('convo',()=>{
 
 
 
-    it('should allow commas and semi-colons',async ()=>{
+    test('should allow commas and semi-colons',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -524,7 +521,7 @@ describe('convo',()=>{
 
 
 
-    it('should deep return',async ()=>{
+    test('should deep return',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -556,7 +553,7 @@ describe('convo',()=>{
 
 
 
-    it('should return based on if',async ()=>{
+    test('should return based on if',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -587,7 +584,7 @@ describe('convo',()=>{
 
 
 
-    it('should validate return type',async ()=>{
+    test('should validate return type',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -628,7 +625,7 @@ describe('convo',()=>{
 
 
 
-    it('should validate function args',async ()=>{
+    test('should validate function args',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -663,7 +660,7 @@ describe('convo',()=>{
 
 
 
-    it('should coerce function args',async ()=>{
+    test('should coerce function args',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -690,7 +687,7 @@ describe('convo',()=>{
 
 
 
-    it('should reference __args',async ()=>{
+    test('should reference __args',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -715,7 +712,7 @@ describe('convo',()=>{
 
 
 
-    it('should loop using while',async ()=>{
+    test('should loop using while',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -744,7 +741,7 @@ describe('convo',()=>{
 
 
 
-    it('should loop using foreach',async ()=>{
+    test('should loop using foreach',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -770,7 +767,7 @@ describe('convo',()=>{
 
 
 
-    it('should break foreach',async ()=>{
+    test('should break foreach',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -799,7 +796,7 @@ describe('convo',()=>{
 
 
 
-    it('should increment var',async ()=>{
+    test('should increment var',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -823,7 +820,7 @@ describe('convo',()=>{
 
 
 
-    it('should decrement var',async ()=>{
+    test('should decrement var',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn() -> (
@@ -847,7 +844,7 @@ describe('convo',()=>{
 
 
 
-    it('should validate enum with strings and numbers',async ()=>{
+    test('should validate enum with strings and numbers',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -896,7 +893,7 @@ describe('convo',()=>{
 
 
 
-    it('should use switch statement',async ()=>{
+    test('should use switch statement',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -927,7 +924,7 @@ describe('convo',()=>{
 
 
 
-    it('should use switch statement with multiple switch values',async ()=>{
+    test('should use switch statement with multiple switch values',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -967,7 +964,7 @@ describe('convo',()=>{
 
 
 
-    it('should use switch statement with default',async ()=>{
+    test('should use switch statement with default',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -1005,7 +1002,7 @@ describe('convo',()=>{
 
 
 
-    it('should use switch statement with test',async ()=>{
+    test('should use switch statement with test',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -1041,7 +1038,7 @@ describe('convo',()=>{
 
 
 
-    it('should use switch statement as ternary',async ()=>{
+    test('should use switch statement as ternary',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > testFn(
@@ -1069,7 +1066,7 @@ describe('convo',()=>{
 
 
 
-    it('should parse message starting without !',async ()=>{
+    test('should parse message starting without !',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > user
@@ -1084,7 +1081,7 @@ describe('convo',()=>{
 
     })
 
-    it('should parse message starting with !',async ()=>{
+    test('should parse message starting with !',async ()=>{
 
         const convo=parse(1,/*convo*/`
             > user
@@ -1100,7 +1097,7 @@ describe('convo',()=>{
     })
 
 
-    it('should parse message test messages with tags',async ()=>{
+    test('should parse message test messages with tags',async ()=>{
 
         const convo=parse(4,/*convo*/`
 
@@ -1137,7 +1134,7 @@ describe('convo',()=>{
     })
 
 
-    it('should parse message test messages with comments',async ()=>{
+    test('should parse message test messages with comments',async ()=>{
 
         const convo=parse(4,/*convo*/`
 
@@ -1174,7 +1171,7 @@ describe('convo',()=>{
     })
 
 
-    it('should parse message test messages with comments and tags',async ()=>{
+    test('should parse message test messages with comments and tags',async ()=>{
 
         const convo=parse(6,/*convo*/`
 
@@ -1233,7 +1230,7 @@ describe('convo',()=>{
 
     });
 
-    it('should escapeConvoMessageContent',()=>{
+    test('should escapeConvoMessageContent',()=>{
         expect(escapeConvoMessageContent('>')).toBe('\\>');
         expect(escapeConvoMessageContent('\\>')).toBe('\\\\>');
         expect(escapeConvoMessageContent('\\\\>')).toBe('\\\\\\>');
@@ -1254,7 +1251,7 @@ describe('convo',()=>{
     });
 
 
-    it('should parse escaped strings',async ()=>{
+    test('should parse escaped strings',async ()=>{
 
         const esc1='{{777}}';
         const esc2='>';
@@ -1379,7 +1376,7 @@ describe('convo',()=>{
     })
 
 
-    it('should parse json message',async ()=>{
+    test('should parse json message',async ()=>{
 
         const convo=parse(1,/*convo*/`
 
@@ -1401,7 +1398,7 @@ describe('convo',()=>{
     })
 
 
-    it('should ignore next message comment',async ()=>{
+    test('should ignore next message comment',async ()=>{
 
         const convo=parse(3,/*convo*/`
             > user

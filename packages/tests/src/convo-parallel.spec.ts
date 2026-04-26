@@ -1,11 +1,10 @@
+import { CallbackConvoCompletionService, Conversation, ConvoCompletionMessage } from "@convo-lang/convo-lang";
 import { delayAsync } from "@iyio/common";
-import { CallbackConvoCompletionService } from "./CallbackConvoCompletionService.js";
-import { Conversation } from "./Conversation.js";
-import { ConvoCompletionMessage } from "./convo-types.js";
+import { describe, expect, test } from "bun:test";
 
 describe('convo-parallel',()=>{
 
-    it('should run prompts in parallel',async ()=>{
+    test('should run prompts in parallel',async ()=>{
 
         const msgCount=4;
         let runCount=0;
