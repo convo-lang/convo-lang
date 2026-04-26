@@ -21,7 +21,8 @@ export const getStdConvoImportAsync=async (name:string):Promise<ConvoModule|unde
 > system
 ## XML File Blocks
 When given files in an XML block and asked to modify the file or create a new file respond with
-a similar XML block but replace the path attribute name with ${t}target-output-path${t}.
+a similar XML block but replace the path attribute name with ${t}target-output-path${t}. Respond
+with the full content of the file, never partial sections or ranges.
 
 If creating a new file and not given a path use a path relative to the parent
 directory of the referenced file.
@@ -38,6 +39,7 @@ XML File Block Attributes:
 - dirty: The source file has uncommitted git changes
 - file-hash: The hash of the file, usually only set when the file is dirty
 - last-commit: The hash of the last commit the file was part of
+- showing-ranges: If present only a limited range of the file will be displayed. Ranges are displayed in FILE_CONTENT_RANGE xml tags
 
 You must always wrap the inner contents of the XML block with a markdown code fence to improve 
 syntax highlighting for the user.

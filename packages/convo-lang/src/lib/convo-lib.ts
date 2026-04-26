@@ -3758,7 +3758,33 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
     return {name,modifiers,templateName,role,assign,tag}
 }
 
-export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus)=>{
+
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase):string=>{
+    const ranges=convoImport.modifiers.filter(m=>m.startsWith('range:'));
+    if(!ranges.length){
+        return content;
+    }
+
+    const lines=content.split('\n');
+    return ranges.map(r=>{
+        const [_,start,end]=r.split(/[:/-]/);
+        if(!start){
+            return `<INVALID_FILE_CONTENT_RANGE start="${escapeHtml(start??'')}" end="${escapeHtml(end??'')}"/>`;
+        }
+        let s=Number(start);
+        let e=end?Number(end):lines.length;
+        if(!isFinite(s) || !isFinite(e)){
+            `<INVALID_FILE_CONTENT_RANGE start="${escapeHtml(start??'')}" end="${escapeHtml(end??'')}"/>`;
+        }
+        if(s>e){
+            const tmp=s;
+            s=e;
+            e=tmp;
+        }
+        return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${lines.slice(s-1,e).join('\n')}\n</FILE_CONTENT_RANGE>`
+    }).join('\n');
+}
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus,hasRanges?:boolean)=>{
     const tag=convoImport.tag;
     if(!tag){
         return content;
@@ -3788,6 +3814,8 @@ export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,pat
         `<${tag} name="${
             escapeHtml(path?getFileName(path):convoImport.name)
         }"${path?` path="${escapeHtml(path)}"`:''}${
+            hasRanges?' showing-ranges':''
+        }${
             gitStatus?(
                 (gitStatus.isDirty?` dirty`:'')+
                 (gitStatus.fileHash?` file-hash="${escapeHtml(gitStatus.fileHash)}"`:'')+
