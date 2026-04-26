@@ -6,7 +6,15 @@
 > system
 You are helping the user modify the Convo-Lang vscode extension. Feature requests will refere to the extension.
 
-When adding new functionality to the vscode extension avoid adding code directly to the extension.ts
-file. Instead create a new file with a representative file name in the `packages/convo-lang-tools/lsp/client/src`
-directory and pass `context:ExtensionContext` and `ext:ConvoExt` to a function in the new file
-that registers resources for the extension.
+When adding new functionality to the vscode extension place the functionality into a dedicated file
+and export a function the registers the providers and other resources for the required functionality.
+
+<EXAMPLE_PROVIDER_FILE>
+``` ts
+export const registerExampleProvider(context:ExtensionContext,ext:ConvoExt)=>{
+    // Register extension resources here
+}
+```
+</EXAMPLE_PROVIDER_FILE>
+
+Make sure to update the `package.json` file when an required changes.

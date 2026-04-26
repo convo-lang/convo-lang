@@ -1,9 +1,12 @@
 import { getDirectoryName, getUriProtocol, isRooted, joinPaths, normalizePath } from '@iyio/common';
 import { DocumentLink, DocumentLinkProvider, Range, TextDocument, Uri } from 'vscode';
 
-export class ConvoDocumentLinkProvider implements DocumentLinkProvider{
+export const convoVirtualDocumentScheme='convo-virtual-file';
 
-    provideDocumentLinks(document:TextDocument):DocumentLink[]{
+export class ConvoDocumentLinkProvider implements DocumentLinkProvider
+{
+    provideDocumentLinks(document:TextDocument):DocumentLink[]
+    {
         const links:DocumentLink[]=[];
         const regex=/(^[ \t]*@import[ \t]+)(.*)/g;
         for(let line=0;line<document.lineCount;line++){
@@ -17,8 +20,14 @@ export class ConvoDocumentLinkProvider implements DocumentLinkProvider{
                 const start=match.index+(match[1]?.length??0);
                 const end=start+uri.length;
                 const range=new Range(line,start,line,end);
+                const protocol=getUriProtocol(uri);
 
-                if(!isRooted(uri) && !getUriProtocol(uri) && !document.isUntitled){
+                if(protocol==='std'){
+                    links.push(new DocumentLink(range,Uri.parse(`${convoVirtualDocumentScheme}:${encodeURIComponent(uri)}`)));
+                    continue;
+                }
+
+                if(!isRooted(uri) && !protocol && !document.isUntitled){
                     uri=normalizePath(joinPaths(getDirectoryName(document.fileName),uri));
                 }
 
@@ -28,3 +37,4 @@ export class ConvoDocumentLinkProvider implements DocumentLinkProvider{
         return links;
     }
 }
+
