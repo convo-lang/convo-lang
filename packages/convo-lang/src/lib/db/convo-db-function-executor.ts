@@ -235,6 +235,7 @@ const getImplementationAsync=async (
             break;
         }
 
+        case 'js':
         case 'javascript':{
             const r=createJsFnImp(fn.main);
             if(!r.success){
@@ -514,7 +515,6 @@ export async function *executeConvoDbFunction<TKeys extends ConvoNodeKeySelectio
     :
         keyof ConvoNode
 >>{
-
     try{
         const {
             function:fn,
