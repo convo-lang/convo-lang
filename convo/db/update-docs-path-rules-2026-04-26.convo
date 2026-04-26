@@ -1,3 +1,21 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+
+> user
+Update the `convo-db.md` document to re-enforce the correct way to use path wildcards.
+- wildcards can not be used as `path` property of `ConvoNode` and can not be used as the `to` or `from` property of `ConvoNodeEdge`
+- The `path` property of `ConvoNodeQueryStep` can be an absolute path or use a wildcard at its end, no where else
+- Wildcards can be used anywhere in the `value` of a condition when using the `like` or `ilike` operator. This is the only place where wildcards can be used this way.
+
+
+@time 2026-04-26T18:55:12-04:00
+@tokenUsage 28274 / 11308 / $0.19791000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md" last-commit="7a1c4a1d7cf4695a24b00dd8d2b2b8331781cf6f">
+``` md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
@@ -277,14 +295,14 @@ Wildcards have different rules depending on where they are used.
 Do not use `*` in stored identifiers:
 
 ```ts
-// !INVALID: node paths cannot contain wildcards
+// Invalid: node paths cannot contain wildcards
 await db.insertNodeAsync({
     path:'/users/*',
     type:'user',
     data:{},
 });
 
-// !INVALID: edge endpoints cannot contain wildcards
+// Invalid: edge endpoints cannot contain wildcards
 await db.insertEdgeAsync({
     type:'member-of',
     from:'/users/*',
@@ -325,7 +343,7 @@ Valid query step paths:
 /workspaces/acme/docs/*
 ```
 
-!INVALID query step paths:
+Invalid query step paths:
 
 ```txt
 *
@@ -708,7 +726,7 @@ const r=await db.queryNodesAsync({
 const r=await db.queryNodesAsync({
     steps:[
         {
-            // !INVALID: wildcard is not at the end of the path
+            // Invalid: wildcard is not at the end of the path
             path:'/users/*/profile',
         },
     ],
@@ -2252,3 +2270,8 @@ import {
     LayeredConvoDb,
 } from '@convo-lang/db';
 ```
+```
+</FILE_CONTENT>
+
+
+> user
