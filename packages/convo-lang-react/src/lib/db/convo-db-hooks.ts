@@ -33,12 +33,25 @@ export interface UseConvoDbOptions
     watch?:boolean;
 
     /**
-     * Sets the default condition of the first step in the query. Useful when used with `useConvoNodesAtPath`
+     * Sets the default condition of the first step in the query.
+     * Useful when used with `useConvoNodesAtPath` to filter selected nodes by type.
+     *
+     * @example
+     * useConvoNodesAtPath('/app/records/*',{type:'domain'})
+     *
+     * @note `type` and `condition` can be used tother
      */
     type?:string;
 
     /**
-     * Sets the default condition of the first step in the query. Useful when used with `useConvoNodesAtPath`
+     * Sets the default condition of the first step in the query.
+     * Useful when used with `useConvoNodesAtPath` to filter based on a condition without having to 
+     * use the full syntax of `useConvoDbQuery`
+     *
+     * @example
+     * useConvoNodesAtPath('/app/employees/*',{condition:{target:'data.salary',op:'>',value:100000}})
+     *
+     * @note `type` and `condition` can be used tother
      */
     condition?:ConvoNodeCondition;
 
