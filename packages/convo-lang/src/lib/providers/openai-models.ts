@@ -11,6 +11,30 @@ const m=(num:number)=>num/1000000;
 
 export const openAiModels:ConvoModelInfo[]=[
     {
+        name:'gpt-5.5',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1050000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(5),
+        outputTokenPriceUsd:m(30),
+    },
+    {
+        name:'gpt-5.5-pro',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1050000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(30),
+        outputTokenPriceUsd:m(180),
+    },
+
+
+    {
         name:'gpt-5.4',
         matchNameStart:true,
         supportsFunctionCalling:true,
