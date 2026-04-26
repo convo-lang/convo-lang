@@ -1,6 +1,6 @@
 # ConvoDb
 
-ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, and other agentic systems.
+ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, authentication flows, and other agentic systems.
 
 It gives you a consistent way to work with:
 
@@ -9,6 +9,8 @@ It gives you a consistent way to work with:
 - **Embeddings** for semantic search and retrieval
 - **Stored functions** for executing behavior directly from nodes during queries
 - **Path-based permissions** for simple but powerful access control
+- **Authentication helpers and permission boundaries** for JWT-backed remote access and identity-scoped database proxies
+- **Reusable database functions** through `@convo-lang/db-functions`
 - **Portable adapters** so the same ConvoDb code can run in memory, in the browser, over HTTP, on the file system, or on SQL backends
 - **A driver-backed architecture** that separates high-level ConvoDb behavior from low-level datastore access
 - **React hooks** for querying and watching node data from React components using `useConvoDbQuery`, `useConvoNodeAtPath`, and `useConvoNodesAtPath`
@@ -22,7 +24,12 @@ import { InMemoryConvoDb, BunPostgresConvoDb } from '@convo-lang/db';
 The `ConvoDb` interface and core types are imported from:
 
 ```ts
-import { ConvoDb } from '@convo-lang/convo-lang';
+import {
+    ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
+} from '@convo-lang/convo-lang';
 ```
 
 React hooks can be imported from:
@@ -43,6 +50,7 @@ They often need to:
 - connect related things together
 - search by meaning, not just exact match
 - scope access per user, agent, workspace, or tool
+- authenticate users or agents and constrain remote database access
 - run stored tools or behaviors as part of graph traversal
 - move between local, browser, and server storage without changing application logic
 
@@ -59,6 +67,7 @@ A single system can use it to store:
 - **permissions**
 - **vector embeddings**
 - **callable functions**
+- **authentication records**
 
 ---
 
@@ -102,6 +111,7 @@ You can use nodes for things like:
 - tasks
 - organizations
 - workspaces
+- sign-in records
 
 ---
 
@@ -153,8 +163,28 @@ This is useful for:
 - returning computed results alongside normal graph traversal
 - encapsulating reusable behavior inside the database
 - mixing static data, relationships, and executable logic in one model
+- implementing auth and account flows as database-backed functions
 
 Function execution is covered in more detail near the end of this document.
+
+---
+
+### Authentication and permission boundaries
+
+ConvoDb includes an auth helper, `ConvoDbAuthManager`, on every `ConvoDb` instance.
+
+Auth is intentionally database-backed. The auth manager does not implement sign-in logic directly. Instead, it calls stored database functions such as `/bin/sign-in-email-password`.
+
+A successful sign-in returns a JWT that contains:
+
+- the database name
+- a user id
+- identity paths the token can act as
+- additional claims
+
+For remote APIs, a verified JWT can be converted into a `ConvoDbPermissionBoundary`. A permission boundary wraps a database and forces every call to use a fixed identity path as `permissionFrom`.
+
+This lets public or remote callers use normal ConvoDb APIs while preventing them from spoofing another identity.
 
 ---
 
@@ -173,11 +203,14 @@ This separation makes the system easier to reason about and easier to implement 
 
 `ConvoDb` handles higher-level behavior such as:
 
+- auth helper access through `auth`
 - path normalization and validation
 - query orchestration and traversal
 - permission checks
+- permission boundary creation
 - watch and stream behavior
 - command execution
+- stored function convenience calls
 - embedding-related higher-level workflows
 - convenience methods like `getNodesByPathAsync` and `getNodeByPathAsync`
 
@@ -208,9 +241,62 @@ For example:
 - a SQLite adapter can focus on SQL execution
 - a Postgres adapter can focus on relational persistence
 - an HTTP adapter can proxy supported operations cleanly
-- shared query traversal and permission logic can stay in one place
+- shared query traversal, permissions, auth boundaries, and function helpers can stay in one place
 
 In practice, this makes adapter implementations cleaner and keeps application behavior more consistent across backends.
+
+---
+
+## Database names and instance maps
+
+Every `ConvoDb` has a `dbName`.
+
+Database names are used by:
+
+- JWT auth tokens
+- HTTP database routes
+- CLI database commands
+- named database maps
+- multi-database applications
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+```
+
+### `ConvoDbInstanceMap`
+
+`ConvoDbInstanceMap` wraps a `ConvoDbMap` and provides named database lookup.
+
+```ts
+import { ConvoDbInstanceMap } from '@convo-lang/convo-lang';
+import { getConvoDbMapFromStrings } from '@convo-lang/db/db-map.js';
+
+const mapResult=getConvoDbMapFromStrings([
+    'default:sqlite:./data/default.db',
+    'cache:mem',
+]);
+
+if(!mapResult.success){
+    throw new Error(mapResult.error);
+}
+
+const dbMap=new ConvoDbInstanceMap(mapResult.result);
+
+const defaultDb=dbMap.getDb('default');
+const cacheDb=dbMap.getDb('cache');
+```
+
+A `ConvoDbMap` maps names to functions that receive the requested name and return a database:
+
+```ts
+type ConvoDbMap=Record<string,(name:string)=>ConvoDb>;
+```
+
+If a `'*'` entry exists, it can be used as a fallback factory for unknown database names.
 
 ---
 
@@ -227,31 +313,6 @@ Examples:
 - `/orgs/acme/projects/p1/tasks/task-42`
 
 This makes your data feel like a structured namespace instead of a flat table.
-
-### Why this is powerful
-
-Paths let you model hierarchical systems naturally:
-
-- users under `/users/*`
-- organizations under `/orgs/*`
-- documents under `/docs/*`
-- agent state under `/agents/*`
-- session memory under `/sessions/*`
-
-You can think of it like a virtual file system for application data.
-
-Example structure:
-
-```txt
-/users/alex
-/users/alex/memories/summary
-/users/alex/memories/preferences
-/agents/researcher
-/agents/researcher/tools/web-search
-/workspaces/acme
-/workspaces/acme/docs/product-spec
-/workspaces/acme/tasks/task-1
-```
 
 ### Path rules
 
@@ -331,7 +392,7 @@ Valid query step paths:
 *
 /users*
 /users/*/profile
-/users/** 
+/users/**
 ```
 
 #### `like` and `ilike` condition values can use wildcards anywhere
@@ -362,7 +423,15 @@ Path-based organization makes permissions much easier to reason about.
 
 Instead of building a totally custom ACL system from scratch, you can grant permissions from one node to another node path or subtree ancestor using edges.
 
-### Why this works well
+### Permission model
+
+Permissions are represented using edges with the `grant` property.
+
+Permission is directional:
+
+```txt
+from -> to
+```
 
 If you grant access to:
 
@@ -412,6 +481,359 @@ And combinations like:
 - `writeExecute`
 - `all`
 
+### Grant a user read/write access to a workspace
+
+```ts
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+```
+
+### Check permissions directly
+
+```ts
+const permission=await db.getNodePermissionAsync(
+    '/users/alex',
+    '/workspaces/acme/docs/spec',
+);
+
+if(permission.success){
+    console.log(permission.result);
+}
+```
+
+### Enforce permissions during reads
+
+```ts
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+```
+
+### Enforce permissions during writes
+
+```ts
+await db.insertNodeAsync(
+    {
+        path:'/workspaces/acme/docs/new-doc',
+        type:'doc',
+        data:{
+            title:'New Doc',
+        },
+    },
+    {
+        permissionFrom:'/users/alex',
+    },
+);
+```
+
+---
+
+## Permission boundaries
+
+`ConvoDbPermissionBoundary` wraps an existing `ConvoDb` and forces all public calls to use a fixed identity path.
+
+Create one through `db.auth.createBoundary(identityPath)`:
+
+```ts
+const aliceDb=db.auth.createBoundary('/users/alice');
+```
+
+The returned object implements `ConvoDb`, but all calls are scoped to `/users/alice`.
+
+For example, this caller-supplied `permissionFrom` is ignored and replaced by `/users/alice`:
+
+```ts
+const docs=await aliceDb.queryNodesAsync({
+    permissionFrom:'/users/bob',
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+});
+```
+
+### What boundaries protect
+
+A permission boundary:
+
+- overwrites `permissionFrom` on reads and writes
+- applies read permission to query steps
+- applies execute permission when query steps call functions
+- applies write checks for node, edge, and embedding mutations
+- prevents external callers from crossing identity boundaries in permission helpers
+- rejects raw `driverCmd` commands
+
+This is especially useful for:
+
+- HTTP APIs
+- browser clients
+- multi-user apps
+- agent sandboxes
+- tenant-scoped tools
+
+### Bypassing a boundary
+
+`createBoundary` accepts a second argument, `byPass`.
+
+```ts
+const scopedDb=db.auth.createBoundary('/users/alice');
+const rawDb=db.auth.createBoundary('/users/alice',true);
+```
+
+When `byPass` is true, the original database is returned. This should only be used in trusted internal code.
+
+---
+
+## Authentication
+
+ConvoDb auth is based on stored database functions and JWT permission boundaries.
+
+### Auth manager
+
+Every `ConvoDb` exposes:
+
+```ts
+db.auth
+```
+
+The auth manager stores the current JWT in memory and, when available, local storage.
+
+```ts
+const jwt=db.auth.jwt;
+
+db.auth.jwtSubject.subscribe(jwt=>{
+    console.log('JWT changed',jwt);
+});
+```
+
+### Email/password sign-in
+
+If the auth functions from `@convo-lang/db-functions` have been loaded under `/bin`, sign in with:
+
+```ts
+const signIn=await db.auth.signInEmailPasswordAsync({
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(signIn.success){
+    console.log(signIn.result.jwt);
+}
+```
+
+The returned JWT contains:
+
+```ts
+{
+    id:string;
+    dbName:string;
+    identityPaths:string[];
+    claims:Record<string,any>;
+    jwt:string;
+}
+```
+
+### HTTP auth
+
+`HttpConvoCompletionService` implements `ConvoDb` and uses `db.auth.jwt` automatically.
+
+When a JWT is set, HTTP DB requests include:
+
+```txt
+Authorization: Bearer <jwt>
+```
+
+On the server, Hono routes verify the JWT, check that the token belongs to the requested database name, pick the first `identityPaths` entry, and wrap the target database in a permission boundary.
+
+### Guest access
+
+If a remote DB request has no valid JWT, the Hono DB routes use a guest token identity:
+
+```txt
+/usr/guest
+```
+
+Grant permissions to `/usr/guest` if you want unauthenticated callers to access public data.
+
+### Disabling API DB auth
+
+The CLI API server and Hono route setup can disable database auth for trusted environments.
+
+CLI:
+
+```sh
+convo \
+    --api \
+    --db-map 'default:sqlite:./data/example.db' \
+    --disable-api-db-auth
+```
+
+Programmatic Hono route setup:
+
+```ts
+getConvoHonoRoutes({
+    dbMap,
+    disableDbAuth:true,
+});
+```
+
+Only disable DB auth for trusted internal servers.
+
+---
+
+## Reusable database functions
+
+The `@convo-lang/db-functions` package contains reusable function nodes for ConvoDb applications.
+
+It currently includes auth-related functions:
+
+| Function | Default path | Effects | Description |
+|---|---|---|---|
+| `init-auth` | `/bin/init-auth` | `readWrite` | Initializes JWT and password hashing secrets. |
+| `create-user` | `/bin/create-user` | `readWrite` | Creates a user sign-in node under `/usr/{id}` using an email claim and password. |
+| `sign-in-email-password` | `/bin/sign-in-email-password` | `readOnly` | Signs in a user by email and password and returns a JWT result node. |
+
+### Loading db functions with the CLI
+
+Functions are usually loaded into a database with the Convo CLI.
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function "default:/bin:node_modules/@convo-lang/db-functions/src/functions/bin/*" \
+    --load-db-function-drop-export
+```
+
+This loads the package functions into the default database under `/bin`.
+
+The load tuple format is:
+
+```txt
+dbName:path:source
+```
+
+Examples:
+
+```sh
+# Load a single function
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin/my-tool:./functions/my-tool.ts'
+
+# Load all .ts and .js files from a directory, non-recursively
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin:./functions/*'
+```
+
+By default, functions are bundled with:
+
+```sh
+bun build "$dbFunctionSrcFilePath"
+```
+
+You can customize the bundle command:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin/my-tool:./functions/my-tool.ts' \
+    --db-function-bundle-command 'bun build "$dbFunctionSrcFilePath" --minify'
+```
+
+Use `--load-db-function-drop-export` when the generated bundled output ends with exports that should not be included in the stored JavaScript body.
+
+### Initializing auth
+
+Before creating users or signing in, initialize auth secrets:
+
+```ts
+const result=await db.callFunctionAsync('/bin/init-auth',{
+    override:false,
+});
+
+if(result.success){
+    console.log(result.result);
+}
+```
+
+The function creates or updates:
+
+```txt
+/secrets/auth-secrets
+```
+
+with:
+
+- `data.jwt`
+- `data.passwordSalt`
+
+If `override` is true, existing secrets are replaced.
+
+### Creating a user
+
+Create a new email/password sign-in record:
+
+```ts
+const result=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/bin/create-user',
+            call:{
+                args:{
+                    password:'correct horse battery staple',
+                    claims:{
+                        email:'alex@example.com',
+                        name:'Alex',
+                    },
+                },
+            },
+        },
+    ],
+});
+
+if(result.success){
+    console.log(result.result.nodes[0]);
+}
+```
+
+The function:
+
+- requires `claims.email`
+- rejects duplicate email addresses
+- hashes the supplied password
+- creates a user node under `/usr/{id}`
+- stores sign-in data on the created node
+- adds `/usr/{id}` to `identityPaths`
+
+### Signing in
+
+```ts
+const result=await db.callFunctionAsync('/bin/sign-in-email-password',{
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(result.success){
+    console.log(result.result);
+}
+```
+
+A successful sign-in returns JWT data. Invalid credentials return a 401 result.
+
 ---
 
 ## Installation and imports
@@ -421,7 +843,20 @@ And combinations like:
 ```ts
 import {
     ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
     ConvoNodePermissionType,
+} from '@convo-lang/convo-lang';
+```
+
+### Auth schemas and types
+
+```ts
+import {
+    ConvoEmailPasswordSignRequestSchema,
+    ConvoSignInJwtSchema,
+    ConvoSignInJwt,
 } from '@convo-lang/convo-lang';
 ```
 
@@ -452,7 +887,9 @@ import {
 ```ts
 import { InMemoryConvoDb } from '@convo-lang/db';
 
-const db=new InMemoryConvoDb();
+const db=new InMemoryConvoDb({
+    name:'default',
+});
 ```
 
 ### Insert some nodes
@@ -612,6 +1049,25 @@ Useful for:
 
 ---
 
+### 7. Auth-backed applications
+
+```txt
+/usr/{id}
+/secrets/auth-secrets
+/bin/init-auth
+/bin/create-user
+/bin/sign-in-email-password
+```
+
+Useful for:
+
+- browser clients
+- authenticated HTTP APIs
+- multi-user dashboards
+- tenant-aware agent systems
+
+---
+
 ## Working with nodes
 
 ### Insert a node
@@ -645,7 +1101,21 @@ await db.updateNodeAsync({
 });
 ```
 
-You can also request shallow merge behavior through update options when supported by the base implementation.
+You can request shallow merge behavior through update options:
+
+```ts
+await db.updateNodeAsync(
+    {
+        path:'/agents/researcher',
+        data:{
+            status:'active',
+        },
+    },
+    {
+        mergeData:true,
+    },
+);
+```
 
 ### Delete a node
 
@@ -1123,6 +1593,7 @@ Useful for:
 - agent maintenance jobs
 - offline indexing
 - migration tasks
+- live UI updates
 
 ---
 
@@ -1188,7 +1659,7 @@ The second argument is an optional options object with the following properties:
     - If omitted, the configured instance from `convoDbService` is used
 - `stream?:boolean`
     - If `true`, results are returned incrementally as chunks are received
-    - Automatically enabled when `watch` is `true`
+    - Automatically enabled when `watch` is true
 - `watch?:boolean`
     - Provides a default `watch` value for the query paired with the hook
     - If enabled, the hook can continue receiving live updates
@@ -1445,6 +1916,8 @@ ConvoDb also supports command objects, which can be useful when:
 
 Commands target the `ConvoDb` interface, and supported low-level driver calls can also be proxied when needed by adapters such as HTTP-backed implementations.
 
+When commands pass through a permission boundary, the boundary applies the caller identity and rejects `driverCmd`.
+
 ### Execute one command
 
 ```ts
@@ -1492,6 +1965,76 @@ This pattern is especially useful for remote and tool-driven agent architectures
 
 ---
 
+## CLI database operations
+
+The Convo CLI can work directly with ConvoDb instances defined by `--db-map`.
+
+*note - query objects passed to the CLI are parsed using the JSON5 syntax which is a relaxed version of JSON*
+
+### Define databases
+
+```sh
+convo --db-map 'default:sqlite:./data/example.db'
+```
+
+Multiple mappings can be passed:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/default.db' \
+    --db-map 'cache:mem'
+```
+
+### Query a database
+
+Short path form:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db 'default:/docs/*'
+```
+
+JSON query form:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db '{dbName:"default",steps:[{path:"/docs/*"}]}'
+```
+
+The CLI follows `nextToken` and prints all returned nodes.
+
+### Call a database function
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --call-db-function 'default:/bin/sign-in-email-password' \
+    --call-db-function-args '{email:"alex@example.com",password:"correct horse battery staple"}'
+```
+
+### Execute database commands
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --execute-db-commands '{dbName:"default",commands:[{queryNodes:{query:{steps:[{path:"/docs/*"}]}}}]}'
+```
+
+### Output formatting
+
+Use `--json-format` to control `JSON.stringify` indentation:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db 'default:/docs/*' \
+    --json-format 2
+```
+
+---
+
 ## Adapters
 
 A major benefit of ConvoDb is that your application can target the `ConvoDb` interface while storage is handled by interchangeable adapters.
@@ -1532,7 +2075,7 @@ Because adapters build on a dedicated `ConvoDbDriver`, high-level behavior can s
 
 A base adapter that simplifies building new adapters.
 
-Use this when you want to implement a custom backend while reusing the shared traversal, permissions, validation, command execution, streaming, and embedding behavior.
+Use this when you want to implement a custom backend while reusing the shared traversal, permissions, validation, command execution, streaming, auth manager, and embedding behavior.
 
 Best for:
 
@@ -1607,11 +2150,9 @@ Best for:
 
 ---
 
-### `HttpConvoDb`
+### `HttpConvoCompletionService` (An HTTP database proxy)
 
-A proxy adapter for remote ConvoDb instances over HTTP.
-
-It can expose normal ConvoDb methods and proxy supported internal driver operations through command execution when needed.
+HTTP-backed database access can proxy normal ConvoDb calls to a remote server.
 
 Best for:
 
@@ -1691,7 +2232,9 @@ Best for:
 ```ts
 import { InMemoryConvoDb } from '@convo-lang/db';
 
-const db=new InMemoryConvoDb();
+const db=new InMemoryConvoDb({
+    name:'default',
+});
 ```
 
 ### Browser app
@@ -1699,16 +2242,19 @@ const db=new InMemoryConvoDb();
 ```ts
 import { IndexDbConvoDb } from '@convo-lang/db';
 
-const db=new IndexDbConvoDb();
+const db=new IndexDbConvoDb({
+    name:'browser',
+});
 ```
 
 ### Remote API client
 
 ```ts
-import { HttpConvoDb } from '@convo-lang/db';
+import { HttpConvoCompletionService } from '@convo-lang/convo-lang';
 
-const db=new HttpConvoDb({
-    baseUrl:'https://api.example.com/convo-db',
+const db=new HttpConvoCompletionService({
+    endpoint:'https://api.example.com/convo-lang',
+    dbName:'default',
 });
 ```
 
@@ -1723,12 +2269,17 @@ import {
     LayeredConvoDb,
 } from '@convo-lang/db';
 
-const cacheDb=new InMemoryConvoDb();
+const cacheDb=new InMemoryConvoDb({
+    name:'cache',
+});
+
 const remoteDb=new HttpConvoDb({
+    name:'remote',
     baseUrl:'https://api.example.com/convo-db',
 });
 
 const db=new LayeredConvoDb({
+    name:'default',
     layers:[
         {
             path:'/agents/*',
@@ -1867,62 +2418,6 @@ Example:
 - path says a task lives under a workflow
 - edge says it depends on another task
 
----
-
-## Minimal end-to-end example
-
-```ts
-import { InMemoryConvoDb } from '@convo-lang/db';
-import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
-
-const db=new InMemoryConvoDb();
-
-await db.insertNodeAsync({
-    path:'/users/alex',
-    type:'user',
-    data:{
-        role:'admin',
-    },
-});
-
-await db.insertNodeAsync({
-    path:'/workspaces/acme',
-    type:'workspace',
-    data:{
-        name:'Acme Workspace',
-    },
-});
-
-await db.insertNodeAsync({
-    path:'/workspaces/acme/docs/spec',
-    type:'doc',
-    data:{
-        title:'System Spec',
-        body:'This workspace contains product requirements and architecture notes.',
-    },
-});
-
-await db.insertEdgeAsync({
-    type:'grant',
-    from:'/users/alex',
-    to:'/workspaces/acme',
-    grant:ConvoNodePermissionType.readWrite,
-});
-
-const docs=await db.queryNodesAsync({
-    steps:[
-        {
-            path:'/workspaces/acme/docs/*',
-        },
-    ],
-    permissionFrom:'/users/alex',
-    permissionRequired:ConvoNodePermissionType.read,
-});
-
-if(docs.success){
-    console.log(docs.result.nodes);
-}
-```
 
 ---
 
@@ -1945,6 +2440,7 @@ This is especially useful for:
 - workflow actions stored in the graph
 - dynamic result generation during traversal
 - mixing static graph structure with executable behavior
+- reusable auth and utility functions
 
 ### How function calling fits into queries
 
@@ -1978,6 +2474,50 @@ const result=await db.queryNodesAsync({
         },
     ],
 });
+```
+
+### Function call convenience APIs
+
+`ConvoDb` includes helper methods for common function call patterns.
+
+```ts
+const value=await db.callFunctionAsync('/tools/echo',{
+    message:'hello',
+});
+```
+
+Available helpers:
+
+```ts
+db.callFunctionAsync(path,args,permissionFrom?)
+db.callFunctionReturnValueAsync(path,args,permissionFrom?)
+db.callFunctionReturnNodeAsync(path,args,permissionFrom?)
+db.callFunctionWithSchemaAsync(inputSchema,outputSchema,path,args,permissionFrom?)
+```
+
+Use `queryNodesAsync` directly when a function can return multiple nodes or stream results.
+
+### Schema-validated function calls
+
+`callFunctionWithSchemaAsync` validates input and output with Zod schemas.
+
+```ts
+import { z } from 'zod';
+
+const result=await db.callFunctionWithSchemaAsync(
+    z.object({
+        a:z.number(),
+        b:z.number(),
+    }),
+    z.object({
+        value:z.number(),
+    }),
+    '/tools/add',
+    {
+        a:2,
+        b:3,
+    },
+);
 ```
 
 ### Defining a function node
@@ -2020,7 +2560,7 @@ ConvoDb supports several function formats:
 
 - `convo`
     - function logic written in Convo-Lang
-- `javascript`
+- `javascript` or `js`
     - function logic written as JavaScript source
 - `uri`
     - a referenced function resolved by the runtime
@@ -2139,6 +2679,8 @@ Function nodes still participate in ConvoDb permission checks.
 
 In practice, execution is typically controlled using execute permissions, allowing you to model which users, agents, or other nodes are allowed to run which stored tools.
 
+When using permission boundaries, query steps with `call` require execute permission for the boundary identity.
+
 This makes it possible to build:
 
 - per-agent tool access
@@ -2201,7 +2743,137 @@ For example, you could:
 - execute a selected tool
 - continue traversal through related result or workflow nodes
 
-This is one of the features that makes ConvoDb useful for agentic systems where data, permissions, and behavior all live in the same graph-oriented model.
+This is one of the features that makes ConvoDb useful for agentic systems where data, permissions, auth, and behavior all live in the same graph-oriented model.
+
+---
+
+## Minimal end-to-end example
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    data:{
+        role:'admin',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme',
+    type:'workspace',
+    data:{
+        name:'Acme Workspace',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme/docs/spec',
+    type:'doc',
+    data:{
+        title:'System Spec',
+        body:'This workspace contains product requirements and architecture notes.',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
+
+---
+
+## Minimal auth setup example
+
+This example assumes `@convo-lang/db-functions` has been loaded under `/bin`.
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+
+await db.callFunctionAsync('/bin/init-auth',{
+    override:false,
+});
+
+const created=await db.callFunctionReturnNodeAsync('/bin/create-user',{
+    password:'correct horse battery staple',
+    claims:{
+        email:'alex@example.com',
+        name:'Alex',
+    },
+});
+
+if(!created.success){
+    throw new Error(created.error);
+}
+
+const signIn=await db.auth.signInEmailPasswordAsync({
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(!signIn.success){
+    throw new Error(signIn.error);
+}
+
+const userPath=signIn.result.identityPaths[0];
+
+await db.insertNodeAsync({
+    path:'/docs/public',
+    type:'doc',
+    data:{
+        title:'Public doc',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:userPath,
+    to:'/docs/public',
+    grant:ConvoNodePermissionType.read,
+});
+
+const userDb=db.auth.createBoundary(userPath);
+
+const docs=await userDb.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
 
 ---
 
@@ -2217,27 +2889,47 @@ ConvoDb is a strong fit for developers building:
 - browser-based copilots
 - local-first AI tools
 - graph-shaped knowledge systems
+- authenticated agent tools and remote database APIs
 
 Its biggest strengths are:
 
 - **path-based organization**
 - **filesystem-style permission modeling**
+- **permission boundaries for identity-scoped access**
+- **JWT auth helper integration**
 - **graph traversal with edges**
 - **semantic retrieval through embeddings**
 - **stored function execution**
+- **reusable database functions**
 - **portable storage through adapters**
 - **shared high-level behavior with backend-specific drivers**
 - **React integration through query hooks**
+- **CLI support for loading functions, querying DBs, calling functions, and executing commands**
 
-If you build agentic systems that need structure, memory, retrieval, access control, and callable behavior, ConvoDb gives you one model that can span local, browser, server, and remote environments.
+If you build agentic systems that need structure, memory, retrieval, access control, authentication, and callable behavior, ConvoDb gives you one model that can span local, browser, server, and remote environments.
 
 ---
 
 ## Imports recap
 
 ```ts
-import { ConvoDb, ConvoNodePermissionType } from '@convo-lang/convo-lang';
-import { useConvoDbQuery, useConvoNodeAtPath, useConvoNodesAtPath } from '@convo-lang/convo-lang-react';
+import {
+    ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
+    ConvoEmailPasswordSignRequestSchema,
+    ConvoNodePermissionType,
+    ConvoSignInJwt,
+    ConvoSignInJwtSchema,
+} from '@convo-lang/convo-lang';
+
+import {
+    useConvoDbQuery,
+    useConvoNodeAtPath,
+    useConvoNodesAtPath,
+} from '@convo-lang/convo-lang-react';
+
 import {
     BaseConvoDb,
     InMemoryConvoDb,

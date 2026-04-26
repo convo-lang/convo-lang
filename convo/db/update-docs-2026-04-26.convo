@@ -1,0 +1,5766 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+@import ../../packages/db-functions/README.md !file
+
+> user
+Update the `convo-db.md` document based on the following diff and commit message and the `db-functions/README.md`:
+
+
+<DIFF script-name="show-staged-diff">
+``` output
+ packages/convo-lang-cli/src/bin/convo.ts           |  71 +++++-
+ .../convo-lang-cli/src/lib/convo-cli-api-server.ts |   8 +-
+ .../src/lib/convo-cli-db-function-loader.ts        | 103 ++++++++
+ .../convo-lang-cli/src/lib/convo-cli-db-util.ts    | 111 +++++++++
+ packages/convo-lang-cli/src/lib/convo-cli-types.ts |  54 +++++
+ packages/convo-lang/src/index.ts                   |   6 +
+ .../src/lib/HttpConvoCompletionService.ts          | 108 ++++++++-
+ .../convo-lang/src/lib/db/ConvoDbAuthManager.ts    | 133 +++++++++++
+ .../convo-lang/src/lib/db/ConvoDbInstanceMap.ts    |  30 +++
+ .../src/lib/db/ConvoDbPermissionBoundary.ts        | 157 +++++++++++++
+ .../convo-lang/src/lib/db/convo-db-auth-schemas.ts |  40 ++++
+ .../convo-lang/src/lib/db/convo-db-auth-types.ts   |  10 +
+ packages/convo-lang/src/lib/db/convo-db-lib.ts     | 189 ++++++++++++++-
+ packages/convo-lang/src/lib/db/convo-db-types.ts   |  51 +++-
+ packages/db-functions/README.md                    | 247 ++++++++++++++++++++
+ packages/db-functions/package.json                 |   6 +
+ packages/db-functions/pkij.json                    |   4 +
+ .../db-functions/src/functions/bin/create-user.ts  | 103 ++++++++
+ .../db-functions/src/functions/bin/init-auth.ts    |  59 +++++
+ .../src/functions/bin/sign-in-email-password.ts    | 118 ++++++++++
+ packages/db-functions/src/lib/auth-lib.ts          |  58 +++++
+ packages/db-functions/src/lib/auth-types.ts        |  14 ++
+ packages/db-functions/tsconfig.json                |  22 ++
+ packages/db/src/BaseConvoDb.ts                     | 137 +++++++++--
+ packages/db/src/BunSqliteConvoDb.ts                |   5 +-
+ packages/db/src/InMemoryConvoDb.ts                 |   2 +
+ packages/db/src/LayeredConvoDb.ts                  |   1 +
+ packages/db/src/NodeSQLiteConvoDb.ts               |   4 +-
+ packages/db/src/db-map.ts                          |   6 +-
+ packages/db/src/db-module.ts                       |   2 +-
+ packages/hono/src/JwtVerifiery.ts                  |  87 +++++++
+ packages/hono/src/convo-lang-hono.ts               |  96 +++-----
+ .../tests/src/convo-db-permission-boundary.test.ts | 260 +++++++++++++++++++++
+ packages/tests/src/convo-db.test.ts                |   1 -
+ packages/tests/src/createTestDb.ts                 |   6 +-
+ 35 files changed, 2197 insertions(+), 112 deletions(-)
+
+diff --git a/packages/convo-lang-cli/src/bin/convo.ts b/packages/convo-lang-cli/src/bin/convo.ts
+index 6530ddd..e533e96 100644
+--- a/packages/convo-lang-cli/src/bin/convo.ts
++++ b/packages/convo-lang-cli/src/bin/convo.ts
+@@ -1,9 +1,13 @@
++import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
+ import { getConvoDbMapFromStrings } from "@convo-lang/db/db-map.js";
+ import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumber, safeParseNumberOrUndefined } from "@iyio/common";
++import { parseJson5 } from "@iyio/json5";
+ import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
+ import { realpath } from "node:fs/promises";
+ import { createConvoCliAsync, initConvoCliAsync } from "../lib/ConvoCli.js";
+ import { runConvoCliApiAsync } from "../lib/convo-cli-api-server.js";
++import { loadCliDbFunctionsAsync } from "../lib/convo-cli-db-function-loader.js";
++import { executeCliCallConvoDbFunction, executeCliConvoDbCommands, executeCliConvoDbQuery, parseQuery } from "../lib/convo-cli-db-util.js";
+ import { generateEmbeddingAsync } from "../lib/convo-cli-embeddings.js";
+ import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
+ import { ConvoCliOptions } from "../lib/convo-cli-types.js";
+@@ -90,6 +94,15 @@ const args=parseCliArgsT<Args>({
+         embeddingProvider:args=>args[0],
+         embeddingDimensions:args=>safeParseNumberOrUndefined(args[0]),
+         dbMap:args=>args,
++        loadDbFunction:args=>args,
++        loadDbFunctionDropExport:args=>args.length?true:false,
++        dbFunctionBundleCommand:args=>args[0],
++        callDbFunction:args=>args[0],
++        callDbFunctionArgs:args=>parseJson5(args[0]??'{}'),
++        queryDb:args=>parseQuery(args[0]??'{}'),
++        jsonFormat:args=>safeParseNumberOrUndefined(args[0]),
++        executeDbCommands:args=>parseJson5(args[0]??'{}'),
++        disableApiDbAuth:args=>args.length?true:false,
+     }
+ }).parsed as Args;
+ 
+@@ -131,6 +144,7 @@ const main=async()=>{
+     args.exeCwd=normalizePath(args.exeCwd?await realpath(args.exeCwd):globalThis.process.cwd());
+ 
+     let toolPromises:Promise<any>[]=[];
++    let disableREPL=false;
+ 
+     if(!getObjKeyCount(args)){
+         args.repl=true;
+@@ -157,25 +171,72 @@ const main=async()=>{
+         toolPromises.push(generateEmbeddingAsync(args.generateEmbedding,args));
+     }
+ 
+-    if(args.api){
++    let dbMap:ConvoDbInstanceMap|undefined;
++    if(args.dbMap){
+         await initConvoCliAsync(args);
+-        const r=args.dbMap?getConvoDbMapFromStrings(args.dbMap):undefined;
+-        if(r?.success===false){
++        const r=getConvoDbMapFromStrings(args.dbMap);
++        if(r.success===false){
+             console.error(r.error);
+             process.exit(1);
+         }
++        dbMap=new ConvoDbInstanceMap(r.result);
++    }
++
++    if(args.loadDbFunction){
++        await initConvoCliAsync(args);
++        if(!dbMap){
++            console.error('loadDbFunction requires a dbMap be defined');
++            process.exit(1);
++        }
++        await loadCliDbFunctionsAsync(dbMap,args);
++        disableREPL=true;
++    }
++
++    if(args.executeDbCommands){
++        await initConvoCliAsync(args);
++        if(!dbMap){
++            console.error('callDbFunction requires a dbMap be defined');
++            process.exit(1);
++        }
++        console.log(JSON.stringify(await executeCliConvoDbCommands(dbMap,args),null,args.jsonFormat??4))
++        disableREPL=true;
++    }
++
++    if(args.queryDb){
++        await initConvoCliAsync(args);
++        if(!dbMap){
++            console.error('callDbFunction requires a dbMap be defined');
++            process.exit(1);
++        }
++        console.log(JSON.stringify(await executeCliConvoDbQuery(dbMap,args),null,args.jsonFormat??4))
++        disableREPL=true;
++    }
++
++    if(args.callDbFunction){
++        await initConvoCliAsync(args);
++        if(!dbMap){
++            console.error('callDbFunction requires a dbMap be defined');
++            process.exit(1);
++        }
++        console.log(JSON.stringify(await executeCliCallConvoDbFunction(dbMap,args),null,args.jsonFormat??4));
++        disableREPL=true;
++    }
++
++    if(args.api){
++        await initConvoCliAsync(args);
+         toolPromises.push(runConvoCliApiAsync({
+             port:args.apiPort,
+             reusePort:args.apiReusePort,
+             cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
+             enableLogging:args.apiLogging,
+-            dbMap:r?.success?r.result:undefined,
++            dbMap,
++            disableApiDbAuth:args.disableApiDbAuth,
+         },cancel));
+     }
+ 
+     await Promise.all(toolPromises);
+ 
+-    if(!toolPromises.length){
++    if(!toolPromises.length && !disableREPL){
+         const cli=await createConvoCliAsync(args);
+         try{
+             if(args.listModels){
+diff --git a/packages/convo-lang-cli/src/lib/convo-cli-api-server.ts b/packages/convo-lang-cli/src/lib/convo-cli-api-server.ts
+index 3df2f90..bea8055 100644
+--- a/packages/convo-lang-cli/src/lib/convo-cli-api-server.ts
++++ b/packages/convo-lang-cli/src/lib/convo-cli-api-server.ts
+@@ -1,4 +1,4 @@
+-import { ConvoDbMap } from "@convo-lang/convo-lang";
++import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
+ import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
+ import { serve } from '@hono/node-server';
+ import { CancelToken, DisposeCallback } from "@iyio/common";
+@@ -13,7 +13,8 @@ export interface ConvoCliApiServerOptions
+     baseRoute?:string;
+     cors?:boolean|string[];
+     enableLogging?:boolean;
+-    dbMap?:ConvoDbMap;
++    dbMap?:ConvoDbInstanceMap;
++    disableApiDbAuth?:boolean;
+ }
+ 
+ export const runConvoCliApiAsync=async ({
+@@ -23,11 +24,12 @@ export const runConvoCliApiAsync=async ({
+     cors,
+     enableLogging,
+     dbMap,
++    disableApiDbAuth,
+ }:ConvoCliApiServerOptions,cancel?:CancelToken)=>{
+ 
+     const app=new Hono();
+ 
+-    const routes=getConvoHonoRoutes({enableLogging,dbMap});
++    const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth});
+ 
+     if(cors){
+         app.use('/*',_cors({
+diff --git a/packages/convo-lang-cli/src/lib/convo-cli-db-function-loader.ts b/packages/convo-lang-cli/src/lib/convo-cli-db-function-loader.ts
+new file mode 100644
+index 0000000..2298770
+--- /dev/null
++++ b/packages/convo-lang-cli/src/lib/convo-cli-db-function-loader.ts
+@@ -0,0 +1,103 @@
++import { ConvoDbFunction, ConvoDbInstanceMap } from "@convo-lang/convo-lang";
++import { getDirectoryName, getFileNameNoExt, joinPaths } from "@iyio/common";
++import { spawnAsync } from "@iyio/node-common";
++import { readdir } from "fs/promises";
++import { ConvoCliOptions } from "./convo-cli-types";
++
++export const loadCliDbFunctionsAsync=async (dbMap:ConvoDbInstanceMap,options:ConvoCliOptions)=>{
++    const list=options.loadDbFunction;
++    if(!list?.length){
++        return;
++    }
++
++    const loads:LoadItem[]=[];
++    await Promise.all(list.map(async line=>{
++        const item=parseLoadItem(line);
++        if(item.src.endsWith('*')){
++            const dir=getDirectoryName(item.src);
++            const items=await readdir(dir,{withFileTypes:true});
++            for(const di of items){
++                if(di.isFile() && (di.name.toLowerCase().endsWith('.ts') || di.name.toLowerCase().endsWith('.js'))){
++                    loads.push({
++                        ...item,
++                        path:joinPaths(item.path,getFileNameNoExt(di.name)),
++                        src:joinPaths(di.parentPath,di.name),
++                    });
++                }
++            }
++        }else{
++            loads.push(item);
++        }
++    }));
++
++
++    while(loads.length){
++        const batch=loads.splice(0,4);
++        await Promise.all(batch.map(async (item)=>{
++            const cmd=`dbFunctionSrcFilePath=${JSON.stringify(item.src)}; ${options.dbFunctionBundleCommand??'bun build "$dbFunctionSrcFilePath"'}`;
++            console.log(`Build db function: ${cmd}`);
++            let src=await spawnAsync({cmd,silent:true});
++            if(options.loadDbFunctionDropExport){
++                const ei=src.lastIndexOf('export');
++                if(ei!==-1){
++                    src=src.substring(0,ei);
++                }
++            }
++
++            const db=dbMap.getDb(item.dbName);
++            if(!db){
++                throw new Error(`Unable to get database by name: ${item.dbName}`);
++            }
++            const existingR=await db.getNodeByPathAsync(item.path);
++            if(!existingR.success){
++                throw new Error(existingR.error);
++            }
++
++            const existing=existingR.result;
++            const data={
++                isExecutable:true,
++                function:{
++                    format:'js',
++                    effects:'readWrite',
++                    main:src,
++                } satisfies ConvoDbFunction
++            }
++            if(existing){
++                await db.updateNodeAsync({
++                    path:item.path,
++                    data,
++                },{mergeData:false});
++            }else{
++                await db.insertNodeAsync({
++                    path:item.path,
++                    type:'function',
++                    data,
++                })
++            }
++
++            console.log(`${existing?'updated':'inserted'} function: ${item.dbName}:${item.path}:${item.src}, ${Math.ceil(src.length/1000)}kb`);
++
++        }));
++    }
++}
++
++const parseLoadItem=(line:string):LoadItem=>{
++    const [dbName,path,src]=line.split(':');
++    if(!dbName){
++        throw new Error('dbName required');
++    }
++    if(!path){
++        throw new Error('path required');
++    }
++    if(!src){
++        throw new Error('src required');
++    }
++    return {dbName,path,src};
++}
++
++interface LoadItem
++{
++    dbName:string;
++    path:string;
++    src:string;
++}
+\ No newline at end of file
+diff --git a/packages/convo-lang-cli/src/lib/convo-cli-db-util.ts b/packages/convo-lang-cli/src/lib/convo-cli-db-util.ts
+new file mode 100644
+index 0000000..451ddf7
+--- /dev/null
++++ b/packages/convo-lang-cli/src/lib/convo-cli-db-util.ts
+@@ -0,0 +1,111 @@
++import { ConvoDbInstanceMap, ConvoNode, ConvoNodeQuery, ConvoNodeQueryKeysToSelection, ConvoNodeQueryResult, PromiseResultType } from "@convo-lang/convo-lang";
++import { parseJson5 } from "@iyio/json5";
++import { ConvoCliOptions } from "./convo-cli-types";
++
++export const executeCliConvoDbCommands=async (dbMap:ConvoDbInstanceMap,options:ConvoCliOptions)=>{
++
++    const query=options.executeDbCommands;
++    if(!query){
++        return;
++    }
++
++    
++    if(!query.dbName){
++        throw new Error('query must define dbName');
++    }
++
++    const db=dbMap.getDb(query.dbName);
++    if(!db){
++        throw new Error(`Db not found by name ${query.dbName}`);
++    }
++
++    return await db.executeCommandsAsync(query.commands);
++}
++
++export const executeCliConvoDbQuery=async (dbMap:ConvoDbInstanceMap,options:ConvoCliOptions):PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<'*'>>>=>{
++
++    const query=options.queryDb;
++    if(!query){
++        return {
++            success:false,
++            error:'queryDb not defined',
++            statusCode:400
++        }
++    }
++
++    
++    if(!query.dbName){
++        throw new Error('query must define dbName');
++    }
++
++    const db=dbMap.getDb(query.dbName);
++    if(!db){
++        throw new Error(`Db not found by name ${query.dbName}`);
++    }
++
++    delete (query as any).dbName;
++
++    const nodes:Partial<ConvoNode>[]=[];
++    let nextToken=query.nextToken;
++    while(true){
++        const r=await db.queryNodesAsync({...query,nextToken});
++        if(!r.success){
++            return r;
++        }
++        nodes.push(...r.result.nodes);
++        nextToken=r.result.nextToken;
++        if(!nextToken){
++            break;
++        }
++    }
++    return {
++        success:true,
++        result:{
++            nodes:nodes as any
++        }
++    }
++}
++
++export const executeCliCallConvoDbFunction=async (dbMap:ConvoDbInstanceMap,options:ConvoCliOptions)=>{
++
++    const call=options.callDbFunction;
++    if(!call){
++        return;
++    }
++
++    const [dbName,path]=call.split(':');
++    if(!dbName){
++        throw new Error('dbName required by db function call');
++    }
++    if(!path){
++        throw new Error('path required by db function call');
++    }
++
++    const db=dbMap.getDb(dbName);
++    if(!db){
++        throw new Error(`Db not found by name ${dbName}`);
++    }
++
++    return await db.queryNodesAsync({
++        steps:[{
++            path,
++            call:{args:options.callDbFunctionArgs}
++        }]
++    });
++}
++
++export const parseQuery=(q:string)=>{
++    if(q[0]==='{'){
++        return parseJson5(q);
++    }else{
++        const [dbName,path]=q.split(':');
++        if(!dbName || !path){
++            console.error('Expected: `[dbName]:[path]`');
++            process.exit(1);
++        }
++        return {
++            steps:[{path}],
++            dbName,
++        } satisfies ConvoNodeQuery&{dbName:string};
++    }
++}
+\ No newline at end of file
+diff --git a/packages/convo-lang-cli/src/lib/convo-cli-types.ts b/packages/convo-lang-cli/src/lib/convo-cli-types.ts
+index 8b58e7d..95604c3 100644
+--- a/packages/convo-lang-cli/src/lib/convo-cli-types.ts
++++ b/packages/convo-lang-cli/src/lib/convo-cli-types.ts
+@@ -1,3 +1,4 @@
++import { ConvoDbCommand, ConvoNodeQuery } from "@convo-lang/convo-lang";
+ 
+ export type ConvoExecAllowMode='disable'|'ask'|'allow'
+ 
+@@ -331,6 +332,59 @@ export interface ConvoCliOptions
+      * @default 'default:sqlite'
+      */
+     dbMap?:string[];
++
++    /**
++     * List of function file to load into the ConvoDb. Each item in the list is a colon separated
++     * database name, node path, file path tuple. For example to load `functions/calculate.ts` in to the 
++     * prd database and store the function at `/bin/calculate` you would use `prd:/bin/calculate:functions/calculate.ts`.
++     * Wildcards can be used in the source path to load all functions in a directory: `prd:/bin:functions/*`.
++     * Wildcards are not recursive.
++     * Use `dbMap` to define databases. 
++     */
++    loadDbFunction?:string[];
++
++    /**
++     * If true bundled function will have their ending export dropped.
++     */
++    loadDbFunctionDropExport?:boolean;
++
++    /**
++     * A shell command to bundle db function. The `$dbFunctionSrcFilePath` variable will contain the 
++     * path to the function file. bun build is used by default.
++     * @default 'bun build "$dbFunctionSrcFilePath"'
++     */
++    dbFunctionBundleCommand?:string;
++
++    /**
++     * Path to a db function to call
++     */
++    callDbFunction?:string;
++
++    /**
++     * Args to pass to called db function
++     */
++    callDbFunctionArgs?:Record<string,any>;
++
++    /**
++     * A convo db node query
++     */
++    queryDb?:ConvoNodeQuery&{dbName:string};
++
++    /**
++     * Executes db commands
++     */
++    executeDbCommands?:{dbName:string,commands:ConvoDbCommand<any>[]};
++
++    /**
++     * If true authentication for api calls to the db will be disabled.
++     */
++    disableApiDbAuth?:boolean;
++
++    /**
++     * Indentation value passed to JSON.stringify when outputting JSON.
++     * @default 4
++     */
++    jsonFormat?:number;
+ }
+ 
+ export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;
+diff --git a/packages/convo-lang/src/index.ts b/packages/convo-lang/src/index.ts
+index 6c345eb..f0205f5 100644
+--- a/packages/convo-lang/src/index.ts
++++ b/packages/convo-lang/src/index.ts
+@@ -34,6 +34,7 @@ export * from './lib/convo-project-config-lib.js';
+ export * from './lib/convo-rag-lib.js';
+ export * from './lib/convo-rag-types.js';
+ export * from './lib/convo-scene-lib.js';
++export * from './lib/convo-std-imports.js';
+ export * from './lib/convo-template-types.js';
+ export * from './lib/convo-template.js';
+ export * from './lib/convo-transcription-lib.js';
+@@ -57,10 +58,15 @@ export * from './lib/ConvoRoom.js';
+ export * from './lib/ConvoUserVfsCache.js';
+ export * from './lib/ConvoVfsCache.js';
+ export * from './lib/ConvoVfsImportService.js';
++export * from './lib/db/convo-db-auth-schemas.js';
++export * from './lib/db/convo-db-auth-types.js';
+ export * from './lib/db/convo-db-const.js';
+ export * from './lib/db/convo-db-function-executor.js';
+ export * from './lib/db/convo-db-lib.js';
+ export * from './lib/db/convo-db-types.js';
++export * from './lib/db/ConvoDbAuthManager.js';
++export * from './lib/db/ConvoDbInstanceMap.js';
++export * from './lib/db/ConvoDbPermissionBoundary.js';
+ export * from './lib/git/convo-git-types.js';
+ export * from './lib/HttpConvoCompletionService.js';
+ export * from './lib/LocalStorageConvoDataStore.js';
+diff --git a/packages/convo-lang/src/lib/HttpConvoCompletionService.ts b/packages/convo-lang/src/lib/HttpConvoCompletionService.ts
+index 2a58ca9..50e3308 100644
+--- a/packages/convo-lang/src/lib/HttpConvoCompletionService.ts
++++ b/packages/convo-lang/src/lib/HttpConvoCompletionService.ts
+@@ -1,10 +1,12 @@
+ import { CancelToken, HttpClientRequestOptions, HttpMethod, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, deleteUndefined, getErrorMessage, getObjKeyCount, getSortedObjectHash, httpClient, joinPaths, objectToQueryParams } from "@iyio/common";
++import type { ZodType } from "zod";
+ import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
+ import { convoRagService } from "./convo-rag-lib.js";
+ import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
+ import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
+ import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
+ import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriverFunction, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
++import { ConvoDbAuthManager } from "./db/ConvoDbAuthManager.js";
+ import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
+ 
+ export const defaultConvoHttpEndpointPrefix='/convo-lang';
+@@ -69,6 +71,8 @@ export class HttpConvoCompletionService implements
+ 
+     public readonly serviceId='http';
+ 
++    public readonly auth:ConvoDbAuthManager;
++
+     public static fromScope(scope:Scope,endpoint?:string|string[],getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>){
+         if(!endpoint){
+             const ep=httpConvoCompletionEndpointParam().split(',').map(e=>e.trim()).filter(e=>e);
+@@ -89,7 +93,7 @@ export class HttpConvoCompletionService implements
+ 
+     private readonly endpoint:string|string[];
+ 
+-    private readonly dbName:string;
++    public readonly dbName:string;
+ 
+     private readonly getRequestOptions?:()=>HttpClientRequestOptions|Promise<HttpClientRequestOptions>;
+ 
+@@ -103,8 +107,29 @@ export class HttpConvoCompletionService implements
+             aryRandomize(endpoint);
+         }
+         this.endpoint=endpoint;
+-        this.getRequestOptions=getRequestOptions;
+         this.dbName=dbName;
++
++        this.getRequestOptions=async ()=>{
++            let options:HttpClientRequestOptions={};
++            if(!getRequestOptions && !this.auth.jwt){
++                return options;
++            }
++
++            if(this.auth.jwt){
++                options.headers={
++                    Authorization:`Bearer ${this.auth.jwt.jwt}`,
++                }
++            }
++            
++            if(getRequestOptions){
++                const o=await getRequestOptions();
++                options={...options,...o,headers:{...options.headers,...o.headers}};
++                
++            }
++
++            return options;
++        }
++        this.auth=new ConvoDbAuthManager(this);
+     }
+ 
+     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
+@@ -727,4 +752,83 @@ export class HttpConvoCompletionService implements
+         const r=await this.executeCommandAsync({deleteEmbedding:{id,options}});
+         return r.success?{success:true}:r;
+     }
++
++    public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
++    {
++        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
++        if(!r.success){
++            return r;
++        }
++        return {
++            success:true,
++            result:r.result?.data as T|undefined,
++        }
++    }
++
++    public async callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>
++    {
++        const inputParsed=inputSchema.safeParse(args);
++        if(inputParsed.error){
++            return {
++                success:false,
++                error:inputParsed.error.message,
++                statusCode:400
++            }
++        }
++
++        const r=await this.callFunctionReturnValueAsync(path,inputParsed.data as any);
++        if(!r.success){
++            return r;
++        }
++
++        const outputParsed=outputSchema.safeParse(r.result);
++        if(outputParsed.error){
++            return {
++                success:false,
++                error:outputParsed.error.message,
++                statusCode:500,
++            }
++        }
++
++        return {
++            success:true,
++            result:outputParsed.data,
++        }
++    }
++
++
++    public async callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>
++    {
++        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
++        if(!r.success){
++            return r;
++        }
++        const data=r.result?.data;
++        if(!data){
++            return {
++                success:false,
++                error:'Called function did not return a value',
++                statusCode:500,
++            }
++        }
++
++        return {
++            success:true,
++            result:data as T,
++        }
++    }
++
++    
++    public async callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
++    {
++        const r=await this.queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom});
++        if(!r.success){
++            return r;
++        }
++        const node=r.result.nodes[0];
++        return {
++            success:true,
++            result:node,
++        }
++    }
+ }
+diff --git a/packages/convo-lang/src/lib/db/ConvoDbAuthManager.ts b/packages/convo-lang/src/lib/db/ConvoDbAuthManager.ts
+new file mode 100644
+index 0000000..4c00949
+--- /dev/null
++++ b/packages/convo-lang/src/lib/db/ConvoDbAuthManager.ts
+@@ -0,0 +1,133 @@
++import { ReadonlySubject } from "@iyio/common";
++import { BehaviorSubject } from "rxjs";
++import { PromiseResultType } from "../result-type.js";
++import { ConvoEmailPasswordSignRequestSchema, ConvoSignInJwtSchema } from "./convo-db-auth-schemas.js";
++import { ConvoEmailPasswordSignRequest, ConvoSignInJwt } from "./convo-db-auth-types.js";
++import { ConvoDb } from "./convo-db-types.js";
++import { ConvoDbPermissionBoundary } from "./ConvoDbPermissionBoundary.js";
++
++const localStorageKey='ConvoDbAuthJwt::';
++
++/**
++ * An auth helper class. Auth is not directly handled by ConvoDbAuth, it relies on stored database
++ * function for auth operations.
++ */
++export class ConvoDbAuthManager
++{
++
++    private readonly _jwt:BehaviorSubject<ConvoSignInJwt|null>=new BehaviorSubject<ConvoSignInJwt|null>(null);
++    public get jwtSubject():ReadonlySubject<ConvoSignInJwt|null>{return this._jwt}
++    public get jwt(){return this._jwt.value}
++
++    private readonly db:ConvoDb;
++
++    public constructor(db:ConvoDb)
++    {
++        this.db=db;
++
++        try{
++            if(globalThis.localStorage){
++                const key=localStorageKey+this.db.dbName;
++                const json=globalThis.localStorage.getItem(key);
++                if(json){
++                    const v=JSON.parse(json);
++                    if(v){
++                        this._jwt.next(v);
++                    }
++                }
++            }
++        }catch(ex){
++            console.error('Failed to load JWT from local storage')
++        }
++    }
++
++    public async signInEmailPasswordAsync(request:ConvoEmailPasswordSignRequest):PromiseResultType<ConvoSignInJwt>
++    {
++        const r=await this.db.callFunctionWithSchemaAsync(
++            ConvoEmailPasswordSignRequestSchema,
++            ConvoSignInJwtSchema,
++            '/bin/sign-in-email-password',
++            request
++        );
++
++        if(!r.success){
++            return r;
++        }
++
++        this.setJwt(r.result);
++
++        return {
++            success:true,
++            result:r.result,
++        }
++    }
++
++    public setJwt(jwt:ConvoSignInJwt|null){
++
++        this._jwt.next(jwt);
++        try{
++            if(globalThis.localStorage){
++                const key=localStorageKey+this.db.dbName;
++                globalThis.localStorage.setItem(key,JSON.stringify(jwt));
++            }
++        }catch(ex){
++            console.error('Failed to store JWT in local storage')
++        }
++    }
++
++    private maxCachedBoundaries=200;
++    private boundaryCacheDropRatio=0.3;
++    private boundaryCacheCount=0;
++    private readonly boundaryCache:Record<string,ConvoDbPermissionBoundary>={}
++
++    /**
++     * Create a proxy db with all public methods permissions scoped to the given `permissionFrom`
++     * argument.
++     * @param permissionFrom The node path where to scope permissions from
++     * @param byPass If true no proxy will be created and the db of the auth manager will be returned.
++     */
++    public createBoundary(permissionFrom:string,byPass=false):ConvoDb
++    {
++        if(byPass){
++            return this.db;
++        }
++
++        const cached=this.boundaryCache[permissionFrom];
++        if(cached){
++            return cached;
++        }
++
++        return this._createBoundary(permissionFrom);
++
++    }
++
++    private _createBoundary(permissionFrom:string):ConvoDbPermissionBoundary
++    {
++        const boundary=new ConvoDbPermissionBoundary({
++            proxiedDb:this.db,
++            auth:this,
++            identityPath: permissionFrom,
++        });
++
++        this.boundaryCache[permissionFrom]=boundary;
++        this.boundaryCacheCount++;
++        if(this.boundaryCacheCount>this.maxCachedBoundaries){
++            const all=Object.values(this.boundaryCache);
++            all.sort((a,b)=>a.lastUsed-b.lastUsed);
++            const end=Math.floor(this.maxCachedBoundaries*this.boundaryCacheDropRatio);
++            for(let i=0;i<end;i++){
++                const b=all[i];
++                if(!b || b===boundary){
++                    continue;
++                }
++                if(this.boundaryCache[b.identityPath]){
++                    delete this.boundaryCache[b.identityPath];
++                    this.boundaryCacheCount--;
++                }
++            }
++        }
++
++        return boundary;
++
++    }
++}
+diff --git a/packages/convo-lang/src/lib/db/ConvoDbInstanceMap.ts b/packages/convo-lang/src/lib/db/ConvoDbInstanceMap.ts
+new file mode 100644
+index 0000000..4c4fbf5
+--- /dev/null
++++ b/packages/convo-lang/src/lib/db/ConvoDbInstanceMap.ts
+@@ -0,0 +1,30 @@
++import { convoDbService } from "../convo.deps.js";
++import { ConvoDb, ConvoDbMap } from "./convo-db-types.js";
++
++export class ConvoDbInstanceMap
++{
++
++    public readonly dbMap?:ConvoDbMap;
++
++    public constructor(dbMap?:ConvoDbMap)
++    {
++        this.dbMap=dbMap;
++    }
++
++    public getDb(name:string):ConvoDb|undefined{
++        if(!this.dbMap){
++            return name==='default'?convoDbService.get():undefined;
++        }
++        const named=this.dbMap[name];
++        if(named){
++            return named(name);
++        }
++        const fallback=this.dbMap['*'];
++        if(fallback){
++            let db=fallback(name);
++            this.dbMap[name]=()=>db;
++            return db;
++        }
++        return undefined;
++    }
++}
+\ No newline at end of file
+diff --git a/packages/convo-lang/src/lib/db/ConvoDbPermissionBoundary.ts b/packages/convo-lang/src/lib/db/ConvoDbPermissionBoundary.ts
+new file mode 100644
+index 0000000..ea763da
+--- /dev/null
++++ b/packages/convo-lang/src/lib/db/ConvoDbPermissionBoundary.ts
+@@ -0,0 +1,157 @@
++import { CancelToken } from "@iyio/common";
++import { ZodType } from "zod";
++import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
++import { applyIdentityToConvoDbCommand, applyIdentityToConvoDbCommands, applyIdentityToConvoDbQuery, applyIdentityToPermission } from "./convo-db-lib.js";
++import { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryKeysToSelection, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./convo-db-types.js";
++import { ConvoDbAuthManager } from "./ConvoDbAuthManager.js";
++
++export interface ConvoDbPermissionBoundaryOptions
++{
++    proxiedDb:ConvoDb;
++    identityPath:string;
++    auth:ConvoDbAuthManager;
++}
++
++/**
++ * The ConvoDbPermissionBoundary class wraps an existing ConvoDb and ensures all calls to the wrapped
++ * database use the provided `identityPath`. Permissions boundaries allow save access from external
++ * callers ensuring that their access to the wrapped database is restricted to their identityPath.
++ * The provided `identityPath` will be used to set the `permissionFrom` of all calls to the wrapped
++ * database. The permissionFrom value supplied by external callers will always be overwritten.
++ * External callers are not allowed to issue driver commands and will receive a 401 response
++ * if they try.
++ */
++export class ConvoDbPermissionBoundary implements ConvoDb
++{
++    public readonly dbName:string;
++    public readonly auth:ConvoDbAuthManager;
++    public readonly proxiedDb:ConvoDb;
++    public readonly identityPath:string;
++    public readonly parentAuth:ConvoDbAuthManager;
++    readonly _driver:ConvoDbDriver;
++    public lastUsed=Date.now();
++
++    public constructor({
++        proxiedDb,
++        identityPath,
++        auth,
++    }:ConvoDbPermissionBoundaryOptions){
++        this.dbName=proxiedDb.dbName;
++        this._driver=proxiedDb._driver;
++        this.auth=proxiedDb.auth;
++        this.proxiedDb=proxiedDb;
++        this.identityPath=identityPath;
++        this.parentAuth=auth;
++    }
++
++    public callFunctionAsync<T extends Record<string, any> = Record<string, any>>(path: string, args: Record<string, any>, _permissionFrom?: string): PromiseResultType<T | undefined> {
++        return this.proxiedDb.callFunctionAsync(path,args,this.identityPath);
++    }
++
++    public callFunctionWithSchemaAsync<TInput, TOutput>(inputSchema: ZodType<TInput>, outputSchema: ZodType<TOutput>, path: string, args: TInput, _permissionFrom?: string): PromiseResultType<TOutput> {
++        return this.proxiedDb.callFunctionWithSchemaAsync(inputSchema,outputSchema,path,args,this.identityPath);
++    }
++
++    public callFunctionReturnValueAsync<T extends Record<string, any> = Record<string, any>>(path: string, args: Record<string, any>, _permissionFrom?: string): PromiseResultType<T> {
++        return this.proxiedDb.callFunctionReturnValueAsync(path,args,this.identityPath);
++    }
++
++    public callFunctionReturnNodeAsync(path: string, args: Record<string, any>, _permissionFrom?: string): PromiseResultType<ConvoNode | undefined> {
++        return this.proxiedDb.callFunctionReturnNodeAsync(path,args,this.identityPath);
++    }
++
++    public queryNodesAsync<TKeys extends ConvoNodeKeySelection = undefined>(query: ConvoNodeQuery<TKeys>): PromiseResultType<ConvoNodeQueryResult<ConvoNodeQueryKeysToSelection<TKeys>>> {
++        return this.proxiedDb.queryNodesAsync(applyIdentityToConvoDbQuery(this.identityPath,query));
++    }
++
++    public streamNodesAsync<TKeys extends ConvoNodeKeySelection = undefined>(query: ConvoNodeQuery<TKeys>, cancel?: CancelToken): AsyncIterableIterator<ConvoNodeStreamItem<ConvoNodeQueryKeysToSelection<TKeys>>> {
++        return this.proxiedDb.streamNodesAsync(applyIdentityToConvoDbQuery(this.identityPath,query),cancel);
++    }
++
++    public getNodesByPathAsync(path: string, _permissionFrom?: string): PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>> {
++        return this.proxiedDb.getNodesByPathAsync(path,this.identityPath);
++    }
++
++    public getNodeByPathAsync(path: string, _permissionFrom?: string): PromiseResultType<ConvoNode | undefined> {
++        return this.proxiedDb.getNodeByPathAsync(path,this.identityPath);
++    }
++
++    public getNodePermissionAsync(_fromPath: string, toPath: string): PromiseResultType<ConvoNodePermissionType> {
++        return this.proxiedDb.getNodePermissionAsync(this.identityPath,toPath);
++    }
++
++    public checkNodePermissionAsync(_fromPath: string, toPath: string, type: ConvoNodePermissionType, matchAny?: boolean): PromiseResultTypeVoid {
++        return this.proxiedDb.checkNodePermissionAsync(this.identityPath,toPath,type,matchAny);
++    }
++
++    public insertNodeAsync(node: ConvoNode, options?: InsertConvoNodeOptions): PromiseResultType<ConvoNode> {
++        return this.proxiedDb.insertNodeAsync(node,applyIdentityToPermission(this.identityPath,options??{}))
++    }
++
++    public updateNodeAsync(node: ConvoNodeUpdate, options?: UpdateConvoNodeOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.updateNodeAsync(node,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public deleteNodeAsync(path: string, options?: DeleteConvoNodeOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.deleteNodeAsync(path,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public queryEdgesAsync(query: ConvoNodeEdgeQuery): PromiseResultType<ConvoNodeEdgeQueryResult> {
++        return this.proxiedDb.queryEdgesAsync(applyIdentityToPermission(this.identityPath,query));
++    }
++
++    public getEdgeByIdAsync(id: string, _permissionFrom?: string): PromiseResultType<ConvoNodeEdge> {
++        return this.proxiedDb.getEdgeByIdAsync(id,this.identityPath);
++    }
++
++    public insertEdgeAsync(edge: Omit<ConvoNodeEdge, "id">, options?: InsertConvoNodeEdgeOptions): PromiseResultType<ConvoNodeEdge> {
++        return this.proxiedDb.insertEdgeAsync(edge,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public updateEdgeAsync(update: ConvoNodeEdgeUpdate, options?: UpdateConvoNodeEdgeOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.updateEdgeAsync(update,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public deleteEdgeAsync(id: string, options?: DeleteConvoNodeEdgeOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.deleteEdgeAsync(id,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public queryEmbeddingsAsync(query: ConvoNodeEmbeddingQuery): PromiseResultType<ConvoNodeEmbeddingQueryResult> {
++        return this.proxiedDb.queryEmbeddingsAsync(applyIdentityToPermission(this.identityPath,query));
++    }
++
++    public getEmbeddingByIdAsync(id: string, _permissionFrom?: string): PromiseResultType<ConvoNodeEmbedding> {
++        return this.proxiedDb.getEmbeddingByIdAsync(id,this.identityPath);
++    }
++
++    public insertEmbeddingAsync(embedding: Omit<ConvoNodeEmbedding, "id">, options?: InsertConvoNodeEmbeddingOptions): PromiseResultType<ConvoNodeEmbedding> {
++        return this.proxiedDb.insertEmbeddingAsync(embedding,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public updateEmbeddingAsync(update: ConvoNodeEmbeddingUpdate, options?: UpdateConvoNodeEmbeddingOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.updateEmbeddingAsync(update,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public deleteEmbeddingAsync(id: string, options?: DeleteConvoNodeEmbeddingOptions): PromiseResultTypeVoid {
++        return this.proxiedDb.deleteEmbeddingAsync(id,applyIdentityToPermission(this.identityPath,options??{}));
++    }
++
++    public executeCommandAsync<TKeys extends ConvoNodeKeySelection = "*">(command: ConvoDbCommand<TKeys>): PromiseResultType<ConvoDbCommandResult<TKeys>> {
++        const r=applyIdentityToConvoDbCommand(this.identityPath,command);
++        if(!r.success){
++            return Promise.resolve(r);
++        }
++        return this.proxiedDb.executeCommandAsync(command);
++    }
++
++    public executeCommandsAsync(commands: ConvoDbCommand<any>[]): PromiseResultType<ConvoDbCommandResult<any>[]> {
++        const r=applyIdentityToConvoDbCommands(this.identityPath,commands);
++        if(!r.success){
++            return Promise.resolve(r);
++        }
++        return this.proxiedDb.executeCommandsAsync(commands);
++    }
++
++    
++
++}
+diff --git a/packages/convo-lang/src/lib/db/convo-db-auth-schemas.ts b/packages/convo-lang/src/lib/db/convo-db-auth-schemas.ts
+new file mode 100644
+index 0000000..3e08ae3
+--- /dev/null
++++ b/packages/convo-lang/src/lib/db/convo-db-auth-schemas.ts
+@@ -0,0 +1,40 @@
++import { z } from 'zod';
++
++export const ConvoSignInJwtValueSchema=z.object({
++    
++    /**
++     * Unique user id
++     */
++    id:z.string(),
++
++    /**
++     * Paths the sign-in can assume the identity of.
++     */
++    identityPaths:z.array(z.string()),
++
++    /**
++     * Additional sign-in claims
++     */
++    claims:z.record(z.string(),z.any()),
++});
++export const ConvoSignInJwtTransportSchema=ConvoSignInJwtValueSchema.extend({
++    
++    /**
++     * Name of the database the JWT belongs
++     */
++    dbName:z.string(),
++});
++
++export const ConvoSignInJwtSchema=ConvoSignInJwtTransportSchema.extend({
++    /**
++     * Signed JWT containing containing identityPaths and any additional claims
++     */
++    jwt:z.string(),
++});
++
++export const ConvoEmailPasswordSignRequestSchema=z.object({
++    email:z.string(),
++    password:z.string(),
++});
++
++
+diff --git a/packages/convo-lang/src/lib/db/convo-db-auth-types.ts b/packages/convo-lang/src/lib/db/convo-db-auth-types.ts
+new file mode 100644
+index 0000000..50206a3
+--- /dev/null
++++ b/packages/convo-lang/src/lib/db/convo-db-auth-types.ts
+@@ -0,0 +1,10 @@
++import type z from "zod";
++import type { ConvoEmailPasswordSignRequestSchema, ConvoSignInJwtSchema, ConvoSignInJwtTransportSchema, ConvoSignInJwtValueSchema } from "./convo-db-auth-schemas.js";
++
++export type ConvoSignInJwt=z.infer<typeof ConvoSignInJwtSchema>;
++
++export type ConvoSignInJwtValue=z.infer<typeof ConvoSignInJwtValueSchema>;
++
++export type ConvoSignInJwtTransport=z.infer<typeof ConvoSignInJwtTransportSchema>;
++
++export type ConvoEmailPasswordSignRequest=z.infer<typeof ConvoEmailPasswordSignRequestSchema>;
+\ No newline at end of file
+diff --git a/packages/convo-lang/src/lib/db/convo-db-lib.ts b/packages/convo-lang/src/lib/db/convo-db-lib.ts
+index 5577c77..5fbd6f5 100644
+--- a/packages/convo-lang/src/lib/db/convo-db-lib.ts
++++ b/packages/convo-lang/src/lib/db/convo-db-lib.ts
+@@ -1,5 +1,5 @@
+-import { ResultTypeError } from "../result-type.js";
+-import { ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNode, ConvoNodeCondition, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
++import { ResultTypeError, ResultTypeVoid } from "../result-type.js";
++import { ConvoDbCommand, ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNodeCondition, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
+ 
+ /**
+  * Normalizes a convo node path.
+@@ -97,6 +97,7 @@ export const validateConvoNodeCondition=(condition:ConvoNodeCondition):string|un
+     }
+     return undefined;
+ }
++
+ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined=>{
+     if(query.permissionFrom!==undefined && normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom){
+         return `Invalid query permissionFrom. permissionFrom:${query.permissionFrom}`
+@@ -168,7 +169,187 @@ export const callConvoDbDriverCmdAsync=<FN extends ConvoDbDriverFunction>(
+     return (driver[fn] as any)(...args);
+ }
+ 
++/**
++ * Sets the `permissionFrom` and `permissionRequired` based on `identityPath` and the action being
++ * taken by the step. The `permissionFrom` of the query will be updated if it is defined but does
++ * not match the `identityPath`
++ */
++export const applyIdentityToConvoDbQuery=(identityPath:string,query:ConvoNodeQuery<any>):ConvoNodeQuery=>{
++    if(query.permissionFrom && query.permissionFrom!==identityPath){
++        query.permissionFrom=identityPath;
++    }
++
++    for(const step of query.steps){
++        step.permissionFrom=identityPath;
++        step.permissionRequired=(
++            (step.permissionRequired??ConvoNodePermissionType.none)|
++            (step.call?ConvoNodePermissionType.execute:ConvoNodePermissionType.read)
++        );
++    }
++    return query;
++}
++
++/**
++ * Sets the permissionFrom of the given object to `identityPath` If the given `permissionObject`
++ */
++export const applyIdentityToPermission=<T extends {permissionFrom?:string}>(
++    identityPath:string,
++    permissionObject:T
++):T=>{
++    permissionObject.permissionFrom=identityPath;
++    return permissionObject;
++}
++
++/**
++ * Applies the identityPath to all properties of all commands. Changes to the commands are made in-place,
++ * mutating the commands.
++ */
++export const applyIdentityToConvoDbCommands=(identityPath:string,cmds:ConvoDbCommand[]):ResultTypeVoid=>{
++    for(const cmd of cmds){
++        const r=applyIdentityToConvoDbCommand(identityPath,cmd);
++        if(!r.success){
++            return r;
++        }
++    }
++    return {success:true}
++}
++
++/**
++ * Applies the identityPath to all properties of the command. Changes to the command are made in-place,
++ * mutating the command.
++ */
++export const applyIdentityToConvoDbCommand=(identityPath:string,cmd:ConvoDbCommand<any>):ResultTypeVoid=>{
++    for(const e in cmd){
++        switch(e as keyof ConvoDbCommand){
++
++            case 'queryNodes':
++                if(cmd.queryNodes){
++                    applyIdentityToConvoDbQuery(identityPath,cmd.queryNodes.query);
++                }
++                break;
+ 
+-export const executeConvoNode=(node:ConvoNode)=>{
++            case 'getNodesByPath':
++                if(cmd.getNodesByPath){
++                    applyIdentityToPermission(identityPath,cmd.getNodesByPath);
++                }
++                break;
+ 
+-}
+\ No newline at end of file
++            case 'getNodePermission':
++                if(cmd.getNodePermission){
++                    if(cmd.getNodePermission.fromPath!==identityPath && cmd.getNodePermission.toPath!==identityPath){
++                        return {
++                            success:false,
++                            error:'getNodePermission fromPath or toPath must point to identityPath',
++                            statusCode:401,
++                        }
++                    }
++                }
++                break;
++
++            case 'checkNodePermission':
++                if(cmd.checkNodePermission){
++                    if(cmd.checkNodePermission.fromPath!==identityPath && cmd.checkNodePermission.toPath!==identityPath){
++                        return {
++                            success:false,
++                            error:'checkNodePermissions fromPath or toPath must point to identityPath',
++                            statusCode:401,
++                        }
++                    }
++                }
++                break;
++
++            case 'insertNode':
++                if(cmd.insertNode){
++                    cmd.insertNode.options=applyIdentityToPermission(identityPath,cmd.insertNode.options??{});
++                }
++                break;
++
++            case 'updateNode':
++                if(cmd.updateNode){
++                    cmd.updateNode.options=applyIdentityToPermission(identityPath,cmd.updateNode.options??{});
++                }
++                break;
++
++            case 'deleteNode':
++                if(cmd.deleteNode){
++                    cmd.deleteNode.options=applyIdentityToPermission(identityPath,cmd.deleteNode.options??{});
++                }
++                break;
++
++            case 'queryEdges':
++                if(cmd.queryEdges){
++                    applyIdentityToPermission(identityPath,cmd.queryEdges.query);
++                }
++                break;
++
++            case 'getEdgeById':
++                if(cmd.getEdgeById){
++                    applyIdentityToPermission(identityPath,cmd.getEdgeById);
++                }
++                break;
++
++            case 'insertEdge':
++                if(cmd.insertEdge){
++                    cmd.insertEdge.options=applyIdentityToPermission(identityPath,cmd.insertEdge.options??{});
++                }
++                break;
++
++            case 'updateEdge':
++                if(cmd.updateEdge){
++                    cmd.updateEdge.options=applyIdentityToPermission(identityPath,cmd.updateEdge.options??{});
++                }
++                break;
++
++            case 'deleteEdge':
++                if(cmd.deleteEdge){
++                    cmd.deleteEdge.options=applyIdentityToPermission(identityPath,cmd.deleteEdge.options??{});
++                }
++                break;
++
++            case 'queryEmbeddings':
++                if(cmd.queryEmbeddings){
++                    applyIdentityToPermission(identityPath,cmd.queryEmbeddings.query);
++                }
++                break;
++
++            case 'getEmbeddingById':
++                if(cmd.getEmbeddingById){
++                    applyIdentityToPermission(identityPath,cmd.getEmbeddingById);
++                }
++                break;
++
++            case 'insertEmbedding':
++                if(cmd.insertEmbedding){
++                    cmd.insertEmbedding.options=applyIdentityToPermission(identityPath,cmd.insertEmbedding.options??{});
++                }
++                break;
++
++            case 'updateEmbedding':
++                if(cmd.updateEmbedding){
++                    cmd.updateEmbedding.options=applyIdentityToPermission(identityPath,cmd.updateEmbedding.options??{});
++                }
++                break;
++
++            case 'deleteEmbedding':
++                if(cmd.deleteEmbedding){
++                    cmd.deleteEmbedding.options=applyIdentityToPermission(identityPath,cmd.deleteEmbedding.options??{});
++                }
++                break;
++
++            case 'driverCmd':
++                return {
++                    success:false,
++                    error:'Driver commands are not allowed to passed between permission boundaries',
++                    statusCode:401,
++                }
++
++            default:
++                return {
++                    success:false,
++                    error:`Unknown ConvoDbCommand property: ${e}`,
++                    statusCode:400
++                }
++        }
++    }
++    return {success:true}
++}
+diff --git a/packages/convo-lang/src/lib/db/convo-db-types.ts b/packages/convo-lang/src/lib/db/convo-db-types.ts
+index d1c83f3..c4f5b1f 100644
+--- a/packages/convo-lang/src/lib/db/convo-db-types.ts
++++ b/packages/convo-lang/src/lib/db/convo-db-types.ts
+@@ -1,6 +1,7 @@
+-import { CancelToken, Scope } from "@iyio/common";
+-import { ZodType } from "zod";
+-import { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
++import type { CancelToken, Scope } from "@iyio/common";
++import type { ZodType } from "zod";
++import type { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
++import type { ConvoDbAuthManager } from "./ConvoDbAuthManager.js";
+ 
+ /**
+  * A unique node within a collection or graph of nodes.
+@@ -1218,6 +1219,40 @@ export type ConvoDbFactory=(scope:Scope)=>ConvoDb;
+  */
+ export interface ConvoDb
+ {
++
++    /**
++     * Name of the database.
++     */
++    readonly dbName:string;
++
++    /**
++     * An auth helper class. Auth is not directly handled by ConvoDbAuth, it relies on stored database
++     * function for auth operations.
++     */
++    readonly auth:ConvoDbAuthManager;
++
++    /**
++     * Convenience function for calling `queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom})`.
++     * Returns the data of the first node returned by the called function or undefined if the function
++     * returns no nodes. If you need to call a node that return multiple nodes use `queryNodesAsync`.
++     * If you need access to the full node returned use `callFunctionReturnNodeAsync`.
++     */
++    callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>;
++
++    callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>;
++
++    /**
++     * Similar to `callFunctionAsync` but required a node to be returned from the called function
++     * for a success result.
++     */
++    callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>;
++
++    /**
++     * Similar to `callFunctionAsync` but returns the full node returned by the called function instead
++     * of just its data.
++     */
++    callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>;
++
+     /**
+      * Queries the database for nodes
+      */
+@@ -1335,17 +1370,13 @@ export interface ConvoDb
+      * Calls one of the functions of this interface based on the action of the command
+      * @param command The command to execute
+      */
+-    executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>,permissionFromOverride?:string):PromiseResultType<ConvoDbCommandResult<TKeys>>;
++    executeCommandAsync<TKeys extends ConvoNodeKeySelection='*'>(command:ConvoDbCommand<TKeys>):PromiseResultType<ConvoDbCommandResult<TKeys>>;
+ 
+     /**
+      * Calls an array of the functions of this interface based on the action of the command
+      * @param commands The commands to execute
+-     * @param permissionFromOverride A permissionFrom path that will override the permissionFrom of
+-     *                               any of the given commands. Commonly used to enforce permissions
+-     *                               of external clients such as a REST API using JWTs to authenticate
+-     *                               users.
+      */
+-    executeCommandsAsync(commands:ConvoDbCommand<any>[],permissionFromOverride?:string):PromiseResultType<ConvoDbCommandResult<any>[]>;
++    executeCommandsAsync(commands:ConvoDbCommand<any>[]):PromiseResultType<ConvoDbCommandResult<any>[]>;
+ 
+     /**
+      * DB Driver
+@@ -2165,4 +2196,4 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
+  * the same cached db after called the first name. There is one exception to the caching rule.
+  * '*' should return a new database every time called.
+  */
+-export type ConvoDbMap=Record<string,()=>ConvoDb>;
+\ No newline at end of file
++export type ConvoDbMap=Record<string,(name:string)=>ConvoDb>;
+\ No newline at end of file
+diff --git a/packages/db-functions/README.md b/packages/db-functions/README.md
+new file mode 100644
+index 0000000..6f5c903
+--- /dev/null
++++ b/packages/db-functions/README.md
+@@ -0,0 +1,247 @@
++# @convo-lang/db-functions
++
++Reusable ConvoDb function nodes for Convo-Lang applications.
++
++This package contains database-backed functions that can be loaded into a `ConvoDb` and executed through normal ConvoDb function calls. They are intended to provide common utility behavior for agents, tools, workflows, authentication, and command-style database operations.
++
++## Usage
++
++Functions are usually loaded into a database with the Convo CLI.
++
++```sh
++convo \
++    --db-map 'default:sqlite:./data/example.db' \
++    --load-db-function "default:/bin:node_modules/@convo-lang/db-functions/src/functions/bin/*" \
++    --load-db-function-drop-export
++```
++
++This loads the package functions into the default database under `/bin`.
++
++## Available functions
++
++The package currently defines the following functions.
++
++| Function | Default path | Effects | Description |
++|---|---|---|---|
++| `init-auth` | `/bin/init-auth` | `readWrite` | Initializes authentication secrets used for JWT signing and password hashing. |
++| `create-user` | `/bin/create-user` | `readWrite` | Creates a user sign-in node under `/usr/{id}` using an email claim and password. |
++| `sign-in-email-password` | `/bin/sign-in-email-password` | `readOnly` | Signs in a user by email and password and returns a JWT result node. |
++
++The default paths assume the functions are loaded under `/bin`. If you load them under another namespace, replace `/bin` with your chosen path.
++
++## Authentication functions
++
++### `init-auth`
++
++Initializes the auth secrets node used by the other auth functions.
++
++This function creates or updates the internal auth secrets node with:
++
++- a JWT signing secret
++- a password salt
++
++Arguments:
++
++```ts
++{
++    override?:boolean;
++}
++```
++
++If `override` is `true`, existing secrets are replaced. Otherwise missing secrets are created and existing values are preserved.
++
++Example:
++
++```ts
++const result=await db.callFunctionAsync('/bin/init-auth',{
++    override:false,
++});
++
++if(result.success){
++    console.log(result.result);
++}
++```
++
++You should run this before using `create-user` or `sign-in-email-password`.
++
++### `create-user`
++
++Creates a new email/password user sign-in record.
++
++The function:
++
++- requires `claims.email`
++- rejects duplicate email addresses
++- hashes the supplied password
++- creates a user node under `/usr/{id}`
++- stores sign-in data on the created node
++- adds `/usr/{id}` to `identityPaths`
++
++Arguments:
++
++```ts
++{
++    password:string;
++    claims:{
++        email:string;
++        [key:string]:any;
++    };
++    identityPaths?:string[];
++    [key:string]:any;
++}
++```
++
++Example:
++
++```ts
++const result=await db.queryNodesAsync({
++    steps:[
++        {
++            path:'/bin/create-user',
++            call:{
++                args:{
++                    password:'correct horse battery staple',
++                    claims:{
++                        email:'alex@example.com',
++                        name:'Alex',
++                    },
++                },
++            },
++        },
++    ],
++});
++
++if(result.success){
++    console.log(result.result.nodes[0]);
++}
++```
++
++The returned node is the created user sign-in node.
++
++### `sign-in-email-password`
++
++Signs in a user using an email address and password.
++
++The function:
++
++- looks up a `/usr/*` node with `type:'user-sign-in'`
++- verifies the password hash
++- signs a JWT with the database name included
++- returns a result node with `type:'sign-in-jwt'`
++
++Arguments:
++
++```ts
++{
++    email:string;
++    password:string;
++}
++```
++
++Example:
++
++```ts
++const result=await db.callFunctionAsync('/bin/sign-in-email-password',{
++    email:'alex@example.com',
++    password:'correct horse battery staple',
++});
++
++if(result.success){
++    console.log(result.result);
++}
++```
++
++A successful sign-in returns JWT data. Invalid credentials return an authentication error.
++
++## Calling a function
++
++After loading functions into a database, call them through ConvoDb like any other stored function node.
++
++```ts
++const result=await db.queryNodesAsync({
++    steps:[
++        {
++            path:'/bin/sign-in-email-password',
++            call:{
++                args:{
++                    email:'alex@example.com',
++                    password:'correct horse battery staple',
++                },
++            },
++        },
++    ],
++});
++
++if(result.success){
++    console.log(result.result.nodes);
++}
++```
++
++For simple value-returning functions, you can also use the convenience helper:
++
++```ts
++const value=await db.callFunctionAsync(
++    '/bin/sign-in-email-password',
++    {
++        email:'alex@example.com',
++        password:'correct horse battery staple',
++    },
++);
++```
++
++## Function node model
++
++Loaded functions are stored as normal ConvoDb nodes. A function node defines executable behavior using:
++
++```ts
++{
++    data:{
++        isExecutable:true,
++        function:{
++            format:'javascript',
++            effects:'pure',
++            argsType:'...',
++            main:'...',
++        },
++    },
++}
++```
++
++Because functions are normal nodes, they can be:
++
++- queried by path
++- organized in namespaces
++- connected with edges
++- protected with permissions
++- executed during query traversal
++
++## Common install location
++
++A common convention is to load utility functions under `/bin`:
++
++```txt
++/bin/init-auth
++/bin/create-user
++/bin/sign-in-email-password
++```
++
++Applications can choose any destination path that fits their database layout.
++
++## Development
++
++When adding a new function to this package:
++
++1. Add the function source under `src/functions`.
++2. Export or structure it so the Convo CLI loader can discover it.
++3. Include an argument schema when the function accepts input.
++4. Set the narrowest valid function effect:
++    - `pure`
++    - `readOnly`
++    - `readWrite`
++5. Prefer small, composable functions that are useful as agent tools.
++
++## Related documentation
++
++- ConvoDb docs: `../../docs/convo-db.md`
++- Convo-Lang package: `@convo-lang/convo-lang`
++- Database adapters: `@convo-lang/db`
+diff --git a/packages/db-functions/package.json b/packages/db-functions/package.json
+new file mode 100644
+index 0000000..7022231
+--- /dev/null
++++ b/packages/db-functions/package.json
+@@ -0,0 +1,6 @@
++{
++    "name": "@convo-lang/db-functions",
++    "version": "0.0.0",
++    "type": "module",
++    "sideEffects": false
++}
+diff --git a/packages/db-functions/pkij.json b/packages/db-functions/pkij.json
+new file mode 100644
+index 0000000..bbb4c89
+--- /dev/null
++++ b/packages/db-functions/pkij.json
+@@ -0,0 +1,4 @@
++{
++    "bundleDir":"phony",
++    "copySource":"src"
++}
+\ No newline at end of file
+diff --git a/packages/db-functions/src/functions/bin/create-user.ts b/packages/db-functions/src/functions/bin/create-user.ts
+new file mode 100644
+index 0000000..dff8bf1
+--- /dev/null
++++ b/packages/db-functions/src/functions/bin/create-user.ts
+@@ -0,0 +1,103 @@
++import type { ConvoDbFunctionExecutionContext, ConvoNode, PartialNode, PromiseResultType } from "@convo-lang/convo-lang";
++import { authSecretsPath, hashPasswordAsync } from "../../lib/auth-lib.js";
++import { CreateUserSignRequest, UserSignIn } from "../../lib/auth-types.js";
++
++export async function resultHandler(signIn:CreateUserSignRequest,{
++    db
++}:ConvoDbFunctionExecutionContext):PromiseResultType<PartialNode>{
++
++    try{
++        
++        const email=signIn?.claims['email'];
++        if(!email){
++            return {
++                success:false,
++                error:'claims.email required',
++                statusCode:400,
++            }
++        }
++        const existing=await db.queryNodesAsync({keys:'path',limit:1,steps:[{
++            path:'/usr/*',
++            condition:{
++                groupOp:'and',
++                conditions:[
++                    {target:'data.jwt.claims.email',op:'=',value:email},
++                    {target:'type',op:'=',value:'user-sign-in'},
++                ]
++            }
++        }]});
++
++        if(!existing.success){
++            return existing;
++        }
++
++        if(existing.result.nodes.length){
++            return {
++                success:false,
++                error:'Email already in use',
++                statusCode:400,
++            }
++        }
++
++        const secret=await db.getNodeByPathAsync(authSecretsPath);
++        if(!secret.success){
++            return secret;
++        }
++
++        if(!secret.result){
++            return {
++                success:false,
++                error:`\`${authSecretsPath}\` not set`,
++                statusCode:500,
++            }
++        }
++
++        const salt=secret.result.data['passwordSalt'];
++        if(!salt){
++            return {
++                success:false,
++                error:`\`${authSecretsPath}[passwordSalt]\` not set`,
++                statusCode:500,
++            }
++        }
++
++        const passwordHash=await hashPasswordAsync(signIn.password,salt);
++        if(!passwordHash.success){
++            return passwordHash;
++        }
++
++        const id=globalThis.crypto.randomUUID();
++        const jwt={...signIn,id};
++        if(!jwt.identityPaths){
++            jwt.identityPaths=[];
++        }
++        jwt.identityPaths.push(`/usr/${id}`);
++        delete (jwt as Partial<CreateUserSignRequest>).password;
++        const node:ConvoNode={
++            path:`/usr/${id}`,
++            type:'user-sign-in',
++            data:{
++                passwordHash:passwordHash.result,
++                jwt,
++            } satisfies UserSignIn
++        };
++
++        const r=await db.insertNodeAsync(node);
++        if(!r.success){
++            return r;
++        }
++        
++        return {
++            success:true,
++            result:node,
++        }
++        
++    }catch(ex){
++        console.error('Create user failed',ex);
++        return {
++            success:false,
++            error:`Create user failed: ${(ex as any)?.message}`,
++            statusCode:500,
++        };
++    }
++}
+diff --git a/packages/db-functions/src/functions/bin/init-auth.ts b/packages/db-functions/src/functions/bin/init-auth.ts
+new file mode 100644
+index 0000000..b427e66
+--- /dev/null
++++ b/packages/db-functions/src/functions/bin/init-auth.ts
+@@ -0,0 +1,59 @@
++import type { ConvoDbFunctionExecutionContext, ConvoNode, PartialNode, PromiseResultType } from "@convo-lang/convo-lang";
++import { authSecretsPath, getRandom } from "../../lib/auth-lib.js";
++
++interface Args{
++    override?:boolean;
++}
++
++export async function resultHandler({
++    override=false
++}:Args,{
++    db
++}:ConvoDbFunctionExecutionContext):PromiseResultType<PartialNode>{
++
++    try{
++
++        const nodeR=await db.getNodeByPathAsync(authSecretsPath);
++        if(!nodeR.success){
++            return nodeR;
++        }
++
++        const node:ConvoNode=nodeR.result??{
++            path:authSecretsPath,
++            type:'auth-secrets',
++            data:{}
++        }
++
++        let changed=false;
++
++        if(!node.data['jwt'] || override){
++            node.data['jwt']=getRandom();
++            changed=true;
++        }
++
++        if(!node.data['passwordSalt'] || override){
++            node.data['passwordSalt']=getRandom();
++            changed=true;
++        }
++
++        if(nodeR.result){
++            await db.updateNodeAsync(node);
++        }else{
++            await db.insertNodeAsync(node);
++        }
++
++        return {
++            success:true,
++            result:node,
++        };
++        
++    }catch(ex){
++        console.error('init auth failed',ex);
++        return {
++            success:false,
++            error:`Init auth failed: ${(ex as any)?.message}`,
++            statusCode:500,
++        };
++    }
++}
++
+diff --git a/packages/db-functions/src/functions/bin/sign-in-email-password.ts b/packages/db-functions/src/functions/bin/sign-in-email-password.ts
+new file mode 100644
+index 0000000..187cd70
+--- /dev/null
++++ b/packages/db-functions/src/functions/bin/sign-in-email-password.ts
+@@ -0,0 +1,118 @@
++import type { ConvoDbFunctionExecutionContext, ConvoSignInJwt, ConvoSignInJwtTransport, PartialNode, PromiseResultType } from "@convo-lang/convo-lang";
++import { sign } from "hono/jwt";
++import { authSecretsPath, hashPasswordAsync, invalidSignIn } from "../../lib/auth-lib.js";
++import { UserSignIn } from "../../lib/auth-types.js";
++
++interface Args{
++    email:string;
++    password:string;
++}
++
++export async function resultHandler({
++    email,
++    password
++}:Args,{
++    db
++}:ConvoDbFunctionExecutionContext):PromiseResultType<PartialNode>{
++
++    try{
++
++        if(typeof email!=='string'){
++            return {
++                success:false,
++                error:'email required',
++                statusCode:400,
++            }
++        }
++
++        if(typeof password!=='string'){
++            return {
++                success:false,
++                error:'password required',
++                statusCode:400,
++            }
++        }
++
++        const [usr,secret]=await Promise.all([
++
++            db.queryNodesAsync({keys:'data',limit:1,steps:[{
++                path:'/usr/*',
++                condition:{
++                    groupOp:'and',
++                    conditions:[
++                        {target:'data.jwt.claims.email',op:'=',value:email},
++                        {target:'type',op:'=',value:'user-sign-in'},
++                    ]
++                }
++            }]}),
++
++            db.getNodeByPathAsync(authSecretsPath),
++        ]);
++
++        if(!secret.success || !secret.result){
++            console.error(`\`${authSecretsPath}\` not set`);
++            return invalidSignIn;
++        }
++
++        const jwtSecret=secret.result.data['jwt'];
++        const passwordSalt=secret.result.data['passwordSalt'];
++
++        if(!jwtSecret){
++            console.error(`\`${authSecretsPath}[jwt]\` not set`);
++        }
++
++        if(!passwordSalt){
++            console.error(`\`${authSecretsPath}[passwordSalt]\` not set`);
++        }
++
++        let passwordHash:string|undefined;
++
++        if(
++            !usr.success ||
++            !usr.result ||
++            !(passwordHash=usr.result.nodes[0]?.data['passwordHash']) ||
++            !jwtSecret ||
++            !passwordSalt
++        ){
++            return invalidSignIn;
++        }
++        
++
++        const hash=await hashPasswordAsync(password,passwordSalt);
++        if(!hash.success || hash.result!==passwordHash){
++            return invalidSignIn;
++        }
++
++        const jwtValue=(usr.result.nodes?.[0].data as UserSignIn)?.jwt;
++        if(
++            !jwtValue?.claims ||
++            (typeof jwtValue.claims!=='object') ||
++            !Array.isArray(jwtValue.identityPaths) ||
++            jwtValue.identityPaths.some(v=>typeof v!=='string')
++        ){
++            return invalidSignIn;
++        }
++
++        const jwt:ConvoSignInJwt={
++            ...jwtValue,
++            dbName:db.dbName,
++            jwt:await sign(
++                {...jwtValue,dbName:db.dbName} satisfies ConvoSignInJwtTransport,
++                jwtSecret,
++                'HS256'
++            )
++        };
++        return {
++            success:true,
++            result:{
++                path:'/null',
++                type:'sign-in-jwt',
++                data:jwt,
++            }
++        }
++    }catch(ex){
++        console.error('sign-in error',ex);
++        return invalidSignIn;
++    }
++}
++
+diff --git a/packages/db-functions/src/lib/auth-lib.ts b/packages/db-functions/src/lib/auth-lib.ts
+new file mode 100644
+index 0000000..a2763fd
+--- /dev/null
++++ b/packages/db-functions/src/lib/auth-lib.ts
+@@ -0,0 +1,58 @@
++import { PromiseResultType, ResultType } from '@convo-lang/convo-lang';
++
++export const authSecretsPath='/secrets/auth-secrets'
++
++export const invalidSignIn:ResultType<any>={
++    success:false,
++    error:'Invalid sign-in',
++    statusCode:401,
++};
++
++export const hashPasswordAsync=async (password:string,passwordSalt:string):PromiseResultType<string>=>
++{
++    if(!globalThis.crypto){
++        console.error('globalThis.crypto not defined');
++        return invalidSignIn;
++    }
++
++    try{
++
++        const encoder=new TextEncoder();
++        const keyMaterial=await globalThis.crypto.subtle.importKey(
++            'raw',
++            encoder.encode(password),
++            {name:'PBKDF2'},
++            false,
++            ['deriveKey']
++        );
++
++        const derivedKey=await globalThis.crypto.subtle.deriveKey(
++            {
++                name:'PBKDF2',
++                salt:encoder.encode(passwordSalt),
++                iterations:600000,
++                hash:'SHA-256',
++            },
++            keyMaterial,
++            {name:'HMAC',hash:'SHA-256'},
++            true,
++            ['sign']
++        );
++
++        const hashBuffer=await globalThis.crypto.subtle.exportKey('raw',derivedKey);
++
++        return {
++            success:true,
++            result:new Uint8Array(hashBuffer).toBase64(),
++        };
++    }catch(ex){
++        console.error('Password hashing failed', ex);
++        return invalidSignIn;
++    }
++};
++
++export const getRandom=()=>{
++    const ary=(globalThis.crypto.randomUUID()+'-'+globalThis.crypto.randomUUID()+'-'+Math.round(Math.random()*10000)+'-'+globalThis.crypto.randomUUID()+'-'+Math.round(Math.random()*10000)).split('-');
++    ary.sort(()=>Math.random()-Math.random());
++    return ary.join('');
++}
+diff --git a/packages/db-functions/src/lib/auth-types.ts b/packages/db-functions/src/lib/auth-types.ts
+new file mode 100644
+index 0000000..e6b1716
+--- /dev/null
++++ b/packages/db-functions/src/lib/auth-types.ts
+@@ -0,0 +1,14 @@
++import type { ConvoSignInJwtValue } from "@convo-lang/convo-lang";
++
++export interface CreateUserSignRequest extends Omit<ConvoSignInJwtValue,'id'>
++{
++    password:string;
++}
++
++export interface UserSignIn
++{
++    passwordHash?:string;
++    jwt:ConvoSignInJwtValue;
++}
++
++
+diff --git a/packages/db-functions/tsconfig.json b/packages/db-functions/tsconfig.json
+new file mode 100644
+index 0000000..ec284ff
+--- /dev/null
++++ b/packages/db-functions/tsconfig.json
+@@ -0,0 +1,22 @@
++{
++    "extends": "../../tsconfig.base.json",
++    "include": [
++        "src/**/*.ts",
++        "src/**/*.tsx"
++    ],
++    "exclude": [
++        "jest.config.ts",
++        "src/**/*.spec.ts",
++        "src/**/*.test.ts",
++        "src/**/*.spec.tsx",
++        "src/**/*.test.tsx"
++    ],
++    "compilerOptions": {
++        "composite": true
++    },
++    "references": [
++        {
++            "path": "../../packages/convo-lang"
++        }
++    ]
++}
+\ No newline at end of file
+diff --git a/packages/db/src/BaseConvoDb.ts b/packages/db/src/BaseConvoDb.ts
+index e28bbb0..97d5e8c 100644
+--- a/packages/db/src/BaseConvoDb.ts
++++ b/packages/db/src/BaseConvoDb.ts
+@@ -1,6 +1,6 @@
+-import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
++import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbAuthManager, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
+ import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
+-import z from "zod";
++import z, { ZodType } from "zod";
+ 
+ 
+ 
+@@ -13,6 +13,11 @@ const QueryTraversalStateSchema=z.object({
+ 
+     stepStage:z.enum(allConvoStepStages),
+ 
++    /**
++     * If true the first defined stage of the current step is being evaluated.
++     */
++    initState:z.boolean().optional(),
++
+     /**
+      * Used by ConvoDbFunctions as a next token.
+      */
+@@ -66,6 +71,11 @@ export interface BaseConvoDbOptions
+      * Options used to create Conversation instances for natural language processing
+      */
+     convoOptions?:ConversationOptions;
++
++    /**
++     * Name of the database
++     */
++    name:string;
+ }
+ 
+ 
+@@ -76,15 +86,22 @@ export abstract class BaseConvoDb implements ConvoDb
+     protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
+     protected convoOptions?:ConversationOptions;
+ 
++    public readonly auth:ConvoDbAuthManager;
++
++    public readonly dbName:string;
++
+     public constructor({
+         embeddingsService,
+         embeddingOptions,
+         convoOptions,
+-    }:BaseConvoDbOptions={})
++        name,
++    }:BaseConvoDbOptions)
+     {
+         this.embeddingsService=embeddingsService;
+         this.embeddingOptions=embeddingOptions;
+         this.convoOptions=convoOptions;
++        this.dbName=name;
++        this.auth=new ConvoDbAuthManager(this);
+     }
+ 
+     abstract readonly _driver: ConvoDbDriver;
+@@ -96,6 +113,85 @@ export abstract class BaseConvoDb implements ConvoDb
+         this.loggingEnabled=true;
+     }
+ 
++    public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
++    {
++        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
++        if(!r.success){
++            return r;
++        }
++        return {
++            success:true,
++            result:r.result?.data as T|undefined,
++        }
++    }
++
++    public async callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>
++    {
++        const inputParsed=inputSchema.safeParse(args);
++        if(inputParsed.error){
++            return {
++                success:false,
++                error:inputParsed.error.message,
++                statusCode:400
++            }
++        }
++
++        const r=await this.callFunctionReturnValueAsync(path,inputParsed.data as any);
++        if(!r.success){
++            return r;
++        }
++
++        const outputParsed=outputSchema.safeParse(r.result);
++        if(outputParsed.error){
++            return {
++                success:false,
++                error:outputParsed.error.message,
++                statusCode:500,
++            }
++        }
++
++        return {
++            success:true,
++            result:outputParsed.data,
++        }
++    }
++
++
++    public async callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>
++    {
++        const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
++        if(!r.success){
++            return r;
++        }
++        const data=r.result?.data;
++        if(!data){
++            return {
++                success:false,
++                error:'Called function did not return a value',
++                statusCode:500,
++            }
++        }
++
++        return {
++            success:true,
++            result:data as T,
++        }
++    }
++
++    
++    public async callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
++    {
++        const r=await this.queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom});
++        if(!r.success){
++            return r;
++        }
++        const node=r.result.nodes[0];
++        return {
++            success:true,
++            result:node,
++        }
++    }
++
+     public async queryNodesAsync<TKeys extends ConvoNodeKeySelection=undefined>(
+         query:ConvoNodeQuery<TKeys>
+     ):PromiseResultType<ConvoNodeQueryResult<
+@@ -517,7 +613,7 @@ export abstract class BaseConvoDb implements ConvoDb
+                         break;
+                     }
+                 }
+-                const paths=state.step===0?null:state.paths;
++                let stagePaths=state.step===0 && (state.initState===true || state.initState===undefined)?null:state.paths;
+ 
+                 switch(state.stepStage){
+ 
+@@ -526,14 +622,14 @@ export abstract class BaseConvoDb implements ConvoDb
+                             const p=step.path;
+                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPathAsync({
+                                 path:p
+-                            },paths,orderBy,batchSize,offset,nextToken));
++                            },stagePaths,orderBy,batchSize,offset,nextToken));
+                             if(cancel.isCanceled){return;}
+ 
+                             if(!r.success){
+                                 yield errorResultToConvoNodeStreamItem(r,state);
+                                 return;
+                             }
+-                            state.paths=r.result;
++                            state.paths=stagePaths=r.result;
+                         }
+                         break;
+ 
+@@ -542,14 +638,14 @@ export abstract class BaseConvoDb implements ConvoDb
+                             const c=step.condition;
+                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForConditionAsync({
+                                 condition:c,
+-                            },paths,orderBy,batchSize,offset,nextToken));
++                            },stagePaths,orderBy,batchSize,offset,nextToken));
+                             if(cancel.isCanceled){return;}
+ 
+                             if(!r.success){
+                                 yield errorResultToConvoNodeStreamItem(r,state);
+                                 return;
+                             }
+-                            state.paths=r.result;
++                            state.paths=stagePaths=r.result;
+                         }
+                         break;
+ 
+@@ -559,14 +655,14 @@ export abstract class BaseConvoDb implements ConvoDb
+                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
+                                 permissionFrom:f,
+                                 permissionRequired:step.permissionRequired??ConvoNodePermissionType.all,
+-                            },paths,orderBy,batchSize,offset,nextToken));
++                            },stagePaths,orderBy,batchSize,offset,nextToken));
+                             if(cancel.isCanceled){return;}
+ 
+                             if(!r.success){
+                                 yield errorResultToConvoNodeStreamItem(r,state);
+                                 return;
+                             }
+-                            state.paths=r.result;
++                            state.paths=stagePaths=r.result;
+                         }
+                         break;
+ 
+@@ -575,14 +671,14 @@ export abstract class BaseConvoDb implements ConvoDb
+                             const e=step.embedding;
+                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForEmbeddingAsync({
+                                 embedding:e
+-                            },paths,orderBy,batchSize,offset,nextToken));
++                            },stagePaths,orderBy,batchSize,offset,nextToken));
+                             if(cancel.isCanceled){return;}
+ 
+                             if(!r.success){
+                                 yield errorResultToConvoNodeStreamItem(r,state);
+                                 return;
+                             }
+-                            state.paths=r.result;
++                            state.paths=stagePaths=r.result;
+                         }
+                         break;
+ 
+@@ -594,7 +690,7 @@ export abstract class BaseConvoDb implements ConvoDb
+                                 const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPermissionAsync({
+                                     permissionFrom:f,
+                                     permissionRequired:ConvoNodePermissionType.execute,
+-                                },paths,orderBy,batchSize,offset,nextToken));
++                                },stagePaths,orderBy,batchSize,offset,nextToken));
+                                 if(cancel.isCanceled){return;}
+ 
+                                 if(!r.success){
+@@ -603,7 +699,7 @@ export abstract class BaseConvoDb implements ConvoDb
+                                 }
+                             }
+                             const fnPaths=state.paths;
+-                            state.paths=[];
++                            state.paths=stagePaths=[];
+                             for(const path of fnPaths){
+                                 const r=await this.selectNodeByPathAsync(path,'*');
+                                 if(cancel.isCanceled){return;}
+@@ -645,7 +741,10 @@ export abstract class BaseConvoDb implements ConvoDb
+                                             fn.mainCompiled=ctx.mainCompiled;
+                                             const r=await this._driver.updateNodeAsync({
+                                                 path:fnNode.path,
+-                                                data:{function:{...fn}}
++                                                data:{
++                                                    ...fnNode.data,
++                                                    function:{...fn}
++                                                }
+ 
+                                             },{});
+                                             if(!r.success){
+@@ -690,14 +789,14 @@ export abstract class BaseConvoDb implements ConvoDb
+                                 edge:e,
+                                 edgeDirection:step.edgeDirection??'bi',
+                                 edgeLimit:step.edgeLimit,
+-                            },paths,orderBy,batchSize,offset,nextToken));
++                            },stagePaths,orderBy,batchSize,offset,nextToken));
+                             if(cancel.isCanceled){return;}
+ 
+                             if(!r.success){
+                                 yield errorResultToConvoNodeStreamItem(r,state);
+                                 return;
+                             }
+-                            state.paths=r.result;
++                            state.paths=stagePaths=r.result;
+                         }
+                         break;
+ 
+@@ -711,9 +810,12 @@ export abstract class BaseConvoDb implements ConvoDb
+ 
+                 }
+ 
++                state.initState=false;
++
+                 const nextStage=getNextStepStage(state.stepStage);
+                 if(nextStage===undefined){
+                     state.step++;
++                    state.initState=true;
+                     delete state.fnNextToken;
+                     state.stepStage=allConvoStepStages[0];
+                     const scan=(step.edge || !query.steps[state.step] || state.step===1)?true:false;
+@@ -1556,6 +1658,7 @@ const parseToken=(token:string|null|undefined):ResultType<QueryTraversalState>=>
+             success:true,
+             result:{
+                 step:0,
++                initState:true,
+                 stepStage:allConvoStepStages[0],
+                 returnedCount:0,
+                 scanCount:0,
+diff --git a/packages/db/src/BunSqliteConvoDb.ts b/packages/db/src/BunSqliteConvoDb.ts
+index 548bc2b..58bba63 100644
+--- a/packages/db/src/BunSqliteConvoDb.ts
++++ b/packages/db/src/BunSqliteConvoDb.ts
+@@ -1,5 +1,5 @@
+ import { PromiseResultType } from "@convo-lang/convo-lang";
+-import { getErrorMessage } from "@iyio/common";
++import { getErrorMessage, getFileName } from "@iyio/common";
+ import type { Database } from "bun:sqlite";
+ import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
+ 
+@@ -15,11 +15,10 @@ export class BunSqliteConvoDb extends BaseSqliteConvoDb
+ {
+ 
+     public static fromConnectionString(connectionString?:string){
+-        return new BunSqliteConvoDb({dbPath:connectionString})
++        return new BunSqliteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
+     }
+ 
+     private readonly dbPath?:string;
+-    private readonly initSchema?:boolean;
+     private db?:Database;
+ 
+     public constructor({
+diff --git a/packages/db/src/InMemoryConvoDb.ts b/packages/db/src/InMemoryConvoDb.ts
+index 8f7298a..f0f68de 100644
+--- a/packages/db/src/InMemoryConvoDb.ts
++++ b/packages/db/src/InMemoryConvoDb.ts
+@@ -2,8 +2,10 @@ import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeCondition,
+ import { deepClone, starStringToRegex, uuid } from "@iyio/common";
+ import { BaseConvoDb } from "./BaseConvoDb.js";
+ 
++
+ export class InMemoryConvoDb extends BaseConvoDb
+ {
++
+     private readonly nodes=new Map<string,ConvoNode>();
+     private readonly edges=new Map<string,ConvoNodeEdge>();
+     private readonly embeddings=new Map<string,ConvoNodeEmbedding>();
+diff --git a/packages/db/src/LayeredConvoDb.ts b/packages/db/src/LayeredConvoDb.ts
+index 6950606..8e1570b 100644
+--- a/packages/db/src/LayeredConvoDb.ts
++++ b/packages/db/src/LayeredConvoDb.ts
+@@ -73,6 +73,7 @@ interface LayerInst extends ConvoDbLayerConfig
+ export interface LayeredConvoDbOptions extends BaseConvoDbOptions
+ {
+     layers:ConvoDbLayerConfig[];
++    dbId?:string;
+ }
+ 
+ export class LayeredConvoDb extends BaseConvoDb
+diff --git a/packages/db/src/NodeSQLiteConvoDb.ts b/packages/db/src/NodeSQLiteConvoDb.ts
+index a5c5dae..ba56b29 100644
+--- a/packages/db/src/NodeSQLiteConvoDb.ts
++++ b/packages/db/src/NodeSQLiteConvoDb.ts
+@@ -1,5 +1,5 @@
+ import { PromiseResultType } from "@convo-lang/convo-lang";
+-import { getErrorMessage } from "@iyio/common";
++import { getErrorMessage, getFileName } from "@iyio/common";
+ import type { DatabaseSync } from "node:sqlite";
+ import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
+ 
+@@ -15,7 +15,7 @@ export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
+ {
+ 
+     public static fromConnectionString(connectionString?:string){
+-        return new NodeSQLiteConvoDb({dbPath:connectionString})
++        return new NodeSQLiteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
+     }
+ 
+     private readonly dbPath?:string;
+diff --git a/packages/db/src/db-map.ts b/packages/db/src/db-map.ts
+index b5ac16b..71ccfc6 100644
+--- a/packages/db/src/db-map.ts
++++ b/packages/db/src/db-map.ts
+@@ -15,13 +15,13 @@ export const getConvoDbMapFromStrings=(mappings:string[]):ResultType<ConvoDbMap>
+             
+             case 'mem':{
+                 let db:InMemoryConvoDb|undefined;
+-                mapped[name]=()=>(noCache?null:db)??(db=new InMemoryConvoDb());
++                mapped[name]=(name)=>(noCache?null:db)??(db=new InMemoryConvoDb({name}));
+                 break;
+             }
+ 
+             case 'sqlite':{
+                 let db:BunSqliteConvoDb|undefined;
+-                mapped[name]=()=>(noCache?null:db)??(db=new BunSqliteConvoDb({dbPath:args[0]}));
++                mapped[name]=(name)=>(noCache?null:db)??(db=new BunSqliteConvoDb({dbPath:args[0],name}));
+                 break;
+             }
+         }
+@@ -31,4 +31,4 @@ export const getConvoDbMapFromStrings=(mappings:string[]):ResultType<ConvoDbMap>
+         success:true,
+         result:mapped,
+     };
+-}
+\ No newline at end of file
++}
+diff --git a/packages/db/src/db-module.ts b/packages/db/src/db-module.ts
+index 1f226c9..b871d87 100644
+--- a/packages/db/src/db-module.ts
++++ b/packages/db/src/db-module.ts
+@@ -5,7 +5,7 @@ export const convoDbModule=(scope:ScopeRegistration)=>{
+ 
+     scope.implement(convoDbProvider,()=>async (connectionString?:string)=>{
+         const {InMemoryConvoDb}=await import('./InMemoryConvoDb.js');
+-        return new InMemoryConvoDb();
++        return new InMemoryConvoDb({name:'default'});
+     },'mem');
+ 
+     scope.implement(convoDbProvider,()=>async (connectionString?:string)=>{
+diff --git a/packages/hono/src/JwtVerifiery.ts b/packages/hono/src/JwtVerifiery.ts
+new file mode 100644
+index 0000000..0d2cf69
+--- /dev/null
++++ b/packages/hono/src/JwtVerifiery.ts
+@@ -0,0 +1,87 @@
++import { ConvoDb, ConvoSignInJwtTransport } from "@convo-lang/convo-lang";
++import { minuteMs } from "@iyio/common";
++import type { Context } from "hono";
++import { HTTPException } from "hono/http-exception";
++import { verify } from "hono/jwt";
++
++export class JwtVerifier
++{
++    public readonly guestToken:TokenRef={
++        identityPath:'/usr/guest',
++        token:{
++            dbName:'',
++            id:'',
++            identityPaths:['/usr/guest'],
++            claims:{}
++        }
++    }
++
++
++    private readonly keyCache:Record<string,KeyRef>={};
++    
++    public async getDbTokenAsync(c:Context,db:ConvoDb):Promise<TokenRef>{
++        let auth=c.req.header('Authorization');
++        if(!auth){
++            return this.guestToken;
++        }
++
++        if(auth.startsWith('Bearer ')){
++            auth=auth.substring(6).trim();
++        }
++
++        let key:string;
++        const cached=this.keyCache[db.dbName];
++        if(cached && cached.ttl>Date.now()){
++            key=cached.key;
++        }else{
++            const node=await db.getNodeByPathAsync('/secrets/auth-secrets');
++            if(!node.success || !node.result){
++                return this.guestToken;
++            }
++
++            const k=node.result.data['jwt'];
++            if(typeof k !=='string'){
++                return this.guestToken;
++            }
++            key=k;
++            this.keyCache[db.dbName]={ttl:Date.now()+ttl,key};
++
++        }
++        
++        try{
++            const token=await verify(auth,key,'HS256') as ConvoSignInJwtTransport;
++
++            if(token.dbName!==db.dbName){
++                throw new HTTPException(401);
++            }
++
++            const identityPath=token.identityPaths?.[0];
++            if(!identityPath){
++                throw new HTTPException(401);
++            }
++
++            return {
++                identityPath,
++                token,
++            };
++        }catch{
++            throw new HTTPException(401);
++        }
++        
++
++    }
++}
++
++const ttl=5*minuteMs;
++
++interface KeyRef
++{
++    ttl:number;
++    key:string;
++}
++
++export interface TokenRef
++{
++    token:ConvoSignInJwtTransport;
++    identityPath:string;
++}
+\ No newline at end of file
+diff --git a/packages/hono/src/convo-lang-hono.ts b/packages/hono/src/convo-lang-hono.ts
+index 46c6dac..62150f5 100644
+--- a/packages/hono/src/convo-lang-hono.ts
++++ b/packages/hono/src/convo-lang-hono.ts
+@@ -1,4 +1,4 @@
+-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbMap, convoDbService, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
++import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDb, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbInstanceMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+ import { CancelToken, minuteMs, uuid } from "@iyio/common";
+ import { Context, Hono } from "hono";
+ import { logger } from 'hono/logger';
+@@ -6,6 +6,7 @@ import { streamSSE } from 'hono/streaming';
+ import { timeout } from 'hono/timeout';
+ import z from "zod";
+ import { initConvoHonoAsync } from "./convo-lang-hono-init.js";
++import { JwtVerifier } from "./JwtVerifiery.js";
+ 
+ export const ConvoTokenQuotaScheme=z.object({
+     id:z.string(),
+@@ -27,7 +28,7 @@ export interface ConvoHonoRoutesOptions
+ {
+     completionTimeoutMs?:number;
+     enableLogging?:boolean;
+-    dbMap?:ConvoDbMap;
++    dbMap?:ConvoDbInstanceMap;
+     
+     onCompletion?:(requestCtx:ConvoCompletionRequestCtx)=>void;
+ 
+@@ -42,6 +43,8 @@ export interface ConvoHonoRoutesOptions
+      * If true a mock route will be added for demoing purposes
+      */
+     enableMockRoute?:boolean;
++
++    disableDbAuth?:boolean;
+ }
+ 
+ export const getConvoHonoRoutes=({
+@@ -53,10 +56,12 @@ export const getConvoHonoRoutes=({
+     afterComplete,
+     completionCtx,
+     getUsage,
++    disableDbAuth=false,
+ }:ConvoHonoRoutesOptions={})=>{
+     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
+ 
+     const routes=new Hono();
++    const jwtVerifier=new JwtVerifier();
+ 
+     let modelCache:ConvoModelInfo[]|undefined;
+ 
+@@ -390,28 +395,31 @@ export const getConvoHonoRoutes=({
+         return c.json(false);
+     });
+ 
+-    const getDb=(name:string)=>{
+-        if(!dbMap){
+-            return name==='default'?convoDbService.get():undefined;
++    const getDbAsync=async (c:Context):Promise<ConvoDb|undefined>=>{
++        const name=c.req.param('dbName');
++        if(!name){
++            return undefined;
+         }
+-        const named=dbMap[name];
+-        if(named){
+-            return named();
++
++        await initConvoHonoAsync();
++
++        const db=dbMap?.getDb(name);
++        if(!db){
++            return undefined;
+         }
+-        const fallback=dbMap['*'];
+-        if(fallback){
+-            let db=fallback();
+-            dbMap[name]=()=>db;
++
++        if(disableDbAuth){
+             return db;
+         }
+-        return undefined;
++
++        const token=await jwtVerifier.getDbTokenAsync(c,db);
++
++        return db.auth.createBoundary(token.identityPath);
+     }
+ 
+     routes.post('/db/:dbName',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -429,11 +437,9 @@ export const getConvoHonoRoutes=({
+ 
+     routes.post('/db/:dbName/node/query',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+         try{
+ 
+-            const store=getDb(c.req.param('dbName'));
++            const store=await getDbAsync(c);
+             if(!store){
+                 return c.json('No database found by name',404);
+             }
+@@ -453,9 +459,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.get('/db/:dbName/node/:path{.*}',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -484,9 +488,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.post('/db/:dbName/node',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -503,9 +505,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.patch('/db/:dbName/node',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -522,9 +522,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.delete('/db/:dbName/node',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -541,9 +539,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.get('/db/:dbName/edge/:id',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -559,9 +555,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.post('/db/:dbName/edge',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -578,9 +572,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.patch('/db/:dbName/edge',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -597,9 +589,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.delete('/db/:dbName/edge',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -616,9 +606,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.get('/db/:dbName/embedding/:id',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -634,9 +622,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.post('/db/:dbName/embedding',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -653,9 +639,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.patch('/db/:dbName/embedding',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -672,9 +656,7 @@ export const getConvoHonoRoutes=({
+ 
+     routes.delete('/db/:dbName/embedding',async (c)=>{
+ 
+-        await initConvoHonoAsync();
+-
+-        const store=getDb(c.req.param('dbName'));
++        const store=await getDbAsync(c);
+         if(!store){
+             return c.json('No database found by name',404);
+         }
+@@ -693,12 +675,10 @@ export const getConvoHonoRoutes=({
+ 
+         return streamSSE(c,async stream=>{
+ 
+-            await initConvoHonoAsync();
+-
+             let id=0;
+             let ping=0;
+ 
+-            const store=getDb(c.req.param('dbName'));
++            const store=await getDbAsync(c);
+             if(!store){
+                 const item:ConvoNodeStreamItem<any>={
+                     type:'error',
+diff --git a/packages/tests/src/convo-db-permission-boundary.test.ts b/packages/tests/src/convo-db-permission-boundary.test.ts
+new file mode 100644
+index 0000000..3287b10
+--- /dev/null
++++ b/packages/tests/src/convo-db-permission-boundary.test.ts
+@@ -0,0 +1,260 @@
++import { ConvoDb, ConvoDbCommandResult, ConvoDbPermissionBoundary, ConvoNode, ConvoNodePermissionType, ConvoNodeQueryResult, PromiseResultType, PromiseResultTypeVoid, ResultTypeVoid } from "@convo-lang/convo-lang";
++import { describe, expect, test } from "bun:test";
++import { createTestDb } from "./createTestDb.js";
++
++const createProxiedDb=():ConvoDb=>{
++    return createTestDb('mem') as ConvoDb;
++}
++
++interface PermissionTestDb
++{
++    db:ConvoDb;
++    aliceDb:ConvoDb;
++    bobDb:ConvoDb;
++}
++
++const expectSuccess=async <T>(promise:PromiseResultType<T>):Promise<T>=>{
++    const r=await promise;
++    if(!r.success){
++        console.error(r.error);
++    }
++    expect(r.success).toBe(true);
++    if(!r.success){
++        throw new Error(r.error);
++    }
++    return r.result;
++}
++
++const expectVoidSuccess=async (promise:PromiseResultTypeVoid):Promise<void>=>{
++    const r=await promise;
++    expect(r.success).toBe(true);
++    if(!r.success){
++        throw new Error(r.error);
++    }
++}
++
++const expectFailure=async <T>(
++    promise:PromiseResultType<T>|Promise<ResultTypeVoid>,
++    statusCode=401
++):Promise<void>=>{
++    const r=await promise;
++    expect(r.success).toBe(false);
++    if(r.success){
++        throw new Error('Expected failure');
++    }
++    expect(r.statusCode as number).toBe(statusCode);
++}
++
++const insertNodesAsync=async (db:ConvoDb,nodes:ConvoNode[]):Promise<void>=>{
++    for(const node of nodes){
++        await expectSuccess(db.insertNodeAsync(node));
++    }
++}
++
++const setupPermissionDbAsync=async ():Promise<PermissionTestDb>=>{
++    const db=createProxiedDb();
++
++    await insertNodesAsync(db,[
++        {
++            path:'/users/alice',
++            type:'user',
++            data:{name:'Alice'},
++        },
++        {
++            path:'/users/bob',
++            type:'user',
++            data:{name:'Bob'},
++        },
++        {
++            path:'/docs/read-only',
++            type:'doc',
++            data:{value:'read-only'},
++        },
++        {
++            path:'/docs/write',
++            type:'doc',
++            data:{value:'write'},
++        },
++        {
++            path:'/docs/bob-only',
++            type:'doc',
++            data:{value:'bob-only'},
++        },
++        {
++            path:'/docs/no-access',
++            type:'doc',
++            data:{value:'no-access'},
++        },
++    ]);
++
++    await expectSuccess(db.insertEdgeAsync({
++        from:'/users/alice',
++        to:'/docs/read-only',
++        type:'grant',
++        grant:ConvoNodePermissionType.read,
++    }));
++
++    await expectSuccess(db.insertEdgeAsync({
++        from:'/users/alice',
++        to:'/docs/write',
++        type:'grant',
++        grant:ConvoNodePermissionType.readWrite,
++    }));
++
++    await expectSuccess(db.insertEdgeAsync({
++        from:'/users/bob',
++        to:'/docs/bob-only',
++        type:'grant',
++        grant:ConvoNodePermissionType.all,
++    }));
++
++    return {
++        db,
++        aliceDb:db.auth.createBoundary('/users/alice'),
++        bobDb:db.auth.createBoundary('/users/bob'),
++    };
++}
++
++describe('ConvoDbPermissionBoundary',()=>{
++
++    test('createBoundary returns a cached ConvoDbPermissionBoundary',()=>{
++        const db=createProxiedDb();
++
++        const a=db.auth.createBoundary('/users/alice');
++        const b=db.auth.createBoundary('/users/alice');
++
++        expect(a).toBeInstanceOf(ConvoDbPermissionBoundary);
++        expect(a).toBe(b);
++        expect((a as ConvoDbPermissionBoundary).identityPath).toBe('/users/alice');
++    });
++
++    test('queryNodesAsync enforces read grants and ignores spoofed permissionFrom',async ()=>{
++        const {aliceDb}=await setupPermissionDbAsync();
++
++        const allowed=await expectSuccess(aliceDb.queryNodesAsync({
++            permissionFrom:'/users/bob',
++            permissionRequired:ConvoNodePermissionType.read,
++            steps:[{path:'/docs/read-only'}],
++        }));
++        expect(allowed.nodes.map(n=>n.path)).toEqual(['/docs/read-only']);
++
++        const denied=await expectSuccess(aliceDb.queryNodesAsync({
++            permissionFrom:'/users/bob',
++            permissionRequired:ConvoNodePermissionType.read,
++            steps:[{path:'/docs/bob-only'}],
++        }));
++
++        expect(denied.nodes).toHaveLength(0);
++    });
++
++    test('write operations require write grants from the boundary identity',async ()=>{
++        const {db,aliceDb}=await setupPermissionDbAsync();
++
++        await expectVoidSuccess(aliceDb.updateNodeAsync(
++            {
++                path:'/docs/write',
++                data:{value:'updated'},
++            },
++            {permissionFrom:'/users/bob'}
++        ));
++
++        const updated=await expectSuccess(db.getNodeByPathAsync('/docs/write'));
++        expect(updated?.data['value']).toBe('updated');
++
++        await expectFailure(aliceDb.updateNodeAsync({
++            path:'/docs/read-only',
++            data:{value:'should-not-update'},
++        }));
++
++        await expectSuccess(aliceDb.insertNodeAsync({
++            path:'/docs/write/child',
++            type:'doc',
++            data:{value:'child'},
++        }));
++
++        const inserted=await expectSuccess(db.getNodeByPathAsync('/docs/write/child'));
++        expect(inserted?.path).toBe('/docs/write/child');
++
++        await expectVoidSuccess(aliceDb.deleteNodeAsync('/docs/write/child'));
++
++        const deleted=await expectSuccess(db.getNodeByPathAsync('/docs/write/child'));
++        expect(deleted).toBeUndefined();
++
++        await expectFailure(aliceDb.insertNodeAsync({
++            path:'/docs/read-only/child',
++            type:'doc',
++            data:{value:'denied'},
++        }));
++    });
++
++    test('edge inserts require write access to from and read or write access to to',async ()=>{
++        const {aliceDb}=await setupPermissionDbAsync();
++
++        const inserted=await expectSuccess(aliceDb.insertEdgeAsync({
++            from:'/docs/write',
++            to:'/docs/read-only',
++            type:'reference',
++        }));
++
++        expect(inserted.id).toBeString();
++        expect(inserted.from).toBe('/docs/write');
++        expect(inserted.to).toBe('/docs/read-only');
++
++        await expectFailure(aliceDb.insertEdgeAsync({
++            from:'/docs/read-only',
++            to:'/docs/write',
++            type:'reference',
++        }));
++    });
++
++    test('permission helpers use the boundary identity instead of caller supplied paths',async ()=>{
++        const {aliceDb,bobDb}=await setupPermissionDbAsync();
++
++        const aliceToBobOnly=await expectSuccess(aliceDb.getNodePermissionAsync('/users/bob','/docs/bob-only'));
++        expect(aliceToBobOnly).toBe(ConvoNodePermissionType.none);
++
++        const bobToBobOnly=await expectSuccess(bobDb.getNodePermissionAsync('/users/alice','/docs/bob-only'));
++        expect(bobToBobOnly).toBe(ConvoNodePermissionType.all);
++
++        await expectFailure(aliceDb.checkNodePermissionAsync(
++            '/users/bob',
++            '/docs/bob-only',
++            ConvoNodePermissionType.read
++        ));
++    });
++
++    test('executeCommandAsync applies boundary permissions and rejects driver commands',async ()=>{
++        const {aliceDb}=await setupPermissionDbAsync();
++
++        const allowed=await expectSuccess(aliceDb.executeCommandAsync({
++            queryNodes:{
++                query:{
++                    permissionFrom:'/users/bob',
++                    permissionRequired:ConvoNodePermissionType.read,
++                    steps:[{path:'/docs/read-only'}],
++                },
++            },
++        })) as ConvoDbCommandResult;
++
++        expect((allowed.queryNodes as ConvoNodeQueryResult<keyof ConvoNode>).nodes.map(n=>n.path)).toEqual(['/docs/read-only']);
++
++        const denied=await expectSuccess(aliceDb.executeCommandAsync({
++            queryNodes:{
++                query:{
++                    permissionFrom:'/users/bob',
++                    permissionRequired:ConvoNodePermissionType.read,
++                    steps:[{path:'/docs/bob-only'}],
++                },
++            },
++        })) as ConvoDbCommandResult;
++
++        expect((denied.queryNodes as ConvoNodeQueryResult<keyof ConvoNode>).nodes).toHaveLength(0);
++
++        await expectFailure(aliceDb.executeCommandAsync({
++            driverCmd:{
++                fn:'selectNodesByPathsAsync',
++                args:['*',['/docs/read-only'],[{prop:'path'}]] as any,
++            },
++        }));
++    });
++});
+diff --git a/packages/tests/src/convo-db.test.ts b/packages/tests/src/convo-db.test.ts
+index 1a31247..e50d626 100644
+--- a/packages/tests/src/convo-db.test.ts
++++ b/packages/tests/src/convo-db.test.ts
+@@ -490,7 +490,6 @@ test("queryNodesAsync supports step permission filtering and final query permiss
+             {path:'/perm/*'},
+         ],
+         permissionFrom:'/principal',
+-        permissionRequired:ConvoNodePermissionType.read,
+         orderBy:{prop:'path',direction:'asc'},
+     });
+ 
+diff --git a/packages/tests/src/createTestDb.ts b/packages/tests/src/createTestDb.ts
+index ae8f19a..19384cb 100644
+--- a/packages/tests/src/createTestDb.ts
++++ b/packages/tests/src/createTestDb.ts
+@@ -11,9 +11,9 @@ export const createTestDb=(type:DbType)=>{
+     return (type==='http'?
+         new HttpConvoCompletionService({endpoint:"http://localhost:7222/api/convo-lang",dbName:uuid()})
+     :type==='bun-sqlite'?
+-        new BunSqliteConvoDb({})
++        new BunSqliteConvoDb({name:'default'})
+     :type==='node'?
+-        new NodeSQLiteConvoDb({})
++        new NodeSQLiteConvoDb({name:'default'})
+     :
+-        new InMemoryConvoDb({}))
++        new InMemoryConvoDb({name:'default'}))
+ }
+\ No newline at end of file
+
+```
+</DIFF>
+
+
+<COMMIT_MESSAGE>
+Add ConvoDb auth boundaries and reusable db functions
+
+- Added `ConvoDbAuthManager.ts`, `ConvoDbPermissionBoundary.ts`, `ConvoDbInstanceMap.ts`, `convo-db-auth-schemas.ts`, and `convo-db-auth-types.ts` for JWT auth state, permission-scoped database proxies, and named database lookup.
+- Updated `convo-db-lib.ts` and `convo-db-types.ts` with identity-bound permission helpers, function call convenience APIs, database names, auth managers, and named DB factory support.
+- Updated `BaseConvoDb.ts`, `HttpConvoCompletionService.ts`, and DB adapter files to support auth managers, db names, schema-validated function calls, and corrected query traversal state handling.
+- Updated `convo-lang-hono.ts` and added `JwtVerifiery.ts` to verify ConvoDb JWTs and wrap API database access in permission boundaries, with an option to disable db auth.
+- Extended `convo.ts`, `convo-cli-types.ts`, `convo-cli-api-server.ts`, `convo-cli-db-function-loader.ts`, and `convo-cli-db-util.ts` with CLI commands for loading, querying, executing, and calling ConvoDb functions.
+- Added the `db-functions` package with auth-related functions in `create-user.ts`, `init-auth.ts`, `sign-in-email-password.ts`, plus auth helpers, package metadata, tsconfig, and README documentation.
+- Updated `db-map.ts`, `db-module.ts`, `BunSqliteConvoDb.ts`, `NodeSQLiteConvoDb.ts`, `InMemoryConvoDb.ts`, and `LayeredConvoDb.ts` for named database construction and updated map factory signatures.
+- Added `convo-db-permission-boundary.test.ts` and updated `convo-db.test.ts` and `createTestDb.ts` to cover permission boundary behavior and db name requirements.
+- Updated `index.ts` to export the new auth, permission boundary, instance map, and standard import modules.
+</COMMIT_MESSAGE>
+
+@time 2026-04-26T19:33:10-04:00
+@tokenUsage 74496 / 13409 / $0.43952500000000005
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md" last-commit="efb9149077040aaa492d5bd6709273d51f76ed1e">
+``` md
+# ConvoDb
+
+ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, authentication flows, and other agentic systems.
+
+It gives you a consistent way to work with:
+
+- **Nodes** for storing entities, documents, tools, users, tasks, memory, and structured data
+- **Edges** for relationships, workflows, permissions, and graph traversal
+- **Embeddings** for semantic search and retrieval
+- **Stored functions** for executing behavior directly from nodes during queries
+- **Path-based permissions** for simple but powerful access control
+- **Authentication helpers and permission boundaries** for JWT-backed remote access and identity-scoped database proxies
+- **Reusable database functions** through `@convo-lang/db-functions`
+- **Portable adapters** so the same ConvoDb code can run in memory, in the browser, over HTTP, on the file system, or on SQL backends
+- **A driver-backed architecture** that separates high-level ConvoDb behavior from low-level datastore access
+- **React hooks** for querying and watching node data from React components using `useConvoDbQuery`, `useConvoNodeAtPath`, and `useConvoNodesAtPath`
+
+Adapters are imported from:
+
+```ts
+import { InMemoryConvoDb, BunPostgresConvoDb } from '@convo-lang/db';
+```
+
+The `ConvoDb` interface and core types are imported from:
+
+```ts
+import {
+    ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
+} from '@convo-lang/convo-lang';
+```
+
+Reusable database functions can be loaded from:
+
+```txt
+@convo-lang/db-functions
+```
+
+React hooks can be imported from:
+
+```ts
+import { useConvoDbQuery, useConvoNodeAtPath, useConvoNodesAtPath } from '@convo-lang/convo-lang-react';
+```
+
+---
+
+## Why ConvoDb is useful for AI agents
+
+AI agents usually need more than a plain key-value store.
+
+They often need to:
+
+- store conversations, memory, tasks, and plans
+- connect related things together
+- search by meaning, not just exact match
+- scope access per user, agent, workspace, or tool
+- authenticate users or agents and constrain remote database access
+- run stored tools or behaviors as part of graph traversal
+- move between local, browser, and server storage without changing application logic
+
+ConvoDb is designed for those patterns.
+
+A single system can use it to store:
+
+- **agent memory**
+- **tool definitions**
+- **user profiles**
+- **documents**
+- **task graphs**
+- **execution history**
+- **permissions**
+- **vector embeddings**
+- **callable functions**
+- **authentication records**
+
+---
+
+## Core concepts
+
+### Nodes
+
+A node is the main stored object.
+
+A node has:
+
+- a unique `path`
+- a `type`
+- arbitrary `data`
+- optional metadata like `name`, `description`, and timestamps
+
+Node paths are exact stored paths. They cannot contain wildcard characters.
+
+Example:
+
+```ts
+const userNode={
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        email:'alex@example.com',
+        tier:'pro',
+    },
+};
+```
+
+You can use nodes for things like:
+
+- users
+- agents
+- memories
+- documents
+- tools
+- jobs
+- tasks
+- organizations
+- workspaces
+- sign-in records
+
+---
+
+### Edges
+
+Edges connect nodes.
+
+They are useful for:
+
+- relationships
+- traversal
+- workflow links
+- permission grants
+
+Edge `from` and `to` values must be exact normalized node paths. They cannot contain wildcard characters.
+
+Example uses:
+
+- user owns workspace
+- agent can access tool
+- task depends on another task
+- memory belongs to session
+- user has permission to project subtree
+
+---
+
+### Embeddings
+
+Embeddings let you attach searchable semantic vectors to nodes.
+
+This is especially useful for AI systems that need:
+
+- retrieval-augmented generation
+- semantic memory lookup
+- document similarity search
+- contextual recall
+
+Embeddings point to a node and usually reference a property like `data`.
+
+---
+
+### Stored functions
+
+ConvoDb can also store executable functions on nodes and invoke them during queries.
+
+This is useful for:
+
+- building tool nodes that can be executed by agents
+- returning computed results alongside normal graph traversal
+- encapsulating reusable behavior inside the database
+- mixing static data, relationships, and executable logic in one model
+- implementing auth and account flows as database-backed functions
+
+Function execution is covered in more detail near the end of this document.
+
+---
+
+### Authentication and permission boundaries
+
+ConvoDb includes an auth helper, `ConvoDbAuthManager`, on every `ConvoDb` instance.
+
+Auth is intentionally database-backed. The auth manager does not implement sign-in logic directly. Instead, it calls stored database functions such as `/bin/sign-in-email-password`.
+
+A successful sign-in returns a JWT that contains:
+
+- the database name
+- a user id
+- identity paths the token can act as
+- additional claims
+
+For remote APIs, a verified JWT can be converted into a `ConvoDbPermissionBoundary`. A permission boundary wraps a database and forces every call to use a fixed identity path as `permissionFrom`.
+
+This lets public or remote callers use normal ConvoDb APIs while preventing them from spoofing another identity.
+
+---
+
+## ConvoDb and ConvoDbDriver
+
+ConvoDb uses a dedicated `ConvoDbDriver` architecture.
+
+At a high level:
+
+- **`ConvoDb`** is the main application-facing interface
+- **`ConvoDbDriver`** is the low-level datastore-facing interface used internally by adapters
+
+This separation makes the system easier to reason about and easier to implement across different backends.
+
+### What `ConvoDb` does
+
+`ConvoDb` handles higher-level behavior such as:
+
+- database naming through `dbName`
+- auth helper access through `auth`
+- path normalization and validation
+- query orchestration and traversal
+- permission checks
+- permission boundary creation
+- watch and stream behavior
+- command execution
+- stored function convenience calls
+- embedding-related higher-level workflows
+- convenience methods like `getNodesByPathAsync` and `getNodeByPathAsync`
+
+### What `ConvoDbDriver` does
+
+`ConvoDbDriver` handles direct communication with the underlying datastore.
+
+That includes low-level operations such as:
+
+- selecting node paths during query execution
+- loading nodes by exact path sets
+- loading permission edges by path combinations
+- inserting, updating, and deleting nodes
+- inserting, updating, and deleting edges
+- inserting, updating, and deleting embeddings
+- direct edge queries
+- direct embedding queries
+
+This means adapters can share the same high-level ConvoDb behavior while customizing only the low-level persistence layer.
+
+### Why this is useful
+
+This driver split improves portability and reuse.
+
+For example:
+
+- an in-memory adapter can implement only storage behavior
+- a SQLite adapter can focus on SQL execution
+- a Postgres adapter can focus on relational persistence
+- an HTTP adapter can proxy supported operations cleanly
+- shared query traversal, permissions, auth boundaries, and function helpers can stay in one place
+
+In practice, this makes adapter implementations cleaner and keeps application behavior more consistent across backends.
+
+---
+
+## Database names and instance maps
+
+Every `ConvoDb` has a `dbName`.
+
+Database names are used by:
+
+- JWT auth tokens
+- HTTP database routes
+- CLI database commands
+- named database maps
+- multi-database applications
+
+Most adapters now require a name when constructed directly:
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+```
+
+### `ConvoDbInstanceMap`
+
+`ConvoDbInstanceMap` wraps a `ConvoDbMap` and provides named database lookup.
+
+```ts
+import { ConvoDbInstanceMap } from '@convo-lang/convo-lang';
+import { getConvoDbMapFromStrings } from '@convo-lang/db/db-map.js';
+
+const mapResult=getConvoDbMapFromStrings([
+    'default:sqlite:./data/default.db',
+    'cache:mem',
+]);
+
+if(!mapResult.success){
+    throw new Error(mapResult.error);
+}
+
+const dbMap=new ConvoDbInstanceMap(mapResult.result);
+
+const defaultDb=dbMap.getDb('default');
+const cacheDb=dbMap.getDb('cache');
+```
+
+A `ConvoDbMap` maps names to functions that receive the requested name and return a database:
+
+```ts
+type ConvoDbMap=Record<string,(name:string)=>ConvoDb>;
+```
+
+If a `'*'` entry exists, it can be used as a fallback factory for unknown database names.
+
+---
+
+## File-system style paths
+
+One of ConvoDb’s most important ideas is that every node has a normalized path that behaves like a file-system path.
+
+Examples:
+
+- `/users/alex`
+- `/users/alex/memories/memory-001`
+- `/agents/researcher`
+- `/workspaces/acme/docs/roadmap`
+- `/orgs/acme/projects/p1/tasks/task-42`
+
+This makes your data feel like a structured namespace instead of a flat table.
+
+### Path rules
+
+ConvoDb paths are normalized and follow file-system-like rules:
+
+- paths start with `/`
+- trailing slashes are removed except for `/`
+- duplicate slashes are normalized
+- paths are case-sensitive
+- `.` and `..` are not allowed
+- stored node paths cannot contain `*`
+- edge `from` and `to` paths cannot contain `*`
+- query step paths can be exact absolute paths or supported trailing wildcard paths like `/users/*`
+- condition values for `like` and `ilike` may use `*` anywhere in the pattern
+- wildcard matching is supported in queries like `/users/*`
+
+### Wildcard rules
+
+Wildcards have different rules depending on where they are used.
+
+#### Stored data cannot use wildcards
+
+Do not use `*` in stored identifiers:
+
+```ts
+// !INVALID: node paths cannot contain wildcards
+await db.insertNodeAsync({
+    path:'/users/*',
+    type:'user',
+    data:{},
+});
+
+// !INVALID: edge endpoints cannot contain wildcards
+await db.insertEdgeAsync({
+    type:'member-of',
+    from:'/users/*',
+    to:'/workspaces/acme',
+});
+```
+
+Use exact paths instead:
+
+```ts
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    data:{},
+});
+
+await db.insertEdgeAsync({
+    type:'member-of',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+});
+```
+
+#### Query step paths only support trailing wildcards
+
+The `path` property of `ConvoNodeQueryStep` may be:
+
+- an exact absolute path such as `/users/alex`
+- a path ending in one wildcard segment such as `/users/*`
+
+The wildcard may only appear at the end of the path, immediately after a `/`.
+
+Valid query step paths:
+
+```txt
+/users/alex
+/users/*
+/workspaces/acme/docs/*
+```
+
+!INVALID query step paths:
+
+```txt
+*
+/users*
+/users/*/profile
+/users/**
+```
+
+#### `like` and `ilike` condition values can use wildcards anywhere
+
+The only place `*` can be used freely is in the `value` of a condition that uses the `like` or `ilike` operator.
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            condition:{
+                target:'path',
+                op:'like',
+                value:'*/docs/*spec*',
+            },
+        },
+    ],
+});
+```
+
+This flexible wildcard behavior only applies to `like` and `ilike` condition values. It does not apply to node paths, edge endpoints, or query step paths.
+
+---
+
+## Filesystem-style permissions
+
+Path-based organization makes permissions much easier to reason about.
+
+Instead of building a totally custom ACL system from scratch, you can grant permissions from one node to another node path or subtree ancestor using edges.
+
+### Permission model
+
+Permissions are represented using edges with the `grant` property.
+
+Permission is directional:
+
+```txt
+from -> to
+```
+
+If you grant access to:
+
+```txt
+/workspaces/acme
+```
+
+that permission can apply to descendant nodes such as:
+
+```txt
+/workspaces/acme/docs/spec
+/workspaces/acme/tasks/task-1
+/workspaces/acme/agents/researcher
+```
+
+The stored edge still points to the exact path `/workspaces/acme`, not `/workspaces/acme/*`.
+
+### Permission types
+
+ConvoDb supports bitwise permissions:
+
+- `read`
+- `write`
+- `execute`
+
+And combinations like:
+
+- `readWrite`
+- `readExecute`
+- `writeExecute`
+- `all`
+
+### Grant a user read/write access to a workspace
+
+```ts
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+```
+
+### Check permissions directly
+
+```ts
+const permission=await db.getNodePermissionAsync(
+    '/users/alex',
+    '/workspaces/acme/docs/spec',
+);
+
+if(permission.success){
+    console.log(permission.result);
+}
+```
+
+### Enforce permissions during reads
+
+```ts
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+```
+
+### Enforce permissions during writes
+
+```ts
+await db.insertNodeAsync(
+    {
+        path:'/workspaces/acme/docs/new-doc',
+        type:'doc',
+        data:{
+            title:'New Doc',
+        },
+    },
+    {
+        permissionFrom:'/users/alex',
+    },
+);
+```
+
+---
+
+## Permission boundaries
+
+`ConvoDbPermissionBoundary` wraps an existing `ConvoDb` and forces all public calls to use a fixed identity path.
+
+Create one through `db.auth.createBoundary(identityPath)`:
+
+```ts
+const aliceDb=db.auth.createBoundary('/users/alice');
+```
+
+The returned object implements `ConvoDb`, but all calls are scoped to `/users/alice`.
+
+For example, this caller-supplied `permissionFrom` is ignored and replaced by `/users/alice`:
+
+```ts
+const docs=await aliceDb.queryNodesAsync({
+    permissionFrom:'/users/bob',
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+});
+```
+
+### What boundaries protect
+
+A permission boundary:
+
+- overwrites `permissionFrom` on reads and writes
+- applies read permission to query steps
+- applies execute permission when query steps call functions
+- applies write checks for node, edge, and embedding mutations
+- prevents external callers from crossing identity boundaries in permission helpers
+- rejects raw `driverCmd` commands
+
+This is especially useful for:
+
+- HTTP APIs
+- browser clients
+- multi-user apps
+- agent sandboxes
+- tenant-scoped tools
+
+### Bypassing a boundary
+
+`createBoundary` accepts a second argument, `byPass`.
+
+```ts
+const scopedDb=db.auth.createBoundary('/users/alice');
+const rawDb=db.auth.createBoundary('/users/alice',true);
+```
+
+When `byPass` is true, the original database is returned. This should only be used in trusted internal code.
+
+---
+
+## Authentication
+
+ConvoDb auth is based on stored database functions and JWT permission boundaries.
+
+### Auth manager
+
+Every `ConvoDb` exposes:
+
+```ts
+db.auth
+```
+
+The auth manager stores the current JWT in memory and, when available, local storage.
+
+```ts
+const jwt=db.auth.jwt;
+
+db.auth.jwtSubject.subscribe(jwt=>{
+    console.log('JWT changed',jwt);
+});
+```
+
+### Email/password sign-in
+
+If the auth functions from `@convo-lang/db-functions` have been loaded under `/bin`, sign in with:
+
+```ts
+const signIn=await db.auth.signInEmailPasswordAsync({
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(signIn.success){
+    console.log(signIn.result.jwt);
+}
+```
+
+The returned JWT contains:
+
+```ts
+{
+    id:string;
+    dbName:string;
+    identityPaths:string[];
+    claims:Record<string,any>;
+    jwt:string;
+}
+```
+
+### HTTP auth
+
+`HttpConvoCompletionService` implements `ConvoDb` and uses `db.auth.jwt` automatically.
+
+When a JWT is set, HTTP DB requests include:
+
+```txt
+Authorization: Bearer <jwt>
+```
+
+On the server, Hono routes verify the JWT, check that the token belongs to the requested database name, pick the first `identityPaths` entry, and wrap the target database in a permission boundary.
+
+### Guest access
+
+If a remote DB request has no valid JWT, the Hono DB routes use a guest token identity:
+
+```txt
+/usr/guest
+```
+
+Grant permissions to `/usr/guest` if you want unauthenticated callers to access public data.
+
+### Disabling API DB auth
+
+The CLI API server and Hono route setup can disable database auth for trusted environments.
+
+CLI:
+
+```sh
+convo \
+    --api \
+    --db-map 'default:sqlite:./data/example.db' \
+    --disable-api-db-auth
+```
+
+Programmatic Hono route setup:
+
+```ts
+getConvoHonoRoutes({
+    dbMap,
+    disableDbAuth:true,
+});
+```
+
+Only disable DB auth for trusted internal servers.
+
+---
+
+## Reusable database functions
+
+The `@convo-lang/db-functions` package contains reusable function nodes for ConvoDb applications.
+
+It currently includes auth-related functions:
+
+| Function | Default path | Effects | Description |
+|---|---|---|---|
+| `init-auth` | `/bin/init-auth` | `readWrite` | Initializes JWT and password hashing secrets. |
+| `create-user` | `/bin/create-user` | `readWrite` | Creates a user sign-in node under `/usr/{id}` using an email claim and password. |
+| `sign-in-email-password` | `/bin/sign-in-email-password` | `readOnly` | Signs in a user by email and password and returns a JWT result node. |
+
+### Loading db functions with the CLI
+
+Functions are usually loaded into a database with the Convo CLI.
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function "default:/bin:node_modules/@convo-lang/db-functions/src/functions/bin/*" \
+    --load-db-function-drop-export
+```
+
+This loads the package functions into the default database under `/bin`.
+
+The load tuple format is:
+
+```txt
+dbName:path:source
+```
+
+Examples:
+
+```sh
+# Load a single function
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin/my-tool:./functions/my-tool.ts'
+
+# Load all .ts and .js files from a directory, non-recursively
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin:./functions/*'
+```
+
+By default, functions are bundled with:
+
+```sh
+bun build "$dbFunctionSrcFilePath"
+```
+
+You can customize the bundle command:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --load-db-function 'default:/bin/my-tool:./functions/my-tool.ts' \
+    --db-function-bundle-command 'bun build "$dbFunctionSrcFilePath" --minify'
+```
+
+Use `--load-db-function-drop-export` when the generated bundled output ends with exports that should not be included in the stored JavaScript body.
+
+### Initializing auth
+
+Before creating users or signing in, initialize auth secrets:
+
+```ts
+const result=await db.callFunctionAsync('/bin/init-auth',{
+    override:false,
+});
+
+if(result.success){
+    console.log(result.result);
+}
+```
+
+The function creates or updates:
+
+```txt
+/secrets/auth-secrets
+```
+
+with:
+
+- `data.jwt`
+- `data.passwordSalt`
+
+If `override` is true, existing secrets are replaced.
+
+### Creating a user
+
+Create a new email/password sign-in record:
+
+```ts
+const result=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/bin/create-user',
+            call:{
+                args:{
+                    password:'correct horse battery staple',
+                    claims:{
+                        email:'alex@example.com',
+                        name:'Alex',
+                    },
+                },
+            },
+        },
+    ],
+});
+
+if(result.success){
+    console.log(result.result.nodes[0]);
+}
+```
+
+The function:
+
+- requires `claims.email`
+- rejects duplicate email addresses
+- hashes the supplied password
+- creates a user node under `/usr/{id}`
+- stores sign-in data on the created node
+- adds `/usr/{id}` to `identityPaths`
+
+### Signing in
+
+```ts
+const result=await db.callFunctionAsync('/bin/sign-in-email-password',{
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(result.success){
+    console.log(result.result);
+}
+```
+
+A successful sign-in returns JWT data. Invalid credentials return a 401 result.
+
+---
+
+## Installation and imports
+
+### Core interface and types
+
+```ts
+import {
+    ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
+    ConvoNodePermissionType,
+} from '@convo-lang/convo-lang';
+```
+
+### Auth schemas and types
+
+```ts
+import {
+    ConvoEmailPasswordSignRequestSchema,
+    ConvoSignInJwtSchema,
+    ConvoSignInJwt,
+} from '@convo-lang/convo-lang';
+```
+
+### Adapters
+
+```ts
+import {
+    InMemoryConvoDb,
+} from '@convo-lang/db';
+```
+
+### React hooks
+
+```ts
+import {
+    useConvoDbQuery,
+    useConvoNodeAtPath,
+    useConvoNodesAtPath,
+} from '@convo-lang/convo-lang-react';
+```
+
+---
+
+## Quick start
+
+### Create a database
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+```
+
+### Insert some nodes
+
+```ts
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    displayName:'Alex',
+    data:{
+        role:'developer',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/airports/jfk',
+    type:'airport',
+    displayName:'JFK Airport',
+    data:{
+        city:'New York',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/trips/alex-jfk',
+    type:'trip',
+    displayName:'Trip to JFK',
+    data:{
+        status:'planning',
+        origin:'/users/alex/home',
+        destination:'/airports/jfk',
+    },
+});
+```
+
+### Query nodes by path
+
+Use wildcards only at the end of query step paths.
+
+```ts
+const trips=await db.getNodesByPathAsync('/trips/*');
+
+if(trips.success){
+    console.log(trips.result.nodes);
+}
+```
+
+### Get a single node by path
+
+```ts
+const trip=await db.getNodeByPathAsync('/trips/alex-jfk');
+
+if(trip.success){
+    console.log(trip.result);
+}
+```
+
+---
+
+## Common use cases for agentic systems
+
+### 1. Agent memory
+
+Store short-term and long-term memory by path:
+
+```txt
+/agents/researcher/memory/working/task-1
+/agents/researcher/memory/episodic/2026-01-10
+/agents/researcher/memory/semantic/product-facts
+```
+
+Benefits:
+
+- easy namespace separation
+- simple cleanup by subtree
+- permission scoping per agent
+
+---
+
+### 2. Multi-tenant AI workspaces
+
+Organize each tenant under a root path:
+
+```txt
+/tenants/acme
+/tenants/acme/users/alex
+/tenants/acme/docs/handbook
+/tenants/acme/agents/support-bot
+```
+
+Grant a user or agent access at `/tenants/acme` and let that flow down the subtree.
+
+---
+
+### 3. Tool registries
+
+Store tool definitions as nodes:
+
+```txt
+/tools/web-search
+/tools/calculator
+/tools/sql-query
+```
+
+Then connect agents to allowed tools with edges.
+
+---
+
+### 4. Workflow and task graphs
+
+Represent tasks and dependencies with nodes and edges:
+
+```txt
+/workflows/onboarding
+/workflows/onboarding/tasks/create-account
+/workflows/onboarding/tasks/send-email
+```
+
+Use edges to model:
+
+- depends on
+- blocks
+- completes
+- owned by
+
+---
+
+### 5. RAG and semantic retrieval
+
+Store documents and embeddings:
+
+```txt
+/docs/product/overview
+/docs/product/faq
+/docs/product/pricing
+```
+
+Create embeddings for each document node and query semantically.
+
+---
+
+### 6. Conversation and session state
+
+```txt
+/sessions/session-001
+/sessions/session-001/messages/msg-1
+/sessions/session-001/messages/msg-2
+/sessions/session-001/summary
+```
+
+Useful for:
+
+- chat agents
+- orchestrators
+- copilots
+- long-running workflows
+
+---
+
+### 7. Auth-backed applications
+
+```txt
+/usr/{id}
+/secrets/auth-secrets
+/bin/init-auth
+/bin/create-user
+/bin/sign-in-email-password
+```
+
+Useful for:
+
+- browser clients
+- authenticated HTTP APIs
+- multi-user dashboards
+- tenant-aware agent systems
+
+---
+
+## Working with nodes
+
+### Insert a node
+
+Node paths must be exact normalized paths and cannot contain wildcards.
+
+```ts
+await db.insertNodeAsync({
+    path:'/agents/researcher',
+    type:'agent',
+    displayName:'Research Agent',
+    data:{
+        model:'gpt-style-model',
+        goal:'Find and summarize information',
+    },
+});
+```
+
+### Update a node
+
+`data` is replaced as a whole when updated by default.
+
+```ts
+await db.updateNodeAsync({
+    path:'/agents/researcher',
+    displayName:'Research Agent v2',
+    data:{
+        model:'gpt-style-model',
+        goal:'Find, rank, and summarize information',
+    },
+});
+```
+
+You can request shallow merge behavior through update options:
+
+```ts
+await db.updateNodeAsync(
+    {
+        path:'/agents/researcher',
+        data:{
+            status:'active',
+        },
+    },
+    {
+        mergeData:true,
+    },
+);
+```
+
+### Delete a node
+
+Deleting a node also deletes:
+
+- connected edges
+- embeddings pointing to the node
+
+```ts
+await db.deleteNodeAsync('/agents/researcher');
+```
+
+### Get one node by exact path
+
+```ts
+const agent=await db.getNodeByPathAsync('/agents/researcher');
+
+if(agent.success){
+    console.log(agent.result);
+}
+```
+
+---
+
+## Querying nodes
+
+ConvoDb supports traversal-based queries.
+
+A query is made of one or more `steps`. Each step can filter nodes and optionally traverse edges to move to connected nodes.
+
+The `path` property of a query step may be either an exact absolute path or a path ending with a wildcard. The wildcard may only appear at the end of the query step path.
+
+### Simple path query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+        },
+    ],
+});
+```
+
+### Exact path query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/alex',
+        },
+    ],
+});
+```
+
+### Invalid path wildcard query
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            // !INVALID: wildcard is not at the end of the path
+            path:'/users/*/profile',
+        },
+    ],
+});
+```
+
+### Query by condition
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/*',
+            condition:{
+                target:'data.tier',
+                op:'=',
+                value:'pro',
+            },
+        },
+    ],
+});
+```
+
+### Query with ordering
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    orderBy:{
+        prop:'path',
+        direction:'asc',
+    },
+});
+```
+
+### Return only selected keys
+
+```ts
+const r=await db.queryNodesAsync({
+    keys:['path','type','data'],
+    steps:[
+        {
+            path:'/agents/*',
+        },
+    ],
+});
+```
+
+### Pagination
+
+```ts
+const firstPage=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    limit:20,
+});
+
+if(firstPage.success && firstPage.result.nextToken){
+    const secondPage=await db.queryNodesAsync({
+        steps:[
+            {
+                path:'/docs/*',
+            },
+        ],
+        limit:20,
+        nextToken:firstPage.result.nextToken,
+    });
+}
+```
+
+---
+
+## Conditions
+
+Conditions can target top-level properties or nested properties in `data`.
+
+Example:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                target:'data.status',
+                op:'=',
+                value:'open',
+            },
+        },
+    ],
+});
+```
+
+Supported operator categories include:
+
+- equality and comparison: `=`, `!=`, `>`, `<`, `>=`, `<=`
+- array operators: `in`, `all-in`, `any-in`, `contains`, `contains-all`, `contains-any`
+- wildcard string operators: `like`, `ilike`
+
+### Wildcards in `like` and `ilike`
+
+When a condition uses `like` or `ilike`, the condition `value` may contain `*` anywhere in the string.
+
+This is the only place where ConvoDb wildcards can be used freely in the middle of a string.
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            condition:{
+                target:'path',
+                op:'ilike',
+                value:'*/docs/*roadmap*',
+            },
+        },
+    ],
+});
+```
+
+This wildcard behavior does not apply to:
+
+- `ConvoNode.path`
+- `ConvoNodeEdge.from`
+- `ConvoNodeEdge.to`
+- `ConvoNodeQueryStep.path`
+
+### Grouped conditions
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tasks/*',
+            condition:{
+                groupOp:'and',
+                conditions:[
+                    {
+                        target:'data.status',
+                        op:'=',
+                        value:'open',
+                    },
+                    {
+                        target:'data.priority',
+                        op:'>=',
+                        value:3,
+                    },
+                ],
+            },
+        },
+    ],
+});
+```
+
+---
+
+## Traversing relationships with edges
+
+Edges turn ConvoDb into a graph-aware database.
+
+Edge endpoints are stored as exact paths. Do not use wildcards in `from` or `to`.
+
+### Insert an edge
+
+```ts
+await db.insertEdgeAsync({
+    type:'uses-tool',
+    from:'/agents/researcher',
+    to:'/tools/web-search',
+    description:'Research agent can use web search',
+});
+```
+
+### Query edges directly
+
+```ts
+const edgeResult=await db.queryEdgesAsync({
+    from:'/agents/researcher',
+    type:'uses-tool',
+});
+```
+
+### Traverse from one node to connected nodes
+
+Start from an agent and move to its tools:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/agents/researcher',
+            edge:'uses-tool',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+### Reverse traversal
+
+Find agents that can use a tool:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/web-search',
+            edge:'uses-tool',
+            edgeDirection:'reverse',
+        },
+    ],
+});
+```
+
+### Multi-step traversal
+
+From a user to their workspace to its documents:
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/users/alex',
+            edge:'member-of',
+            edgeDirection:'forward',
+        },
+        {
+            edge:'contains',
+            edgeDirection:'forward',
+        },
+    ],
+});
+```
+
+---
+
+## Embeddings and semantic search
+
+Embeddings attach vector-searchable representations to nodes.
+
+### Insert a document node
+
+```ts
+await db.insertNodeAsync({
+    path:'/docs/faq/refunds',
+    type:'doc',
+    data:{
+        title:'Refund Policy',
+        body:'Customers may request a refund within 30 days...',
+    },
+});
+```
+
+### Insert an embedding
+
+```ts
+await db.insertEmbeddingAsync({
+    path:'/docs/faq/refunds',
+    prop:'data.body',
+    type:'text',
+});
+```
+
+### Query embeddings directly
+
+```ts
+const embeddings=await db.queryEmbeddingsAsync({
+    path:'/docs/faq/refunds',
+});
+```
+
+### Semantic node lookup in a query step
+
+```ts
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+            embedding:{
+                text:'How do refunds work?',
+                type:'text',
+            },
+        },
+    ],
+});
+```
+
+### Embedding instructions
+
+Embeddings can include instructions describing how to transform source data before generating the vector.
+
+This is useful when you want to:
+
+- combine title and body
+- summarize a large object
+- embed only selected fields
+- normalize noisy content before indexing
+
+---
+
+## Streaming query results
+
+For larger scans, stream nodes instead of loading them all at once.
+
+```ts
+for await(const item of db.streamNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+})){
+    if(item.type==='error'){
+        console.error(item.error);
+        break;
+    }
+
+    if(item.type==='node'){
+        console.log(item.node.path);
+    }
+}
+```
+
+Useful for:
+
+- long-running ingestion
+- batch processing
+- agent maintenance jobs
+- offline indexing
+- migration tasks
+- live UI updates
+
+---
+
+## React hooks
+
+ConvoDb includes React hooks for querying node data from components without manually managing async loading, pagination, and live watch state.
+
+They can be imported from:
+
+```ts
+import { useConvoDbQuery, useConvoNodeAtPath, useConvoNodesAtPath } from '@convo-lang/convo-lang-react';
+```
+
+These hooks are useful for:
+
+- loading nodes directly into React components
+- subscribing to live changes using query watch mode
+- building searchable lists
+- rendering path-based views
+- handling paginated query flows
+
+### `useConvoDbQuery`
+
+`useConvoDbQuery` executes a `ConvoNodeQuery` and returns React state describing loading, error, loaded, or streaming status.
+
+Signature:
+
+```ts
+useConvoDbQuery(query,options)
+```
+
+#### Query argument
+
+The first argument is a `ConvoNodeQuery` or `null` / `undefined`.
+
+If the query is `null` or `undefined`, the hook can be disabled automatically.
+
+Example query shape:
+
+```ts
+{
+    keys:['path','type','data'],
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+    watch:true,
+}
+```
+
+#### `UseConvoDbOptions`
+
+The second argument is an optional options object with the following properties:
+
+- `disabled?:boolean`
+    - Disables or pauses the query
+    - Defaults to `true` when no query is provided
+- `refresh?:number`
+    - Changing this value forces the hook to rerun the query
+- `db?:ConvoDb`
+    - Explicit database instance to use
+    - If omitted, the configured instance from `convoDbService` is used
+- `stream?:boolean`
+    - If `true`, results are returned incrementally as chunks are received
+    - Automatically enabled when `watch` is true
+- `watch?:boolean`
+    - Provides a default `watch` value for the query paired with the hook
+    - If enabled, the hook can continue receiving live updates
+- `debounceMs?:number`
+    - Debounce delay in milliseconds before starting the query
+    - Useful for user-driven input such as search fields
+- `type?:string`
+    - Adds a node `type` filter when used with path hooks such as `useConvoNodeAtPath` and `useConvoNodesAtPath`
+- `condition?:ConvoNodeCondition`
+    - Adds a node condition filter when used with path hooks such as `useConvoNodeAtPath` and `useConvoNodesAtPath`
+
+#### Returned state
+
+The hook returns a discriminated union with shared properties and state-specific properties.
+
+Shared properties:
+
+- `nodes`
+    - All currently selected nodes
+- `node`
+    - First node in `nodes`
+- `lastNode`
+    - Last node in `nodes`
+- `query`
+    - The query currently being used
+- `watch`
+    - Indicates whether watch mode is enabled
+
+Possible `state` values:
+
+- `disabled`
+- `loading`
+- `loaded`
+- `streaming`
+- `error`
+
+Additional state-specific fields include:
+
+- `db`
+    - Present when a database is available
+- `result`
+    - Present in the `loaded` state and contains the raw `ConvoNodeQueryResult`
+- `next()`
+    - Present in `loaded` and `streaming` states and can be used to request the next page or next batch cycle
+- `watchingChanges`
+    - Present in the `streaming` state and becomes `true` once the initial stream finishes and live watching begins
+- `error`
+    - Present in the `error` state
+- `statusCode`
+    - Present in the `error` state
+
+#### Example using `useConvoDbQuery`
+
+```tsx
+import { useConvoDbQuery } from '@convo-lang/convo-lang-react';
+
+export function ProUsersList()
+{
+
+    const result=useConvoDbQuery({
+        steps:[
+            {
+                path:'/users/*',
+                condition:{
+                    target:'data.tier',
+                    op:'=',
+                    value:'pro',
+                },
+            },
+        ],
+        orderBy:{
+            prop:'path',
+            direction:'asc',
+        },
+    });
+
+    if(result.state==='disabled' || result.state==='loading'){
+        return <div>Loading users...</div>;
+    }
+
+    if(result.state==='error'){
+        return <div>Error: {result.error}</div>;
+    }
+
+    return (
+        <div>
+            <h3>Pro Users</h3>
+            <ul>
+                {result.nodes.map(node=>(
+                    <li key={node.path}>
+                        {node.path}
+                    </li>
+                ))}
+            </ul>
+
+            {(result.state==='loaded' && result.result.nextToken) && (
+                <button onClick={result.next}>
+                    Load more
+                </button>
+            )}
+        </div>
+    );
+}
+```
+
+### `useConvoNodeAtPath` and `useConvoNodesAtPath`
+
+`useConvoNodeAtPath` and `useConvoNodesAtPath` are convenience hooks for path-based lookup.
+
+They are useful when you want to select nodes by exact path or wildcard path without writing the full `ConvoNodeQuery` object yourself.
+
+Conceptually, `useConvoNodesAtPath(path,options)` is shorthand for:
+
+```ts
+useConvoDbQuery({steps:[{path}]},options)
+```
+
+`useConvoNodeAtPath` follows the same path-based pattern but is intended for reading a single node.
+
+Signatures:
+
+```ts
+useConvoNodeAtPath(path,options)
+useConvoNodesAtPath(path,options)
+```
+
+#### Arguments
+
+- `path:string`
+    - Exact normalized path or a supported ending wildcard path such as `/docs/*`
+    - Wildcards may only appear at the end of the path
+- `options?:UseConvoDbOptions`
+    - The same options supported by `useConvoDbQuery`
+    - `type` and `condition` are especially useful with path hooks because they add common filtering without requiring a full query object
+
+Prefer `useConvoNodeAtPath` or `useConvoNodesAtPath` with `type` and `condition` when you only need path-based lookup plus simple filtering. Reach for `useConvoDbQuery` when you need the full query model, such as multi-step traversal, edge traversal, embeddings, ordering, permissions, or custom selected keys.
+
+---
+
+## Command-based execution
+
+ConvoDb supports command objects, which can be useful when:
+
+- sending DB instructions over HTTP
+- building agent tools around structured actions
+- serializing operations
+- proxying remote databases
+
+Commands target the `ConvoDb` interface, and supported low-level driver calls can also be proxied when needed by adapters such as HTTP-backed implementations.
+
+When commands pass through a permission boundary, the boundary applies the caller identity and rejects `driverCmd`.
+
+### Execute one command
+
+```ts
+const result=await db.executeCommandAsync({
+    queryNodes:{
+        query:{
+            steps:[
+                {
+                    path:'/docs/*',
+                },
+            ],
+        },
+    },
+});
+```
+
+### Execute multiple commands
+
+```ts
+const result=await db.executeCommandsAsync([
+    {
+        insertNode:{
+            node:{
+                path:'/agents/planner',
+                type:'agent',
+                data:{},
+            },
+        },
+    },
+    {
+        queryNodes:{
+            query:{
+                steps:[
+                    {
+                        path:'/agents/*',
+                    },
+                ],
+            },
+        },
+    },
+]);
+```
+
+This pattern is especially useful for remote and tool-driven agent architectures.
+
+---
+
+## CLI database operations
+
+The Convo CLI can work directly with ConvoDb instances defined by `--db-map`.
+
+### Define databases
+
+```sh
+convo --db-map 'default:sqlite:./data/example.db'
+```
+
+Multiple mappings can be passed:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/default.db' \
+    --db-map 'cache:mem'
+```
+
+### Query a database
+
+Short path form:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db 'default:/docs/*'
+```
+
+JSON query form:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db '{dbName:"default",steps:[{path:"/docs/*"}]}'
+```
+
+The CLI follows `nextToken` and prints all returned nodes.
+
+### Call a database function
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --call-db-function 'default:/bin/sign-in-email-password' \
+    --call-db-function-args '{email:"alex@example.com",password:"correct horse battery staple"}'
+```
+
+### Execute database commands
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --execute-db-commands '{dbName:"default",commands:[{queryNodes:{query:{steps:[{path:"/docs/*"}]}}}]}'
+```
+
+### Output formatting
+
+Use `--json-format` to control `JSON.stringify` indentation:
+
+```sh
+convo \
+    --db-map 'default:sqlite:./data/example.db' \
+    --query-db 'default:/docs/*' \
+    --json-format 2
+```
+
+---
+
+## Adapters
+
+A major benefit of ConvoDb is that your application can target the `ConvoDb` interface while storage is handled by interchangeable adapters.
+
+This means your agent logic can stay mostly the same while storage changes depending on environment or scale.
+
+Adapters are imported from:
+
+```ts
+import {
+    BaseConvoDb,
+    InMemoryConvoDb,
+    LocalStorageConvoDb,
+    HttpConvoDb,
+} from '@convo-lang/db';
+```
+
+### Current adapters
+
+### `BaseConvoDb`
+
+A base adapter that simplifies building new adapters.
+
+Use this when you want to implement a custom backend while reusing the shared traversal, permissions, validation, command execution, streaming, auth manager, and embedding behavior.
+
+Best for:
+
+- custom storage engines
+- internal platform adapters
+- adapting proprietary databases
+
+---
+
+### `InMemoryConvoDb`
+
+Stores everything in memory.
+
+Its in-memory persistence is implemented behind the shared ConvoDb/ConvoDbDriver split.
+
+Best for:
+
+- testing
+- unit tests
+- demos
+- prototypes
+- ephemeral agent runs
+
+Example:
+
+```ts
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+```
+
+---
+
+### `BaseSqliteConvoDb`
+
+An abstract SQLite adapter that makes it easier to create SQLite-based adapters by delegating low-level sqlite operations through the driver-backed architecture.
+
+Best for:
+
+- embedded apps
+- desktop tools
+- local dev environments
+- lightweight persistent stores
+
+---
+
+### `BunSqliteConvoDb`
+
+A SQLite adapter using Bun’s SQLite implementation.
+
+Best for:
+
+- Bun-based apps
+- local persistence
+- fast dev setups
+
+---
+
+### `BasePostgresConvoDb`
+
+An abstract Postgres adapter that makes it easier to create Postgres adapters by only implementing a query function.
+
+Best for:
+
+- server backends
+- production APIs
+- scalable relational persistence
+
+---
+
+### `BunPostgresConvoDb`
+
+A Postgres adapter using Bun’s Postgres implementation.
+
+Best for:
+
+- Bun servers
+- cloud-hosted APIs
+- multi-user production systems
+
+---
+
+### `HttpConvoDb` and `HttpConvoCompletionService`
+
+HTTP-backed database access can proxy normal ConvoDb calls to a remote server.
+
+`HttpConvoCompletionService` also implements `ConvoDb` and now includes:
+
+- `dbName`
+- `auth`
+- JWT Authorization header support
+- function call convenience methods
+
+Best for:
+
+- client/server architectures
+- browser apps
+- remote agent workers
+- service boundaries
+- centralized data access
+
+---
+
+### `LocalStorageConvoDb`
+
+Stores data in browser local storage.
+
+Best for:
+
+- small browser apps
+- local demos
+- offline-capable prototypes
+- simple single-user tools
+
+---
+
+### `IndexDbConvoDb`
+
+Stores data in IndexedDB in the browser.
+
+Best for:
+
+- larger browser datasets
+- offline-first apps
+- local AI assistants
+- client-side memory stores
+
+---
+
+### `FsConvoDb`
+
+Uses the local file system for storage.
+
+Best for:
+
+- developer tools
+- CLI workflows
+- local-first systems
+- inspectable data layouts
+
+---
+
+### `LayeredConvoDb`
+
+Lets you layer multiple adapters together and route requests based on path rules.
+
+This works similarly to Unix file-system mounts.
+
+For example:
+
+- `/cache/*` in memory
+- `/browser/*` in IndexedDB
+- `/shared/*` over HTTP
+- `/archive/*` on disk
+
+Best for:
+
+- hybrid storage architectures
+- caching layers
+- multi-environment apps
+- path-routed storage strategies
+
+---
+
+## Example adapter usage patterns
+
+### Local prototype
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+```
+
+### Browser app
+
+```ts
+import { IndexDbConvoDb } from '@convo-lang/db';
+
+const db=new IndexDbConvoDb({
+    name:'browser',
+});
+```
+
+### Remote API client
+
+```ts
+import { HttpConvoCompletionService } from '@convo-lang/convo-lang';
+
+const db=new HttpConvoCompletionService({
+    endpoint:'https://api.example.com/convo-lang',
+    dbName:'default',
+});
+```
+
+### Hybrid layered storage
+
+Use fast local storage for temporary memory and remote storage for shared data.
+
+```ts
+import {
+    InMemoryConvoDb,
+    HttpConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+
+const cacheDb=new InMemoryConvoDb({
+    name:'cache',
+});
+
+const remoteDb=new HttpConvoDb({
+    name:'remote',
+    baseUrl:'https://api.example.com/convo-db',
+});
+
+const db=new LayeredConvoDb({
+    name:'default',
+    layers:[
+        {
+            path:'/agents/*',
+            db:cacheDb,
+        },
+        {
+            path:'/shared/*',
+            db:remoteDb,
+        },
+    ],
+});
+```
+
+---
+
+## Stored function execution
+
+ConvoDb can execute functions stored inside nodes as part of a query.
+
+This allows you to treat nodes not only as data records, but also as callable tools or behaviors that participate in graph traversal.
+
+At a high level:
+
+- a function is stored in `node.data.function`
+- the node must also set `node.data.isExecutable=true`
+- queries can select one or more function nodes and execute them with a `call` step
+- functions can emit returned nodes, computed values, or streamed results
+
+This is especially useful for:
+
+- tool nodes used by agents
+- workflow actions stored in the graph
+- dynamic result generation during traversal
+- mixing static graph structure with executable behavior
+- reusable auth and utility functions
+
+### How function calling fits into queries
+
+Function execution is part of the normal query step flow.
+
+A query step may include `call` to execute the currently selected nodes as functions.
+
+Conceptually, the step flow is:
+
+1. filter nodes by path
+2. filter by condition
+3. apply step permissions
+4. apply embedding filtering
+5. execute functions with `call`
+6. traverse edges if `edge` is also defined
+
+That means function execution can happen in the middle of a larger traversal pipeline.
+
+Example shape:
+
+```ts
+const result=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/weather',
+            call:{
+                args:{
+                    city:'Seattle',
+                },
+            },
+        },
+    ],
+});
+```
+
+### Function call convenience APIs
+
+`ConvoDb` includes helper methods for common function call patterns.
+
+```ts
+const value=await db.callFunctionAsync('/tools/echo',{
+    message:'hello',
+});
+```
+
+Available helpers:
+
+```ts
+db.callFunctionAsync(path,args,permissionFrom?)
+db.callFunctionReturnValueAsync(path,args,permissionFrom?)
+db.callFunctionReturnNodeAsync(path,args,permissionFrom?)
+db.callFunctionWithSchemaAsync(inputSchema,outputSchema,path,args,permissionFrom?)
+```
+
+Use `queryNodesAsync` directly when a function can return multiple nodes or stream results.
+
+### Schema-validated function calls
+
+`callFunctionWithSchemaAsync` validates input and output with Zod schemas.
+
+```ts
+import { z } from 'zod';
+
+const result=await db.callFunctionWithSchemaAsync(
+    z.object({
+        a:z.number(),
+        b:z.number(),
+    }),
+    z.object({
+        value:z.number(),
+    }),
+    '/tools/add',
+    {
+        a:2,
+        b:3,
+    },
+);
+```
+
+### Defining a function node
+
+A callable function is stored on a normal node.
+
+Example:
+
+```ts
+await db.insertNodeAsync({
+    path:'/tools/echo',
+    type:'tool',
+    data:{
+        isExecutable:true,
+        function:{
+            format:'javascript',
+            effects:'pure',
+            main:`
+                const handler=(args)=>{
+                    return {
+                        echoed:args.message,
+                    };
+                };
+            `,
+        },
+    },
+});
+```
+
+The node still behaves like a normal node in ConvoDb, which means you can:
+
+- query it by path
+- relate it with edges
+- protect it with permissions
+- organize it under namespaces such as `/tools/*`
+
+### Supported function formats
+
+ConvoDb supports several function formats:
+
+- `convo`
+    - function logic written in Convo-Lang
+- `javascript` or `js`
+    - function logic written as JavaScript source
+- `uri`
+    - a referenced function resolved by the runtime
+
+This allows a database to mix inline scripted behavior with externally provided implementations.
+
+### Function effects
+
+Functions declare their expected effect level using `effects`.
+
+Available effect levels are:
+
+- `pure`
+    - no database or external side effects
+- `readOnly`
+    - may read but not write
+- `readWrite`
+    - may read and write
+
+These effect declarations help communicate intended behavior and can be used by runtimes and tools to reason about safety.
+
+### Passing arguments
+
+Arguments are passed through the query step’s `call.args` property.
+
+Example:
+
+```ts
+const result=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/echo',
+            call:{
+                args:{
+                    message:'hello',
+                },
+            },
+        },
+    ],
+});
+```
+
+Functions can also define an `argsType` schema so inputs can be validated before execution.
+
+At a high level, this gives you a way to describe expected function arguments directly on the stored function definition.
+
+### Return behavior
+
+Functions can return data as nodes.
+
+A common pattern is to return a value that gets wrapped as a result node with:
+
+- `path:'/null'`
+- `type:'function-result'`
+- `data.value` containing the returned value
+
+Functions may also return:
+
+- one node
+- multiple nodes
+- a stream of nodes
+
+This makes function execution fit naturally into ConvoDb’s node-oriented query model.
+
+### JavaScript function handlers
+
+For JavaScript functions, ConvoDb supports several high-level handler styles.
+
+Common entry points include:
+
+- `handler`
+    - returns a plain value that becomes a result node
+- `nodeHandler`
+    - returns one node or multiple nodes
+- `resultHandler`
+    - returns a result object so the function can control success and failure
+- `streamHandler`
+    - returns an async stream of nodes
+
+This gives JavaScript-backed tools flexibility depending on whether they want to behave like a simple function, a node generator, or a streaming producer.
+
+### Convo functions
+
+Functions stored with `format:'convo'` are written in Convo-Lang.
+
+These can be useful when you want to keep agent-oriented logic in the same language ecosystem as conversations and prompts.
+
+At a high level, Convo functions can produce a return value or a response that is converted into a function result node.
+
+### URI functions
+
+Functions stored with `format:'uri'` allow the actual implementation to live outside the database.
+
+This is useful when:
+
+- implementations are provided by plugins
+- sensitive logic should not be stored inline
+- you want stable references to runtime-registered tools
+
+### Streaming function results
+
+Stored functions can also stream nodes over time.
+
+This is useful for:
+
+- incremental tool output
+- long-running tasks
+- chunked generation
+- agent workflows that want to emit progress-like results
+
+Because function execution integrates with query streaming, the caller can consume results as they are produced.
+
+### Permissions and execution
+
+Function nodes still participate in ConvoDb permission checks.
+
+In practice, execution is typically controlled using execute permissions, allowing you to model which users, agents, or other nodes are allowed to run which stored tools.
+
+When using permission boundaries, query steps with `call` require execute permission for the boundary identity.
+
+This makes it possible to build:
+
+- per-agent tool access
+- per-user callable workflows
+- tenant-scoped execution boundaries
+
+### Example: tool stored as a node
+
+```ts
+await db.insertNodeAsync({
+    path:'/tools/add',
+    type:'tool',
+    data:{
+        isExecutable:true,
+        function:{
+            format:'javascript',
+            effects:'pure',
+            argsType:`
+                struct(
+                    a:number
+                    b:number
+                )
+            `,
+            main:`
+                const handler=(args)=>{
+                    return args.a+args.b;
+                };
+            `,
+        },
+    },
+});
+
+const r=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/tools/add',
+            call:{
+                args:{
+                    a:2,
+                    b:3,
+                },
+            },
+        },
+    ],
+});
+
+if(r.success){
+    console.log(r.result.nodes);
+}
+```
+
+### Example: call during traversal
+
+Because `call` is a query step feature, it can be mixed with graph traversal.
+
+For example, you could:
+
+- start at an agent node
+- traverse to allowed tool nodes
+- execute a selected tool
+- continue traversal through related result or workflow nodes
+
+This is one of the features that makes ConvoDb useful for agentic systems where data, permissions, auth, and behavior all live in the same graph-oriented model.
+
+---
+
+## Minimal end-to-end example
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+
+await db.insertNodeAsync({
+    path:'/users/alex',
+    type:'user',
+    data:{
+        role:'admin',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme',
+    type:'workspace',
+    data:{
+        name:'Acme Workspace',
+    },
+});
+
+await db.insertNodeAsync({
+    path:'/workspaces/acme/docs/spec',
+    type:'doc',
+    data:{
+        title:'System Spec',
+        body:'This workspace contains product requirements and architecture notes.',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:'/users/alex',
+    to:'/workspaces/acme',
+    grant:ConvoNodePermissionType.readWrite,
+});
+
+const docs=await db.queryNodesAsync({
+    steps:[
+        {
+            path:'/workspaces/acme/docs/*',
+        },
+    ],
+    permissionFrom:'/users/alex',
+    permissionRequired:ConvoNodePermissionType.read,
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
+
+---
+
+## Minimal auth setup example
+
+This example assumes `@convo-lang/db-functions` has been loaded under `/bin`.
+
+```ts
+import { InMemoryConvoDb } from '@convo-lang/db';
+import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
+
+const db=new InMemoryConvoDb({
+    name:'default',
+});
+
+await db.callFunctionAsync('/bin/init-auth',{
+    override:false,
+});
+
+const created=await db.callFunctionReturnNodeAsync('/bin/create-user',{
+    password:'correct horse battery staple',
+    claims:{
+        email:'alex@example.com',
+        name:'Alex',
+    },
+});
+
+if(!created.success){
+    throw new Error(created.error);
+}
+
+const signIn=await db.auth.signInEmailPasswordAsync({
+    email:'alex@example.com',
+    password:'correct horse battery staple',
+});
+
+if(!signIn.success){
+    throw new Error(signIn.error);
+}
+
+const userPath=signIn.result.identityPaths[0];
+
+await db.insertNodeAsync({
+    path:'/docs/public',
+    type:'doc',
+    data:{
+        title:'Public doc',
+    },
+});
+
+await db.insertEdgeAsync({
+    type:'grant',
+    from:userPath,
+    to:'/docs/public',
+    grant:ConvoNodePermissionType.read,
+});
+
+const userDb=db.auth.createBoundary(userPath);
+
+const docs=await userDb.queryNodesAsync({
+    steps:[
+        {
+            path:'/docs/*',
+        },
+    ],
+});
+
+if(docs.success){
+    console.log(docs.result.nodes);
+}
+```
+
+---
+
+## Summary
+
+ConvoDb is a strong fit for developers building:
+
+- AI agents
+- agent memory systems
+- RAG pipelines
+- workflow engines
+- multi-tenant AI apps
+- browser-based copilots
+- local-first AI tools
+- graph-shaped knowledge systems
+- authenticated agent tools and remote database APIs
+
+Its biggest strengths are:
+
+- **path-based organization**
+- **filesystem-style permission modeling**
+- **permission boundaries for identity-scoped access**
+- **JWT auth helper integration**
+- **graph traversal with edges**
+- **semantic retrieval through embeddings**
+- **stored function execution**
+- **reusable database functions**
+- **portable storage through adapters**
+- **shared high-level behavior with backend-specific drivers**
+- **React integration through query hooks**
+- **CLI support for loading functions, querying DBs, calling functions, and executing commands**
+
+If you build agentic systems that need structure, memory, retrieval, access control, authentication, and callable behavior, ConvoDb gives you one model that can span local, browser, server, and remote environments.
+
+---
+
+## Imports recap
+
+```ts
+import {
+    ConvoDb,
+    ConvoDbAuthManager,
+    ConvoDbInstanceMap,
+    ConvoDbPermissionBoundary,
+    ConvoEmailPasswordSignRequestSchema,
+    ConvoNodePermissionType,
+    ConvoSignInJwt,
+    ConvoSignInJwtSchema,
+} from '@convo-lang/convo-lang';
+
+import {
+    useConvoDbQuery,
+    useConvoNodeAtPath,
+    useConvoNodesAtPath,
+} from '@convo-lang/convo-lang-react';
+
+import {
+    BaseConvoDb,
+    InMemoryConvoDb,
+    BaseSqliteConvoDb,
+    BunSqliteConvoDb,
+    BasePostgresConvoDb,
+    BunPostgresConvoDb,
+    HttpConvoDb,
+    LocalStorageConvoDb,
+    IndexDbConvoDb,
+    FsConvoDb,
+    LayeredConvoDb,
+} from '@convo-lang/db';
+```
+```
+</FILE_CONTENT>
+
+
+> user
