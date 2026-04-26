@@ -1,0 +1,893 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-lib.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/ConvoDbAuthManager.ts !file
+@import ../../packages/convo-lang/src/lib/db/ConvoDbPermissionBoundary.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+
+> user
+Create a set of tests to test permission boundaries using `ConvoDbAuthManager.createBoundary` and
+the `ConvoDbPermissionBoundary` class
+
+Use the BunJs testing framework
+
+Use the `createTestDb` function to create test databases. Use the mem type for testing. Wrap
+the call to `createTestDb` in a function to returned the proxied db.
+
+save to `../../packages/tests/src/convo-db-permission-boundary.test.ts`
+
+
+
+
+
+@time 2026-04-26T16:07:33-04:00
+@tokenUsage 36414 / 70 / $0.09121
+@model gpt-5.4-2026-03-05
+> assistant
+Before I generate the test file, one quick clarification:
+
+Should these tests cover only the boundary proxy behavior itself (for example that `permissionFrom` is injected/overrides caller input for reads/writes/queries/commands), or do you also want end-to-end permission enforcement behavior using actual grant edges and allowed/denied operations?
+
+
+> user
+Test should include end-to-end permission enforcement behavior using actual grant edges
+
+@time 2026-04-26T16:16:47-04:00
+@tokenUsage 39059 / 2761 / $0.10455000000000002
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-db-permission-boundary.test.ts" target-output-path="../../packages/tests/src/convo-db-permission-boundary.test.ts">
+``` ts
+import { ConvoDb, ConvoNodeEdge, ConvoNodePermissionType } from '@convo-lang/convo-lang';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { createTestDb } from './createTestDb.js';
+
+const createdDbs:ConvoDb[]=[];
+
+const createBoundaryDb=(
+    identityPath:string,
+    byPass=false,
+):ConvoDb=>{
+    const db=createTestDb('mem') as unknown as ConvoDb;
+    createdDbs.push(db);
+    return db.auth.createBoundary(identityPath,byPass);
+}
+
+const seedPermissionGraphAsync=async (db:ConvoDb)=>{
+    const adminNode={
+        path:'/users/admin',
+        type:'user',
+        data:{},
+    };
+    const aliceNode={
+        path:'/users/alice',
+        type:'user',
+        data:{},
+    };
+    const bobNode={
+        path:'/users/bob',
+        type:'user',
+        data:{},
+    };
+    const aliceDocNode={
+        path:'/docs/alice-doc',
+        type:'doc',
+        data:{owner:'alice',value:'alice secret'},
+    };
+    const bobDocNode={
+        path:'/docs/bob-doc',
+        type:'doc',
+        data:{owner:'bob',value:'bob secret'},
+    };
+    const sharedNode={
+        path:'/docs/shared',
+        type:'doc',
+        data:{scope:'shared',value:'shared value'},
+    };
+    const docsFolder={
+        path:'/docs',
+        type:'doc-folder',
+        data:{}
+    };
+
+    for(const node of [
+        adminNode,
+        aliceNode,
+        bobNode,
+        aliceDocNode,
+        bobDocNode,
+        sharedNode,
+        docsFolder,
+    ]){
+        const r=await db.insertNodeAsync(node);
+        expect(r.success).toBe(true);
+    }
+
+    for(const edge of [
+        {
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/alice-doc',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/shared',
+            grant:ConvoNodePermissionType.read,
+        },
+        {
+            type:'grant',
+            from:'/users/bob',
+            to:'/docs/bob-doc',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/bob',
+            to:'/docs/shared',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/admin',
+            to:'/docs',
+            grant:ConvoNodePermissionType.readWriteExecute,
+        },
+    ] satisfies Omit<ConvoNodeEdge,'id'>[]){
+        const r=await db.insertEdgeAsync(edge);
+        console.log('hio 👋 👋 👋 R FAL',edge,r);
+        expect(r.success).toBe(true);
+    }
+}
+
+afterEach(()=>{
+    createdDbs.length=0;
+});
+
+describe('ConvoDbPermissionBoundary',()=>{
+    test('createBoundary returns cached boundary per identity path',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+
+        const a=db.auth.createBoundary('/users/alice');
+        const b=db.auth.createBoundary('/users/alice');
+        const c=db.auth.createBoundary('/users/bob');
+
+        expect(a).toBe(b);
+        expect(a).not.toBe(c);
+    });
+
+    test('createBoundary with byPass returns original db',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+
+        const boundary=db.auth.createBoundary('/users/alice',true);
+
+        expect(boundary).toBe(db);
+    });
+
+    test('boundary injects identity into permission checks',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const allowed=await boundary.checkNodePermissionAsync(
+            '/users/bob',
+            '/docs/alice-doc',
+            ConvoNodePermissionType.read,
+        );
+        expect(allowed.success).toBe(true);
+
+        const denied=await boundary.checkNodePermissionAsync(
+            '/users/alice',
+            '/docs/bob-doc',
+            ConvoNodePermissionType.read,
+        );
+        expect(denied.success).toBe(false);
+        if(denied.success){return}
+        expect(denied.statusCode).toBe(401);
+
+        const permission=await boundary.getNodePermissionAsync('/users/bob','/docs/shared');
+        expect(permission.success).toBe(true);
+        if(!permission.success){return}
+        expect(permission.result).toBe(ConvoNodePermissionType.read);
+    });
+
+    test('boundary enforces read access for getNodeByPathAsync and getNodesByPathAsync',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const ownNode=await boundary.getNodeByPathAsync('/docs/alice-doc');
+        expect(ownNode.success).toBe(true);
+        if(!ownNode.success){return}
+        expect(ownNode.result?.path).toBe('/docs/alice-doc');
+
+        const otherNode=await boundary.getNodeByPathAsync('/docs/bob-doc');
+        expect(otherNode.success).toBe(true);
+        if(!otherNode.success){return}
+        expect(otherNode.result).toBeUndefined();
+
+        const docs=await boundary.getNodesByPathAsync('/docs/*');
+        expect(docs.success).toBe(true);
+        if(!docs.success){return}
+        expect(docs.result.nodes.map((n:any)=>n.path).sort()).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+
+    test('boundary overrides caller supplied permissionFrom on queryNodesAsync',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const r=await boundary.queryNodesAsync({
+            permissionFrom:'/users/bob',
+            steps:[{path:'/docs/*'}],
+            orderBy:{prop:'path',direction:'asc'},
+        });
+
+        expect(r.success).toBe(true);
+        expect(r.result.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+
+    test('boundary allows updating writable owned node and blocks updating unreadable node',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const ownUpdate=await boundary.updateNodeAsync({
+            path:'/docs/alice-doc',
+            description:'updated by alice',
+        });
+        expect(ownUpdate.success).toBe(true);
+
+        const ownRead=await db.getNodeByPathAsync('/docs/alice-doc');
+        expect(ownRead.success).toBe(true);
+        if(!ownRead.success){return}
+
+        expect(ownRead.result?.description).toBe('updated by alice');
+
+        const deniedUpdate=await boundary.updateNodeAsync({
+            path:'/docs/bob-doc',
+            description:'should fail',
+        });
+        expect(deniedUpdate.success).toBe(false);
+        expect(deniedUpdate.statusCode).toBe(401);
+    });
+
+    test('boundary allows insert node only where identity has write permission',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const adminBoundary=db.auth.createBoundary('/users/admin');
+        const aliceBoundary=db.auth.createBoundary('/users/alice');
+
+        const adminInsert=await adminBoundary.insertNodeAsync({
+            path:'/docs/new-admin-created',
+            type:'doc',
+            data:{},
+        });
+        expect(adminInsert.success).toBe(true);
+
+        const aliceInsert=await aliceBoundary.insertNodeAsync({
+            path:'/docs/new-alice-created',
+            type:'doc',
+            data:{},
+        });
+        expect(aliceInsert.success).toBe(false);
+        expect(aliceInsert.statusCode).toBe(401);
+    });
+
+    test('boundary allows deleting writable owned node and blocks deleting others',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/bob');
+
+        const ownDelete=await boundary.deleteNodeAsync('/docs/shared');
+        expect(ownDelete.success).toBe(true);
+
+        const deleted=await db.getNodeByPathAsync('/docs/shared');
+        expect(deleted.success).toBe(true);
+        if(!deleted.success){return}
+        
+        expect(deleted.result).toBeUndefined();
+
+        const deniedDelete=await boundary.deleteNodeAsync('/docs/alice-doc');
+        expect(deniedDelete.success).toBe(false);
+        expect(deniedDelete.statusCode).toBe(401);
+    });
+
+    test('boundary enforces permissions for edge queries and mutations',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const aliceBoundary=db.auth.createBoundary('/users/alice');
+        const bobBoundary=db.auth.createBoundary('/users/bob');
+
+        const aliceEdges=await aliceBoundary.queryEdgesAsync({
+            from:'/users/alice',
+        });
+        expect(aliceEdges.success).toBe(true);
+        expect(aliceEdges.result.edges.length).toBeGreaterThan(0);
+
+        const bobCannotSeeAliceEdge=await bobBoundary.queryEdgesAsync({
+            from:'/users/alice',
+        });
+        expect(bobCannotSeeAliceEdge.success).toBe(true);
+        expect(bobCannotSeeAliceEdge.result.edges.length).toBe(0);
+
+        const insertDenied=await aliceBoundary.insertEdgeAsync({
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/bob-doc',
+            data:{},
+            grant:ConvoNodePermissionType.read,
+        } as any);
+        expect(insertDenied.success).toBe(false);
+        expect(insertDenied.statusCode).toBe(401);
+    });
+
+    test('boundary executeCommandAsync applies identity and blocks driver commands',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const queryResult=await boundary.executeCommandAsync({
+            queryNodes:{
+                query:{
+                    permissionFrom:'/users/bob',
+                    steps:[{path:'/docs/*'}],
+                    orderBy:{prop:'path',direction:'asc'},
+                },
+            },
+        });
+        expect(queryResult.success).toBe(true);
+        expect(queryResult.result.queryNodes?.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+
+        const denied=await boundary.executeCommandAsync({
+            driverCmd:{
+                fn:'queryEdgesAsync',
+                args:[{limit:1}],
+            },
+        });
+        expect(denied.success).toBe(false);
+        expect(denied.statusCode).toBe(401);
+    });
+
+    test('executeCommandsAsync applies identity to all commands',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const r=await boundary.executeCommandsAsync([
+            {
+                queryNodes:{
+                    query:{
+                        permissionFrom:'/users/bob',
+                        steps:[{path:'/docs/*'}],
+                        orderBy:{prop:'path',direction:'asc'},
+                    },
+                },
+            },
+            {
+                getNodePermission:{
+                    fromPath:'/users/bob',
+                    toPath:'/docs/shared',
+                },
+            },
+            {
+                checkNodePermission:{
+                    fromPath:'/users/bob',
+                    toPath:'/docs/bob-doc',
+                    type:ConvoNodePermissionType.read,
+                },
+            },
+        ]);
+
+        expect(r.success).toBe(true);
+        expect(r.result[0]?.queryNodes?.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+        expect(r.result[1]?.getNodePermission).toBe(ConvoNodePermissionType.read);
+        expect(r.result[2]?.checkNodePermission).toBe(false);
+    });
+
+    test('wrapped createTestDb helper returns proxied db',async ()=>{
+        const boundary=createBoundaryDb('/users/alice');
+        const rootDb=createdDbs[createdDbs.length-1];
+        expect(rootDb).not.toBeUndefined();
+        if(!rootDb){return;}
+
+        expect(boundary).not.toBe(rootDb);
+
+        await seedPermissionGraphAsync(rootDb);
+
+        const r=await boundary.getNodesByPathAsync('/docs/*');
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+        
+        expect(r.result.nodes.map((n:any)=>n.path).sort()).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+});
+```
+</FILE_CONTENT>
+
+
+> user
+Many of the tests are not returning early after success comparison. This causes typing errors
+since the ResultType is a discriminative union.
+
+For example:
+``` ts
+expect(r.success).toBe(true);
+expect(r.result.nodes.map((n:any)=>n.path)).toEqual([
+    '/docs/alice-doc',
+    '/docs/shared',
+]);
+```
+
+should be written like
+``` ts
+expect(r.success).toBe(true);
+if(!r.success){return}
+expect(r.result.nodes.map((n:any)=>n.path)).toEqual([
+    '/docs/alice-doc',
+    '/docs/shared',
+]);
+```
+
+@time 2026-04-26T16:32:54-04:00
+@tokenUsage 42044 / 2979 / $0.1125575
+@model gpt-5.4-2026-03-05
+> assistant
+<FILE_CONTENT name="convo-db-permission-boundary.test.ts" target-output-path="../../packages/tests/src/convo-db-permission-boundary.test.ts">
+``` ts
+import { ConvoDb, ConvoNodeEdge, ConvoNodePermissionType } from '@convo-lang/convo-lang';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { createTestDb } from './createTestDb.js';
+
+const createdDbs:ConvoDb[]=[];
+
+const createBoundaryDb=(
+    identityPath:string,
+    byPass=false,
+):ConvoDb=>{
+    const db=createTestDb('mem') as unknown as ConvoDb;
+    createdDbs.push(db);
+    return db.auth.createBoundary(identityPath,byPass);
+}
+
+const seedPermissionGraphAsync=async (db:ConvoDb)=>{
+    const adminNode={
+        path:'/users/admin',
+        type:'user',
+        data:{},
+    };
+    const aliceNode={
+        path:'/users/alice',
+        type:'user',
+        data:{},
+    };
+    const bobNode={
+        path:'/users/bob',
+        type:'user',
+        data:{},
+    };
+    const aliceDocNode={
+        path:'/docs/alice-doc',
+        type:'doc',
+        data:{owner:'alice',value:'alice secret'},
+    };
+    const bobDocNode={
+        path:'/docs/bob-doc',
+        type:'doc',
+        data:{owner:'bob',value:'bob secret'},
+    };
+    const sharedNode={
+        path:'/docs/shared',
+        type:'doc',
+        data:{scope:'shared',value:'shared value'},
+    };
+    const docsFolder={
+        path:'/docs',
+        type:'doc-folder',
+        data:{}
+    };
+
+    for(const node of [
+        adminNode,
+        aliceNode,
+        bobNode,
+        aliceDocNode,
+        bobDocNode,
+        sharedNode,
+        docsFolder,
+    ]){
+        const r=await db.insertNodeAsync(node);
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+    }
+
+    for(const edge of [
+        {
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/alice-doc',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/shared',
+            grant:ConvoNodePermissionType.read,
+        },
+        {
+            type:'grant',
+            from:'/users/bob',
+            to:'/docs/bob-doc',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/bob',
+            to:'/docs/shared',
+            grant:ConvoNodePermissionType.readWrite,
+        },
+        {
+            type:'grant',
+            from:'/users/admin',
+            to:'/docs',
+            grant:ConvoNodePermissionType.readWriteExecute,
+        },
+    ] satisfies Omit<ConvoNodeEdge,'id'>[]){
+        const r=await db.insertEdgeAsync(edge);
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+    }
+}
+
+afterEach(()=>{
+    createdDbs.length=0;
+});
+
+describe('ConvoDbPermissionBoundary',()=>{
+    test('createBoundary returns cached boundary per identity path',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+
+        const a=db.auth.createBoundary('/users/alice');
+        const b=db.auth.createBoundary('/users/alice');
+        const c=db.auth.createBoundary('/users/bob');
+
+        expect(a).toBe(b);
+        expect(a).not.toBe(c);
+    });
+
+    test('createBoundary with byPass returns original db',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+
+        const boundary=db.auth.createBoundary('/users/alice',true);
+
+        expect(boundary).toBe(db);
+    });
+
+    test('boundary injects identity into permission checks',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const allowed=await boundary.checkNodePermissionAsync(
+            '/users/bob',
+            '/docs/alice-doc',
+            ConvoNodePermissionType.read,
+        );
+        expect(allowed.success).toBe(true);
+        if(!allowed.success){return}
+
+        const denied=await boundary.checkNodePermissionAsync(
+            '/users/alice',
+            '/docs/bob-doc',
+            ConvoNodePermissionType.read,
+        );
+        expect(denied.success).toBe(false);
+        if(denied.success){return}
+        expect(denied.statusCode).toBe(401);
+
+        const permission=await boundary.getNodePermissionAsync('/users/bob','/docs/shared');
+        expect(permission.success).toBe(true);
+        if(!permission.success){return}
+        expect(permission.result).toBe(ConvoNodePermissionType.read);
+    });
+
+    test('boundary enforces read access for getNodeByPathAsync and getNodesByPathAsync',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const ownNode=await boundary.getNodeByPathAsync('/docs/alice-doc');
+        expect(ownNode.success).toBe(true);
+        if(!ownNode.success){return}
+        expect(ownNode.result?.path).toBe('/docs/alice-doc');
+
+        const otherNode=await boundary.getNodeByPathAsync('/docs/bob-doc');
+        expect(otherNode.success).toBe(true);
+        if(!otherNode.success){return}
+        expect(otherNode.result).toBeUndefined();
+
+        const docs=await boundary.getNodesByPathAsync('/docs/*');
+        expect(docs.success).toBe(true);
+        if(!docs.success){return}
+        expect(docs.result.nodes.map((n:any)=>n.path).sort()).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+
+    test('boundary overrides caller supplied permissionFrom on queryNodesAsync',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const r=await boundary.queryNodesAsync({
+            permissionFrom:'/users/bob',
+            steps:[{path:'/docs/*'}],
+            orderBy:{prop:'path',direction:'asc'},
+        });
+
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+        expect(r.result.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+
+    test('boundary allows updating writable owned node and blocks updating unreadable node',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const ownUpdate=await boundary.updateNodeAsync({
+            path:'/docs/alice-doc',
+            description:'updated by alice',
+        });
+        expect(ownUpdate.success).toBe(true);
+        if(!ownUpdate.success){return}
+
+        const ownRead=await db.getNodeByPathAsync('/docs/alice-doc');
+        expect(ownRead.success).toBe(true);
+        if(!ownRead.success){return}
+        expect(ownRead.result?.description).toBe('updated by alice');
+
+        const deniedUpdate=await boundary.updateNodeAsync({
+            path:'/docs/bob-doc',
+            description:'should fail',
+        });
+        expect(deniedUpdate.success).toBe(false);
+        if(deniedUpdate.success){return}
+        expect(deniedUpdate.statusCode).toBe(401);
+    });
+
+    test('boundary allows insert node only where identity has write permission',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const adminBoundary=db.auth.createBoundary('/users/admin');
+        const aliceBoundary=db.auth.createBoundary('/users/alice');
+
+        const adminInsert=await adminBoundary.insertNodeAsync({
+            path:'/docs/new-admin-created',
+            type:'doc',
+            data:{},
+        });
+        expect(adminInsert.success).toBe(true);
+        if(!adminInsert.success){return}
+
+        const aliceInsert=await aliceBoundary.insertNodeAsync({
+            path:'/docs/new-alice-created',
+            type:'doc',
+            data:{},
+        });
+        expect(aliceInsert.success).toBe(false);
+        if(aliceInsert.success){return}
+        expect(aliceInsert.statusCode).toBe(401);
+    });
+
+    test('boundary allows deleting writable owned node and blocks deleting others',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/bob');
+
+        const ownDelete=await boundary.deleteNodeAsync('/docs/shared');
+        expect(ownDelete.success).toBe(true);
+        if(!ownDelete.success){return}
+
+        const deleted=await db.getNodeByPathAsync('/docs/shared');
+        expect(deleted.success).toBe(true);
+        if(!deleted.success){return}
+        expect(deleted.result).toBeUndefined();
+
+        const deniedDelete=await boundary.deleteNodeAsync('/docs/alice-doc');
+        expect(deniedDelete.success).toBe(false);
+        if(deniedDelete.success){return}
+        expect(deniedDelete.statusCode).toBe(401);
+    });
+
+    test('boundary enforces permissions for edge queries and mutations',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const aliceBoundary=db.auth.createBoundary('/users/alice');
+        const bobBoundary=db.auth.createBoundary('/users/bob');
+
+        const aliceEdges=await aliceBoundary.queryEdgesAsync({
+            from:'/users/alice',
+        });
+        expect(aliceEdges.success).toBe(true);
+        if(!aliceEdges.success){return}
+        expect(aliceEdges.result.edges.length).toBeGreaterThan(0);
+
+        const bobCannotSeeAliceEdge=await bobBoundary.queryEdgesAsync({
+            from:'/users/alice',
+        });
+        expect(bobCannotSeeAliceEdge.success).toBe(true);
+        if(!bobCannotSeeAliceEdge.success){return}
+        expect(bobCannotSeeAliceEdge.result.edges.length).toBe(0);
+
+        const insertDenied=await aliceBoundary.insertEdgeAsync({
+            type:'grant',
+            from:'/users/alice',
+            to:'/docs/bob-doc',
+            data:{},
+            grant:ConvoNodePermissionType.read,
+        } as any);
+        expect(insertDenied.success).toBe(false);
+        if(insertDenied.success){return}
+        expect(insertDenied.statusCode).toBe(401);
+    });
+
+    test('boundary executeCommandAsync applies identity and blocks driver commands',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const queryResult=await boundary.executeCommandAsync({
+            queryNodes:{
+                query:{
+                    permissionFrom:'/users/bob',
+                    steps:[{path:'/docs/*'}],
+                    orderBy:{prop:'path',direction:'asc'},
+                },
+            },
+        });
+        expect(queryResult.success).toBe(true);
+        if(!queryResult.success){return}
+        expect(queryResult.result.queryNodes?.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+
+        const denied=await boundary.executeCommandAsync({
+            driverCmd:{
+                fn:'queryEdgesAsync',
+                args:[{limit:1}],
+            },
+        });
+        expect(denied.success).toBe(false);
+        if(denied.success){return}
+        expect(denied.statusCode).toBe(401);
+    });
+
+    test('executeCommandsAsync applies identity to all commands',async ()=>{
+        const db=createTestDb('mem') as unknown as ConvoDb;
+        createdDbs.push(db);
+        await seedPermissionGraphAsync(db);
+
+        const boundary=db.auth.createBoundary('/users/alice');
+
+        const r=await boundary.executeCommandsAsync([
+            {
+                queryNodes:{
+                    query:{
+                        permissionFrom:'/users/bob',
+                        steps:[{path:'/docs/*'}],
+                        orderBy:{prop:'path',direction:'asc'},
+                    },
+                },
+            },
+            {
+                getNodePermission:{
+                    fromPath:'/users/bob',
+                    toPath:'/docs/shared',
+                },
+            },
+            {
+                checkNodePermission:{
+                    fromPath:'/users/bob',
+                    toPath:'/docs/bob-doc',
+                    type:ConvoNodePermissionType.read,
+                },
+            },
+        ]);
+
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+        expect(r.result[0]?.queryNodes?.nodes.map((n:any)=>n.path)).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+        expect(r.result[1]?.getNodePermission).toBe(ConvoNodePermissionType.read);
+        expect(r.result[2]?.checkNodePermission).toBe(false);
+    });
+
+    test('wrapped createTestDb helper returns proxied db',async ()=>{
+        const boundary=createBoundaryDb('/users/alice');
+        const rootDb=createdDbs[createdDbs.length-1];
+        expect(rootDb).not.toBeUndefined();
+        if(!rootDb){return}
+
+        expect(boundary).not.toBe(rootDb);
+
+        await seedPermissionGraphAsync(rootDb);
+
+        const r=await boundary.getNodesByPathAsync('/docs/*');
+        expect(r.success).toBe(true);
+        if(!r.success){return}
+        expect(r.result.nodes.map((n:any)=>n.path).sort()).toEqual([
+            '/docs/alice-doc',
+            '/docs/shared',
+        ]);
+    });
+});
+```
+</FILE_CONTENT>
+
+
+> user
