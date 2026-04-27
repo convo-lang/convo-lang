@@ -1,5 +1,6 @@
 import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
 import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
+import { getStaticHonoRoutesAsync } from "@convo-lang/hono/hono-static-routes.js";
 import { serve } from '@hono/node-server';
 import { CancelToken, DisposeCallback } from "@iyio/common";
 import { Hono } from "hono";
@@ -15,6 +16,8 @@ export interface ConvoCliApiServerOptions
     enableLogging?:boolean;
     dbMap?:ConvoDbInstanceMap;
     disableApiDbAuth?:boolean;
+    staticRoot?:string;
+    embeddedFileMap?:Record<string,string>;
 }
 
 export const runConvoCliApiAsync=async ({
@@ -25,11 +28,17 @@ export const runConvoCliApiAsync=async ({
     enableLogging,
     dbMap,
     disableApiDbAuth,
+    staticRoot,
+    embeddedFileMap,
 }:ConvoCliApiServerOptions,cancel?:CancelToken)=>{
 
     const app=new Hono();
 
     const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth});
+
+    if(staticRoot){
+        await getStaticHonoRoutesAsync(app,staticRoot,embeddedFileMap);
+    }
 
     if(cors){
         app.use('/*',_cors({

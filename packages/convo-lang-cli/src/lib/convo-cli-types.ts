@@ -299,6 +299,17 @@ export interface ConvoCliOptions
     apiLogging?:boolean;
 
     /**
+     * Path to a folder to server static files over http. Redirects are automatically created at runtime
+     * for NextJS pages square bracket route params.
+     */
+    apiStaticRoot?:string;
+
+    /**
+     * Used to map file embedded during bun build
+     */
+    embeddedFileMap?:Record<string,string>;
+
+    /**
      * Generates an embedding for the give text
      */
     generateEmbedding?:string;
