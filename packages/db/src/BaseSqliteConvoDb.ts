@@ -1064,11 +1064,19 @@ const buildPropertyConditionSql=(condition:ConvoNodePropertyCondition,targetType
     const left=getSqlTargetExpression(condition.target,targetType);
     switch(condition.op){
         case '=':
-            bind.push(serializeConditionValue(condition.value));
-            return `(${left} = ?)`;
+            if(condition.value===null){
+                return `(${left} is null)`;
+            }else{
+                bind.push(serializeConditionValue(condition.value));
+                return `(${left} = ?)`;
+            }
         case '!=':
-            bind.push(serializeConditionValue(condition.value));
-            return `(${left} != ?)`;
+            if(condition.value===null){
+                return `(${left} is not null)`;
+            }else{
+                bind.push(serializeConditionValue(condition.value));
+                return `(${left} != ?)`;
+            }
         case '>':
             bind.push(serializeConditionValue(condition.value));
             return `(${left} > ?)`;
