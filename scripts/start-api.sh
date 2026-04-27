@@ -7,4 +7,5 @@ bun run --watch packages/convo-lang-cli/src/bin/convo.ts \
     --api \
     --api-cors \
     --api-logging \
-    --db-map '*:sqlite'
+    --disable-api-db-auth \
+    --db-map '*:mem'
