@@ -271,6 +271,7 @@ export const useConvoDbQuery=<TKeys extends ConvoNodeKeySelection='*'>(
                                         break;
                                     }
 
+                                    case 'end':
                                     case 'flush':
                                         flush();
                                         errorCount=0;

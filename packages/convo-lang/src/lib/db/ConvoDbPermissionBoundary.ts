@@ -76,6 +76,10 @@ export class ConvoDbPermissionBoundary implements ConvoDb
         return this.proxiedDb.getNodeByPathAsync(path,this.identityPath);
     }
 
+    public requireNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode>{
+        return this.proxiedDb.requireNodeByPathAsync(path,this.identityPath);
+    }
+
     public getNodePermissionAsync(_fromPath: string, toPath: string): PromiseResultType<ConvoNodePermissionType> {
         return this.proxiedDb.getNodePermissionAsync(this.identityPath,toPath);
     }

@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
 
 
-const createDb=()=>createTestDb('mem');
+const createDb=()=>createTestDb('http');
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
     path,
@@ -278,7 +278,7 @@ test("streamNodesAsync returns nodes and respects limit zero",async ()=>{
         limit:0,
     }));
 
-    expect(items).toEqual([]);
+    expect(items).toEqual([{type:'end'}]);
 });
 
 test("queryNodesAsync supports condition filtering",async ()=>{
@@ -1068,6 +1068,7 @@ test("Should stream watch events",async ()=>{
                         deleteNodes.push(item.node.path);
                         if(deleteNodes.length===insertNodesSrc.length){
                             endInserts.resolve();
+                            return;
                         }
                         break;
 

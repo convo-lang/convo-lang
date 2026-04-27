@@ -242,6 +242,7 @@ export abstract class BaseConvoDb implements ConvoDb
 
                 case 'flush':
                 case 'ping':
+                case 'end':
                     break;
 
                 case 'node-insert':
@@ -284,6 +285,22 @@ export abstract class BaseConvoDb implements ConvoDb
             success:true,
             result:r.result.nodes[0],
         }
+    }
+
+    public async requireNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode>
+    {
+        const node=await this.getNodeByPathAsync(path,permissionFrom);
+        if(!node.success){
+            return node;
+        }
+        if(!node.result){
+            return {
+                success:false,
+                error:`Node not found by path: ${path}`,
+                statusCode:404,
+            }
+        }
+        return node as ResultType<ConvoNode>;
     }
 
     protected getBatchSize(query:ConvoNodeQuery<any>):number
@@ -370,6 +387,7 @@ export abstract class BaseConvoDb implements ConvoDb
         }
 
         if(hasLimit && state.returnedCount>=limit){
+            yield {type:'end'}
             return;
         }
 
@@ -504,6 +522,7 @@ export abstract class BaseConvoDb implements ConvoDb
                                 }
                                 yield {type:'node',node:node as any,...watcher?.itemMap[node.path??''] as any};
                                 if(hasLimit && state.returnedCount>=limit){
+                                    yield {type:'end'}
                                     return;
                                 }
                             }

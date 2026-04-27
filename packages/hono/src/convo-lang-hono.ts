@@ -697,6 +697,20 @@ export const getConvoHonoRoutes=({
 
             let queue:ConvoNodeStreamItem<any>[]=[];
             let isWriting=false;
+            const flushQueueAsync=async ()=>{
+                if(queue.length){
+                    return;
+                }
+                const q=queue;
+                queue=[];
+                for(const item of q){
+                    await stream.writeSSE({
+                        event:'node',
+                        id:(id++).toString(),
+                        data:JSON.stringify(item)
+                    });
+                }
+            }
             const iv=setInterval(async ()=>{
                 if(isWriting){
                     return;
@@ -709,15 +723,7 @@ export const getConvoHonoRoutes=({
                         data:'null'
                     });
                     if(queue.length){
-                        const q=queue;
-                        queue=[];
-                        for(const item of q){
-                            await stream.writeSSE({
-                                event:'node',
-                                id:(id++).toString(),
-                                data:JSON.stringify(item)
-                            });
-                        }
+                        await flushQueueAsync();
                     }
                 }catch(ex){
                     console.error('Write SSE ping failed',ex);    
@@ -746,6 +752,9 @@ export const getConvoHonoRoutes=({
                                 id:(id++).toString(),
                                 data:JSON.stringify(item)
                             });
+                            if(queue.length){
+                                await flushQueueAsync();
+                            }
                         }finally{
                             isWriting=false;
                         }

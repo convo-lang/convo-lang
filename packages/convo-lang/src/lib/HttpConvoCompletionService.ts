@@ -7,7 +7,7 @@ import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, Convo
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
 import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriverFunction, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
 import { ConvoDbAuthManager } from "./db/ConvoDbAuthManager.js";
-import { PromiseResultType, PromiseResultTypeVoid, StatusCode } from "./result-type.js";
+import { PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode } from "./result-type.js";
 
 export const defaultConvoHttpEndpointPrefix='/convo-lang';
 export const defaultConvoHttpApiEndpointPrefix='/api'+defaultConvoHttpEndpointPrefix;
@@ -164,6 +164,22 @@ export class HttpConvoCompletionService implements
             success:true,
             result:r.result.nodes[0],
         }
+    }
+
+    public async requireNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode>
+    {
+        const node=await this.getNodeByPathAsync(path,permissionFrom);
+        if(!node.success){
+            return node;
+        }
+        if(!node.result){
+            return {
+                success:false,
+                error:`Node not found by path: ${path}`,
+                statusCode:404,
+            }
+        }
+        return node as ResultType<ConvoNode>;
     }
 
     public async completeConvoAsync(flat:FlatConvoConversationBase,_:FlatConvoConversationBase,ctx:ConvoCompletionCtx<FlatConvoConversationBase,ConvoCompletionMessage[]>):Promise<ConvoCompletionMessage[]>

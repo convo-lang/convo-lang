@@ -940,6 +940,11 @@ export type ConvoNodeStreamItem<T extends keyof ConvoNode>={
     node:Pick<ConvoNode,T>;
 }|{
     /**
+     * Indicates the end of the stream
+     */
+    type:'end',  
+}|{
+    /**
      * Indicates all items in the current buffer have been sent / flushed
      */
     type:'flush',  
@@ -1275,6 +1280,13 @@ export interface ConvoDb
      * target node is not found.
      */
     getNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>;
+
+    /**
+     * Convenience function for calling `queryNodesAsync({steps:[{path}],limit:1,permissionFrom})`.
+     * `path` may be an exact path or a supported wildcard path. If no node is found a 404
+     * status is returned
+     */
+    requireNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode>;
 
     /**
      * Returns the permissions granted from the node at `fromPath` to the node at `toPath`.
