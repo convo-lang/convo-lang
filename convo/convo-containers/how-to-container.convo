@@ -1,0 +1,167 @@
+@import ../base.convo
+
+> user
+How can I run a single process in a container without docker, just using Linux and isolate file
+system access to the folder the process is in and grant access to the internet but not to
+the local ports of the host machine. 
+
+Folder structure
+
+``` txt
+start-container.sh - a bash script
+app
+ |
+ +-- main - program to run 
+ |
+ +-- data.db - sqlite database main will access
+```
+
+@time 2026-04-28T08:51:27-04:00
+@tokenUsage 1825 / 1688 / $0.017565000000000004
+@model gpt-5.5-2026-04-23
+> assistant
+Use Linux namespaces + `chroot`/mount isolation + a separate network namespace.
+
+The simplest robust approach is:
+
+- Put the process in its own **network namespace**
+- Give it internet through a `veth` pair + NAT
+- Block traffic from that namespace to host-local/private networks
+- Run the app inside a `chroot` rooted at `./app`
+- Drop privileges before executing `main`
+
+Important: this assumes `app/main` is a **static binary**. If it is dynamically linked, you need to copy its loader and shared libraries into `app`, or use a fuller rootfs.
+
+Example:
+
+```txt
+start-container.sh
+app/
+  main
+  data.db
+```
+
+`start-container.sh`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="$(cd "$(dirname "$0")/app" && pwd)"
+NS_NAME="mini-container-$$"
+
+HOST_VETH="veth-host-$$"
+NS_VETH="veth-ns-$$"
+
+HOST_IP="10.200.1.1"
+NS_IP="10.200.1.2"
+CIDR="10.200.1.0/24"
+
+OUT_IF="$(ip route show default | awk '{print $5; exit}')"
+
+cleanup()
+{
+    ip netns del "$NS_NAME" 2>/dev/null || true
+    ip link del "$HOST_VETH" 2>/dev/null || true
+}
+
+trap cleanup EXIT
+
+# Create network namespace
+ip netns add "$NS_NAME"
+
+# Create veth pair
+ip link add "$HOST_VETH" type veth peer name "$NS_VETH"
+
+# Move one side into the namespace
+ip link set "$NS_VETH" netns "$NS_NAME"
+
+# Configure host side
+ip addr add "$HOST_IP/24" dev "$HOST_VETH"
+ip link set "$HOST_VETH" up
+
+# Configure namespace side
+ip netns exec "$NS_NAME" ip addr add "$NS_IP/24" dev "$NS_VETH"
+ip netns exec "$NS_NAME" ip link set "$NS_VETH" up
+ip netns exec "$NS_NAME" ip link set lo up
+ip netns exec "$NS_NAME" ip route add default via "$HOST_IP"
+
+# Enable IPv4 forwarding
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+# NAT namespace traffic to the internet
+iptables -t nat -A POSTROUTING -s "$CIDR" -o "$OUT_IF" -j MASQUERADE
+
+# Allow forwarding out to the internet
+iptables -A FORWARD -i "$HOST_VETH" -o "$OUT_IF" -j ACCEPT
+iptables -A FORWARD -i "$OUT_IF" -o "$HOST_VETH" -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# Block access from namespace to the host-side veth IP
+iptables -A INPUT -i "$HOST_VETH" -s "$NS_IP" -d "$HOST_IP" -j REJECT
+
+# Block access to common local/private networks.
+# Remove lines if you intentionally want LAN access.
+iptables -A FORWARD -i "$HOST_VETH" -d 10.0.0.0/8 -j REJECT
+iptables -A FORWARD -i "$HOST_VETH" -d 172.16.0.0/12 -j REJECT
+iptables -A FORWARD -i "$HOST_VETH" -d 192.168.0.0/16 -j REJECT
+iptables -A FORWARD -i "$HOST_VETH" -d 127.0.0.0/8 -j REJECT
+iptables -A FORWARD -i "$HOST_VETH" -d 169.254.0.0/16 -j REJECT
+
+# Run process with:
+# - network namespace
+# - mount namespace
+# - pid namespace
+# - ipc namespace
+# - uts namespace
+# - chroot to ./app
+# - non-root user
+ip netns exec "$NS_NAME" \
+    unshare --mount --pid --ipc --uts --fork \
+    chroot --userspec="$(id -u):$(id -g)" "$APP_DIR" /main
+```
+
+Run it as root:
+
+```bash
+sudo ./start-container.sh
+```
+
+Also make sure:
+
+```bash
+chmod +x start-container.sh
+chmod +x app/main
+```
+
+Inside the process, the filesystem root will effectively be:
+
+```txt
+/
+  main
+  data.db
+```
+
+So `main` should open the SQLite DB as:
+
+```txt
+/data.db
+```
+
+or relative to its working directory if appropriate.
+
+A few notes:
+
+1. `127.0.0.1` inside the process is not the host’s `127.0.0.1`; it is the namespace-local loopback.
+2. The main host exposure risk is the host’s `veth` IP and LAN/private addresses, so the script blocks those.
+3. This is not Docker-level ergonomics, but it uses the same core Linux primitives: namespaces, veth, NAT, chroot, and firewall rules.
+4. For stronger filesystem isolation, use `pivot_root` or a mount namespace with bind mounts. `chroot` is acceptable only if the process is not running as root after entering it.
+5. If `main` is dynamically linked, check with:
+
+```bash
+ldd app/main
+```
+
+If it says `not a dynamic executable`, you are good. Otherwise, you need to provide the required libraries inside `app`.
+
+
+> user

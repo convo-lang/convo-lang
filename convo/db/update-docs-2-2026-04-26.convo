@@ -1,0 +1,22 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+@import ../../packages/db-functions/README.md !file
+
+> user
+Update the `convo-db.md` document to address the following common miss understandings:
+
+- `ConvoDb.getNodeByPathAsync` does not return an error if the target node is not found, it returns undefined when the target node is not found. 
+  `ConvoDb.requireNodeByPathAsync` can be used when it is preferred that an error is returned when the target node is not found.
+
+- Wildcard paths in queries return all match nodes recursively. It is a common mistake that wildcard in queries only
+  return all items in the target target directory.
+
+
+And Include updates for:
+- `ConvoDb.requireNodeByPathAsync`
+- `ConvoNodeStreamItem.type` == 'end'

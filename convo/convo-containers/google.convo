@@ -1,0 +1,113 @@
+> assistant
+Docker containers are not virtual machines; they are isolated processes that rely on several native Linux kernel features to function. [1, 2, 3] 
+The two primary features used to create containers are:
+
+* Namespaces: This feature provides isolation by creating a separate workspace for the container. Namespaces ensure that a process inside a container cannot see or interfere with processes or resources in other containers or on the host. Key types include:
+* PID Namespace: Isolates process IDs so a container can have its own PID 1.
+   * Net Namespace: Provides an independent network stack, including private IP addresses and routing tables.
+   * Mnt Namespace: Isolates the filesystem view for each container.
+   * UTS Namespace: Allows each container to have its own unique hostname.
+   * IPC Namespace: Isolates inter-process communication resources like shared memory.
+   * User Namespace: Maps user and group IDs inside a container to different IDs on the host for better security.
+* Control Groups (cgroups): While namespaces provide isolation, cgroups handle resource management. They allow Docker to limit and monitor system resources like CPU, memory, disk I/O, and network bandwidth for a group of processes. This prevents a single container from exhausting host resources. [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] 
+
+## Other Essential Native Features
+
+* Union Filesystems: Docker uses layered filesystems like [OverlayFS](https://docs.docker.com/storage/storagedriver/overlayfs-driver/) to combine multiple read-only image layers with a single writable layer, making images lightweight and efficient.
+* Security Modules: Docker leverages [AppArmor](https://docs.docker.com/engine/security/apparmor/) or SELinux to enforce mandatory access control policies on the host.
+* Seccomp (Secure Computing Mode): This feature restricts the specific system calls an application inside a container is allowed to make, reducing the kernel's attack surface. [8, 10, 14, 15, 16] 
+
+
+[1] [https://docs.docker.com](https://docs.docker.com/get-started/docker-overview/)
+[2] [https://medium.com](https://medium.com/@nimetha.21/how-docker-works-under-the-hood-with-the-linux-kernel-17026e5c70b7)
+[3] [https://medium.com](https://medium.com/zero-equals-false/docker-introduction-what-you-need-to-know-to-start-creating-containers-8ffaf064930a#:~:text=Docker%20is%20not%E2%80%A6%20Docker%20is%20not%20a,require%20or%20include%20a%20separate%20operating%20system.)
+[4] [https://www.atlantbh.com](https://www.atlantbh.com/how-docker-containers-work-under-the-hood-namespaces-and-cgroups/)
+[5] [https://medium.com](https://medium.com/@lingeshcbz/how-docker-works-a-deep-dive-into-containerization-01722b21f59d)
+[6] [https://www.youtube.com](https://www.youtube.com/watch?v=jB7H3mfYALE&t=14)
+[7] [https://medium.com](https://medium.com/@princetiwari97940/what-containers-really-are-understanding-namespaces-cgroups-and-linux-kernel-features-de4dc71ed63c)
+[8] [https://blog.pmunhoz.com](https://blog.pmunhoz.com/docker/docker-behind-containers)
+[9] [https://medium.com](https://medium.com/@a.kanojiya2003/container-unplugged-how-docker-utilizes-linux-namespaces-and-chroot-2dd87d133a53)
+[10] [https://opensource.com](https://opensource.com/article/21/8/container-linux-technology)
+[11] [https://www.docker.com](https://www.docker.com/blog/understanding-the-docker-user-instruction/)
+[12] [https://medium.com](https://medium.com/@ozbillwang/understanding-cgroups-and-namespaces-in-linux-the-foundations-of-containerization-e0e565eb236e)
+[13] [https://medium.com](https://medium.com/@hydermemon2001/namespaces-and-cgroups-two-important-linux-features-733beca4b1da)
+[14] [https://dev.to](https://dev.to/ankitdevcode/inside-docker-linux-namespaces-cgroups-3h27#:~:text=The%20Key%20Concepts%20Behind%20Docker.%20Docker%20is,image%20layers%20+%20a%20writable%20container%20layer.)
+[15] [https://blog.devgenius.io](https://blog.devgenius.io/docker-didnt-invent-containers-linux-did-e482c155b99b)
+[16] [https://www.linkedin.com](https://www.linkedin.com/pulse/linux-technologies-fundamental-containers-hossein-abedinzadeh-x9fjf)
+
+> user
+Create me a bash script that uses namespaces to fully isolate a process and only allows it the following
+- Read write Access to the directory the process is in
+- Network access to the internet, no network access to the host machine
+
+Folder structure
+
+``` txt
+start-container.sh - a bash script
+app
+ |
+ +-- main - program to run 
+ |
+ +-- data.db - sqlite database main will access
+```
+
+> assistant
+
+To isolate a process manually in Linux using only native tools like ip, mount, and unshare, you need to set up a "sandbox" that mimics what Docker does under the hood.
+This script uses User, Mount, PID, and Network namespaces. It creates a virtual ethernet pair and uses NAT (via iptables) to grant internet access while blocking traffic to the host's private IP ranges.
+## The Bash Script (start-container.sh)
+
+``` bash
+#!/bin/bash
+# Configuration
+APP_DIR="$(pwd)/app"
+VETH_HOST="veth-host"
+VETH_GUEST="veth-guest"
+GUEST_IP="10.0.0.2/24"
+HOST_IP="10.0.0.1"
+GATEWAY="10.0.0.1"
+# 1. Prepare the Network (Run as root)# Create a veth pair to link host and container namespaces
+ip link add $VETH_HOST type veth peer name $VETH_GUEST
+ip addr add $HOST_IP/24 dev $VETH_HOST
+ip link set $VETH_HOST up
+# Enable NAT/Forwarding for Internet access
+sysctl -w net.ipv4.ip_forward=1 > /dev/null
+iptables -t nat -A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE# Block access to the host's LAN (assuming 192.168.x.x)
+iptables -A FORWARD -s 10.0.0.0/24 -d 192.168.0.0/16 -j REJECT
+# 2. Launch the containerized process# --map-root-user: Maps your current user to root inside the container# --mount: Gives it a private mount namespace# --net: Gives it a private network stack# --pid --fork: Gives it a private process tree
+unshare --user --map-root-user --mount --net --pid --fork bash <<EOF
+    # Inside the Namespace:
+    
+    # Configure the guest network interface
+    ip link set lo up
+    ip link set $VETH_GUEST up
+    ip addr add $GUEST_IP dev $VETH_GUEST
+    ip route add default via $GATEWAY
+    
+    # Isolate the filesystem:
+    # Mount the app dir as the new root (simplified pivot_root/chroot logic)
+    mount --bind $APP_DIR $APP_DIR
+    cd $APP_DIR
+    
+    # Execute the application
+    echo "[Container] Starting main..."
+    ./main
+EOF
+# 3. Cleanup after exit
+iptables -t nat -D POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE
+ip link delete $VETH_HOST
+```
+
+## How it works:
+
+   1. Network Namespace (--net): The script creates a "virtual cable" (veth). One end stays on your host, the other goes into the container. The iptables rule acts as a firewall, allowing the container to talk to the web but explicitly REJECT-ing packets destined for your local network.
+   2. Mount Namespace (--mount): By using mount --bind, we ensure the process treats the app directory as its functional world. For true filesystem isolation (preventing access to /etc or /bin), you would typically use pivot_root into a minimal rootfs.
+   3. User Namespace (--user): This allows the script to run without needing a real root user for every sub-action, mapping your account to "root" inside the container's context.
+
+## Prerequisites:
+
+* Ensure the main binary is statically linked or has all its dependencies inside the app folder; otherwise, it will fail to find libraries like libc once isolated.
+* Run the script with sudo to allow the creation of network interfaces and iptables rules.
+
+Would you like to see how to add cgroups to this script to also limit the CPU or RAM the process can use?
+
