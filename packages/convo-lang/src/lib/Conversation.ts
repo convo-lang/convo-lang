@@ -128,6 +128,12 @@ export interface ConversationOptions
     defaultVars?:Record<string,any>;
 
     /**
+     * A callback that is called before each completion or flattening use to populate default variables.
+     * Values returned from this function will override the `defaultVars` property.
+     */
+    getDefaultVars?:()=>Record<string,any>;
+
+    /**
      * Array of ConvoDefItems to define
      */
     define?:ConvoDefItem[];
@@ -3165,6 +3171,12 @@ export class Conversation
         }
         for(const e in this.defaultVars){
             flatExe.setVar(true,this.defaultVars[e],e);
+        }
+        if(this.defaultOptions.getDefaultVars){
+            const defaultVars=this.defaultOptions.getDefaultVars()??{};
+            for(const e in defaultVars){
+                flatExe.setVar(true,defaultVars[e],e);
+            }
         }
         return flatExe;
     }

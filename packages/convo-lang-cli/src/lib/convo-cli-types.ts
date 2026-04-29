@@ -305,6 +305,17 @@ export interface ConvoCliOptions
     apiStaticRoot?:string;
 
     /**
+     * If true all API endpoints will require a JWT to access
+     */
+    apiRequireSignIn?:boolean;
+
+    /**
+     * The route where the api will be rooted.
+     * @default '/api/convo-lang'
+     */
+    apiRouteBase?:string;
+
+    /**
      * Used to map file embedded during bun build
      */
     embeddedFileMap?:Record<string,string>;

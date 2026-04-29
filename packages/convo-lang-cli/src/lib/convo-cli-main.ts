@@ -14,9 +14,8 @@ import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
 
-
-export const getConvoCliArgs=()=>parseCliArgsT<ConvoCliOptions>({
-    args:process.argv,
+export const getConvoCliArgs=(argv=globalThis.process?.argv??[])=>parseCliArgsT<ConvoCliOptions>({
+    args:argv,
     startIndex:2,
     defaultKey:'source',
     restKey:'spawn',
@@ -86,6 +85,8 @@ export const getConvoCliArgs=()=>parseCliArgsT<ConvoCliOptions>({
         apiCors:args=>args.length?true:false,
         apiCorsOrigins:args=>args,
         apiLogging:args=>args.length?true:false,
+        apiRequireSignIn:args=>args.length?true:false,
+        apiRouteBase:args=>args[0],
         env:args=>args,
         generateEmbedding:args=>args[0],
         embeddingModel:args=>args[0],
@@ -226,14 +227,9 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
     if(args.api){
         await initConvoCliAsync(args);
         toolPromises.push(runConvoCliApiAsync({
-            port:args.apiPort,
-            reusePort:args.apiReusePort,
-            cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
-            enableLogging:args.apiLogging,
+            ...args,
             dbMap,
-            disableApiDbAuth:args.disableApiDbAuth,
-            staticRoot:args.apiStaticRoot,
-            embeddedFileMap:args.embeddedFileMap
+            
         },cancel));
     }
 

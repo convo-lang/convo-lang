@@ -37,4 +37,9 @@ export const ConvoEmailPasswordSignRequestSchema=z.object({
     password:z.string(),
 });
 
+export const ConvoEmailOtpSignRequestSchema=z.object({
+    email:z.string(),
+    otp:z.string(),
+});
+
 

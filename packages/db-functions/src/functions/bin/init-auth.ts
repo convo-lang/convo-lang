@@ -36,8 +36,15 @@ export async function resultHandler({
             changed=true;
         }
 
+        if(!node.data['otpSecret'] || override){
+            node.data['otpSecret']=getRandom();
+            changed=true;
+        }
+
         if(nodeR.result){
-            await db.updateNodeAsync(node);
+            if(changed){
+                await db.updateNodeAsync(node);
+            }
         }else{
             await db.insertNodeAsync(node);
         }

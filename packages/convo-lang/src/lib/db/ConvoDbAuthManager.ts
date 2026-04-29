@@ -1,8 +1,8 @@
 import { ReadonlySubject } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { PromiseResultType } from "../result-type.js";
-import { ConvoEmailPasswordSignRequestSchema, ConvoSignInJwtSchema } from "./convo-db-auth-schemas.js";
-import { ConvoEmailPasswordSignRequest, ConvoSignInJwt } from "./convo-db-auth-types.js";
+import { ConvoEmailOtpSignRequestSchema, ConvoEmailPasswordSignRequestSchema, ConvoSignInJwtSchema } from "./convo-db-auth-schemas.js";
+import { ConvoEmailOtpSignRequest, ConvoEmailPasswordSignRequest, ConvoSignInJwt } from "./convo-db-auth-types.js";
 import { ConvoDb } from "./convo-db-types.js";
 import { ConvoDbPermissionBoundary } from "./ConvoDbPermissionBoundary.js";
 
@@ -38,6 +38,32 @@ export class ConvoDbAuthManager
             }
         }catch(ex){
             console.error('Failed to load JWT from local storage')
+        }
+    }
+
+    public async signOutAsync()
+    {
+        this.setJwt(null);
+    }
+
+    public async signInEmailOtpAsync(request:ConvoEmailOtpSignRequest):PromiseResultType<ConvoSignInJwt>
+    {
+        const r=await this.db.callFunctionWithSchemaAsync(
+            ConvoEmailOtpSignRequestSchema,
+            ConvoSignInJwtSchema,
+            '/bin/sign-in-email-otp',
+            request
+        );
+
+        if(!r.success){
+            return r;
+        }
+
+        this.setJwt(r.result);
+
+        return {
+            success:true,
+            result:r.result,
         }
     }
 

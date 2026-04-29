@@ -9,6 +9,7 @@
         "test-familyark":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../familyark--gpt55",
         "test-inventory-manager":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../inventory-manager",
         "test-simple-shad":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../simple-shad",
+        "test-public":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../convo-lang-public",
         "test-self":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../..",
         "publish-ext":"./publish.sh",
         "publish-ext-open":"./publish-ovsx.sh"

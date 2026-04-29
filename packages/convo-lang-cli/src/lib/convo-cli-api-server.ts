@@ -6,35 +6,34 @@ import { CancelToken, DisposeCallback } from "@iyio/common";
 import { Hono } from "hono";
 import { cors as _cors } from 'hono/cors';
 import { defaultConvoCliApiPort } from "./convo-cli-lib.js";
+import { ConvoCliOptions } from "./convo-cli-types.js";
 
-export interface ConvoCliApiServerOptions
-{
-    port?:number;
-    reusePort?:boolean;
-    baseRoute?:string;
-    cors?:boolean|string[];
-    enableLogging?:boolean;
-    dbMap?:ConvoDbInstanceMap;
-    disableApiDbAuth?:boolean;
-    staticRoot?:string;
-    embeddedFileMap?:Record<string,string>;
-}
+
+// port:args.apiPort,
+// reusePort:args.apiReusePort,
+// cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
+// enableLogging:args.apiLogging,
+// dbMap,
+// disableApiDbAuth:args.disableApiDbAuth,
+// staticRoot:args.apiStaticRoot,
+// embeddedFileMap:args.embeddedFileMap
 
 export const runConvoCliApiAsync=async ({
-    port=defaultConvoCliApiPort,
-    reusePort=false,
-    baseRoute='/api/convo-lang',
-    cors,
-    enableLogging,
+    apiPort:port=defaultConvoCliApiPort,
+    apiReusePort:reusePort=false,
+    apiRouteBase:baseRoute='/api/convo-lang',
+    apiCors:cors,
+    apiLogging:enableLogging,
     dbMap,
     disableApiDbAuth,
-    staticRoot,
+    apiStaticRoot:staticRoot,
     embeddedFileMap,
-}:ConvoCliApiServerOptions,cancel?:CancelToken)=>{
+    apiRequireSignIn
+}:Omit<ConvoCliOptions,'dbMap'>&{dbMap?:ConvoDbInstanceMap},cancel?:CancelToken)=>{
 
     const app=new Hono();
 
-    const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth});
+    const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth,requireSignIn:apiRequireSignIn});
 
     if(staticRoot){
         await getStaticHonoRoutesAsync(app,staticRoot,embeddedFileMap);

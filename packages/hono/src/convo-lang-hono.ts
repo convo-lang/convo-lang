@@ -1,6 +1,8 @@
 import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDb, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbInstanceMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
 import { CancelToken, minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { decode } from "hono/jwt";
 import { logger } from 'hono/logger';
 import { streamSSE } from 'hono/streaming';
 import { timeout } from 'hono/timeout';
@@ -45,6 +47,8 @@ export interface ConvoHonoRoutesOptions
     enableMockRoute?:boolean;
 
     disableDbAuth?:boolean;
+
+    requireSignIn?:boolean;
 }
 
 export const getConvoHonoRoutes=({
@@ -57,6 +61,7 @@ export const getConvoHonoRoutes=({
     completionCtx,
     getUsage,
     disableDbAuth=false,
+    requireSignIn,
 }:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
@@ -72,13 +77,42 @@ export const getConvoHonoRoutes=({
         routes.use(logger(customLogger));
     }
 
-    routes.get('/models',async (c)=>{
+    const verifySignedIn=async (c:Context)=>{
 
+        let token=c.req.header('Authorization');
+        if(token?.startsWith('Bearer')){
+            token=token.substring(6).trim();
+        }
+        if(!token){
+            throw new HTTPException(401);
+        }
+        const decoded=decode(token);
+        const dbName=decoded.payload['dbName'];
+        if(typeof dbName!=='string'){
+            throw new HTTPException(401);
+        }
+
+        const db=dbMap?.getDb(dbName);
+        if(!db){
+            throw new HTTPException(401);
+        }
+
+        await jwtVerifier.getDbTokenAsync(c,db);
+
+    }
+    
+
+    routes.get('/models',async (c)=>{
+        
         if(modelCache){
             return c.json(modelCache);
         }
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
 
         const services=convoCompletionService.all();
@@ -104,6 +138,10 @@ export const getConvoHonoRoutes=({
     routes.get('/completion/support/:modelName',async (c)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const services=convoCompletionService.all();
 
@@ -160,6 +198,10 @@ export const getConvoHonoRoutes=({
     const completeAsync=async (c:Context,returnJson:boolean,ctx?:ConvoCompletionCtx<any,any>)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const flat:FlatConvoConversation=await c.req.json();
 
@@ -240,6 +282,10 @@ export const getConvoHonoRoutes=({
 
         await initConvoHonoAsync();
 
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         const request:ConvoHttpToInputRequest=await c.req.json();
         let inputType=request.inputType;
 
@@ -261,6 +307,10 @@ export const getConvoHonoRoutes=({
     routes.post('/transcribe',async (c)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const data=await c.req.formData();
         const audio=data.get('audio');
@@ -294,6 +344,10 @@ export const getConvoHonoRoutes=({
 
         await initConvoHonoAsync();
 
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         const services=convoTranscriptionService.all();
 
         const request=await c.req.json();
@@ -311,6 +365,10 @@ export const getConvoHonoRoutes=({
     routes.post('/tts',async (c)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const request=await c.req.json() as ConvoTtsRequest;
 
@@ -339,6 +397,10 @@ export const getConvoHonoRoutes=({
 
         await initConvoHonoAsync();
 
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         const services=convoTtsService.all();
 
         const request=await c.req.json();
@@ -356,6 +418,10 @@ export const getConvoHonoRoutes=({
     routes.post('/embeddings',async (c)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const request=await c.req.json();
         const supportRequest={...request} as ConvoEmbeddingsGenerationSupportRequest;
@@ -380,6 +446,10 @@ export const getConvoHonoRoutes=({
     routes.post('/embeddings/support',async (c)=>{
 
         await initConvoHonoAsync();
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
 
         const services=convoEmbeddingsService.all();
 
@@ -417,6 +487,25 @@ export const getConvoHonoRoutes=({
         return db.auth.createBoundary(token.identityPath);
     }
 
+    const allowedCalls:string[]=[
+        '/bin/create-otp-url',
+        '/bin/sign-in-email-password',
+        '/bin/sign-in-otp',
+        '/bin/verify-otp-token',
+    ]
+
+    const isAuthAllowedQuery=(query:ConvoNodeQuery<any>):boolean=>{
+        if(query.steps.length!==1){
+            return false;
+        }
+        const step=query.steps[0];
+        if(!step){
+            return false;
+        }
+
+        return (step.path && step.call && Object.keys(step).length===2 && allowedCalls.includes(step.path))?true:false;
+    }
+
     routes.post('/db/:dbName',async (c)=>{
 
         const store=await getDbAsync(c);
@@ -425,6 +514,17 @@ export const getConvoHonoRoutes=({
         }
 
         const commands=await c.req.json<ConvoDbCommand[]>();
+
+        if(requireSignIn){
+            for(const cmd of commands){
+                const query=cmd.queryNodes?.query;
+                if(Object.keys(cmd).length>1 || !query || !isAuthAllowedQuery(query)){
+                    await verifySignedIn(c);
+                    break;
+                }
+            }
+        }
+
 
         const result=await store.executeCommandsAsync(commands);
         
@@ -445,6 +545,11 @@ export const getConvoHonoRoutes=({
             }
 
             const query:ConvoNodeQuery=await c.req.json();
+
+            if(requireSignIn && !isAuthAllowedQuery(query)){
+                await verifySignedIn(c);
+            }
+
             const result=await store.queryNodesAsync(query);
             
             if(!result.success){
@@ -460,6 +565,11 @@ export const getConvoHonoRoutes=({
     routes.get('/db/:dbName/node/:path{.*}',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -489,6 +599,11 @@ export const getConvoHonoRoutes=({
     routes.post('/db/:dbName/node',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -506,6 +621,11 @@ export const getConvoHonoRoutes=({
     routes.patch('/db/:dbName/node',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -523,6 +643,11 @@ export const getConvoHonoRoutes=({
     routes.delete('/db/:dbName/node',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -540,6 +665,11 @@ export const getConvoHonoRoutes=({
     routes.get('/db/:dbName/edge/:id',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -556,6 +686,11 @@ export const getConvoHonoRoutes=({
     routes.post('/db/:dbName/edge',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -573,6 +708,11 @@ export const getConvoHonoRoutes=({
     routes.patch('/db/:dbName/edge',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -590,6 +730,11 @@ export const getConvoHonoRoutes=({
     routes.delete('/db/:dbName/edge',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -607,6 +752,11 @@ export const getConvoHonoRoutes=({
     routes.get('/db/:dbName/embedding/:id',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -623,6 +773,11 @@ export const getConvoHonoRoutes=({
     routes.post('/db/:dbName/embedding',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -640,6 +795,11 @@ export const getConvoHonoRoutes=({
     routes.patch('/db/:dbName/embedding',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -657,6 +817,11 @@ export const getConvoHonoRoutes=({
     routes.delete('/db/:dbName/embedding',async (c)=>{
 
         const store=await getDbAsync(c);
+
+        if(requireSignIn){
+            await verifySignedIn(c);
+        }
+
         if(!store){
             return c.json('No database found by name',404);
         }
@@ -679,6 +844,11 @@ export const getConvoHonoRoutes=({
             let ping=0;
 
             const store=await getDbAsync(c);
+
+            if(requireSignIn){
+                await verifySignedIn(c);
+            }
+            
             if(!store){
                 const item:ConvoNodeStreamItem<any>={
                     type:'error',

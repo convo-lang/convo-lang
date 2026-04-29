@@ -1,5 +1,5 @@
 import type { ConvoDbFunctionExecutionContext, ConvoNode, PartialNode, PromiseResultType } from "@convo-lang/convo-lang";
-import { authSecretsPath, hashPasswordAsync } from "../../lib/auth-lib.js";
+import { authSecretsPath, encryptSecret, hashPasswordAsync } from "../../lib/auth-lib.js";
 import { CreateUserSignRequest, UserSignIn } from "../../lib/auth-types.js";
 
 export async function resultHandler(signIn:CreateUserSignRequest,{
@@ -8,6 +8,14 @@ export async function resultHandler(signIn:CreateUserSignRequest,{
 
     try{
         
+        if(!signIn.password && !signIn.otpSecret){
+            return {
+                success:false,
+                error:'password or otpSecret required',
+                statusCode:400
+            }
+        }
+
         const email=signIn?.claims['email'];
         if(!email){
             return {
@@ -52,18 +60,38 @@ export async function resultHandler(signIn:CreateUserSignRequest,{
             }
         }
 
-        const salt=secret.result.data['passwordSalt'];
-        if(!salt){
-            return {
-                success:false,
-                error:`\`${authSecretsPath}[passwordSalt]\` not set`,
-                statusCode:500,
+        
+
+        let passwordHash:string|undefined;
+        let otpSecretValue:string|undefined
+
+        if(signIn.password){
+
+            const salt=secret.result.data['passwordSalt'];
+            if(!salt){
+                return {
+                    success:false,
+                    error:`\`${authSecretsPath}[passwordSalt]\` not set`,
+                    statusCode:500,
+                }
             }
+            const passwordHashResult=await hashPasswordAsync(signIn.password,salt);
+            if(!passwordHashResult.success){
+                return passwordHashResult;
+            }
+            passwordHash=passwordHashResult.result;
         }
 
-        const passwordHash=await hashPasswordAsync(signIn.password,salt);
-        if(!passwordHash.success){
-            return passwordHash;
+        if(signIn.otpSecret){
+            const otpSecret=secret.result.data['otpSecret'];
+            if(!otpSecret){
+                return {
+                    success:false,
+                    error:`\`${authSecretsPath}[otpSecret]\` not set`,
+                    statusCode:500,
+                }
+            }
+            otpSecretValue=await encryptSecret(signIn.otpSecret,otpSecret);
         }
 
         const id=globalThis.crypto.randomUUID();
@@ -73,14 +101,17 @@ export async function resultHandler(signIn:CreateUserSignRequest,{
         }
         jwt.identityPaths.push(`/usr/${id}`);
         delete (jwt as Partial<CreateUserSignRequest>).password;
+        delete (jwt as Partial<CreateUserSignRequest>).otpSecret;
         const node:ConvoNode={
             path:`/usr/${id}`,
             type:'user-sign-in',
             data:{
-                passwordHash:passwordHash.result,
+                passwordHash:passwordHash,
+                otpSecret:otpSecretValue,
                 jwt,
             } satisfies UserSignIn
         };
+
 
         const r=await db.insertNodeAsync(node);
         if(!r.success){

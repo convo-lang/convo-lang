@@ -37,9 +37,6 @@ const _getConfigAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
     }
 
     const configExists=await pathExistsAsync(configPath);
-    if(!configExists && configPath && (typeof options.config!=='object')){
-        throw new Error(`Convo config file not found a path - ${configPath}`)
-    }
     let c:ConvoCliConfig=configExists?await readFileAsJsonAsync(configPath):{};
 
     if(options.config && (typeof options.config === 'object')){
