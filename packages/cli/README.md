@@ -40,12 +40,12 @@ a CLI, and a vscode extension for syntax highlighting and in-editor script execu
 
 
 ## Quick Start with NextJS
-You can use the `npx @convo-lang/convo-lang-cli --create-next-app` command to quickly get started building AI Agents powered
+You can use the `npx @convo-lang/cli --create-next-app` command to quickly get started building AI Agents powered
 by Convo-Lang in a NextJS project
 
 **Step 1:** Create project using convo CLI
 ``` sh
-npx @convo-lang/convo-lang-cli --create-next-app
+npx @convo-lang/cli --create-next-app
 ```
 
 **Step 1:** Open newly created project in VSCode or your favorite editor
@@ -282,14 +282,14 @@ Output:
 ## Using the CLI
 The convo CLI can be used to execute convo scripts from the command line
 
-For use on the command line install the @convo-lang/convo-lang-cli package
+For use on the command line install the @convo-lang/cli package
 ``` sh
-npm i @convo-lang/convo-lang-cli -g
+npm i @convo-lang/cli -g
 ```
 
 ``` sh
 # install the convo cli
-npm i -g @convo-lang/convo-lang-cli
+npm i -g @convo-lang/cli
 
 # Results will be printed to stdout
 convo talky-time.convo

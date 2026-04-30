@@ -19,9 +19,6 @@
             "path": "../../packages/convo-lang"
         },
         {
-            "path": "../../packages/convo-lang-bedrock"
-        },
-        {
             "path": "../../packages/convo-lang-browser"
         },
         {

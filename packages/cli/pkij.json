@@ -1,4 +1,7 @@
 {
     "optional":true,
-    "copySource":["package.json","bin"]
+    "copySource":["package.json","bin"],
+    "scripts":{
+        "build":"../../scripts/build-cli.ts"
+    }
 }

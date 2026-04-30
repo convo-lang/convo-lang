@@ -1,5 +1,4 @@
-import { ConvoHttpImportService, ConvoProjectConfig, ConvoVfsImportService, convoAnthropicModule, convoCapabilitiesParams, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
-import { convoBedrockModule } from "@convo-lang/convo-lang-bedrock";
+import { ConvoHttpImportService, ConvoProjectConfig, ConvoVfsImportService, convoCapabilitiesParams, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
 import { convoDbModule } from "@convo-lang/db/db-module.js";
 import { EnvParams, ScopeRegistration, deleteUndefined } from "@iyio/common";
@@ -42,10 +41,10 @@ export const convoCliModule=(
 
     reg.use(nodeCommonModule);
     reg.use(convoOpenAiModule);
-    reg.use(convoBedrockModule);
+    //reg.use(convoBedrockModule);
     reg.use(convoMcpClientModule);
     reg.use(convoOpenRouterModule);
-    reg.use(convoAnthropicModule);
+    //reg.use(convoAnthropicModule);
     reg.use(convoDbModule);
     reg.implementService(convoGitService,()=>new ConvoCliGitService());
     // reg.implementService(convoDbService,()=>new BunSqliteConvoDb({
