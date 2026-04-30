@@ -1,0 +1,448 @@
+@import ../base.convo
+
+> user
+I need to create a set of NPM packages to distribute the Convo-Lang CLI.
+
+I would like for you to add the necessary NPM files and a basic wrapper code.
+
+../../packages/
+        |
+        +- cli: should contain the wrapper package - NPM Name: `@convo-lang/cli`
+            |
+            +- targets
+                |
+                +- cli-{os_name}-{arch}: NPM Name: `@convo-lang/cli-{os_name}-{arch}`
+                    |
+                    +- bin
+                        |
+                        +- convo: The Convo-Lang cli compiled for each target OS and architecture
+
+
+There should be a target package for each of the following operating system and architecture paris:
+linux-x64
+linux-arm64
+windows-x64
+windows-arm64
+darwin-x64
+darwin-arm64
+linux-x64-musl
+linux-arm64-musl
+
+@time 2026-04-30T15:48:13-04:00
+@tokenUsage 1917 / 380 / $0.011485000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+A few quick questions before I generate the files:
+
+1. Which package manager/workspace setup does this repo use?  
+   - npm workspaces, pnpm, yarn, or something else?
+
+2. Should `../../packages/cli/package.json` be marked as:
+   - `"private": false`
+   - publishable to npm
+   - with `"access": "public"`?
+
+3. What version should the new packages use initially?  
+   Example: `0.0.0`, `0.1.0`, or match an existing repo version.
+
+4. For the wrapper behavior, is this acceptable?
+   - `@convo-lang/cli` exposes a `convo` bin.
+   - At runtime it detects `process.platform`, `process.arch`, and musl vs glibc.
+   - It requires/executes the matching optional dependency package.
+   - Target packages contain the real binary at `bin/convo` or `bin/convo.exe`.
+
+5. Should the Windows target binary be named:
+   - `bin/convo.exe`
+   - or exactly `bin/convo` as in your layout?
+
+6. Do you want me to update any root workspace config files too, if needed?  
+   For example root `package.json`, `pnpm-workspace.yaml`, etc.
+
+
+> user
+1. An internal tool called PKIJ. Packages are linked together by tsconfig files and tsconfig
+   files are managed manually
+2. mark as public
+3. 0.9.2
+4. Yes, the wrapper code should be javascript and not require any bundling
+5. Yes use bin/convo.exe for windows
+6. Do not updating any root files
+
+@time 2026-04-30T15:53:56-04:00
+@tokenUsage 2272 / 3844 / $0.030580000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/package.json">
+``` json
+{
+    "name": "@convo-lang/cli",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI wrapper.",
+    "bin": {
+        "convo": "bin/convo.js"
+    },
+    "files": [
+        "bin/"
+    ],
+    "optionalDependencies": {
+        "@convo-lang/cli-linux-x64": "0.9.2",
+        "@convo-lang/cli-linux-arm64": "0.9.2",
+        "@convo-lang/cli-windows-x64": "0.9.2",
+        "@convo-lang/cli-windows-arm64": "0.9.2",
+        "@convo-lang/cli-darwin-x64": "0.9.2",
+        "@convo-lang/cli-darwin-arm64": "0.9.2",
+        "@convo-lang/cli-linux-x64-musl": "0.9.2",
+        "@convo-lang/cli-linux-arm64-musl": "0.9.2"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo.js" target-output-path="../../packages/cli/bin/convo.js">
+``` js
+#!/usr/bin/env node
+
+const fs=require('fs');
+const path=require('path');
+const childProcess=require('child_process');
+
+function isMusl()
+{
+    if(process.platform!=='linux'){
+        return false;
+    }
+
+    try{
+        if(process.report && typeof process.report.getReport==='function'){
+            const report=process.report.getReport();
+            const header=report.header || {};
+            const sharedObjects=report.sharedObjects || [];
+
+            if(header.glibcVersionRuntime){
+                return false;
+            }
+
+            if(sharedObjects.some(item=>item.includes('libc.musl') || item.includes('ld-musl'))){
+                return true;
+            }
+        }
+    }catch{
+        // ignore
+    }
+
+    try{
+        const result=childProcess.spawnSync('ldd',['--version'],{encoding:'utf8'});
+        const output=`${result.stdout || ''}${result.stderr || ''}`.toLowerCase();
+
+        if(output.includes('musl')){
+            return true;
+        }
+
+        if(output.includes('glibc') || output.includes('gnu libc')){
+            return false;
+        }
+    }catch{
+        // ignore
+    }
+
+    return fs.existsSync('/lib/ld-musl-x86_64.so.1') ||
+        fs.existsSync('/lib/ld-musl-aarch64.so.1') ||
+        fs.existsSync('/usr/lib/ld-musl-x86_64.so.1') ||
+        fs.existsSync('/usr/lib/ld-musl-aarch64.so.1');
+}
+
+function getTargetPackageName()
+{
+    const osNames={
+        linux:'linux',
+        darwin:'darwin',
+        win32:'windows',
+    };
+    const archNames={
+        x64:'x64',
+        arm64:'arm64',
+    };
+
+    const osName=osNames[process.platform];
+    const archName=archNames[process.arch];
+
+    if(!osName || !archName){
+        throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
+    }
+
+    const libcSuffix=process.platform==='linux' && isMusl()?'-musl':'';
+
+    return `@convo-lang/cli-${osName}-${archName}${libcSuffix}`;
+}
+
+function getBinaryPath(packageName)
+{
+    const packageJsonPath=require.resolve(`${packageName}/package.json`);
+    const packageDir=path.dirname(packageJsonPath);
+    const binaryName=process.platform==='win32'?'convo.exe':'convo';
+
+    return path.join(packageDir,'bin',binaryName);
+}
+
+function main()
+{
+    let packageName;
+    let binaryPath;
+
+    try{
+        packageName=getTargetPackageName();
+        binaryPath=getBinaryPath(packageName);
+    }catch(error){
+        console.error(`Unable to find a compatible Convo-Lang CLI binary for ${process.platform}-${process.arch}.`);
+        console.error('Make sure optional dependencies were installed for @convo-lang/cli.');
+        console.error(error.message);
+        process.exit(1);
+    }
+
+    const child=childProcess.spawn(binaryPath,process.argv.slice(2),{stdio:'inherit'});
+
+    child.on('error',error=>{
+        console.error(`Failed to start Convo-Lang CLI from ${packageName}.`);
+        console.error(error.message);
+        process.exit(1);
+    });
+
+    for(const signal of ['SIGINT','SIGTERM','SIGHUP']){
+        process.on(signal,()=>{
+            if(!child.killed){
+                child.kill(signal);
+            }
+        });
+    }
+
+    child.on('exit',(code,signal)=>{
+        if(signal){
+            process.kill(process.pid,signal);
+            return;
+        }
+
+        process.exit(code===null?1:code);
+    });
+}
+
+main();
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-linux-x64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-linux-x64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Linux x64.",
+    "os": [
+        "linux"
+    ],
+    "cpu": [
+        "x64"
+    ],
+    "libc": [
+        "glibc"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-linux-arm64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-linux-arm64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Linux arm64.",
+    "os": [
+        "linux"
+    ],
+    "cpu": [
+        "arm64"
+    ],
+    "libc": [
+        "glibc"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-windows-x64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-windows-x64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Windows x64.",
+    "os": [
+        "win32"
+    ],
+    "cpu": [
+        "x64"
+    ],
+    "bin": {
+        "convo": "bin/convo.exe"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-windows-arm64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-windows-arm64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Windows arm64.",
+    "os": [
+        "win32"
+    ],
+    "cpu": [
+        "arm64"
+    ],
+    "bin": {
+        "convo": "bin/convo.exe"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-darwin-x64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-darwin-x64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for macOS x64.",
+    "os": [
+        "darwin"
+    ],
+    "cpu": [
+        "x64"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-darwin-arm64/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-darwin-arm64",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for macOS arm64.",
+    "os": [
+        "darwin"
+    ],
+    "cpu": [
+        "arm64"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-linux-x64-musl/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-linux-x64-musl",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Linux x64 musl.",
+    "os": [
+        "linux"
+    ],
+    "cpu": [
+        "x64"
+    ],
+    "libc": [
+        "musl"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/cli/targets/cli-linux-arm64-musl/package.json">
+``` json
+{
+    "name": "@convo-lang/cli-linux-arm64-musl",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Linux arm64 musl.",
+    "os": [
+        "linux"
+    ],
+    "cpu": [
+        "arm64"
+    ],
+    "libc": [
+        "musl"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user

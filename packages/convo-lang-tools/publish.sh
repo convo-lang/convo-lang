@@ -13,5 +13,6 @@ cd ..
 # - give full access
 
 # See https://code.visualstudio.com/api/working-with-extensions/publishing-extension
+# https://marketplace.visualstudio.com/manage/publishers/iyio/extensions/convo-lang-tools/hub?_a=review
 echo token=$VS_CODE_TOKEN
 npx --yes vsce publish -p $VS_CODE_TOKEN
