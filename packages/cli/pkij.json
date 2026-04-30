@@ -1,0 +1,4 @@
+{
+    "optional":true,
+    "copySource":["package.json","bin"]
+}

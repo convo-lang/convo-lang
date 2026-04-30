@@ -1,0 +1,38 @@
+{
+    "name": "@convo-lang/cli-linux-arm64-musl",
+    "version": "0.9.2",
+    "description": "Convo-Lang CLI binary for Linux arm64 musl.",
+    "license": "Apache-2.0",
+    "keywords": [
+        "prompt",
+        "prompt-engineering",
+        "LLM",
+        "ai-agents",
+        "tool-calling",
+        "open-ai",
+        "ai",
+        "convo-lang"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "os": [
+        "linux"
+    ],
+    "cpu": [
+        "arm64"
+    ],
+    "libc": [
+        "musl"
+    ],
+    "bin": {
+        "convo": "bin/convo"
+    },
+    "files": [
+        "bin/"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
