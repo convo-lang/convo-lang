@@ -1,0 +1,10 @@
+@import ../base.convo
+@import ../../packages/tui/src/tui-types.ts !file
+@import ../../packages/tui/src/ConvoTuiCtrl.ts !file
+@import ./tui-notes.md !file
+
+> system
+We are working on a terminal user interface (TUI). The defined types are in the `tui-types.ts` file.
+implementation will be taken care of by the `ConvoTuiCtrl` class.
+
+Save any notes to `./tui-notes.md`
