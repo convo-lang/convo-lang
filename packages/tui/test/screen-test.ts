@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
+import { appendFile } from "node:fs/promises";
 import { ConvoTuiCtrl } from '../src/ConvoTuiCtrl.js';
-import type { SpriteDef, TuiConsole, TuiTheme } from '../src/tui-types.js';
+import type { SpriteDef, SpriteMouseEvtBase, TuiConsole, TuiTheme } from '../src/tui-types.js';
 
 const proc=(globalThis as any).process;
 if(!proc){
@@ -11,6 +12,44 @@ if(!proc){
 if(!proc.stdin.isTTY){
     console.error('screen-test requires an interactive terminal.');
     proc.exit(1);
+}
+
+
+const log=(...values:any[])=>{
+    writeOutputAsync(values.map(v=>{
+        try{
+            if(typeof v === 'string'){
+                return v;
+            }
+            return JSON.stringify(v);
+        }catch{
+            return v+'';
+        }
+    }).join(' '))
+}
+
+const queue:string[]=[];
+let writing=false;
+const writeOutputAsync=async (value:string)=>{
+    if(writing){
+        queue.push(value);
+        return;
+    }
+    try{
+        writing=true;
+        if(queue.length){
+            value=queue.splice(0,queue.length).join('\n')+'\n'+value;
+        }
+        await appendFile('./log',value+'\n');
+    }catch(ex){
+        process.stdout.write('Error writing to log');
+    }finally{
+        writing=false;
+        if(queue.length){
+            const value=queue.splice(0,queue.length).join('\n');
+            writeOutputAsync(value);
+        }
+    }
 }
 
 const theme:TuiTheme={
@@ -36,7 +75,7 @@ const status={
 let clickCount=0;
 let mouseEventCount=0;
 
-const setMouseStatus=(evt:any, label:string)=>{
+const setMouseStatus=(evt:SpriteMouseEvtBase, label:string)=>{
     evt.ctrl.updateSprite('mouse-status',s=>{
         const modifiers=[
             evt.modifiers?.shift?'shift':undefined,
@@ -775,6 +814,7 @@ const ctrl=new ConvoTuiCtrl({
     console:tuiConsole,
     theme,
     defaultScreen:'home',
+    log,
     screens:[
         {
             id:'home',

@@ -89,6 +89,10 @@
   - classic
   - per-side border colors
 - Added scroll offsets for scrollable sprites.
+- Added scroll bounds for scrollable sprites:
+  - scroll offsets are clamped using the current content viewport
+  - wheel and keyboard scrolling stop when the last content row reaches the bottom of the scroll viewport
+  - stale scroll offsets are clamped during render after resize or content changes
 - Added clipping bounds for scrollable container children:
   - drawing operations respect an internal clip stack
   - scrollable sprite children clip to the sprite content rect

@@ -1,5 +1,6 @@
 import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
+
 export interface ConvoTuiCtrlOptions
 {
     screens:ScreenDef[];
@@ -11,6 +12,8 @@ export interface ConvoTuiCtrlOptions
      * will be used.
      */
     defaultScreen?:string;
+
+    log?:(...values:any[])=>void;
 }
 
 interface TuiSize
@@ -90,6 +93,7 @@ export class ConvoTuiCtrl
     public readonly screens:Screen[]=[];
     public readonly console:TuiConsole;
     public readonly theme:TuiTheme;
+    public readonly log:(...values:any[])=>void;
 
     private readonly bufferState:ScreenBufferState={
         width:0,
@@ -100,6 +104,7 @@ export class ConvoTuiCtrl
 
     private readonly cleanupCallbacks:(()=>void)[]=[];
     private readonly clipStack:TuiRect[]=[];
+    private readonly spriteContentRects=new Map<string,TuiRect>();
     private inputBuffer='';
     private inputCursor?:TuiCursorPosition;
     private isInitialized=false;
@@ -113,7 +118,9 @@ export class ConvoTuiCtrl
         console,
         theme,
         defaultScreen,
+        log=globalThis.console.log,
     }:ConvoTuiCtrlOptions){
+        this.log=log;
         this.console=console;
         this.theme=theme;
         this.screens=this.loadScreens(screens);
@@ -492,6 +499,7 @@ export class ConvoTuiCtrl
         this.inputCursor=undefined;
         this.resizeBuffers();
         this.clearBuffer(this.bufferState.back);
+        this.spriteContentRects.clear();
 
         const screen=this._activeScreen;
         if(screen){
@@ -650,10 +658,16 @@ export class ConvoTuiCtrl
 
         const border=this.getBorderColors(sprite, style.f);
         if(border.hasBorder){
-            this.drawBorder(rect, border, sprite.borderStyle??'normal');
+            this.drawBorder(rect, border, sprite.borderStyle??'normal',sprite.id);
         }
 
         const contentRect=this.getContentRect(rect, border);
+        this.spriteContentRects.set(sprite.id, contentRect);
+
+        if(sprite.scrollable){
+            this.clampSpriteScroll(sprite, contentRect);
+        }
+
         if(contentRect.width<=0 || contentRect.height<=0){
             return;
         }
@@ -1017,6 +1031,90 @@ export class ConvoTuiCtrl
         };
     }
 
+    private getScrollableContentSize(sprite:Sprite, viewport:TuiRect):TuiSize
+    {
+        const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
+        const layout=sprite.layout??'inline';
+
+        if(layout==='inline' || !children.length){
+            const text=this.getInlineSpriteText(sprite);
+            const textWrap=sprite.textWrap??'wrap';
+            const lines=(
+                textWrap==='clip'?
+                    this.getTextLines(text)
+                :
+                    this.getInlineSpriteLines(text, Math.max(1, viewport.width), textWrap)
+            );
+
+            return {
+                width:Math.max(1, ...lines.map(line=>line.length)),
+                height:Math.max(1, lines.length),
+            };
+        }
+
+        if(layout==='row'){
+            const sizes=children.map(child=>this.getNaturalSize(child));
+            return {
+                width:sizes.reduce((sum, size)=>sum+size.width, 0),
+                height:Math.max(1, ...sizes.map(size=>size.height)),
+            };
+        }
+
+        if(layout==='grid'){
+            const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+            const widths=this.getGridColWidths(cols as SpriteGridColSize[], viewport.width);
+            const colCount=Math.max(1, widths.length);
+            const rowHeights:number[]=[];
+
+            children.forEach((child, i)=>{
+                const row=Math.floor(i/colCount);
+                const col=i%colCount;
+                rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+            });
+
+            return {
+                width:Math.max(viewport.width, widths.reduce((sum, width)=>sum+width, 0)),
+                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)),
+            };
+        }
+
+        const sizes=children.map(child=>this.getNaturalSize(child, viewport.width));
+        return {
+            width:Math.max(1, ...sizes.map(size=>size.width)),
+            height:Math.max(1, sizes.reduce((sum, size)=>sum+size.height, 0)),
+        };
+    }
+
+    private getSpriteMaxScroll(sprite:Sprite, viewport:TuiRect):TuiCursorPosition
+    {
+        const size=this.getScrollableContentSize(sprite, viewport);
+        return {
+            x:Math.max(0, size.width-viewport.width),
+            y:Math.max(0, size.height-viewport.height),
+        };
+    }
+
+    private clampSpriteScroll(sprite:Sprite, viewport:TuiRect)
+    {
+        if(!sprite.scrollable){
+            return;
+        }
+
+        const currentX=sprite.state?.scrollX??0;
+        const currentY=sprite.state?.scrollY??0;
+        const max=this.getSpriteMaxScroll(sprite, viewport);
+        const nextX=this.clampNumber(currentX, 0, max.x);
+        const nextY=this.clampNumber(currentY, 0, max.y);
+
+        if(nextX===currentX && nextY===currentY){
+            return;
+        }
+
+        sprite.state??={};
+        sprite.state.scrollX=nextX;
+        sprite.state.scrollY=nextY;
+    }
+
     private getInlineSpriteText(sprite:Sprite):string
     {
         if(sprite.isInput){
@@ -1354,7 +1452,7 @@ export class ConvoTuiCtrl
         }
     }
 
-    private drawBorder(rect:TuiRect, border:ReturnType<ConvoTuiCtrl['getBorderColors']>, style:SpriteBorderStyle)
+    private drawBorder(rect:TuiRect, border:ReturnType<ConvoTuiCtrl['getBorderColors']>, style:SpriteBorderStyle, spriteId:string)
     {
         const chars=this.getBorderChars(style);
         const x1=rect.x;
@@ -1364,39 +1462,39 @@ export class ConvoTuiCtrl
 
         if(border.top){
             for(let x=x1;x<=x2;x++){
-                this.setChar(x, y1, {c:chars.h, f:border.top, b:undefined, i:''});
+                this.setChar(x, y1, {c:chars.h, f:border.top, b:undefined, i:spriteId});
             }
         }
 
         if(border.bottom){
             for(let x=x1;x<=x2;x++){
-                this.setChar(x, y2, {c:chars.h, f:border.bottom, b:undefined, i:''});
+                this.setChar(x, y2, {c:chars.h, f:border.bottom, b:undefined, i:spriteId});
             }
         }
 
         if(border.left){
             for(let y=y1;y<=y2;y++){
-                this.setChar(x1, y, {c:chars.v, f:border.left, b:undefined, i:''});
+                this.setChar(x1, y, {c:chars.v, f:border.left, b:undefined, i:spriteId});
             }
         }
 
         if(border.right){
             for(let y=y1;y<=y2;y++){
-                this.setChar(x2, y, {c:chars.v, f:border.right, b:undefined, i:''});
+                this.setChar(x2, y, {c:chars.v, f:border.right, b:undefined, i:spriteId});
             }
         }
 
         if(border.top && border.left){
-            this.setChar(x1, y1, {c:chars.tl, f:border.top, b:undefined, i:''});
+            this.setChar(x1, y1, {c:chars.tl, f:border.top, b:undefined, i:spriteId});
         }
         if(border.top && border.right){
-            this.setChar(x2, y1, {c:chars.tr, f:border.top, b:undefined, i:''});
+            this.setChar(x2, y1, {c:chars.tr, f:border.top, b:undefined, i:spriteId});
         }
         if(border.bottom && border.left){
-            this.setChar(x1, y2, {c:chars.bl, f:border.bottom, b:undefined, i:''});
+            this.setChar(x1, y2, {c:chars.bl, f:border.bottom, b:undefined, i:spriteId});
         }
         if(border.bottom && border.right){
-            this.setChar(x2, y2, {c:chars.br, f:border.bottom, b:undefined, i:''});
+            this.setChar(x2, y2, {c:chars.br, f:border.bottom, b:undefined, i:spriteId});
         }
     }
 
@@ -1920,10 +2018,19 @@ export class ConvoTuiCtrl
         }
     }
 
+    public logBuffer(buffer=this.bufferState.front){
+        this.log(
+            `\n\n__________________________________________________\n`,
+            buffer.map(r=>r.map(p=>p.i[0]||' ').join('')).join('\n'),
+            '\n__________________________________________________\n'
+        );
+    }
+
     private getMouseTarget(x:number, y:number):TuiMouseTarget|undefined
     {
         const id=this.bufferState.front[y]?.[x]?.i;
         const screen=this._activeScreen;
+        
         if(!id || !screen){
             return undefined;
         }
@@ -2009,9 +2116,10 @@ export class ConvoTuiCtrl
             return;
         }
 
-        target.sprite.onMouseWheel?.({
+        const handlerTarget=[...target.path].reverse().find(sprite=>sprite.onMouseWheel);
+        handlerTarget?.onMouseWheel?.({
             type:'mouse-wheel',
-            sprite:target.sprite,
+            sprite:handlerTarget,
             screen:target.screen,
             ctrl:this,
             x:evt.x,
@@ -2023,8 +2131,7 @@ export class ConvoTuiCtrl
 
         const scrollTarget=[...target.path].reverse().find(sprite=>sprite.scrollable);
         const didScroll=scrollTarget?this.scrollSprite(scrollTarget, 0, evt.direction==='up'?-1:1, false):false;
-
-        if(target.sprite.onMouseWheel || didScroll){
+        if(handlerTarget || didScroll){
             this.render();
         }
     }
@@ -2201,10 +2308,14 @@ export class ConvoTuiCtrl
 
         sprite.state??={};
 
-        const nextX=Math.max(0, (sprite.state.scrollX??0)+x);
-        const nextY=Math.max(0, (sprite.state.scrollY??0)+y);
+        const currentX=sprite.state.scrollX??0;
+        const currentY=sprite.state.scrollY??0;
+        const rect=this.spriteContentRects.get(sprite.id);
+        const max=rect?this.getSpriteMaxScroll(sprite, rect):undefined;
+        const nextX=max?this.clampNumber(currentX+x, 0, max.x):Math.max(0, currentX+x);
+        const nextY=max?this.clampNumber(currentY+y, 0, max.y):Math.max(0, currentY+y);
 
-        if(nextX===sprite.state.scrollX && nextY===sprite.state.scrollY){
+        if(nextX===currentX && nextY===currentY){
             return false;
         }
 

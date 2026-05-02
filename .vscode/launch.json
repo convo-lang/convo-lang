@@ -9,6 +9,12 @@
                 "<node_internals>/**"
             ],
             "type": "node"
+        },
+        {
+            "type": "bun",
+            "request": "attach",
+            "name": "Attach to Bun",
+            "url": "ws://localhost:6499/1gy3j3mmefj" 
         }
     ]
 }
