@@ -1,0 +1,361 @@
+@import ../base.convo
+
+> user
+Add all the files needed to add a package to `brew` the package manager. The files will be stored
+in a directory the mirror the structure of the `homebrew-core` repo.
+
+Mirror directory: `../../packages/brew/homebrew-core`
+
+The package will be called "convo" and will consist of 2 binaries one for apple silicon and the other for intel.
+
+Binaries are  located at:
+https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-arm64
+https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-x64
+
+
+Use the `../../packages/cli/README.md` file for the readme.
+
+@time 2026-04-30T19:54:24-04:00
+@tokenUsage 1892 / 346 / $0.011190000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+I can add the Homebrew formula files, but I need two details first:
+
+1. The SHA256 checksums for these binaries:
+   - `https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-arm64`
+   - `https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-x64`
+
+2. Please provide the contents of `../../packages/cli/README.md`, or confirm I should create the formula using a short generated description/homepage instead of copying from that README.
+
+Homebrew formulas require stable `sha256` values, so I shouldn’t guess or omit them.
+
+
+> user
+Write a bash script that will calculate the formulas and will be ran before creating pull requests.
+Use placeholders include of the hashes for the files that live in the mirror directory.
+
+Use the local version of the binaries store at:
+../../packages/cli-darwin-arm64/bin/convo
+../../packages/cli-darwin-x64/bin/convo
+
+save the bash script to `../../packages/brew/update.sh`
+
+Write the bash script and brew files now. Remember to use placeholders in the brew files
+that will be replaced later manually using the content from the bash script.
+
+@time 2026-04-30T20:06:18-04:00
+@tokenUsage 2159 / 2694 / $0.024265000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="update.sh" target-output-path="../../packages/brew/update.sh">
+``` bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve paths relative to this script so it can be run from any directory.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+
+formula_path="${script_dir}/homebrew-core/Formula/c/convo.rb"
+arm_binary="${repo_root}/packages/cli-darwin-arm64/bin/convo"
+x64_binary="${repo_root}/packages/cli-darwin-x64/bin/convo"
+
+arm_placeholder="CONVO_DARWIN_ARM64_SHA256"
+x64_placeholder="CONVO_DARWIN_X64_SHA256"
+
+sha256_file()
+{
+    local file_path="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "${file_path}" | awk '{print $1}'
+    else
+        shasum -a 256 "${file_path}" | awk '{print $1}'
+    fi
+}
+
+require_file()
+{
+    local file_path="$1"
+
+    if [[ ! -f "${file_path}" ]]; then
+        echo "Missing required file: ${file_path}" >&2
+        exit 1
+    fi
+}
+
+# Verify the local binaries and formula exist before calculating replacement values.
+require_file "${arm_binary}"
+require_file "${x64_binary}"
+require_file "${formula_path}"
+
+# Calculate hashes from the local release binaries.
+arm_sha256="$(sha256_file "${arm_binary}")"
+x64_sha256="$(sha256_file "${x64_binary}")"
+
+# Print manual replacement values for the Homebrew formula.
+echo "Replace placeholders in:"
+echo "  ${formula_path}"
+echo
+echo "${arm_placeholder}=${arm_sha256}"
+echo "${x64_placeholder}=${x64_sha256}"
+echo
+echo "Manual replacement commands:"
+echo "  perl -0pi -e 's/${arm_placeholder}/${arm_sha256}/g; s/${x64_placeholder}/${x64_sha256}/g' '${formula_path}'"
+echo
+echo "Formula preview with replacements applied:"
+echo
+
+# Show the formula with placeholders replaced, but do not modify the file.
+sed \
+    -e "s/${arm_placeholder}/${arm_sha256}/g" \
+    -e "s/${x64_placeholder}/${x64_sha256}/g" \
+    "${formula_path}"
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo.rb" target-output-path="../../packages/brew/homebrew-core/Formula/c/convo.rb">
+``` ruby
+class Convo < Formula
+  desc "Convo-Lang CLI"
+  homepage "https://github.com/convo-lang/convo-lang/tree/main/packages/cli#readme"
+  version "0.9.3"
+  license "MIT"
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-arm64"
+      sha256 "CONVO_DARWIN_ARM64_SHA256"
+    else
+      url "https://github.com/convo-lang/convo-lang/releases/download/v0.9.3/convo-darwin-x64"
+      sha256 "CONVO_DARWIN_X64_SHA256"
+    end
+  end
+
+  def install
+    binary=Hardware::CPU.arm? ? "convo-darwin-arm64" : "convo-darwin-x64"
+    chmod 0755, binary
+    bin.install binary => "convo"
+  end
+
+  test do
+    system "#{bin}/convo", "--help"
+  end
+end
+```
+</FILE_CONTENT>
+
+
+> user
+Let's do it differently.
+
+Instead write a single bash script that will write the ruby file directly to the fork of the 
+homebrew-core repo. Also set the version based on the current version of the Convo-Lang repo.
+You can get the version using the `../../package.json` file.
+
+The fork is located at `../../../homebrew-core`.
+
+save the script to `../../scripts/update-brew-package.sh`
+
+@time 2026-04-30T20:13:08-04:00
+@tokenUsage 3034 / 1578 / $0.023060000000000004
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="update-brew-package.sh" target-output-path="../../scripts/update-brew-package.sh">
+``` bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+homebrew_core_root="$(cd "${repo_root}/../homebrew-core" && pwd)"
+
+package_json="${repo_root}/package.json"
+arm_binary="${repo_root}/packages/cli-darwin-arm64/bin/convo"
+x64_binary="${repo_root}/packages/cli-darwin-x64/bin/convo"
+formula_dir="${homebrew_core_root}/Formula/c"
+formula_path="${formula_dir}/convo.rb"
+
+require_file()
+{
+    local file_path="$1"
+
+    if [[ ! -f "${file_path}" ]]; then
+        echo "Missing required file: ${file_path}" >&2
+        exit 1
+    fi
+}
+
+sha256_file()
+{
+    local file_path="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "${file_path}" | awk '{print $1}'
+    else
+        shasum -a 256 "${file_path}" | awk '{print $1}'
+    fi
+}
+
+# Verify all required inputs exist before writing the formula.
+require_file "${package_json}"
+require_file "${arm_binary}"
+require_file "${x64_binary}"
+
+# Read the Convo-Lang version from the repository package.json.
+version="$(node -e "console.log(require(process.argv[1]).version)" "${package_json}")"
+
+if [[ -z "${version}" ]]; then
+    echo "Unable to read version from ${package_json}" >&2
+    exit 1
+fi
+
+# Calculate SHA256 hashes from the local release binaries.
+arm_sha256="$(sha256_file "${arm_binary}")"
+x64_sha256="$(sha256_file "${x64_binary}")"
+
+# Ensure the Homebrew formula directory exists in the fork.
+mkdir -p "${formula_dir}"
+
+# Write the Homebrew formula directly to the fork.
+cat > "${formula_path}" <<EOF
+class Convo < Formula
+  desc "Convo-Lang CLI"
+  homepage "https://github.com/convo-lang/convo-lang/tree/main/packages/cli#readme"
+  version "${version}"
+  license "MIT"
+
+  depends_on :macos
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/convo-lang/convo-lang/releases/download/v${version}/convo-darwin-arm64"
+      sha256 "${arm_sha256}"
+    else
+      url "https://github.com/convo-lang/convo-lang/releases/download/v${version}/convo-darwin-x64"
+      sha256 "${x64_sha256}"
+    end
+  end
+
+  def install
+    binary = Hardware::CPU.arm? ? "convo-darwin-arm64" : "convo-darwin-x64"
+    chmod 0755, binary
+    bin.install binary => "convo"
+  end
+
+  test do
+    system "#{bin}/convo", "--help"
+  end
+end
+EOF
+
+echo "Updated Homebrew formula:"
+echo "  ${formula_path}"
+echo
+echo "Version: ${version}"
+echo "Apple Silicon SHA256: ${arm_sha256}"
+echo "Intel SHA256: ${x64_sha256}"
+```
+</FILE_CONTENT>
+
+
+> user
+Rewrite the script as a TypeScript file using the BunJS runtime. Also change the package.json used
+for the version to `../../package/cli/package.json`
+
+@time 2026-04-30T20:16:40-04:00
+@tokenUsage 3795 / 1237 / $0.025160000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="update-brew-package.ts" target-output-path="../../scripts/update-brew-package.ts">
+``` ts
+#!/usr/bin/env bun
+import {createHash} from 'node:crypto';
+import {access,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {dirname,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const scriptDir=dirname(fileURLToPath(import.meta.url));
+const repoRoot=resolve(scriptDir,'..');
+const homebrewCoreRoot=resolve(repoRoot,'../homebrew-core');
+
+const packageJsonPath=resolve(repoRoot,'package/cli/package.json');
+const armBinaryPath=resolve(repoRoot,'packages/cli-darwin-arm64/bin/convo');
+const x64BinaryPath=resolve(repoRoot,'packages/cli-darwin-x64/bin/convo');
+const formulaDir=resolve(homebrewCoreRoot,'Formula/c');
+const formulaPath=resolve(formulaDir,'convo.rb');
+
+const requireFileAsync=async (filePath:string):Promise<void>=>{
+    try{
+        await access(filePath);
+    }catch{
+        console.error(`Missing required file: ${filePath}`);
+        process.exit(1);
+    }
+};
+
+const sha256FileAsync=async (filePath:string):Promise<string>=>{
+    const content=await readFile(filePath);
+    return createHash('sha256').update(content).digest('hex');
+};
+
+await requireFileAsync(packageJsonPath);
+await requireFileAsync(armBinaryPath);
+await requireFileAsync(x64BinaryPath);
+
+const packageJson=JSON.parse(await readFile(packageJsonPath,'utf8')) as {version?:string};
+const version=packageJson.version;
+
+if(!version){
+    console.error(`Unable to read version from ${packageJsonPath}`);
+    process.exit(1);
+}
+
+const armSha256=await sha256FileAsync(armBinaryPath);
+const x64Sha256=await sha256FileAsync(x64BinaryPath);
+
+await mkdir(formulaDir,{recursive:true});
+
+const formula=`class Convo < Formula
+  desc "Convo-Lang CLI"
+  homepage "https://github.com/convo-lang/convo-lang/tree/main/packages/cli#readme"
+  version "${version}"
+  license "MIT"
+
+  depends_on :macos
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/convo-lang/convo-lang/releases/download/v${version}/convo-darwin-arm64"
+      sha256 "${armSha256}"
+    else
+      url "https://github.com/convo-lang/convo-lang/releases/download/v${version}/convo-darwin-x64"
+      sha256 "${x64Sha256}"
+    end
+  end
+
+  def install
+    binary = Hardware::CPU.arm? ? "convo-darwin-arm64" : "convo-darwin-x64"
+    chmod 0755, binary
+    bin.install binary => "convo"
+  end
+
+  test do
+    system "#{bin}/convo", "--help"
+  end
+end
+`;
+
+await writeFile(formulaPath,formula);
+
+console.info('Updated Homebrew formula:');
+console.info(`  ${formulaPath}`);
+console.info('');
+console.info(`Version: ${version}`);
+console.info(`Apple Silicon SHA256: ${armSha256}`);
+console.info(`Intel SHA256: ${x64Sha256}`);
+```
+</FILE_CONTENT>
+
+
+> user

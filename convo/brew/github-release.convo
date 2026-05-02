@@ -1,0 +1,108 @@
+@import ../base.convo
+
+> user
+Create a bash script to publish the following list of binaries as a GitHub release:
+
+../../packages/cli-darwin-arm64/bin/convo
+../../packages/cli-darwin-x64/bin/convo
+../../packages/cli-linux-arm64/bin/convo
+../../packages/cli-linux-arm64-musl/bin/convo
+../../packages/cli-linux-x64/bin/convo
+../../packages/cli-linux-x64-musl/bin/convo
+../../packages/cli-windows-arm64/bin/convo.exe
+../../packages/cli-windows-x64/bin/convo.exe
+
+Use the `../../packages/cli/README.md` file for the readme if a readme is needed.
+
+Save the script to `../../scripts/publish-github-release.sh`
+
+Use the version in stored in `../../package.json` as the version of the release.
+
+@time 2026-04-30T19:24:48-04:00
+@tokenUsage 1911 / 1259 / $0.015850000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="publish-github-release.sh" target-output-path="../../scripts/publish-github-release.sh">
+``` bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+package_json="$repo_root/package.json"
+readme="$repo_root/packages/cli/README.md"
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: GitHub CLI (gh) is required." >&2
+    exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "Error: node is required to read package.json." >&2
+    exit 1
+fi
+
+version="$(node -p "require('$package_json').version")"
+tag="v$version"
+title="Convo CLI $tag"
+
+if [[ ! -f "$readme" ]]; then
+    echo "Error: README not found: $readme" >&2
+    exit 1
+fi
+
+staging_dir="$(mktemp -d)"
+trap 'rm -rf "$staging_dir"' EXIT
+
+copy_asset()
+{
+    local source="$1"
+    local name="$2"
+    local target="$staging_dir/$name"
+
+    if [[ ! -f "$source" ]]; then
+        echo "Error: binary not found: $source" >&2
+        exit 1
+    fi
+
+    cp "$source" "$target"
+    chmod +x "$target"
+}
+
+copy_asset "$repo_root/packages/cli-darwin-arm64/bin/convo" "convo-darwin-arm64"
+copy_asset "$repo_root/packages/cli-darwin-x64/bin/convo" "convo-darwin-x64"
+copy_asset "$repo_root/packages/cli-linux-arm64/bin/convo" "convo-linux-arm64"
+copy_asset "$repo_root/packages/cli-linux-arm64-musl/bin/convo" "convo-linux-arm64-musl"
+copy_asset "$repo_root/packages/cli-linux-x64/bin/convo" "convo-linux-x64"
+copy_asset "$repo_root/packages/cli-linux-x64-musl/bin/convo" "convo-linux-x64-musl"
+copy_asset "$repo_root/packages/cli-windows-arm64/bin/convo.exe" "convo-windows-arm64.exe"
+copy_asset "$repo_root/packages/cli-windows-x64/bin/convo.exe" "convo-windows-x64.exe"
+
+assets=(
+    "$staging_dir/convo-darwin-arm64"
+    "$staging_dir/convo-darwin-x64"
+    "$staging_dir/convo-linux-arm64"
+    "$staging_dir/convo-linux-arm64-musl"
+    "$staging_dir/convo-linux-x64"
+    "$staging_dir/convo-linux-x64-musl"
+    "$staging_dir/convo-windows-arm64.exe"
+    "$staging_dir/convo-windows-x64.exe"
+)
+
+if gh release view "$tag" >/dev/null 2>&1; then
+    echo "Release $tag already exists. Uploading assets with --clobber."
+    gh release upload "$tag" "${assets[@]}" --clobber
+else
+    echo "Creating release $tag."
+    gh release create "$tag" "${assets[@]}" \
+        --title "$title" \
+        --notes-file "$readme"
+fi
+
+echo "Published GitHub release $tag."
+```
+</FILE_CONTENT>
+
+
+> user
