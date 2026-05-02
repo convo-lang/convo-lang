@@ -186,6 +186,24 @@ const homeRoot:SpriteDef={
                             activeBg:'activeBg',
                             activeBorder:'active',
                         },
+                        {
+                            id:'grid-link',
+                            text:' Grid layout ',
+                            link:'grid',
+                            border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
+                        },
+                        {
+                            id:'flex-link',
+                            text:' Flex layout ',
+                            link:'flex',
+                            border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
+                        },
                         quitButton,
                     ],
                 },
@@ -263,6 +281,8 @@ const helpRoot:SpriteDef={
                 {text:'The rich text screen demonstrates inline spans with per-span foreground and background colors.'},
                 {text:'The mouse events screen demonstrates release, drag, and wheel event callbacks.'},
                 {text:'The scrolling screen demonstrates vertical and horizontal scroll clipping.'},
+                {text:'The grid layout screen demonstrates fixed and flexible grid columns plus row height sizing.'},
+                {text:'The flex layout screen demonstrates no-flex, all-flex, and mixed flex sizing.'},
                 {text:'Tab moves focus forward.'},
                 {text:'Shift+Tab moves focus backward.'},
                 {text:'Enter activates the active button/link.'},
@@ -805,6 +825,447 @@ const scrollRoot:SpriteDef={
     ],
 };
 
+const gridRoot:SpriteDef={
+    id:'grid-root',
+    layout:'column',
+    border:'accent',
+    bg:'background',
+    children:[
+        {
+            id:'grid-title',
+            text:' Grid layout ',
+            color:'accent',
+            bg:'panel',
+            textAlign:'center',
+        },
+        {
+            id:'grid-instructions',
+            text:'Resize the terminal to test fixed cr columns, flexible fr columns, mixed columns, and row heights based on constrained child widths.',
+            color:'muted',
+            bg:'panel',
+        },
+        {
+            id:'grid-body',
+            layout:'column',
+            flex:1,
+            scrollable:true,
+            isButton:true,
+            border:'muted',
+            activeBorder:'active',
+            bg:'panelAlt',
+            children:[
+                {
+                    text:'Fixed cr + flexible fr columns',
+                    color:'accent',
+                },
+                {
+                    id:'grid-fixed-flex',
+                    layout:'grid',
+                    gridCols:['12cr','1fr','2fr'],
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'12cr',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'1fr column wraps this medium text based on the remaining width.',
+                            border:'muted',
+                        },
+                        {
+                            text:'2fr column receives twice the flexible space and should usually wrap less than the 1fr column.',
+                            border:'muted',
+                        },
+                        {
+                            text:'fixed',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Short cell',
+                            border:'muted',
+                        },
+                        {
+                            text:'A much longer cell in the wider flexible column makes this row taller only when constrained.',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    text:'Equal fr columns',
+                    color:'accent',
+                },
+                {
+                    id:'grid-equal-fr',
+                    layout:'grid',
+                    gridCols:['1fr','1fr','1fr'],
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'One',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Two columns can wrap independently when the terminal narrows.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Three',
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'A longer first cell demonstrates that grid row height should be the max height of all cells in the row after column widths are known.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Middle cell',
+                            border:'muted',
+                        },
+                        {
+                            text:'Right cell',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    text:'Mostly fixed columns with remaining fr space',
+                    color:'accent',
+                },
+                {
+                    id:'grid-mostly-fixed',
+                    layout:'grid',
+                    gridCols:['8cr','14cr','1fr'],
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'ID',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Name',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Description',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'001',
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Alpha',
+                            border:'muted',
+                        },
+                        {
+                            text:'The description column uses remaining fr space and wraps if the fixed columns leave little room.',
+                            border:'muted',
+                        },
+                        {
+                            text:'002',
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Beta item',
+                            border:'muted',
+                        },
+                        {
+                            text:'Another long description verifies row height calculation across multiple rows.',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    text:'Narrow fixed columns and multiple rows',
+                    color:'accent',
+                },
+                {
+                    id:'grid-narrow',
+                    layout:'grid',
+                    gridCols:['6cr','1fr','6cr'],
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'A',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Long middle content wraps between two narrow fixed columns.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Z',
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'B',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'A second row with even longer middle content should expand only this row without forcing other rows to use the same height.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Y',
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'C',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Short middle',
+                            border:'muted',
+                        },
+                        {
+                            text:'X',
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            id:'grid-back-link',
+            text:' Back home ',
+            link:'home',
+            border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
+        },
+    ],
+};
+
+const flexRoot:SpriteDef={
+    id:'flex-root',
+    layout:'column',
+    border:'accent',
+    bg:'background',
+    children:[
+        {
+            id:'flex-title',
+            text:' Flex layout ',
+            color:'accent',
+            bg:'panel',
+            textAlign:'center',
+        },
+        {
+            id:'flex-instructions',
+            text:'Resize the terminal to test row and column flex distribution. The main panels intentionally mix no-flex, all-flex, and fixed-plus-flex children.',
+            color:'muted',
+            bg:'panel',
+        },
+        {
+            id:'flex-body',
+            layout:'column',
+            flex:1,
+            border:'muted',
+            bg:'panelAlt',
+            children:[
+                {
+                    text:'Row: no flex children use natural widths',
+                    color:'accent',
+                    bg:'panel',
+                },
+                {
+                    id:'flex-row-no-flex',
+                    layout:'row',
+                    flex:1,
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'Natural A',
+                            color:'success',
+                            border:'success',
+                        },
+                        {
+                            text:'Natural child B is wider',
+                            border:'muted',
+                        },
+                        {
+                            text:'Natural C',
+                            color:'danger',
+                            border:'danger',
+                        },
+                    ],
+                },
+                {
+                    text:'Row: all flex children share remaining width',
+                    color:'accent',
+                    bg:'panel',
+                },
+                {
+                    id:'flex-row-all-flex',
+                    layout:'row',
+                    flex:1,
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'flex 1',
+                            flex:1,
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'flex 2 receives about twice the width',
+                            flex:2,
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'flex 1',
+                            flex:1,
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                    ],
+                },
+                {
+                    text:'Row: fixed natural children plus flex children',
+                    color:'accent',
+                    bg:'panel',
+                },
+                {
+                    id:'flex-row-mixed',
+                    layout:'row',
+                    flex:1,
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'Fixed left',
+                            color:'success',
+                            border:'success',
+                        },
+                        {
+                            text:'flex 1 middle grows after fixed siblings keep natural width',
+                            flex:1,
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Fixed right',
+                            color:'danger',
+                            border:'danger',
+                        },
+                    ],
+                },
+                {
+                    text:'Column: all flex children share remaining height',
+                    color:'accent',
+                    bg:'panel',
+                },
+                {
+                    id:'flex-column-all-flex',
+                    layout:'column',
+                    flex:2,
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'flex 1 top',
+                            flex:1,
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'flex 2 middle should receive more rows when space is available.',
+                            flex:2,
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'flex 1 bottom',
+                            flex:1,
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                    ],
+                },
+                {
+                    text:'Column: fixed header/footer plus flex center',
+                    color:'accent',
+                    bg:'panel',
+                },
+                {
+                    id:'flex-column-mixed',
+                    layout:'column',
+                    flex:2,
+                    border:'accent',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'Fixed header keeps natural height',
+                            color:'success',
+                            border:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'flex center fills remaining height between fixed rows',
+                            flex:1,
+                            border:'muted',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Fixed footer keeps natural height',
+                            color:'danger',
+                            border:'danger',
+                            textAlign:'center',
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            id:'flex-back-link',
+            text:' Back home ',
+            link:'home',
+            border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
+        },
+    ],
+};
+
 const tuiConsole:TuiConsole={
     stdout:proc.stdout as TuiConsole['stdout'],
     stdin:proc.stdin as TuiConsole['stdin'],
@@ -845,6 +1306,16 @@ const ctrl=new ConvoTuiCtrl({
             id:'scroll',
             defaultSprite:'scroll-body',
             root:scrollRoot,
+        },
+        {
+            id:'grid',
+            defaultSprite:'grid-body',
+            root:gridRoot,
+        },
+        {
+            id:'flex',
+            defaultSprite:'flex-back-link',
+            root:flexRoot,
         },
     ],
 });

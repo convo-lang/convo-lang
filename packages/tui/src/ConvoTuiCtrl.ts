@@ -635,7 +635,7 @@ export class ConvoTuiCtrl
 
     private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle, inheritedProps:TuiInheritedSpriteProps={})
     {
-        rect=this.clampRect(rect);
+        rect=this.normalizeRect(rect);
         if(rect.width<=0 || rect.height<=0){
             return;
         }
@@ -798,6 +798,24 @@ export class ConvoTuiCtrl
         const xOffset=scrollX>0?0:this.getTextAlignOffset(textAlign, text.length, rect.width);
         const x=this.clampNumber(rect.x+xOffset+col-offset, rect.x, rect.x+rect.width-1);
         const y=this.clampNumber(rect.y+lineIndex-Math.max(0, scrollY), rect.y, rect.y+rect.height-1);
+        const visibleRect=this.intersectRects(
+            this.getCurrentClip()??{
+                x:0,
+                y:0,
+                width:this.bufferState.width,
+                height:this.bufferState.height,
+            },
+            {
+                x:0,
+                y:0,
+                width:this.bufferState.width,
+                height:this.bufferState.height,
+            }
+        );
+
+        if(x<visibleRect.x || y<visibleRect.y || x>=visibleRect.x+visibleRect.width || y>=visibleRect.y+visibleRect.height){
+            return;
+        }
 
         this.inputCursor={x,y};
     }
@@ -857,29 +875,11 @@ export class ConvoTuiCtrl
     private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
         const sizes=children.map(child=>this.getNaturalSize(child));
-        const fixedWidth=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.width??0), 0);
-        const totalFlex=children.reduce((sum, child)=>sum+(child.flex??0), 0);
-        const remaining=Math.max(0, rect.width-fixedWidth);
+        const widths=this.getFlexDistributedSizes(children, rect.width, sizes.map(size=>size.width));
         let x=rect.x;
-        let flexUsed=0;
 
         children.forEach((child, i)=>{
-            const flex=child.flex??0;
-            const width=(
-                flex>0?
-                    (
-                        i===children.length-1?
-                            remaining-flexUsed
-                        :
-                            Math.floor(remaining*(flex/totalFlex))
-                    )
-                :
-                    sizes[i]?.width??0
-            );
-
-            if(flex>0){
-                flexUsed+=width;
-            }
+            const width=widths[i]??0;
 
             this.drawSprite(child, {
                 x,
@@ -894,29 +894,11 @@ export class ConvoTuiCtrl
     private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
         const sizes=children.map(child=>this.getNaturalSize(child, rect.width));
-        const fixedHeight=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.height??0), 0);
-        const totalFlex=children.reduce((sum, child)=>sum+(child.flex??0), 0);
-        const remaining=Math.max(0, rect.height-fixedHeight);
+        const heights=this.getFlexDistributedSizes(children, rect.height, sizes.map(size=>size.height));
         let y=rect.y;
-        let flexUsed=0;
 
         children.forEach((child, i)=>{
-            const flex=child.flex??0;
-            const height=(
-                flex>0?
-                    (
-                        i===children.length-1?
-                            remaining-flexUsed
-                        :
-                            Math.floor(remaining*(flex/totalFlex))
-                    )
-                :
-                    sizes[i]?.height??0
-            );
-
-            if(flex>0){
-                flexUsed+=height;
-            }
+            const height=heights[i]??0;
 
             this.drawSprite(child, {
                 x:rect.x,
@@ -961,12 +943,50 @@ export class ConvoTuiCtrl
         }
     }
 
+    private getFlexDistributedSizes(children:Sprite[], totalSize:number, naturalSizes:number[]):number[]
+    {
+        totalSize=Math.max(0, Math.floor(totalSize));
+        const flexes=children.map(child=>Math.max(0, child.flex??0));
+        const totalFlex=flexes.reduce((sum, flex)=>sum+flex, 0);
+        const fixedSize=naturalSizes.reduce((sum, size, i)=>sum+(flexes[i]!>0?0:Math.max(0, Math.floor(size))), 0);
+
+        if(totalFlex<=0){
+            return naturalSizes.map(size=>Math.max(0, Math.floor(size)));
+        }
+
+        const remaining=Math.max(0, totalSize-fixedSize);
+        let lastFlexIndex=-1;
+        for(let i=0;i<flexes.length;i++){
+            if(flexes[i]!>0){
+                lastFlexIndex=i;
+            }
+        }
+
+        let flexUsed=0;
+        return children.map((_, i)=>{
+            const flex=flexes[i]!;
+            if(flex<=0){
+                return Math.max(0, Math.floor(naturalSizes[i]??0));
+            }
+
+            const size=(
+                i===lastFlexIndex?
+                    remaining-flexUsed
+                :
+                    Math.floor(remaining*(flex/totalFlex))
+            );
+
+            flexUsed+=size;
+            return Math.max(0, size);
+        });
+    }
+
     private getNaturalSize(sprite:Sprite, width?:number):TuiSize
     {
         const border=this.getBorderColors(sprite);
         const borderWidth=(border.left?1:0)+(border.right?1:0);
         const borderHeight=(border.top?1:0)+(border.bottom?1:0);
-        const contentWidth=width===undefined?undefined:Math.max(0, width-borderWidth);
+        const contentWidth=width===undefined?undefined:Math.max(0, Math.floor(width)-borderWidth);
         const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
         const layout=sprite.layout??'inline';
 
@@ -982,6 +1002,15 @@ export class ConvoTuiCtrl
 
         if(layout==='row'){
             const sizes=children.map(child=>this.getNaturalSize(child));
+
+            if(contentWidth!==undefined){
+                const widths=this.getFlexDistributedSizes(children, contentWidth, sizes.map(size=>size.width));
+                return {
+                    width:contentWidth+borderWidth,
+                    height:Math.max(1, ...children.map((child, i)=>this.getNaturalSize(child, widths[i]??0).height))+borderHeight,
+                };
+            }
+
             return {
                 width:sizes.reduce((sum, size)=>sum+size.width, 0)+borderWidth,
                 height:Math.max(1, ...sizes.map(size=>size.height))+borderHeight,
@@ -1004,7 +1033,7 @@ export class ConvoTuiCtrl
 
                 return {
                     width:contentWidth+borderWidth,
-                    height:rowHeights.reduce((sum, height)=>sum+height, 0)+borderHeight,
+                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0))+borderHeight,
                 };
             }
 
@@ -1020,7 +1049,7 @@ export class ConvoTuiCtrl
 
             return {
                 width:naturalWidth+borderWidth,
-                height:naturalHeight+borderHeight,
+                height:Math.max(1, naturalHeight)+borderHeight,
             };
         }
 
@@ -1407,34 +1436,51 @@ export class ConvoTuiCtrl
 
     private getGridColWidths(cols:SpriteGridColSize[]|undefined, width:number):number[]
     {
-        if(!cols){
-            return [0];
+        if(!cols?.length){
+            return [Math.max(0, Math.floor(width))];
         }
+
+        width=Math.max(0, Math.floor(width));
+
         const parsed=cols.map(col=>{
             const match=/^(\d+(?:\.\d+)?)(cr|fr)$/.exec(col);
+            const value=match?Number(match[1]):1;
             return {
-                value:match?Number(match[1]):1,
+                value:Number.isFinite(value)?Math.max(0, value):1,
                 unit:match?.[2]??'fr',
             };
         });
 
-        const fixed=parsed.reduce((sum, col)=>sum+(col.unit==='cr'?col.value:0), 0);
+        const fixed=parsed.reduce((sum, col)=>sum+(col.unit==='cr'?Math.max(0, Math.floor(col.value)):0), 0);
         const totalFr=parsed.reduce((sum, col)=>sum+(col.unit==='fr'?col.value:0), 0);
         const remaining=Math.max(0, width-fixed);
-        let used=0;
+        let lastFrIndex=-1;
+        for(let i=0;i<parsed.length;i++){
+            const col=parsed[i]!;
+            if(col.unit==='fr' && col.value>0){
+                lastFrIndex=i;
+            }
+        }
 
+        let usedFr=0;
         return parsed.map((col, i)=>{
+            if(col.unit==='cr'){
+                return Math.max(0, Math.floor(col.value));
+            }
+
+            if(totalFr<=0 || col.value<=0){
+                return 0;
+            }
+
             const colWidth=(
-                col.unit==='cr'?
-                    Math.floor(col.value)
-                :i===parsed.length-1?
-                    Math.max(0, width-used)
+                i===lastFrIndex?
+                    remaining-usedFr
                 :
                     Math.floor(remaining*(col.value/totalFr))
             );
 
-            used+=colWidth;
-            return colWidth;
+            usedFr+=colWidth;
+            return Math.max(0, colWidth);
         });
     }
 
@@ -1636,18 +1682,13 @@ export class ConvoTuiCtrl
         };
     }
 
-    private clampRect(rect:TuiRect):TuiRect
+    private normalizeRect(rect:TuiRect):TuiRect
     {
-        const x=Math.max(0, rect.x);
-        const y=Math.max(0, rect.y);
-        const right=Math.min(this.bufferState.width, rect.x+Math.max(0, rect.width));
-        const bottom=Math.min(this.bufferState.height, rect.y+Math.max(0, rect.height));
-
         return {
-            x,
-            y,
-            width:Math.max(0, right-x),
-            height:Math.max(0, bottom-y),
+            x:Math.floor(rect.x),
+            y:Math.floor(rect.y),
+            width:Math.max(0, Math.floor(rect.width)),
+            height:Math.max(0, Math.floor(rect.height)),
         };
     }
 

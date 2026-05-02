@@ -81,6 +81,14 @@
   - column
   - grid
   - flex distribution for row and column children
+- Added layout sizing refinements:
+  - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
+  - flex remainder is assigned to the last positive-flex child for predictable total sizing
+  - negative and invalid layout sizes are normalized before drawing
+  - row natural height can now account for constrained child widths
+  - grid `fr` sizing avoids divide-by-zero and assigns remainder to the last positive `fr` column
+  - grid row heights are calculated from constrained child column widths
+  - scrollable clipping preserves child layout coordinates so wrapped text scrolls without reflowing against the clipped viewport edge
 - Added sprite borders:
   - normal
   - thick
@@ -189,8 +197,7 @@
   - pixel-level mouse modes
   - release events over borders, since border chars currently do not retain sprite ids
   - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
-- Layout sizing refinements for grid rows and flex edge cases.
 
 ## Planned implementation convo scripts
 
-- `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.
+- `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
