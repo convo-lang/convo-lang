@@ -56,11 +56,13 @@
   - hidden cursor
   - raw stdin mode
   - mouse reporting
+  - bracketed paste mode
 - Added cleanup/dispose handling:
   - removes event listeners
   - disables raw mode
   - pauses stdin
   - disables mouse reporting
+  - disables bracketed paste mode
   - restores cursor and main screen buffer
 - Added buffer resize/allocation helpers.
 - Added rendering:
@@ -127,6 +129,16 @@
   - Backspace
   - arrow key scrolling for active scrollable sprites
   - Ctrl+C dispose
+- Added more complete input sprite keyboard editing:
+  - Backspace removes the character before the caret
+  - Delete removes the character at the caret
+  - Left/right arrows move the caret within active input sprites
+  - Home and End move the caret to the start and end
+  - Ctrl+A and Ctrl+E move the caret to the start and end on macOS/Linux terminals
+  - printable pasted text is inserted at the caret
+  - bracketed paste input strips escape/control sequences before insertion
+  - `onInput` fires only when the input value changes
+  - non-input left/right arrow behavior continues to scroll active scrollable sprites
 - Added active input cursor support:
   - `SpriteState.inputCaret` stores a minimal zero-based caret position
   - active input sprites show the terminal cursor
@@ -146,11 +158,11 @@
   - nested style ranges
   - markdown-like parsing
   - links/actions per span
-- More complete keyboard handling:
-  - delete
-  - home/end
-  - cursor movement inside input
-  - paste handling
+- More advanced keyboard handling:
+  - multiline input editing
+  - word-wise cursor movement
+  - selection
+  - undo/redo
 - More robust mouse support:
   - drag
   - wheel scrolling
@@ -159,6 +171,5 @@
 
 ## Planned implementation convo scripts
 
-- `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
 - `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.
 - `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.

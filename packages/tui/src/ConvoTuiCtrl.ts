@@ -120,7 +120,7 @@ export class ConvoTuiCtrl
         this.console.stdin.setRawMode?.(false);
         this.console.stdin.pause?.();
 
-        this.writeAnsi('\x1b[0m\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l');
+        this.writeAnsi('\x1b[0m\x1b[?1000l\x1b[?1006l\x1b[?2004l\x1b[?25h\x1b[?1049l');
     }
 
     public addDisposeCallback(callback:()=>void){
@@ -152,7 +152,7 @@ export class ConvoTuiCtrl
         
         this.resizeBuffers();
 
-        this.writeAnsi('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[H');
+        this.writeAnsi('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[?2004h\x1b[2J\x1b[H');
 
         this.console.stdin.setRawMode?.(true);
         this.console.stdin.resume?.();
@@ -1576,6 +1576,19 @@ export class ConvoTuiCtrl
 
     private consumeInput(input:string):number
     {
+        const pasteStart='\x1b[200~';
+        const pasteEnd='\x1b[201~';
+
+        if(input.startsWith(pasteStart)){
+            const endIndex=input.indexOf(pasteEnd, pasteStart.length);
+            if(endIndex<0){
+                return 0;
+            }
+
+            this.insertActiveInputText(input.slice(pasteStart.length, endIndex));
+            return endIndex+pasteEnd.length;
+        }
+
         if(input.startsWith('\x1b[<')){
             const match=/^\x1b\[<(\d+);(\d+);(\d+)([mM])/.exec(input);
             if(!match){
@@ -1594,6 +1607,24 @@ export class ConvoTuiCtrl
             return match[0].length;
         }
 
+        const homeSequence=this.getMatchedInputSequence(input, ['\x1b[H','\x1b[1~','\x1b[7~','\x1bOH']);
+        if(homeSequence){
+            this.setActiveInputCaret(0);
+            return homeSequence.length;
+        }
+
+        const endSequence=this.getMatchedInputSequence(input, ['\x1b[F','\x1b[4~','\x1b[8~','\x1bOF']);
+        if(endSequence){
+            this.setActiveInputCaretToEnd();
+            return endSequence.length;
+        }
+
+        const deleteSequence=this.getMatchedInputSequence(input, ['\x1b[3~']);
+        if(deleteSequence){
+            this.deleteActiveInput();
+            return deleteSequence.length;
+        }
+
         if(input.startsWith('\x1b[Z')){
             this.focusPrev();
             return 3;
@@ -1610,23 +1641,60 @@ export class ConvoTuiCtrl
         }
 
         if(input.startsWith('\x1b[C')){
-            this.scrollActiveSprite(1, 0);
+            if(!this.moveActiveInputCaret(1)){
+                this.scrollActiveSprite(1, 0);
+            }
             return 3;
         }
 
         if(input.startsWith('\x1b[D')){
-            this.scrollActiveSprite(-1, 0);
+            if(!this.moveActiveInputCaret(-1)){
+                this.scrollActiveSprite(-1, 0);
+            }
             return 3;
+        }
+
+        const printable=this.getPrintableInputPrefix(input);
+        if(printable){
+            if(this.getActiveSprite()?.isInput){
+                this.insertActiveInputText(printable);
+                return printable.length;
+            }
+
+            if(printable[0]===' '){
+                this.activateCurrentSprite();
+                return 1;
+            }
+
+            return printable.length;
         }
 
         const char=input[0]!;
         if(char==='\x1b'){
-            return input.length>=2?2:0;
+            const csi=/^\x1b\[[0-?]*[ -/]*[@-~]/.exec(input);
+            if(csi){
+                return csi[0].length;
+            }
+
+            const ss3=/^\x1bO./.exec(input);
+            if(ss3){
+                return ss3[0].length;
+            }
+
+            return (input.startsWith('\x1b[') || input.startsWith('\x1bO') || input.length<2)?0:2;
         }
 
         switch(char){
+            case '\x01':
+                this.setActiveInputCaret(0);
+                return 1;
+
             case '\x03':
                 this.dispose();
+                return 1;
+
+            case '\x05':
+                this.setActiveInputCaretToEnd();
                 return 1;
 
             case '\t':
@@ -1640,21 +1708,39 @@ export class ConvoTuiCtrl
 
             case '\x7f':
             case '\b':
-                this.updateActiveInput(value=>value.slice(0, -1));
-                return 1;
-
-            case ' ':
-                if(!this.activateCurrentSprite()){
-                    this.updateActiveInput(value=>`${value} `);
-                }
+                this.backspaceActiveInput();
                 return 1;
 
             default:
-                if(char>=' ' && char!=='\x7f'){
-                    this.updateActiveInput(value=>`${value}${char}`);
-                }
                 return 1;
         }
+    }
+
+    private getMatchedInputSequence(input:string, sequences:string[]):string|undefined
+    {
+        return sequences.find(sequence=>input.startsWith(sequence));
+    }
+
+    private getPrintableInputPrefix(input:string):string
+    {
+        let value='';
+        for(const char of input){
+            if(char<' ' || char==='\x7f' || char==='\x1b'){
+                break;
+            }
+            value+=char;
+        }
+        return value;
+    }
+
+    private getPrintableInputText(text:string):string
+    {
+        const withoutEsc=text
+            .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g,'')
+            .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'')
+            .replace(/\x1b[@-_]/g,'');
+
+        return Array.from(withoutEsc).filter(char=>char>=' ' && char!=='\x7f').join('');
     }
 
     /**
@@ -1766,27 +1852,125 @@ export class ConvoTuiCtrl
         }
     }
 
-    private updateActiveInput(update:(value:string)=>string)
+    private editActiveInput(update:(value:string, caret:number)=>{value:string;caret:number}):boolean
     {
         const sprite=this.getActiveSprite();
         const screen=this._activeScreen;
         if(!sprite?.isInput || !screen){
-            return;
+            return false;
         }
 
         sprite.state??={};
-        sprite.state.inputValue=update(sprite.state.inputValue??'');
-        sprite.state.inputCaret=sprite.state.inputValue.length;
 
-        sprite.onInput?.({
-            type:'input',
-            sprite,
-            screen,
-            ctrl:this,
-            value:sprite.state.inputValue,
-        });
+        const value=sprite.state.inputValue??'';
+        const caret=this.getInputCaret(sprite, value);
+        const next=update(value, caret);
+        const nextValue=next.value;
+        const nextCaret=this.clampNumber(
+            typeof next.caret==='number' && Number.isFinite(next.caret)?
+                Math.floor(next.caret)
+            :
+                nextValue.length,
+            0,
+            nextValue.length
+        );
+        const valueChanged=nextValue!==value;
+        const caretChanged=nextCaret!==caret || sprite.state.inputCaret!==nextCaret;
+
+        if(!valueChanged && !caretChanged){
+            return true;
+        }
+
+        sprite.state.inputValue=nextValue;
+        sprite.state.inputCaret=nextCaret;
+
+        if(valueChanged){
+            sprite.onInput?.({
+                type:'input',
+                sprite,
+                screen,
+                ctrl:this,
+                value:nextValue,
+            });
+        }
 
         this.render();
+
+        return true;
+    }
+
+    private insertActiveInputText(text:string):boolean
+    {
+        const value=this.getPrintableInputText(text);
+        if(!value){
+            return this.getActiveSprite()?.isInput===true;
+        }
+
+        return this.editActiveInput((current, caret)=>({
+            value:`${current.slice(0, caret)}${value}${current.slice(caret)}`,
+            caret:caret+value.length,
+        }));
+    }
+
+    private backspaceActiveInput():boolean
+    {
+        return this.editActiveInput((value, caret)=>(
+            caret<=0?
+                {value,caret}
+            :
+                {
+                    value:`${value.slice(0, caret-1)}${value.slice(caret)}`,
+                    caret:caret-1,
+                }
+        ));
+    }
+
+    private deleteActiveInput():boolean
+    {
+        return this.editActiveInput((value, caret)=>(
+            caret>=value.length?
+                {value,caret}
+            :
+                {
+                    value:`${value.slice(0, caret)}${value.slice(caret+1)}`,
+                    caret,
+                }
+        ));
+    }
+
+    private moveActiveInputCaret(offset:number):boolean
+    {
+        const sprite=this.getActiveSprite();
+        if(!sprite?.isInput){
+            return false;
+        }
+
+        const value=sprite.state?.inputValue??'';
+        const caret=this.getInputCaret(sprite, value);
+        return this.setActiveInputCaret(caret+offset);
+    }
+
+    private setActiveInputCaretToEnd():boolean
+    {
+        const sprite=this.getActiveSprite();
+        if(!sprite?.isInput){
+            return false;
+        }
+
+        return this.setActiveInputCaret((sprite.state?.inputValue??'').length);
+    }
+
+    private setActiveInputCaret(caret:number):boolean
+    {
+        const sprite=this.getActiveSprite();
+        if(!sprite?.isInput){
+            return false;
+        }
+
+        return this.editActiveInput((value)=>({
+            value,
+            caret,
+        }));
     }
 
     private scrollActiveSprite(x:number, y:number)
