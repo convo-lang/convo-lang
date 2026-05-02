@@ -1,3 +1,383 @@
+@import ./_tui.convo
+@import ../../packages/tui/src/tui-image-lib.ts !file
+
+> user
+Implement the `convertB64TuiImage` function
+
+@time 2026-05-02T17:35:19-04:00
+@tokenUsage 23661 / 5849 / $0.14755000000000001
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="tui-image-lib.ts" target-output-path="../../packages/tui/src/tui-image-lib.ts" dirty file-hash="492361ae070131f11d62743a3afdbdd13e0d2903">
+```ts
+import { SpriteImage } from "./tui-types.js";
+
+const imageHeaderSize=32;
+const imageHeader=[0x43, 0x6f, 0x6e, 0x76];
+
+/**
+ * Converts a base64 string into a SpriteImage.* Data layout:
+ * [header - 4 bytes][width - 4 bytes][bytesPerByte - 4 bytes][height - 4 bytes][reserved - 16 bytes][pixel data - (width*bytesPerByte*height) bytes]
+ * header = x43 x6f x6e x76
+ *
+ * If invalid data is supplied a default (X) image will be supplied with and the `error` property of the image will be populated.
+ */
+export const convertB64TuiImage=(b64:string):SpriteImage=>{
+    try{
+        const data=decodeB64Bytes(b64);
+        const error=validateTuiImageBytes(data);
+
+        if(error){
+            return createDefaultTuiImage(error);
+        }
+
+        const view=new DataView(data.buffer, data.byteOffset, data.byteLength);
+        const width=view.getUint32(4, true);
+        const bytesPerPixel=view.getUint32(8, true);
+        const height=view.getUint32(12, true);
+        const pixelLength=width*bytesPerPixel*height;
+
+        return {
+            width,
+            height,
+            bytesPerPixel,
+            pixelData:data.slice(imageHeaderSize, imageHeaderSize+pixelLength),
+        };
+    }catch(ex){
+        return createDefaultTuiImage(ex instanceof Error?ex.message:'Unable to decode TUI image');
+    }
+}
+
+const decodeB64Bytes=(b64:string):Uint8Array=>{
+    const normalized=normalizeB64(b64);
+
+    if(!normalized){
+        throw new Error('Empty TUI image data');
+    }
+
+    const atobFn=(globalThis as {atob?:(value:string)=>string}).atob;
+    let atobError:unknown;
+
+    if(atobFn){
+        try{
+            const binary=atobFn(normalized);
+            const bytes=new Uint8Array(binary.length);
+
+            for(let i=0;i<binary.length;i++){
+                bytes[i]=binary.charCodeAt(i);
+            }
+
+            return bytes;
+        }catch(ex){
+            atobError=ex;
+        }
+    }
+
+    const BufferCtor=(globalThis as any).Buffer;
+    if(BufferCtor?.from){
+        return new Uint8Array(BufferCtor.from(normalized, 'base64'));
+    }
+
+    throw atobError instanceof Error?atobError:new Error('No base64 decoder available');
+}
+
+const normalizeB64=(b64:string):string=>{
+    const trimmed=b64.trim();
+    const commaIndex=trimmed.indexOf(',');
+    const value=trimmed.startsWith('data:') && commaIndex>=0?trimmed.slice(commaIndex+1):trimmed;
+
+    return value.replace(/\s+/g,'');
+}
+
+const validateTuiImageBytes=(data:Uint8Array):string|undefined=>{
+    if(data.length<imageHeaderSize){
+        return `Invalid TUI image data. Expected at least ${imageHeaderSize} bytes.`;
+    }
+
+    for(let i=0;i<imageHeader.length;i++){
+        if(data[i]!==imageHeader[i]){
+            return 'Invalid TUI image header.';
+        }
+    }
+
+    const view=new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const width=view.getUint32(4, true);
+    const bytesPerPixel=view.getUint32(8, true);
+    const height=view.getUint32(12, true);
+
+    if(!width || !height){
+        return 'Invalid TUI image dimensions.';
+    }
+
+    if(!bytesPerPixel){
+        return 'Invalid TUI image bytesPerPixel value.';
+    }
+
+    const pixelLength=width*bytesPerPixel*height;
+    if(!Number.isSafeInteger(pixelLength)){
+        return 'Invalid TUI image pixel data length.';
+    }
+
+    if(data.length<imageHeaderSize+pixelLength){
+        return `Invalid TUI image pixel data length. Expected ${pixelLength} bytes.`;
+    }
+
+    return undefined;
+}
+
+const createDefaultTuiImage=(error:string):SpriteImage=>{
+    const width=8;
+    const height=8;
+    const bytesPerPixel=3;
+    const pixelData=new Uint8Array(width*height*bytesPerPixel);
+
+    for(let y=0;y<height;y++){
+        for(let x=0;x<width;x++){
+            const offset=((y*width)+x)*bytesPerPixel;
+            const isX=x===y || x===width-y-1;
+
+            pixelData[offset]=isX?255:32;
+            pixelData[offset+1]=isX?64:32;
+            pixelData[offset+2]=isX?64:32;
+        }
+    }
+
+    return {
+        width,
+        height,
+        bytesPerPixel,
+        pixelData,
+        error,
+    };
+}
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" last-commit="0af214ed9f03e3d9ac37575ecb305b39700d1dc7">
+```md
+# TUI Notes
+
+## ConvoTuiCtrl first-pass decisions
+
+- `ConvoTuiCtrlOptions` includes:
+  - `theme:TuiTheme`
+  - `defaultScreen?:string`
+- A theme is required and theme colors are expected to be `#rrggbb`.
+- Initial active screen is:
+  1. `defaultScreen`, when provided and found
+  2. otherwise the first screen in the `screens` array
+- Public navigation API should include:
+  - `activateScreen(id)`
+  - `activateSprite(id, screen?)`
+  - `activateLink(link, sourceScreen?)`
+  - `followLink(spriteOrId)`
+- Rendering flow for the first implementation pass:
+  1. populate the back buffer
+  2. compare the back buffer to the front buffer
+  3. write changed runs to stdout using ANSI escape sequences
+  4. copy the back buffer to the front buffer
+- First render and resize render use a full redraw.
+- Color handling should support theme variables and `#rrggbb`.
+- Layout should be split into two passes:
+  1. determine natural layout size of inline sprites
+  2. share remaining layout space between row, column, grid, and flex children
+- Default `flex` is `0`.
+- Children without `flex` use natural size; remaining space is distributed by flex value.
+- Borders draw inside the assigned sprite rectangle and inset content by 1.
+- Input support planned:
+  - Tab / Shift+Tab navigation
+  - Enter / Space click activation
+  - text input editing
+  - Backspace
+  - link activation
+  - mouse support
+- Resize support planned:
+  - listen to stdout `resize`
+  - recreate buffers
+  - re-render automatically
+
+## Current implementation status
+
+- Added required controller options and public navigation API.
+- Added screen/sprite loading with generated ids and copied state.
+- Added active screen and active sprite state management.
+- Added active sprite state syncing:
+  - `state.active` is set on the active sprite
+  - previous active sprites are reset to `false`
+- Added active sprite visual properties:
+  - `activeColor`
+  - `activeBg`
+  - `activeBorder`
+- Added full-screen terminal initialization:
+  - alternate screen buffer
+  - hidden cursor
+  - raw stdin mode
+  - mouse reporting
+  - bracketed paste mode
+- Added cleanup/dispose handling:
+  - removes event listeners
+  - disables raw mode
+  - pauses stdin
+  - disables mouse reporting
+  - disables bracketed paste mode
+  - restores cursor and main screen buffer
+- Added buffer resize/allocation helpers.
+- Added rendering:
+  - clears the back buffer
+  - draws active screen root
+  - draws absolute sprites
+  - full redraws on first render and after resize
+  - diff renders after the first render by comparing front/back buffers
+  - emits changed character runs using cursor positioning escape sequences
+  - preserves ANSI foreground/background style changes for changed runs
+  - copies back buffer to front buffer after rendering
+- Added color resolution for theme variables and `#rrggbb`.
+- Added layouts:
+  - inline
+  - row
+  - column
+  - grid
+  - flex distribution for row and column children
+- Added layout sizing refinements:
+  - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
+  - flex remainder is assigned to the last positive-flex child for predictable total sizing
+  - negative and invalid layout sizes are normalized before drawing
+  - row natural height can now account for constrained child widths
+  - grid `fr` sizing avoids divide-by-zero and assigns remainder to the last positive `fr` column
+  - grid row heights are calculated from constrained child column widths
+  - scrollable clipping preserves child layout coordinates so wrapped text scrolls without reflowing against the clipped viewport edge
+- Added sprite borders:
+  - normal
+  - thick
+  - rounded
+  - double
+  - classic
+  - per-side border colors
+- Added scroll offsets for scrollable sprites.
+- Added scroll bounds for scrollable sprites:
+  - scroll offsets are clamped using the current content viewport
+  - wheel and keyboard scrolling stop when the last content row reaches the bottom of the scroll viewport
+  - stale scroll offsets are clamped during render after resize or content changes
+- Added clipping bounds for scrollable container children:
+  - drawing operations respect an internal clip stack
+  - scrollable sprite children clip to the sprite content rect
+  - parent borders remain visible because clipping is scoped to children only
+  - nested scrollable containers clip by intersecting parent and child clip rects
+  - absolute sprites continue to be drawn by the existing absolute rendering pass
+- Added inline text wrapping:
+  - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
+  - `wrap-hard` wraps exactly at the available width
+  - `clip` preserves explicit lines and clips horizontally
+  - explicit newlines are preserved
+  - `textClipStyle` supports no marker or ellipses for clipped text
+  - natural inline height updates when a constrained width is known
+- Added a manual text wrapping screen to `screen-test.ts` that demonstrates:
+  - default wrapping
+  - hard wrapping
+  - clipping with ellipses
+  - clipping without marker
+  - explicit newlines
+  - centered wrapped text
+- Added inline text alignment:
+  - `start`
+  - `center`
+  - `end`
+  - inherited from nearest ancestor when undefined
+  - applied only when drawing inline text
+- Added rich inline text:
+  - `Sprite.richText?:SpriteTextSpan[]`
+  - per-span `text`, `color`, and `bg`
+  - span colors support theme variables and `#rrggbb`
+  - plain `text` behavior is preserved when `richText` is not defined
+  - non-input inline sprites prefer `richText` over `text`
+  - wrapping, clipping, scrolling, and alignment use the same character layout rules as plain text
+- Added keyboard input:
+  - Tab / Shift+Tab focus navigation
+  - Enter / Space click activation
+  - printable character input
+  - Backspace
+  - arrow key scrolling for active scrollable sprites
+  - Ctrl+C dispose
+- Added more complete input sprite keyboard editing:
+  - Backspace removes the character before the caret
+  - Delete removes the character at the caret
+  - Left/right arrows move the caret within active input sprites
+  - Home and End move the caret to the start and end
+  - Ctrl+A and Ctrl+E move the caret to the start and end on macOS/Linux terminals
+  - printable pasted text is inserted at the caret
+  - bracketed paste input strips escape/control sequences before insertion
+  - `onInput` fires only when the input value changes
+  - non-input left/right arrow behavior continues to scroll active scrollable sprites
+- Added active input cursor support:
+  - `SpriteState.inputCaret` stores a minimal zero-based caret position
+  - active input sprites show the terminal cursor
+  - non-input active sprites hide the terminal cursor
+  - cursor defaults to the end of the input value
+  - cursor position respects sprite layout rect and sprite scroll offsets
+- Added mouse click support using SGR mouse mode.
+- Added more robust SGR mouse support:
+  - parses press, release, drag, and wheel events
+  - preserves existing left-button press click behavior
+  - dispatches `onMouseRelease`, `onMouseDrag`, and `onMouseWheel` to the sprite under the mouse
+  - mouse event objects include terminal-relative `x` and `y` coordinates
+  - mouse event objects include button/modifier metadata where applicable
+  - wheel up/down scrolls the nearest scrollable sprite under the mouse path
+- Added a manual mouse events screen to `screen-test.ts` that demonstrates:
+  - mouse release event callbacks
+  - mouse drag event callbacks
+  - mouse wheel event callbacks
+  - terminal-relative mouse coordinates
+  - reported mouse modifiers
+  - wheel scrolling on a scrollable panel
+- Added resize support:
+  - listens to stdout `resize`
+  - recreates buffers
+  - re-renders automatically
+  - forces a full redraw after buffer size changes
+- Added TUI image base64 decoding:
+  - accepts raw base64 strings and data URL base64 payloads
+  - validates the `Conv` header and 32-byte metadata block
+  - reads width, bytes per pixel, and height as little-endian unsigned 32-bit integers
+  - extracts the expected pixel data range
+  - returns a default red X image with `error` populated when image data is invalid
+
+## Deferred / future work
+
+- Rich text support beyond first-pass inline spans:
+  - nested style ranges
+  - markdown-like parsing
+  - links/actions per span
+- More advanced keyboard handling:
+  - multiline input editing
+  - word-wise cursor movement
+  - selection
+  - undo/redo
+- More robust mouse support:
+  - mouse capture / button ownership during drag sequences
+  - dedicated mouse press events separate from existing click behavior
+  - double-click / multi-click detection
+  - horizontal wheel scrolling
+  - pixel-level mouse modes
+  - release events over borders, since border chars currently do not retain sprite ids
+  - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
+
+## Planned implementation convo scripts
+
+- `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
+```
+</FILE_CONTENT>
+
+
+> user
+Implement image support in the `ConvoTuiCtrl` class
+
+@time 2026-05-02T17:50:52-04:00
+@tokenUsage 27878 / 20846 / $0.24362
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="ConvoTuiCtrl.ts" target-output-path="../../packages/tui/src/ConvoTuiCtrl.ts" dirty file-hash="ccbdabca8c952322fc6577081bddd1dd598c151f" last-commit="0af214ed9f03e3d9ac37575ecb305b39700d1dc7">
+```ts
 import { convertB64TuiImage } from "./tui-image-lib.js";
 import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
@@ -2545,3 +2925,229 @@ const wait=(ms=1000)=>{
     const end=Date.now()+ms;
     while(end>Date.now()){}
 }
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" dirty file-hash="a69bdb7d3f90aa1f4b29fe9bf0b1e58be25589d1" last-commit="0af214ed9f03e3d9ac37575ecb305b39700d1dc7">
+```md
+# TUI Notes
+
+## ConvoTuiCtrl first-pass decisions
+
+- `ConvoTuiCtrlOptions` includes:
+  - `theme:TuiTheme`
+  - `defaultScreen?:string`
+- A theme is required and theme colors are expected to be `#rrggbb`.
+- Initial active screen is:
+  1. `defaultScreen`, when provided and found
+  2. otherwise the first screen in the `screens` array
+- Public navigation API should include:
+  - `activateScreen(id)`
+  - `activateSprite(id, screen?)`
+  - `activateLink(link, sourceScreen?)`
+  - `followLink(spriteOrId)`
+- Rendering flow for the first implementation pass:
+  1. populate the back buffer
+  2. compare the back buffer to the front buffer
+  3. write changed runs to stdout using ANSI escape sequences
+  4. copy the back buffer to the front buffer
+- First render and resize render use a full redraw.
+- Color handling should support theme variables and `#rrggbb`.
+- Layout should be split into two passes:
+  1. determine natural layout size of inline sprites
+  2. share remaining layout space between row, column, grid, and flex children
+- Default `flex` is `0`.
+- Children without `flex` use natural size; remaining space is distributed by flex value.
+- Borders draw inside the assigned sprite rectangle and inset content by 1.
+- Input support planned:
+  - Tab / Shift+Tab navigation
+  - Enter / Space click activation
+  - text input editing
+  - Backspace
+  - link activation
+  - mouse support
+- Resize support planned:
+  - listen to stdout `resize`
+  - recreate buffers
+  - re-render automatically
+
+## Current implementation status
+
+- Added required controller options and public navigation API.
+- Added screen/sprite loading with generated ids and copied state.
+- Added active screen and active sprite state management.
+- Added active sprite state syncing:
+  - `state.active` is set on the active sprite
+  - previous active sprites are reset to `false`
+- Added active sprite visual properties:
+  - `activeColor`
+  - `activeBg`
+  - `activeBorder`
+- Added full-screen terminal initialization:
+  - alternate screen buffer
+  - hidden cursor
+  - raw stdin mode
+  - mouse reporting
+  - bracketed paste mode
+- Added cleanup/dispose handling:
+  - removes event listeners
+  - disables raw mode
+  - pauses stdin
+  - disables mouse reporting
+  - disables bracketed paste mode
+  - restores cursor and main screen buffer
+- Added buffer resize/allocation helpers.
+- Added rendering:
+  - clears the back buffer
+  - draws active screen root
+  - draws absolute sprites
+  - full redraws on first render and after resize
+  - diff renders after the first render by comparing front/back buffers
+  - emits changed character runs using cursor positioning escape sequences
+  - preserves ANSI foreground/background style changes for changed runs
+  - copies back buffer to front buffer after rendering
+- Added color resolution for theme variables and `#rrggbb`.
+- Added layouts:
+  - inline
+  - row
+  - column
+  - grid
+  - flex distribution for row and column children
+- Added layout sizing refinements:
+  - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
+  - flex remainder is assigned to the last positive-flex child for predictable total sizing
+  - negative and invalid layout sizes are normalized before drawing
+  - row natural height can now account for constrained child widths
+  - grid `fr` sizing avoids divide-by-zero and assigns remainder to the last positive `fr` column
+  - grid row heights are calculated from constrained child column widths
+  - scrollable clipping preserves child layout coordinates so wrapped text scrolls without reflowing against the clipped viewport edge
+- Added sprite borders:
+  - normal
+  - thick
+  - rounded
+  - double
+  - classic
+  - per-side border colors
+- Added scroll offsets for scrollable sprites.
+- Added scroll bounds for scrollable sprites:
+  - scroll offsets are clamped using the current content viewport
+  - wheel and keyboard scrolling stop when the last content row reaches the bottom of the scroll viewport
+  - stale scroll offsets are clamped during render after resize or content changes
+- Added clipping bounds for scrollable container children:
+  - drawing operations respect an internal clip stack
+  - scrollable sprite children clip to the sprite content rect
+  - parent borders remain visible because clipping is scoped to children only
+  - nested scrollable containers clip by intersecting parent and child clip rects
+  - absolute sprites continue to be drawn by the existing absolute rendering pass
+- Added inline text wrapping:
+  - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
+  - `wrap-hard` wraps exactly at the available width
+  - `clip` preserves explicit lines and clips horizontally
+  - explicit newlines are preserved
+  - `textClipStyle` supports no marker or ellipses for clipped text
+  - natural inline height updates when a constrained width is known
+- Added a manual text wrapping screen to `screen-test.ts` that demonstrates:
+  - default wrapping
+  - hard wrapping
+  - clipping with ellipses
+  - clipping without marker
+  - explicit newlines
+  - centered wrapped text
+- Added inline text alignment:
+  - `start`
+  - `center`
+  - `end`
+  - inherited from nearest ancestor when undefined
+  - applied only when drawing inline text
+- Added rich inline text:
+  - `Sprite.richText?:SpriteTextSpan[]`
+  - per-span `text`, `color`, and `bg`
+  - span colors support theme variables and `#rrggbb`
+  - plain `text` behavior is preserved when `richText` is not defined
+  - non-input inline sprites prefer `richText` over `text`
+  - wrapping, clipping, scrolling, and alignment use the same character layout rules as plain text
+- Added keyboard input:
+  - Tab / Shift+Tab focus navigation
+  - Enter / Space click activation
+  - printable character input
+  - Backspace
+  - arrow key scrolling for active scrollable sprites
+  - Ctrl+C dispose
+- Added more complete input sprite keyboard editing:
+  - Backspace removes the character before the caret
+  - Delete removes the character at the caret
+  - Left/right arrows move the caret within active input sprites
+  - Home and End move the caret to the start and end
+  - Ctrl+A and Ctrl+E move the caret to the start and end on macOS/Linux terminals
+  - printable pasted text is inserted at the caret
+  - bracketed paste input strips escape/control sequences before insertion
+  - `onInput` fires only when the input value changes
+  - non-input left/right arrow behavior continues to scroll active scrollable sprites
+- Added active input cursor support:
+  - `SpriteState.inputCaret` stores a minimal zero-based caret position
+  - active input sprites show the terminal cursor
+  - non-input active sprites hide the terminal cursor
+  - cursor defaults to the end of the input value
+  - cursor position respects sprite layout rect and sprite scroll offsets
+- Added mouse click support using SGR mouse mode.
+- Added more robust SGR mouse support:
+  - parses press, release, drag, and wheel events
+  - preserves existing left-button press click behavior
+  - dispatches `onMouseRelease`, `onMouseDrag`, and `onMouseWheel` to the sprite under the mouse
+  - mouse event objects include terminal-relative `x` and `y` coordinates
+  - mouse event objects include button/modifier metadata where applicable
+  - wheel up/down scrolls the nearest scrollable sprite under the mouse path
+- Added a manual mouse events screen to `screen-test.ts` that demonstrates:
+  - mouse release event callbacks
+  - mouse drag event callbacks
+  - mouse wheel event callbacks
+  - terminal-relative mouse coordinates
+  - reported mouse modifiers
+  - wheel scrolling on a scrollable panel
+- Added resize support:
+  - listens to stdout `resize`
+  - recreates buffers
+  - re-renders automatically
+  - forces a full redraw after buffer size changes
+- Added TUI image base64 decoding:
+  - accepts raw base64 strings and data URL base64 payloads
+  - validates the `Conv` header and 32-byte metadata block
+  - reads width, bytes per pixel, and height as little-endian unsigned 32-bit integers
+  - extracts the expected pixel data range
+  - returns a default red X image with `error` populated when image data is invalid
+- Added TUI image rendering:
+  - inline sprites with `image` render with upper-half block characters
+  - two vertical image pixels are packed into one terminal row using foreground/background colors
+  - image natural size is `width` columns by `ceil(height / 2)` terminal rows
+  - RGB and grayscale pixel data are supported, with transparent alpha falling back to the sprite background
+  - text/rich text can still render over an image without affecting image natural size
+
+## Deferred / future work
+
+- Rich text support beyond first-pass inline spans:
+  - nested style ranges
+  - markdown-like parsing
+  - links/actions per span
+- More advanced keyboard handling:
+  - multiline input editing
+  - word-wise cursor movement
+  - selection
+  - undo/redo
+- More robust mouse support:
+  - mouse capture / button ownership during drag sequences
+  - dedicated mouse press events separate from existing click behavior
+  - double-click / multi-click detection
+  - horizontal wheel scrolling
+  - pixel-level mouse modes
+  - release events over borders, since border chars currently do not retain sprite ids
+  - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
+
+## Planned implementation convo scripts
+
+- `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
+```
+</FILE_CONTENT>
+
+
+> user

@@ -177,6 +177,18 @@
   - recreates buffers
   - re-renders automatically
   - forces a full redraw after buffer size changes
+- Added TUI image base64 decoding:
+  - accepts raw base64 strings and data URL base64 payloads
+  - validates the `Conv` header and 32-byte metadata block
+  - reads width, bytes per pixel, and height as little-endian unsigned 32-bit integers
+  - extracts the expected pixel data range
+  - returns a default red X image with `error` populated when image data is invalid
+- Added TUI image rendering:
+  - inline sprites with `image` render with upper-half block characters
+  - two vertical image pixels are packed into one terminal row using foreground/background colors
+  - image natural size is `width` columns by `ceil(height / 2)` terminal rows
+  - RGB and grayscale pixel data are supported, with transparent alpha falling back to the sprite background
+  - text/rich text can still render over an image without affecting image natural size
 
 ## Deferred / future work
 

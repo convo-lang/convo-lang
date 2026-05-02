@@ -122,6 +122,14 @@ export interface Sprite{
     textClipStyle?:SpriteTextClipStyle;
 
     /**
+     * An image displayed by the sprite. When an image is defined the natural layout size is 
+     * determined by the image size. The `text` property can be used with an image but the
+     * text will not effect the layout size of the sprite.
+     * @note Images are only displayed when a sprite uses the `inline` layout type.
+     */
+    image?:SpriteImage;
+
+    /**
      * Foreground color. Can be a hex color or the name of a theme variable.
      */
     color?:string;
@@ -257,6 +265,28 @@ export interface Sprite{
 }
 
 /**
+ * The definition of a sprite. When loaded the `SpriteDef` will be converted into a `Sprite`.
+ */
+export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image'>
+{
+    id?:string;
+    children?:SpriteDef[];
+    /**
+     * Base64 encoded image.
+     * Data layout:
+     * [header - 4 bytes][width - 4 bytes][bytesPerByte - 4 bytes][height - 4 bytes][reserved - 16 bytes][pixel data - (width*bytesPerByte*height) bytes]
+     * header = x43 x6f x6e x76
+     */
+    image?:string;
+}
+
+export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
+{
+    id:string;
+    children?:SpriteDef[];
+}
+
+/**
  * A rich inline text span.
  */
 export interface SpriteTextSpan
@@ -275,21 +305,6 @@ export interface SpriteTextSpan
      * Background color. Can be a hex color or the name of a theme variable.
      */
     bg?:string;
-}
-
-/**
- * The definition of a sprite. When loaded the `SpriteDef` will be converted into a `Sprite`.
- */
-export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'>
-{
-    id?:string;
-    children?:SpriteDef[];
-}
-
-export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
-{
-    id:string;
-    children?:SpriteDef[];
 }
 
 export interface SpriteState
@@ -504,6 +519,35 @@ export type SpriteGridColUnit='cr'|'fr';
  */
 export type SpriteGridColSize=`${number}${SpriteGridColUnit}`;
 
+
+///// Image /////
+export interface SpriteImage
+{
+    /**
+     * Width in pixels
+     */
+    width:number;
+
+    /**
+     * Height in pixels
+     */
+    height:number;
+
+    /**
+     * Number of bytes per pixel. For RGB should be 3
+     */
+    bytesPerPixel:number;
+
+    /**
+     * Raw pixel data. Size = width * bytesPerPixel * height
+     */
+    pixelData:Uint8Array;
+
+    /**
+     * Parsing error encounter when creating the image.
+     */
+    error?:string;
+}
 
 
 ///// Char /////

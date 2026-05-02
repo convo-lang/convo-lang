@@ -2,6 +2,7 @@
 import { appendFile } from "node:fs/promises";
 import { ConvoTuiCtrl } from '../src/ConvoTuiCtrl.js';
 import type { SpriteDef, SpriteMouseEvtBase, TuiConsole, TuiTheme } from '../src/tui-types.js';
+import { logoSrc } from "./logo.js";
 
 const proc=(globalThis as any).process;
 if(!proc){
@@ -71,6 +72,7 @@ const status={
     color:'success',
     flex:1,
 } satisfies SpriteDef;
+
 
 let clickCount=0;
 let mouseEventCount=0;
@@ -238,6 +240,10 @@ const homeRoot:SpriteDef={
                             },
                         },
                         status,
+                        {
+                            id:'logo-image',
+                            image:logoSrc,
+                        },
                         {
                             id:'timer',
                             text:'Count: 0',
