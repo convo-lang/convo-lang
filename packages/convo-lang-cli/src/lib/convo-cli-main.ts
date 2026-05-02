@@ -13,12 +13,14 @@ import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.j
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
+import { convoCliHelpMessage } from "./convo-cli-help.js";
 
 export const getConvoCliArgs=(argv=globalThis.process?.argv??[])=>parseCliArgsT<ConvoCliOptions>({
     args:argv,
     startIndex:2,
     defaultKey:'source',
     restKey:'spawn',
+    aliasMap:{help:'h'},
     flags:[
         'parse',
         'convert',
@@ -42,6 +44,7 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[])=>parseCliArgsT<
         config:args=>args[0],
         inlineConfig:args=>args[0],
         sourcePath:args=>args[0],
+        help:args=>args.length?true:false,
         out:args=>args[0],
         parse:args=>args.length?true:false,
         convert:args=>args.length?true:false,
@@ -138,6 +141,10 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
         console.error('Unhandled Exception',ex,'origin',origin);
         process.exit(1);
     });
+
+    if(args.help){
+        console.log(convoCliHelpMessage);
+    }
 
     if(args.env){
         await loadEnvFileAsync(args.env);

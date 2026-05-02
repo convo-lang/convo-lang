@@ -16,15 +16,43 @@ export interface ConvoCliConfig
     overrideEnv?:boolean;
 
     /**
-     * @default "vision"
+     * @deprecated
      */
     capabilities?:string;
+
+    /**
+     * @deprecated use environment variables instead
+     */
     apiKey?:string;
+    
+    /**
+     * @deprecated use environment variables instead
+     */
     apiBaseUrl?:string;
+    
+    /**
+     * @deprecated
+     */
     chatModel?:string;
+    
+    /**
+     * @deprecated
+     */
     audioModel?:string;
+    
+    /**
+     * @deprecated
+     */
     imageModel?:string;
+    
+    /**
+     * @deprecated
+     */
     visionModel?:string;
+    
+    /**
+     * @deprecated
+     */
     secrets?:string;
     defaultModel?:string;
     defaultVars?:Record<string,any>;
@@ -37,6 +65,11 @@ export interface ConvoCliOptions
      * ConvoCliConfig object or path to a ConvoCliConfig file
      */
     config?:string|ConvoCliConfig;
+
+    /**
+     * Prints help
+     */
+    help?:boolean;
 
     /**
      * Path to env files to load environment variables from

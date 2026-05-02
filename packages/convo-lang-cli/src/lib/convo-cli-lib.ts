@@ -3,6 +3,8 @@ import { readFileAsStringAsync } from "@iyio/node-common";
 
 export const defaultConvoCliApiPort=7222;
 
+export const defaultConvoCliConfigFile='~/.config/convo/convo.json';
+
 export const loadEnvFileAsync=async (path:string|string[])=>{
     const ary=asArray(path);
     for(const path of ary){

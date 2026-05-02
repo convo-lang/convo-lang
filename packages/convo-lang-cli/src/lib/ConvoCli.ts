@@ -10,6 +10,7 @@ import { realpath, writeFile } from "fs/promises";
 import { homedir } from 'node:os';
 import Path from 'node:path';
 import { z } from 'zod';
+import { defaultConvoCliConfigFile } from './convo-cli-lib.js';
 import { convoCliModule } from './convo-cli-module.js';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
 import { createConvoExec } from './convo-exec.js';
@@ -30,7 +31,7 @@ const _getConfigAsync=async (options:ConvoCliOptions):Promise<ConvoCliConfig>=>
         return inlineConfig;
     }
 
-    let configPath=(typeof options.config === 'string'?options.config:null)??'~/.config/convo/convo.json';
+    let configPath=(typeof options.config === 'string'?options.config:null)??defaultConvoCliConfigFile;
 
     if(configPath.startsWith('~')){
         configPath=homedir()+configPath.substring(1);
