@@ -64,7 +64,6 @@ const quitButton:SpriteDef={
 const homeRoot:SpriteDef={
     id:'home-root',
     layout:'column',
-    border:'muted',
     bg:'background',
     children:[
         {
@@ -72,6 +71,7 @@ const homeRoot:SpriteDef={
             text:' Convo TUI screen test ',
             color:'accent',
             bg:'panel',
+            textAlign:'center',
         },
         {
             id:'main',
@@ -134,7 +134,8 @@ const homeRoot:SpriteDef={
                         status,
                         {
                             id:'timer',
-                            text:'Count: 0'
+                            text:'Count: 0',
+                            textAlign:'end',
                         }
                     ],
                 }

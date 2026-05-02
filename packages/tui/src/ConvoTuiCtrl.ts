@@ -1,4 +1,4 @@
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteTextAlignment, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 export interface ConvoTuiCtrlOptions
 {
@@ -35,6 +35,17 @@ interface TuiFocusableSprite
 {
     sprite:Sprite;
     order:number;
+}
+
+interface TuiInheritedSpriteProps
+{
+    textAlign?:SpriteTextAlignment;
+}
+
+interface TuiAbsoluteSprite
+{
+    sprite:Sprite;
+    inheritedProps:TuiInheritedSpriteProps;
 }
 
 export class ConvoTuiCtrl
@@ -483,7 +494,7 @@ export class ConvoTuiCtrl
         return `${output}\x1b[0m`;
     }
 
-    private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle)
+    private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle, inheritedProps:TuiInheritedSpriteProps={})
     {
         rect=this.clampRect(rect);
         if(rect.width<=0 || rect.height<=0){
@@ -491,6 +502,10 @@ export class ConvoTuiCtrl
         }
 
         const active=this.isSpriteActive(sprite);
+        const nextInheritedProps:TuiInheritedSpriteProps={
+            ...inheritedProps,
+            textAlign:sprite.textAlign??inheritedProps.textAlign,
+        };
         const baseStyle:TuiStyle={
             f:this.resolveColor(sprite.color)??parentStyle.f,
             b:this.resolveColor(sprite.bg)??parentStyle.b,
@@ -516,16 +531,17 @@ export class ConvoTuiCtrl
 
         const layout=sprite.layout??'inline';
         if(layout==='inline'){
-            this.drawInlineSprite(sprite, contentRect, style);
+            this.drawInlineSprite(sprite, contentRect, style, nextInheritedProps.textAlign??'start');
             return;
         }
 
-        this.drawChildren(sprite, contentRect, style);
+        this.drawChildren(sprite, contentRect, style, nextInheritedProps);
     }
 
     private drawAbsoluteSprites(root:Sprite)
     {
-        for(const sprite of this.getAbsoluteSprites(root)){
+        for(const item of this.getAbsoluteSprites(root)){
+            const sprite=item.sprite;
             const pos=sprite.absolutePosition;
             if(!pos){
                 continue;
@@ -543,7 +559,7 @@ export class ConvoTuiCtrl
             this.drawSprite(sprite, rect, {
                 f:this.resolveColor(this.theme.foreground),
                 b:this.resolveColor(this.theme.background),
-            });
+            }, item.inheritedProps);
         }
     }
 
@@ -552,16 +568,21 @@ export class ConvoTuiCtrl
         return sprite.state?.active===true;
     }
 
-    private getAbsoluteSprites(root:Sprite):Sprite[]
+    private getAbsoluteSprites(root:Sprite):TuiAbsoluteSprite[]
     {
-        const sprites:Sprite[]=[];
+        const sprites:TuiAbsoluteSprite[]=[];
 
-        const visit=(sprite:Sprite)=>{
+        const visit=(sprite:Sprite, inheritedProps:TuiInheritedSpriteProps={})=>{
+            const nextInheritedProps:TuiInheritedSpriteProps={
+                ...inheritedProps,
+                textAlign:sprite.textAlign??inheritedProps.textAlign,
+            };
+
             for(const child of sprite.children??[]){
                 if(child.absolutePosition){
-                    sprites.push(child);
+                    sprites.push({sprite:child,inheritedProps:nextInheritedProps});
                 }
-                visit(child);
+                visit(child, nextInheritedProps);
             }
         };
 
@@ -570,23 +591,31 @@ export class ConvoTuiCtrl
         return sprites;
     }
 
-    private drawInlineSprite(sprite:Sprite, rect:TuiRect, style:TuiStyle)
+    private drawInlineSprite(sprite:Sprite, rect:TuiRect, style:TuiStyle, textAlign:SpriteTextAlignment)
     {
-        const value=sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+        const value=this.getInlineSpriteText(sprite);
         const scrollX=sprite.scrollable?(sprite.state?.scrollX??0):0;
-        const text=value.slice(Math.max(0, scrollX), Math.max(0, scrollX)+rect.width);
+        const scrollY=sprite.scrollable?(sprite.state?.scrollY??0):0;
+        const lines=this.wrapText(value, rect.width);
+        const visibleLines=lines.slice(Math.max(0, scrollY), Math.max(0, scrollY)+rect.height);
 
-        for(let i=0;i<text.length && i<rect.width;i++){
-            this.setChar(rect.x+i, rect.y, {
-                c:text[i]??' ',
-                f:style.f,
-                b:style.b,
-                i:sprite.id,
-            });
+        for(let y=0;y<visibleLines.length && y<rect.height;y++){
+            const line=visibleLines[y]??'';
+            const text=line.slice(Math.max(0, scrollX), Math.max(0, scrollX)+rect.width);
+            const xOffset=scrollX>0?0:this.getTextAlignOffset(textAlign, text.length, rect.width);
+
+            for(let i=0;i<text.length && i<rect.width;i++){
+                this.setChar(rect.x+xOffset+i, rect.y+y, {
+                    c:text[i]??' ',
+                    f:style.f,
+                    b:style.b,
+                    i:sprite.id,
+                });
+            }
         }
     }
 
-    private drawChildren(sprite:Sprite, rect:TuiRect, style:TuiStyle)
+    private drawChildren(sprite:Sprite, rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
         const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
         if(!children.length){
@@ -603,21 +632,21 @@ export class ConvoTuiCtrl
 
         switch(sprite.layout){
             case 'row':
-                this.drawRowChildren(children, childRect, style);
+                this.drawRowChildren(children, childRect, style, inheritedProps);
                 break;
 
             case 'grid':
-                this.drawGridChildren(sprite, children, childRect, style);
+                this.drawGridChildren(sprite, children, childRect, style, inheritedProps);
                 break;
 
             case 'column':
             default:
-                this.drawColumnChildren(children, childRect, style);
+                this.drawColumnChildren(children, childRect, style, inheritedProps);
                 break;
         }
     }
 
-    private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle)
+    private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
         const sizes=children.map(child=>this.getNaturalSize(child));
         const fixedWidth=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.width??0), 0);
@@ -649,14 +678,14 @@ export class ConvoTuiCtrl
                 y:rect.y,
                 width,
                 height:rect.height,
-            }, style);
+            }, style, inheritedProps);
             x+=width;
         });
     }
 
-    private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle)
+    private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
-        const sizes=children.map(child=>this.getNaturalSize(child));
+        const sizes=children.map(child=>this.getNaturalSize(child, rect.width));
         const fixedHeight=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.height??0), 0);
         const totalFlex=children.reduce((sum, child)=>sum+(child.flex??0), 0);
         const remaining=Math.max(0, rect.height-fixedHeight);
@@ -686,12 +715,12 @@ export class ConvoTuiCtrl
                 y,
                 width:rect.width,
                 height,
-            }, style);
+            }, style, inheritedProps);
             y+=height;
         });
     }
 
-    private drawGridChildren(sprite:Sprite, children:Sprite[], rect:TuiRect, style:TuiStyle)
+    private drawGridChildren(sprite:Sprite, children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
         const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
         const widths=this.getGridColWidths(cols as SpriteGridColSize[], rect.width);
@@ -699,8 +728,9 @@ export class ConvoTuiCtrl
         const rowHeights:number[]=[];
 
         children.forEach((child, i)=>{
+            const col=i%colCount;
             const row=Math.floor(i/colCount);
-            rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child).height);
+            rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
         });
 
         let y=rect.y;
@@ -715,7 +745,7 @@ export class ConvoTuiCtrl
                         y,
                         width,
                         height:rowHeights[row]??0,
-                    }, style);
+                    }, style, inheritedProps);
                 }
                 x+=width;
             }
@@ -723,25 +753,26 @@ export class ConvoTuiCtrl
         }
     }
 
-    private getNaturalSize(sprite:Sprite):TuiSize
+    private getNaturalSize(sprite:Sprite, width?:number):TuiSize
     {
         const border=this.getBorderColors(sprite);
         const borderWidth=(border.left?1:0)+(border.right?1:0);
         const borderHeight=(border.top?1:0)+(border.bottom?1:0);
+        const contentWidth=width===undefined?undefined:Math.max(0, width-borderWidth);
         const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
         const layout=sprite.layout??'inline';
 
         if(layout==='inline' || !children.length){
-            const text=sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+            const text=this.getInlineSpriteText(sprite);
+            const lines=contentWidth===undefined?this.getTextLines(text):this.wrapText(text, Math.max(1, contentWidth));
             return {
-                width:Math.max(1, text.length)+borderWidth,
-                height:1+borderHeight,
+                width:(contentWidth===undefined?Math.max(1, ...lines.map(line=>line.length)):Math.max(1, contentWidth))+borderWidth,
+                height:Math.max(1, lines.length)+borderHeight,
             };
         }
 
-        const sizes=children.map(child=>this.getNaturalSize(child));
-
         if(layout==='row'){
+            const sizes=children.map(child=>this.getNaturalSize(child));
             return {
                 width:sizes.reduce((sum, size)=>sum+size.width, 0)+borderWidth,
                 height:Math.max(1, ...sizes.map(size=>size.height))+borderHeight,
@@ -751,25 +782,110 @@ export class ConvoTuiCtrl
         if(layout==='grid'){
             const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
             const colCount=Math.max(1, cols.length);
-            let width=0;
-            let height=0;
+
+            if(contentWidth!==undefined){
+                const widths=this.getGridColWidths(cols as SpriteGridColSize[], contentWidth);
+                const rowHeights:number[]=[];
+
+                children.forEach((child, i)=>{
+                    const row=Math.floor(i/colCount);
+                    const col=i%colCount;
+                    rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+                });
+
+                return {
+                    width:contentWidth+borderWidth,
+                    height:rowHeights.reduce((sum, height)=>sum+height, 0)+borderHeight,
+                };
+            }
+
+            const sizes=children.map(child=>this.getNaturalSize(child));
+            let naturalWidth=0;
+            let naturalHeight=0;
 
             for(let i=0;i<sizes.length;i+=colCount){
                 const row=sizes.slice(i, i+colCount);
-                width=Math.max(width, row.reduce((sum, size)=>sum+size.width, 0));
-                height+=Math.max(1, ...row.map(size=>size.height));
+                naturalWidth=Math.max(naturalWidth, row.reduce((sum, size)=>sum+size.width, 0));
+                naturalHeight+=Math.max(1, ...row.map(size=>size.height));
             }
 
             return {
-                width:width+borderWidth,
-                height:height+borderHeight,
+                width:naturalWidth+borderWidth,
+                height:naturalHeight+borderHeight,
             };
         }
 
+        const sizes=children.map(child=>this.getNaturalSize(child, contentWidth));
         return {
             width:Math.max(1, ...sizes.map(size=>size.width))+borderWidth,
             height:sizes.reduce((sum, size)=>sum+size.height, 0)+borderHeight,
         };
+    }
+
+    private getInlineSpriteText(sprite:Sprite):string
+    {
+        return sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+    }
+
+    private getTextLines(text:string):string[]
+    {
+        return text.split(/\r?\n/);
+    }
+
+    private wrapText(text:string, width:number):string[]
+    {
+        width=Math.max(1, Math.floor(width));
+
+        const lines:string[]=[];
+        const paragraphs=this.getTextLines(text);
+
+        for(const paragraph of paragraphs){
+            if(!paragraph){
+                lines.push('');
+                continue;
+            }
+
+            let remaining=paragraph;
+            while(remaining.length>width){
+                const nextChar=remaining[width];
+                let breakIndex=nextChar && /\s/.test(nextChar)?width:-1;
+
+                if(breakIndex<0){
+                    for(let i=width-1;i>0;i--){
+                        if(/\s/.test(remaining[i]??'')){
+                            breakIndex=i;
+                            break;
+                        }
+                    }
+                }
+
+                if(breakIndex<=0){
+                    breakIndex=width;
+                }
+
+                lines.push(remaining.slice(0, breakIndex).replace(/[ \t]+$/,''));
+                remaining=remaining.slice(breakIndex).replace(/^[ \t]+/,'');
+            }
+
+            lines.push(remaining);
+        }
+
+        return lines.length?lines:[''];
+    }
+
+    private getTextAlignOffset(textAlign:SpriteTextAlignment, textLength:number, width:number):number
+    {
+        switch(textAlign){
+            case 'center':
+                return Math.max(0, Math.floor((width-textLength)/2));
+
+            case 'end':
+                return Math.max(0, width-textLength);
+
+            case 'start':
+            default:
+                return 0;
+        }
     }
 
     private getGridColWidths(cols:SpriteGridColSize[]|undefined, width:number):number[]

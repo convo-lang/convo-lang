@@ -97,7 +97,7 @@ export interface Sprite{
     text?:string;
 
     /**
-     * Controls the alignment of inline text.
+     * Controls the alignment of inline text. If undefined textAlignment is inherited.
      */
     textAlign?:SpriteTextAlignment;
 

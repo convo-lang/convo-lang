@@ -83,6 +83,16 @@
   - classic
   - per-side border colors
 - Added scroll offsets for scrollable sprites.
+- Added inline text wrapping:
+  - wraps on whitespace when possible
+  - preserves explicit newlines
+  - updates natural inline height when a constrained width is known
+- Added inline text alignment:
+  - `start`
+  - `center`
+  - `end`
+  - inherited from nearest ancestor when undefined
+  - applied only when drawing inline text
 - Added keyboard input:
   - Tab / Shift+Tab focus navigation
   - Enter / Space click activation
@@ -100,7 +110,7 @@
 
 - Diff rendering to reduce terminal output.
 - Cursor display/positioning for active input sprites.
-- Rich text wrapping and multiline text.
+- Rich text support.
 - Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
 - More complete keyboard handling:
   - delete
