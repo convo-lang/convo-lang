@@ -204,6 +204,21 @@ export interface Sprite{
     onClick?:(evt:SpriteClickEvt)=>void;
 
     /**
+     * Called when a mouse button is released over the sprite.
+     */
+    onMouseRelease?:(evt:SpriteMouseReleaseEvt)=>void;
+
+    /**
+     * Called when the mouse is dragged over the sprite.
+     */
+    onMouseDrag?:(evt:SpriteMouseDragEvt)=>void;
+
+    /**
+     * Called when the mouse wheel is scrolled over the sprite.
+     */
+    onMouseWheel?:(evt:SpriteMouseWheelEvt)=>void;
+
+    /**
      * Called when input is received from the keyboard while the sprite is active. The current
      * input value of the sprite is stored in `state.inputValue` and is updated before calling
      * onInput.
@@ -350,7 +365,56 @@ export interface SpriteInputEvt extends SpriteEvtBase
     value:string;
 }
 
-export type SpriteEvt=SpriteClickEvt|SpriteInputEvt;
+export type SpriteMouseButton='left'|'middle'|'right'|'unknown';
+
+export interface SpriteMouseModifiers
+{
+    shift:boolean;
+    alt:boolean;
+    ctrl:boolean;
+}
+
+export interface SpriteMouseEvtBase extends SpriteEvtBase
+{
+    /**
+     * Terminal-relative x coordinate of the mouse event
+     */
+    x:number;
+
+    /**
+     * Terminal-relative y coordinate of the mouse event
+     */
+    y:number;
+
+    modifiers:SpriteMouseModifiers;
+}
+
+export interface SpriteMouseReleaseEvt extends SpriteMouseEvtBase
+{
+    type:'mouse-release';
+    button:SpriteMouseButton;
+}
+
+export interface SpriteMouseDragEvt extends SpriteMouseEvtBase
+{
+    type:'mouse-drag';
+    button:SpriteMouseButton;
+}
+
+export type SpriteMouseWheelDirection='up'|'down';
+
+export interface SpriteMouseWheelEvt extends SpriteMouseEvtBase
+{
+    type:'mouse-wheel';
+    direction:SpriteMouseWheelDirection;
+
+    /**
+     * Vertical wheel delta. Negative values scroll up and positive values scroll down.
+     */
+    deltaY:number;
+}
+
+export type SpriteEvt=SpriteClickEvt|SpriteInputEvt|SpriteMouseReleaseEvt|SpriteMouseDragEvt|SpriteMouseWheelEvt;
 
 export type SpriteTextAlignment='start'|'center'|'end';
 

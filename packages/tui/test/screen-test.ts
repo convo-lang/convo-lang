@@ -34,6 +34,19 @@ const status={
 } satisfies SpriteDef;
 
 let clickCount=0;
+let mouseEventCount=0;
+
+const setMouseStatus=(evt:any, label:string)=>{
+    evt.ctrl.updateSprite('mouse-status',s=>{
+        const modifiers=[
+            evt.modifiers?.shift?'shift':undefined,
+            evt.modifiers?.alt?'alt':undefined,
+            evt.modifiers?.ctrl?'ctrl':undefined,
+        ].filter(Boolean).join('+') || 'none';
+        s.text=`${++mouseEventCount}: ${label} @ ${evt.x},${evt.y} modifiers=${modifiers}`;
+    })
+};
+
 const nameInput:SpriteDef={
     id:'name-input',
     text:'Type here...',
@@ -117,6 +130,15 @@ const homeRoot:SpriteDef={
                             activeBorder:'active',
                         },
                         {
+                            id:'mouse-link',
+                            text:' Mouse events ',
+                            link:'mouse',
+                            border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
+                        },
+                        {
                             id:'scroll-link',
                             text:' Scrolling ',
                             link:'scroll',
@@ -141,7 +163,7 @@ const homeRoot:SpriteDef={
                         },
                         {
                             id:'mouse-note',
-                            text:'Mouse clicks are enabled on interactive text.',
+                            text:'Mouse clicks are enabled on interactive text. Use the mouse events screen to test release, drag, and wheel.',
                         },
                         nameInput,
                         {
@@ -200,6 +222,7 @@ const helpRoot:SpriteDef={
                 {text:'This screen verifies links, layout, borders, colors, input, and mouse clicks.'},
                 {text:'The text wrapping screen demonstrates wrap, wrap-hard, clipping, ellipses, and explicit newlines.'},
                 {text:'The rich text screen demonstrates inline spans with per-span foreground and background colors.'},
+                {text:'The mouse events screen demonstrates release, drag, and wheel event callbacks.'},
                 {text:'The scrolling screen demonstrates vertical and horizontal scroll clipping.'},
                 {text:'Tab moves focus forward.'},
                 {text:'Shift+Tab moves focus backward.'},
@@ -466,6 +489,145 @@ const richRoot:SpriteDef={
     ],
 };
 
+const mouseRoot:SpriteDef={
+    id:'mouse-root',
+    layout:'column',
+    border:'accent',
+    bg:'background',
+    children:[
+        {
+            id:'mouse-title',
+            text:' Mouse events ',
+            color:'accent',
+            bg:'panel',
+            textAlign:'center',
+        },
+        {
+            id:'mouse-instructions',
+            text:'Click to focus a panel. Release and drag inside the left pad. Wheel over the right panel to scroll. Wheel over empty right-panel space also fires onMouseWheel.',
+            color:'muted',
+            bg:'panel',
+        },
+        {
+            id:'mouse-status',
+            text:'Mouse status: waiting for release, drag, or wheel.',
+            color:'success',
+            bg:'panelAlt',
+        },
+        {
+            id:'mouse-body',
+            layout:'row',
+            flex:1,
+            children:[
+                {
+                    id:'mouse-pad',
+                    layout:'column',
+                    flex:1,
+                    isButton:true,
+                    border:'success',
+                    activeBorder:'active',
+                    bg:'panelAlt',
+                    onMouseRelease:evt=>setMouseStatus(evt, `release ${evt.button}`),
+                    onMouseDrag:evt=>setMouseStatus(evt, `drag ${evt.button}`),
+                    onMouseWheel:evt=>setMouseStatus(evt, `wheel ${evt.direction} deltaY=${evt.deltaY}`),
+                    children:[
+                        {
+                            text:'Drag/release pad',
+                            color:'success',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Hold a mouse button and move over this panel to test drag events.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Release over this panel to test release events.',
+                            border:'muted',
+                        },
+                        {
+                            text:'The status line shows terminal-relative coordinates and modifiers.',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    id:'mouse-wheel-panel',
+                    layout:'column',
+                    flex:1,
+                    scrollable:true,
+                    isButton:true,
+                    border:'accent',
+                    activeBorder:'active',
+                    bg:'panelAlt',
+                    onMouseRelease:evt=>setMouseStatus(evt, `release ${evt.button}`),
+                    onMouseDrag:evt=>setMouseStatus(evt, `drag ${evt.button}`),
+                    onMouseWheel:evt=>setMouseStatus(evt, `wheel ${evt.direction} deltaY=${evt.deltaY}`),
+                    children:[
+                        {
+                            text:'Wheel scroll panel',
+                            color:'accent',
+                            textAlign:'center',
+                        },
+                        {
+                            text:'Wheel Row 01 - scrolling should move this content vertically.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 02 - scroll events also include terminal-relative coordinates.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 03 - wheel up uses deltaY=-1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 04 - wheel down uses deltaY=1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 05 - modifier keys are included when reported by the terminal.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 06 - the nearest scrollable sprite under the mouse path is scrolled.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 07 - child rows may receive the hit target while the parent still scrolls.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 08 - keep scrolling to verify clipping.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 09 - parent borders should remain visible.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 10 - release and drag handlers are also attached to this panel.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 11 - final row.',
+                            border:'muted',
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            id:'mouse-back-link',
+            text:' Back home ',
+            link:'home',
+            border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
+        },
+    ],
+};
+
 const scrollRoot:SpriteDef={
     id:'scroll-root',
     layout:'column',
@@ -633,6 +795,11 @@ const ctrl=new ConvoTuiCtrl({
             id:'rich',
             defaultSprite:'rich-back-link',
             root:richRoot,
+        },
+        {
+            id:'mouse',
+            defaultSprite:'mouse-pad',
+            root:mouseRoot,
         },
         {
             id:'scroll',

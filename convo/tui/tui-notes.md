@@ -20,7 +20,7 @@
   3. write changed runs to stdout using ANSI escape sequences
   4. copy the back buffer to the front buffer
 - First render and resize render use a full redraw.
-- Color handling should support theme variables and `#rrggbb` truecolor.
+- Color handling should support theme variables and `#rrggbb`.
 - Layout should be split into two passes:
   1. determine natural layout size of inline sprites
   2. share remaining layout space between row, column, grid, and flex children
@@ -146,6 +146,20 @@
   - cursor defaults to the end of the input value
   - cursor position respects sprite layout rect and sprite scroll offsets
 - Added mouse click support using SGR mouse mode.
+- Added more robust SGR mouse support:
+  - parses press, release, drag, and wheel events
+  - preserves existing left-button press click behavior
+  - dispatches `onMouseRelease`, `onMouseDrag`, and `onMouseWheel` to the sprite under the mouse
+  - mouse event objects include terminal-relative `x` and `y` coordinates
+  - mouse event objects include button/modifier metadata where applicable
+  - wheel up/down scrolls the nearest scrollable sprite under the mouse path
+- Added a manual mouse events screen to `screen-test.ts` that demonstrates:
+  - mouse release event callbacks
+  - mouse drag event callbacks
+  - mouse wheel event callbacks
+  - terminal-relative mouse coordinates
+  - reported mouse modifiers
+  - wheel scrolling on a scrollable panel
 - Added resize support:
   - listens to stdout `resize`
   - recreates buffers
@@ -164,12 +178,15 @@
   - selection
   - undo/redo
 - More robust mouse support:
-  - drag
-  - wheel scrolling
-  - release events
+  - mouse capture / button ownership during drag sequences
+  - dedicated mouse press events separate from existing click behavior
+  - double-click / multi-click detection
+  - horizontal wheel scrolling
+  - pixel-level mouse modes
+  - release events over borders, since border chars currently do not retain sprite ids
+  - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
 - Layout sizing refinements for grid rows and flex edge cases.
 
 ## Planned implementation convo scripts
 
-- `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.
 - `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.

@@ -1,4 +1,4 @@
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 export interface ConvoTuiCtrlOptions
 {
@@ -46,6 +46,25 @@ interface TuiCursorPosition
 {
     x:number;
     y:number;
+}
+
+interface TuiMouseTarget
+{
+    sprite:Sprite;
+    screen:Screen;
+    path:Sprite[];
+}
+
+type TuiSgrMouseAction='press'|'release'|'drag'|'wheel';
+
+interface TuiSgrMouseEvt
+{
+    action:TuiSgrMouseAction;
+    x:number;
+    y:number;
+    button:SpriteMouseButton;
+    direction?:SpriteMouseWheelDirection;
+    modifiers:SpriteMouseModifiers;
 }
 
 /**
@@ -278,6 +297,27 @@ export class ConvoTuiCtrl
             const found=this.findSpriteInTree(child, id);
             if(found){
                 return found;
+            }
+        }
+
+        return undefined;
+    }
+
+    private findSpritePathById(id:string, screen:Screen):Sprite[]|undefined
+    {
+        return this.findSpritePathInTree(screen.root, id);
+    }
+
+    private findSpritePathInTree(sprite:Sprite, id:string):Sprite[]|undefined
+    {
+        if(sprite.id===id){
+            return [sprite];
+        }
+
+        for(const child of sprite.children??[]){
+            const path=this.findSpritePathInTree(child, id);
+            if(path){
+                return [sprite, ...path];
             }
         }
 
@@ -1595,14 +1635,14 @@ export class ConvoTuiCtrl
                 return 0;
             }
 
-            const button=Number(match[1]);
-            const x=Number(match[2])-1;
-            const y=Number(match[3])-1;
-            const pressed=match[4]==='M';
+            const mouseEvt=this.parseSgrMouseEvent(
+                Number(match[1]),
+                Number(match[2])-1,
+                Number(match[3])-1,
+                match[4] as 'm'|'M'
+            );
 
-            if(pressed && (button&3)===0){
-                this.handleMouseClick(x, y);
-            }
+            this.handleMouseEvent(mouseEvt);
 
             return match[0].length;
         }
@@ -1797,18 +1837,115 @@ export class ConvoTuiCtrl
         return true;
     }
 
-    private handleMouseClick(x:number, y:number)
+    private parseSgrMouseEvent(code:number, x:number, y:number, suffix:'m'|'M'):TuiSgrMouseEvt
+    {
+        const isWheel=(code&64)!==0;
+        const isDrag=(code&32)!==0;
+        const isRelease=suffix==='m';
+
+        return {
+            action:(
+                isWheel?
+                    'wheel'
+                :isRelease?
+                    'release'
+                :isDrag?
+                    'drag'
+                :
+                    'press'
+            ),
+            x,
+            y,
+            button:this.getMouseButton(code),
+            direction:isWheel?this.getMouseWheelDirection(code):undefined,
+            modifiers:{
+                shift:(code&4)!==0,
+                alt:(code&8)!==0,
+                ctrl:(code&16)!==0,
+            },
+        };
+    }
+
+    private getMouseButton(code:number):SpriteMouseButton
+    {
+        switch(code&3){
+            case 0:
+                return 'left';
+
+            case 1:
+                return 'middle';
+
+            case 2:
+                return 'right';
+
+            default:
+                return 'unknown';
+        }
+    }
+
+    private getMouseWheelDirection(code:number):SpriteMouseWheelDirection|undefined
+    {
+        switch(code&3){
+            case 0:
+                return 'up';
+
+            case 1:
+                return 'down';
+
+            default:
+                return undefined;
+        }
+    }
+
+    private handleMouseEvent(evt:TuiSgrMouseEvt)
+    {
+        switch(evt.action){
+            case 'press':
+                if(evt.button==='left'){
+                    this.handleMouseClick(evt.x, evt.y);
+                }
+                break;
+
+            case 'release':
+                this.handleMouseRelease(evt);
+                break;
+
+            case 'drag':
+                this.handleMouseDrag(evt);
+                break;
+
+            case 'wheel':
+                this.handleMouseWheel(evt);
+                break;
+        }
+    }
+
+    private getMouseTarget(x:number, y:number):TuiMouseTarget|undefined
     {
         const id=this.bufferState.front[y]?.[x]?.i;
         const screen=this._activeScreen;
         if(!id || !screen){
+            return undefined;
+        }
+
+        const path=this.findSpritePathById(id, screen);
+        const sprite=path?.[path.length-1];
+        if(!path || !sprite){
+            return undefined;
+        }
+
+        return {sprite,screen,path};
+    }
+
+    private handleMouseClick(x:number, y:number)
+    {
+        const target=this.getMouseTarget(x, y);
+        if(!target){
             return;
         }
 
-        const sprite=this.findSpriteById(id, screen);
-        if(!sprite){
-            return;
-        }
+        const sprite=target.sprite;
+        const screen=target.screen;
 
         this.activateSprite(sprite.id, screen);
 
@@ -1817,6 +1954,79 @@ export class ConvoTuiCtrl
         }
 
         this.render();
+    }
+
+    private handleMouseRelease(evt:TuiSgrMouseEvt)
+    {
+        const target=this.getMouseTarget(evt.x, evt.y);
+        if(!target?.sprite.onMouseRelease){
+            return;
+        }
+
+        target.sprite.onMouseRelease({
+            type:'mouse-release',
+            sprite:target.sprite,
+            screen:target.screen,
+            ctrl:this,
+            x:evt.x,
+            y:evt.y,
+            button:evt.button,
+            modifiers:evt.modifiers,
+        });
+
+        this.render();
+    }
+
+    private handleMouseDrag(evt:TuiSgrMouseEvt)
+    {
+        const target=this.getMouseTarget(evt.x, evt.y);
+        if(!target?.sprite.onMouseDrag){
+            return;
+        }
+
+        target.sprite.onMouseDrag({
+            type:'mouse-drag',
+            sprite:target.sprite,
+            screen:target.screen,
+            ctrl:this,
+            x:evt.x,
+            y:evt.y,
+            button:evt.button,
+            modifiers:evt.modifiers,
+        });
+
+        this.render();
+    }
+
+    private handleMouseWheel(evt:TuiSgrMouseEvt)
+    {
+        if(!evt.direction){
+            return;
+        }
+
+        const target=this.getMouseTarget(evt.x, evt.y);
+        if(!target){
+            return;
+        }
+
+        target.sprite.onMouseWheel?.({
+            type:'mouse-wheel',
+            sprite:target.sprite,
+            screen:target.screen,
+            ctrl:this,
+            x:evt.x,
+            y:evt.y,
+            direction:evt.direction,
+            deltaY:evt.direction==='up'?-1:1,
+            modifiers:evt.modifiers,
+        });
+
+        const scrollTarget=[...target.path].reverse().find(sprite=>sprite.scrollable);
+        const didScroll=scrollTarget?this.scrollSprite(scrollTarget, 0, evt.direction==='up'?-1:1, false):false;
+
+        if(target.sprite.onMouseWheel || didScroll){
+            this.render();
+        }
     }
 
     private activateCurrentSprite():boolean
@@ -1976,15 +2186,36 @@ export class ConvoTuiCtrl
     private scrollActiveSprite(x:number, y:number)
     {
         const sprite=this.getActiveSprite();
-        if(!sprite?.scrollable){
+        if(!sprite){
             return;
         }
 
-        sprite.state??={};
-        sprite.state.scrollX=Math.max(0, (sprite.state.scrollX??0)+x);
-        sprite.state.scrollY=Math.max(0, (sprite.state.scrollY??0)+y);
+        this.scrollSprite(sprite, x, y);
+    }
 
-        this.render();
+    private scrollSprite(sprite:Sprite, x:number, y:number, reRender=true):boolean
+    {
+        if(!sprite.scrollable){
+            return false;
+        }
+
+        sprite.state??={};
+
+        const nextX=Math.max(0, (sprite.state.scrollX??0)+x);
+        const nextY=Math.max(0, (sprite.state.scrollY??0)+y);
+
+        if(nextX===sprite.state.scrollX && nextY===sprite.state.scrollY){
+            return false;
+        }
+
+        sprite.state.scrollX=nextX;
+        sprite.state.scrollY=nextY;
+
+        if(reRender){
+            this.render();
+        }
+
+        return true;
     }
 
     private focusNext()
