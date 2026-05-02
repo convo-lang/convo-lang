@@ -80,6 +80,7 @@ export class ConvoTuiCtrl
     };
 
     private readonly cleanupCallbacks:(()=>void)[]=[];
+    private readonly clipStack:TuiRect[]=[];
     private inputBuffer='';
     private inputCursor?:TuiCursorPosition;
     private isInitialized=false;
@@ -774,21 +775,29 @@ export class ConvoTuiCtrl
             x:rect.x-scrollX,
             y:rect.y-scrollY,
         };
+        const draw=()=>{
+            switch(sprite.layout){
+                case 'row':
+                    this.drawRowChildren(children, childRect, style, inheritedProps);
+                    break;
 
-        switch(sprite.layout){
-            case 'row':
-                this.drawRowChildren(children, childRect, style, inheritedProps);
-                break;
+                case 'grid':
+                    this.drawGridChildren(sprite, children, childRect, style, inheritedProps);
+                    break;
 
-            case 'grid':
-                this.drawGridChildren(sprite, children, childRect, style, inheritedProps);
-                break;
+                case 'column':
+                default:
+                    this.drawColumnChildren(children, childRect, style, inheritedProps);
+                    break;
+            }
+        };
 
-            case 'column':
-            default:
-                this.drawColumnChildren(children, childRect, style, inheritedProps);
-                break;
+        if(sprite.scrollable){
+            this.withClip(rect, draw);
+            return;
         }
+
+        draw();
     }
 
     private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
@@ -1429,6 +1438,11 @@ export class ConvoTuiCtrl
 
     private setChar(x:number, y:number, char:Char)
     {
+        const clip=this.getCurrentClip();
+        if(clip && (x<clip.x || y<clip.y || x>=clip.x+clip.width || y>=clip.y+clip.height)){
+            return;
+        }
+
         if(y<0 || y>=this.bufferState.height || x<0 || x>=this.bufferState.width){
             return;
         }
@@ -1443,6 +1457,44 @@ export class ConvoTuiCtrl
             f:char.f??prev.f,
             b:char.b??prev.b,
             i:char.i,
+        };
+    }
+
+    private withClip<T>(clip:TuiRect, callback:()=>T):T
+    {
+        const current=this.getCurrentClip()??{
+            x:0,
+            y:0,
+            width:this.bufferState.width,
+            height:this.bufferState.height,
+        };
+        const next=this.intersectRects(current, clip);
+
+        this.clipStack.push(next);
+        try{
+            return callback();
+        }finally{
+            this.clipStack.pop();
+        }
+    }
+
+    private getCurrentClip():TuiRect|undefined
+    {
+        return this.clipStack[this.clipStack.length-1];
+    }
+
+    private intersectRects(a:TuiRect, b:TuiRect):TuiRect
+    {
+        const x=Math.max(a.x, b.x);
+        const y=Math.max(a.y, b.y);
+        const right=Math.min(a.x+Math.max(0, a.width), b.x+Math.max(0, b.width));
+        const bottom=Math.min(a.y+Math.max(0, a.height), b.y+Math.max(0, b.height));
+
+        return {
+            x,
+            y,
+            width:Math.max(0, right-x),
+            height:Math.max(0, bottom-y),
         };
     }
 

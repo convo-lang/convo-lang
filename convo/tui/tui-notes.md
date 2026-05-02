@@ -87,6 +87,12 @@
   - classic
   - per-side border colors
 - Added scroll offsets for scrollable sprites.
+- Added clipping bounds for scrollable container children:
+  - drawing operations respect an internal clip stack
+  - scrollable sprite children clip to the sprite content rect
+  - parent borders remain visible because clipping is scoped to children only
+  - nested scrollable containers clip by intersecting parent and child clip rects
+  - absolute sprites continue to be drawn by the existing absolute rendering pass
 - Added inline text wrapping:
   - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
   - `wrap-hard` wraps exactly at the available width
@@ -140,7 +146,6 @@
   - nested style ranges
   - markdown-like parsing
   - links/actions per span
-- Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
 - More complete keyboard handling:
   - delete
   - home/end
@@ -154,7 +159,6 @@
 
 ## Planned implementation convo scripts
 
-- `11_tui-scroll-container-clipping.convo`: add drawing clip bounds for scrollable containers.
 - `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
 - `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.
 - `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.

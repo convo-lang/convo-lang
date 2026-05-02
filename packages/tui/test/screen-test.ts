@@ -116,6 +116,15 @@ const homeRoot:SpriteDef={
                             activeBg:'activeBg',
                             activeBorder:'active',
                         },
+                        {
+                            id:'scroll-link',
+                            text:' Scrolling ',
+                            link:'scroll',
+                            border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
+                        },
                         quitButton,
                     ],
                 },
@@ -191,6 +200,7 @@ const helpRoot:SpriteDef={
                 {text:'This screen verifies links, layout, borders, colors, input, and mouse clicks.'},
                 {text:'The text wrapping screen demonstrates wrap, wrap-hard, clipping, ellipses, and explicit newlines.'},
                 {text:'The rich text screen demonstrates inline spans with per-span foreground and background colors.'},
+                {text:'The scrolling screen demonstrates vertical and horizontal scroll clipping.'},
                 {text:'Tab moves focus forward.'},
                 {text:'Shift+Tab moves focus backward.'},
                 {text:'Enter activates the active button/link.'},
@@ -456,6 +466,144 @@ const richRoot:SpriteDef={
     ],
 };
 
+const scrollRoot:SpriteDef={
+    id:'scroll-root',
+    layout:'column',
+    border:'accent',
+    bg:'background',
+    children:[
+        {
+            id:'scroll-title',
+            text:' Scrolling and clipping ',
+            color:'accent',
+            bg:'panel',
+            textAlign:'center',
+        },
+        {
+            id:'scroll-instructions',
+            text:'Tab to focus a scrollable panel, then use arrow keys. Borders should remain visible and content should never draw outside them.',
+            color:'muted',
+            bg:'panel',
+        },
+        {
+            id:'scroll-body',
+            layout:'column',
+            flex:1,
+            scrollable:true,
+            isButton:true,
+            border:'muted',
+            activeBorder:'active',
+            bg:'panelAlt',
+            children:[
+                {
+                    text:'Outer vertical scroll panel',
+                    color:'accent',
+                    textAlign:'center',
+                },
+                {
+                    text:'Rows above and below this panel should disappear cleanly at the content bounds while the border stays intact.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 01 - This row is intentionally plain so clipping at the top edge is easy to see.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 02 - Scroll down and this row should move behind the top border without overwriting it.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 03 - The parent content rect is the only drawable area for scrolled children.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 04 - Inline text clipping still applies inside each child sprite.',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    id:'scroll-horizontal',
+                    layout:'row',
+                    scrollable:true,
+                    isButton:true,
+                    border:'accent',
+                    activeBorder:'active',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'Horizontal A: use left and right arrows when this nested panel is active.',
+                            border:'success',
+                            color:'success',
+                        },
+                        {
+                            text:'Horizontal B: this child should clip at the right edge of the nested panel.',
+                            border:'accent',
+                            color:'accent',
+                        },
+                        {
+                            text:'Horizontal C: scroll right far enough and earlier children should not overwrite the left border.',
+                            border:'danger',
+                            color:'danger',
+                        },
+                        {
+                            text:'Horizontal D: nested clipping intersects with the outer scroll clipping.',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    text:'Row 05 - The horizontal panel above is also inside the vertically scrollable parent.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 06 - Nested scrollable containers should clip to the intersection of both content rects.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 07 - Scroll this row partly above the viewport to check top clipping.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 08 - Scroll this row partly below the viewport to check bottom clipping.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 09 - Long clipped line: abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    text:'Row 10 - Borders on this child should not leak outside the parent content rect.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 11 - Keep scrolling down to verify the parent border remains visible.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 12 - Bottom clipping should hide this row before it overwrites the footer link.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 13 - Final row of the scroll clipping test.',
+                    border:'muted',
+                },
+            ],
+        },
+        {
+            id:'scroll-back-link',
+            text:' Back home ',
+            link:'home',
+            border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
+        },
+    ],
+};
+
 const tuiConsole:TuiConsole={
     stdout:proc.stdout as TuiConsole['stdout'],
     stdin:proc.stdin as TuiConsole['stdin'],
@@ -485,6 +633,11 @@ const ctrl=new ConvoTuiCtrl({
             id:'rich',
             defaultSprite:'rich-back-link',
             root:richRoot,
+        },
+        {
+            id:'scroll',
+            defaultSprite:'scroll-body',
+            root:scrollRoot,
         },
     ],
 });
