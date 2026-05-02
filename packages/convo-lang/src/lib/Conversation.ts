@@ -3432,6 +3432,15 @@ export class Conversation
                 if(result){
                     if(Array.isArray(result)){
 
+                        if(tag){
+                            for(const r of result){
+                                if(r.convo){
+                                    r.content=r.content?escapeConvo(r.convo)+'\n\n'+r.content:escapeConvo(r.convo);
+                                    delete r.convo;
+                                }
+                            }
+                        }
+
                         const first=result[0];
                         if(first && modifiers.includes(convoImportModifiers.merge)){
                             const git=convoGitService.get();
@@ -3468,6 +3477,10 @@ export class Conversation
                             imports.push(...result);
                         }
                     }else{
+                        if(tag && result.convo){
+                            result.content=result.content?escapeConvo(result.convo)+'\n\n'+result.content:escapeConvo(result.convo);
+                            delete result.convo;
+                        }
                         imports.push(result);
                     }
                 }
