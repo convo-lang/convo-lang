@@ -40,7 +40,69 @@
 
 ## Current implementation status
 
-- Added required controller options and public navigation skeleton.
+- Added required controller options and public navigation API.
 - Added screen/sprite loading with generated ids and copied state.
-- Added buffer resize/allocation helper.
-- Full rendering, ANSI output, layout, input, mouse, and resize listeners are still TODO.
+- Added active screen and active sprite state management.
+- Added full-screen terminal initialization:
+  - alternate screen buffer
+  - hidden cursor
+  - raw stdin mode
+  - mouse reporting
+- Added cleanup/dispose handling:
+  - removes event listeners
+  - disables raw mode
+  - pauses stdin
+  - disables mouse reporting
+  - restores cursor and main screen buffer
+- Added buffer resize/allocation helpers.
+- Added full redraw rendering:
+  - clears the back buffer
+  - draws active screen root
+  - draws absolute sprites
+  - copies back buffer to front buffer
+  - writes ANSI truecolor output to stdout
+- Added color resolution for theme variables and `#rrggbb`.
+- Added layouts:
+  - inline
+  - row
+  - column
+  - grid
+  - flex distribution for row and column children
+- Added sprite borders:
+  - normal
+  - thick
+  - rounded
+  - double
+  - classic
+  - per-side border colors
+- Added scroll offsets for scrollable sprites.
+- Added keyboard input:
+  - Tab / Shift+Tab focus navigation
+  - Enter / Space click activation
+  - printable character input
+  - Backspace
+  - arrow key scrolling for active scrollable sprites
+  - Ctrl+C dispose
+- Added mouse click support using SGR mouse mode.
+- Added resize support:
+  - listens to stdout `resize`
+  - recreates buffers
+  - re-renders automatically
+
+## Deferred / future work
+
+- Diff rendering to reduce terminal output.
+- Cursor display/positioning for active input sprites.
+- Rich text wrapping and multiline text.
+- Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
+- More complete keyboard handling:
+  - delete
+  - home/end
+  - cursor movement inside input
+  - paste handling
+- More robust mouse support:
+  - drag
+  - wheel scrolling
+  - release events
+- Active/focused sprite visual styling.
+- Layout sizing refinements for grid rows and flex edge cases.

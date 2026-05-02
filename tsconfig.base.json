@@ -78,6 +78,9 @@
             ],
             "@convo-lang/hono/*": [
                 "./packages/hono/src/*"
+            ],
+            "@convo-lang/tui/*": [
+                "./packages/hono/src/*"
             ]
         }
     },

@@ -1,5 +1,4 @@
-import { DisposeContainer } from "@iyio/common";
-import { Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteDef, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, TuiConsole, TuiTheme } from "./tui-types.js";
 
 export interface ConvoTuiCtrlOptions
 {
@@ -12,6 +11,30 @@ export interface ConvoTuiCtrlOptions
      * will be used.
      */
     defaultScreen?:string;
+}
+
+interface TuiSize
+{
+    width:number;
+    height:number;
+}
+
+interface TuiRect extends TuiSize
+{
+    x:number;
+    y:number;
+}
+
+interface TuiStyle
+{
+    f?:string;
+    b?:string;
+}
+
+interface TuiFocusableSprite
+{
+    sprite:Sprite;
+    order:number;
 }
 
 export class ConvoTuiCtrl
@@ -28,7 +51,11 @@ export class ConvoTuiCtrl
         height:0,
         front:[],
         back:[],
-    }
+    };
+
+    private readonly cleanupCallbacks:(()=>void)[]=[];
+    private inputBuffer='';
+    private isInitialized=false;
 
     private _activeScreen?:Screen;
     public get activeScreen(){return this._activeScreen}
@@ -48,7 +75,6 @@ export class ConvoTuiCtrl
         }
     }
 
-    private readonly disposables=new DisposeContainer();
     private _isDisposed=false;
     public get isDisposed(){return this._isDisposed}
     public dispose()
@@ -57,9 +83,15 @@ export class ConvoTuiCtrl
             return;
         }
         this._isDisposed=true;
-        this.disposables.dispose();
 
-        // todo - Exit the alternate screen (rmcup)
+        for(const cb of this.cleanupCallbacks.splice(0)){
+            cb();
+        }
+
+        this.console.stdin.setRawMode?.(false);
+        this.console.stdin.pause?.();
+
+        this.writeAnsi('\x1b[0m\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l');
     }
     
 
@@ -76,16 +108,33 @@ export class ConvoTuiCtrl
      * Intializes the terminal
      */
     public init(){
+        if(this.isInitialized || this._isDisposed){
+            return;
+        }
+        this.isInitialized=true;
         
         this.resizeBuffers();
 
-        // todo - Enter the alternate screen (smcup)
+        this.writeAnsi('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[H');
 
-        // todo - enable raw mode and input listeners
+        this.console.stdin.setRawMode?.(true);
+        this.console.stdin.resume?.();
 
-        // todo - listen to terminal resize events and re-render automatically
+        const onData=(data:any)=>this.handleInput(data);
+        const onResize=()=>{
+            this.resizeBuffers();
+            this.render();
+        };
 
-        // todo - add any other required initialization code
+        this.console.stdin.on?.('data', onData);
+        this.console.stdout.on?.('resize', onResize);
+
+        this.cleanupCallbacks.push(()=>{
+            this.console.stdin.off?.('data', onData);
+            this.console.stdout.off?.('resize', onResize);
+        });
+
+        this.render();
     }
 
     private loadScreens(defs:ScreenDef[]):Screen[]
@@ -230,11 +279,16 @@ export class ConvoTuiCtrl
             ctrl:this,
         });
 
+        this.render();
+
         return screen;
     }
 
-    public activateSprite(id:string, screen?:Screen|string):Sprite|undefined
+    public activateSprite(id:string|undefined|null, screen?:Screen|string):Sprite|undefined
     {
+        if(typeof id !== 'string'){
+            return undefined;
+        }
         const targetScreen=typeof screen==='string'?this.findScreen(screen):(screen??this._activeScreen);
         if(!targetScreen){
             return undefined;
@@ -247,6 +301,8 @@ export class ConvoTuiCtrl
 
         targetScreen.state??={};
         targetScreen.state.activeSpriteId=sprite.id;
+
+        this.render();
 
         return sprite;
     }
@@ -308,26 +364,863 @@ export class ConvoTuiCtrl
 
     private createBuffer(width:number, height:number):ScreenBuffer
     {
-        return Array.from({length:height},()=>Array.from({length:width},()=>({
-            c:' ',
-            i:'',
-        })));
+        return Array.from({length:height},()=>Array.from({length:width},()=>this.createChar()));
+    }
+
+    private createChar(char=' ', spriteId=''):Char
+    {
+        return {
+            c:char,
+            f:this.resolveColor(this.theme.foreground),
+            b:this.resolveColor(this.theme.background),
+            i:spriteId,
+        };
     }
 
     public render()
     {
+        if(this._isDisposed){
+            return;
+        }
+
         this.resizeBuffers();
+        this.clearBuffer(this.bufferState.back);
 
-        // todo - calculate natural inline sizes
+        const screen=this._activeScreen;
+        if(screen){
+            const rect:TuiRect={
+                x:0,
+                y:0,
+                width:this.bufferState.width,
+                height:this.bufferState.height,
+            };
+            this.drawSprite(screen.root, rect, {
+                f:this.resolveColor(this.theme.foreground),
+                b:this.resolveColor(this.theme.background),
+            });
+            this.drawAbsoluteSprites(screen.root);
+        }
 
-        // todo - layout row / column / grid sprites using flex and remaining space
+        this.copyBackBufferToFront();
+        this.writeAnsi(this.renderBufferAnsi(this.bufferState.front));
+    }
 
-        // todo - draw borders inside assigned sprite rectangles and inset content
+    private clearBuffer(buffer:ScreenBuffer)
+    {
+        for(let y=0;y<this.bufferState.height;y++){
+            for(let x=0;x<this.bufferState.width;x++){
+                buffer[y]![x]=this.createChar();
+            }
+        }
+    }
 
-        // todo - populate the back buffer
+    private copyBackBufferToFront()
+    {
+        this.bufferState.front=this.bufferState.back.map(row=>row.map(char=>({...char})));
+    }
 
-        // todo - copy the back buffer to the front buffer
+    private renderBufferAnsi(buffer:ScreenBuffer):string
+    {
+        let output='\x1b[0m\x1b[H';
+        let activeF:string|undefined;
+        let activeB:string|undefined;
 
-        // todo - write the full front buffer as ANSI escape sequences directly to stdout
+        for(let y=0;y<buffer.length;y++){
+            const row=buffer[y]!;
+            for(let x=0;x<row.length;x++){
+                const char=row[x]!;
+                if(char.f!==activeF){
+                    output+=this.getFgAnsi(char.f);
+                    activeF=char.f;
+                }
+                if(char.b!==activeB){
+                    output+=this.getBgAnsi(char.b);
+                    activeB=char.b;
+                }
+                output+=char.c;
+            }
+            if(y<buffer.length-1){
+                output+='\r\n';
+            }
+        }
+
+        return `${output}\x1b[0m`;
+    }
+
+    private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle)
+    {
+        rect=this.clampRect(rect);
+        if(rect.width<=0 || rect.height<=0){
+            return;
+        }
+
+        const style:TuiStyle={
+            f:this.resolveColor(sprite.color)??parentStyle.f,
+            b:this.resolveColor(sprite.bg)??parentStyle.b,
+        };
+
+        this.fillRect(rect, style, sprite.id);
+
+        const border=this.getBorderColors(sprite, style.f);
+        if(border.hasBorder){
+            this.drawBorder(rect, border, sprite.borderStyle??'normal');
+        }
+
+        const contentRect=this.getContentRect(rect, border);
+        if(contentRect.width<=0 || contentRect.height<=0){
+            return;
+        }
+
+        const layout=sprite.layout??'inline';
+        if(layout==='inline'){
+            this.drawInlineSprite(sprite, contentRect, style);
+            return;
+        }
+
+        this.drawChildren(sprite, contentRect, style);
+    }
+
+    private drawAbsoluteSprites(root:Sprite)
+    {
+        for(const sprite of this.getAbsoluteSprites(root)){
+            const pos=sprite.absolutePosition;
+            if(!pos){
+                continue;
+            }
+
+            const right=pos.right??0;
+            const bottom=pos.bottom??0;
+            const rect:TuiRect={
+                x:pos.left,
+                y:pos.top,
+                width:pos.width??Math.max(0, this.bufferState.width-pos.left-right),
+                height:pos.height??Math.max(0, this.bufferState.height-pos.top-bottom),
+            };
+
+            this.drawSprite(sprite, rect, {
+                f:this.resolveColor(this.theme.foreground),
+                b:this.resolveColor(this.theme.background),
+            });
+        }
+    }
+
+    private getAbsoluteSprites(root:Sprite):Sprite[]
+    {
+        const sprites:Sprite[]=[];
+
+        const visit=(sprite:Sprite)=>{
+            for(const child of sprite.children??[]){
+                if(child.absolutePosition){
+                    sprites.push(child);
+                }
+                visit(child);
+            }
+        };
+
+        visit(root);
+
+        return sprites;
+    }
+
+    private drawInlineSprite(sprite:Sprite, rect:TuiRect, style:TuiStyle)
+    {
+        const value=sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+        const scrollX=sprite.scrollable?(sprite.state?.scrollX??0):0;
+        const text=value.slice(Math.max(0, scrollX), Math.max(0, scrollX)+rect.width);
+
+        for(let i=0;i<text.length && i<rect.width;i++){
+            this.setChar(rect.x+i, rect.y, {
+                c:text[i]??' ',
+                f:style.f,
+                b:style.b,
+                i:sprite.id,
+            });
+        }
+    }
+
+    private drawChildren(sprite:Sprite, rect:TuiRect, style:TuiStyle)
+    {
+        const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
+        if(!children.length){
+            return;
+        }
+
+        const scrollX=sprite.scrollable?(sprite.state?.scrollX??0):0;
+        const scrollY=sprite.scrollable?(sprite.state?.scrollY??0):0;
+        const childRect={
+            ...rect,
+            x:rect.x-scrollX,
+            y:rect.y-scrollY,
+        };
+
+        switch(sprite.layout){
+            case 'row':
+                this.drawRowChildren(children, childRect, style);
+                break;
+
+            case 'grid':
+                this.drawGridChildren(sprite, children, childRect, style);
+                break;
+
+            case 'column':
+            default:
+                this.drawColumnChildren(children, childRect, style);
+                break;
+        }
+    }
+
+    private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle)
+    {
+        const sizes=children.map(child=>this.getNaturalSize(child));
+        const fixedWidth=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.width??0), 0);
+        const totalFlex=children.reduce((sum, child)=>sum+(child.flex??0), 0);
+        const remaining=Math.max(0, rect.width-fixedWidth);
+        let x=rect.x;
+        let flexUsed=0;
+
+        children.forEach((child, i)=>{
+            const flex=child.flex??0;
+            const width=(
+                flex>0?
+                    (
+                        i===children.length-1?
+                            remaining-flexUsed
+                        :
+                            Math.floor(remaining*(flex/totalFlex))
+                    )
+                :
+                    sizes[i]?.width??0
+            );
+
+            if(flex>0){
+                flexUsed+=width;
+            }
+
+            this.drawSprite(child, {
+                x,
+                y:rect.y,
+                width,
+                height:rect.height,
+            }, style);
+            x+=width;
+        });
+    }
+
+    private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle)
+    {
+        const sizes=children.map(child=>this.getNaturalSize(child));
+        const fixedHeight=children.reduce((sum, child, i)=>sum+((child.flex??0)>0?0:sizes[i]?.height??0), 0);
+        const totalFlex=children.reduce((sum, child)=>sum+(child.flex??0), 0);
+        const remaining=Math.max(0, rect.height-fixedHeight);
+        let y=rect.y;
+        let flexUsed=0;
+
+        children.forEach((child, i)=>{
+            const flex=child.flex??0;
+            const height=(
+                flex>0?
+                    (
+                        i===children.length-1?
+                            remaining-flexUsed
+                        :
+                            Math.floor(remaining*(flex/totalFlex))
+                    )
+                :
+                    sizes[i]?.height??0
+            );
+
+            if(flex>0){
+                flexUsed+=height;
+            }
+
+            this.drawSprite(child, {
+                x:rect.x,
+                y,
+                width:rect.width,
+                height,
+            }, style);
+            y+=height;
+        });
+    }
+
+    private drawGridChildren(sprite:Sprite, children:Sprite[], rect:TuiRect, style:TuiStyle)
+    {
+        const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+        const widths=this.getGridColWidths(cols as SpriteGridColSize[], rect.width);
+        const colCount=Math.max(1, widths.length);
+        const rowHeights:number[]=[];
+
+        children.forEach((child, i)=>{
+            const row=Math.floor(i/colCount);
+            rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child).height);
+        });
+
+        let y=rect.y;
+        for(let row=0;row<rowHeights.length;row++){
+            let x=rect.x;
+            for(let col=0;col<colCount;col++){
+                const child=children[(row*colCount)+col];
+                const width=widths[col]??0;
+                if(child){
+                    this.drawSprite(child, {
+                        x,
+                        y,
+                        width,
+                        height:rowHeights[row]??0,
+                    }, style);
+                }
+                x+=width;
+            }
+            y+=rowHeights[row]??0;
+        }
+    }
+
+    private getNaturalSize(sprite:Sprite):TuiSize
+    {
+        const border=this.getBorderColors(sprite);
+        const borderWidth=(border.left?1:0)+(border.right?1:0);
+        const borderHeight=(border.top?1:0)+(border.bottom?1:0);
+        const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
+        const layout=sprite.layout??'inline';
+
+        if(layout==='inline' || !children.length){
+            const text=sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+            return {
+                width:Math.max(1, text.length)+borderWidth,
+                height:1+borderHeight,
+            };
+        }
+
+        const sizes=children.map(child=>this.getNaturalSize(child));
+
+        if(layout==='row'){
+            return {
+                width:sizes.reduce((sum, size)=>sum+size.width, 0)+borderWidth,
+                height:Math.max(1, ...sizes.map(size=>size.height))+borderHeight,
+            };
+        }
+
+        if(layout==='grid'){
+            const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+            const colCount=Math.max(1, cols.length);
+            let width=0;
+            let height=0;
+
+            for(let i=0;i<sizes.length;i+=colCount){
+                const row=sizes.slice(i, i+colCount);
+                width=Math.max(width, row.reduce((sum, size)=>sum+size.width, 0));
+                height+=Math.max(1, ...row.map(size=>size.height));
+            }
+
+            return {
+                width:width+borderWidth,
+                height:height+borderHeight,
+            };
+        }
+
+        return {
+            width:Math.max(1, ...sizes.map(size=>size.width))+borderWidth,
+            height:sizes.reduce((sum, size)=>sum+size.height, 0)+borderHeight,
+        };
+    }
+
+    private getGridColWidths(cols:SpriteGridColSize[]|undefined, width:number):number[]
+    {
+        if(!cols){
+            return [0];
+        }
+        const parsed=cols.map(col=>{
+            const match=/^(\d+(?:\.\d+)?)(cr|fr)$/.exec(col);
+            return {
+                value:match?Number(match[1]):1,
+                unit:match?.[2]??'fr',
+            };
+        });
+
+        const fixed=parsed.reduce((sum, col)=>sum+(col.unit==='cr'?col.value:0), 0);
+        const totalFr=parsed.reduce((sum, col)=>sum+(col.unit==='fr'?col.value:0), 0);
+        const remaining=Math.max(0, width-fixed);
+        let used=0;
+
+        return parsed.map((col, i)=>{
+            const colWidth=(
+                col.unit==='cr'?
+                    Math.floor(col.value)
+                :i===parsed.length-1?
+                    Math.max(0, width-used)
+                :
+                    Math.floor(remaining*(col.value/totalFr))
+            );
+
+            used+=colWidth;
+            return colWidth;
+        });
+    }
+
+    private fillRect(rect:TuiRect, style:TuiStyle, spriteId:string)
+    {
+        for(let y=rect.y;y<rect.y+rect.height;y++){
+            for(let x=rect.x;x<rect.x+rect.width;x++){
+                this.setChar(x, y, {
+                    c:' ',
+                    f:style.f,
+                    b:style.b,
+                    i:spriteId,
+                });
+            }
+        }
+    }
+
+    private drawBorder(rect:TuiRect, border:ReturnType<ConvoTuiCtrl['getBorderColors']>, style:SpriteBorderStyle)
+    {
+        const chars=this.getBorderChars(style);
+        const x1=rect.x;
+        const y1=rect.y;
+        const x2=rect.x+rect.width-1;
+        const y2=rect.y+rect.height-1;
+
+        if(border.top){
+            for(let x=x1;x<=x2;x++){
+                this.setChar(x, y1, {c:chars.h, f:border.top, b:undefined, i:''});
+            }
+        }
+
+        if(border.bottom){
+            for(let x=x1;x<=x2;x++){
+                this.setChar(x, y2, {c:chars.h, f:border.bottom, b:undefined, i:''});
+            }
+        }
+
+        if(border.left){
+            for(let y=y1;y<=y2;y++){
+                this.setChar(x1, y, {c:chars.v, f:border.left, b:undefined, i:''});
+            }
+        }
+
+        if(border.right){
+            for(let y=y1;y<=y2;y++){
+                this.setChar(x2, y, {c:chars.v, f:border.right, b:undefined, i:''});
+            }
+        }
+
+        if(border.top && border.left){
+            this.setChar(x1, y1, {c:chars.tl, f:border.top, b:undefined, i:''});
+        }
+        if(border.top && border.right){
+            this.setChar(x2, y1, {c:chars.tr, f:border.top, b:undefined, i:''});
+        }
+        if(border.bottom && border.left){
+            this.setChar(x1, y2, {c:chars.bl, f:border.bottom, b:undefined, i:''});
+        }
+        if(border.bottom && border.right){
+            this.setChar(x2, y2, {c:chars.br, f:border.bottom, b:undefined, i:''});
+        }
+    }
+
+    private getBorderColors(sprite:Sprite, fallback?:string)
+    {
+        const border=sprite.border;
+        const empty={
+            hasBorder:false,
+            top:undefined as string|undefined,
+            bottom:undefined as string|undefined,
+            left:undefined as string|undefined,
+            right:undefined as string|undefined,
+        };
+
+        if(!border){
+            return empty;
+        }
+
+        if(typeof border==='string'){
+            const color=this.resolveColor(border)??fallback;
+            return {
+                hasBorder:true,
+                top:color,
+                bottom:color,
+                left:color,
+                right:color,
+            };
+        }
+
+        const top=this.resolveColor(border.top)??(border.top?fallback:undefined);
+        const bottom=this.resolveColor(border.bottom)??(border.bottom?fallback:undefined);
+        const left=this.resolveColor(border.left)??(border.left?fallback:undefined);
+        const right=this.resolveColor(border.right)??(border.right?fallback:undefined);
+
+        return {
+            hasBorder:!!(top || bottom || left || right),
+            top,
+            bottom,
+            left,
+            right,
+        };
+    }
+
+    private getContentRect(rect:TuiRect, border:ReturnType<ConvoTuiCtrl['getBorderColors']>):TuiRect
+    {
+        const left=border.left?1:0;
+        const right=border.right?1:0;
+        const top=border.top?1:0;
+        const bottom=border.bottom?1:0;
+
+        return {
+            x:rect.x+left,
+            y:rect.y+top,
+            width:Math.max(0, rect.width-left-right),
+            height:Math.max(0, rect.height-top-bottom),
+        };
+    }
+
+    private getBorderChars(style:SpriteBorderStyle)
+    {
+        switch(style){
+            case 'thick':
+                return {tl:'┏',tr:'┓',bl:'┗',br:'┛',h:'━',v:'┃'};
+
+            case 'rounded':
+                return {tl:'╭',tr:'╮',bl:'╰',br:'╯',h:'─',v:'│'};
+
+            case 'double':
+                return {tl:'╔',tr:'╗',bl:'╚',br:'╝',h:'═',v:'║'};
+
+            case 'classic':
+                return {tl:'+',tr:'+',bl:'+',br:'+',h:'-',v:'|'};
+
+            case 'normal':
+            default:
+                return {tl:'┌',tr:'┐',bl:'└',br:'┘',h:'─',v:'│'};
+        }
+    }
+
+    private setChar(x:number, y:number, char:Char)
+    {
+        if(y<0 || y>=this.bufferState.height || x<0 || x>=this.bufferState.width){
+            return;
+        }
+
+        const prev=this.bufferState.back[y]?.[x];
+        if(!prev){
+            return;
+        }
+
+        this.bufferState.back[y]![x]={
+            c:char.c,
+            f:char.f??prev.f,
+            b:char.b??prev.b,
+            i:char.i,
+        };
+    }
+
+    private clampRect(rect:TuiRect):TuiRect
+    {
+        const x=Math.max(0, rect.x);
+        const y=Math.max(0, rect.y);
+        const right=Math.min(this.bufferState.width, rect.x+Math.max(0, rect.width));
+        const bottom=Math.min(this.bufferState.height, rect.y+Math.max(0, rect.height));
+
+        return {
+            x,
+            y,
+            width:Math.max(0, right-x),
+            height:Math.max(0, bottom-y),
+        };
+    }
+
+    private resolveColor(color?:string):string|undefined
+    {
+        if(!color){
+            return undefined;
+        }
+
+        const value=color.startsWith('#')?color:this.theme[color];
+        if(!value || !/^#[0-9a-fA-F]{6}$/.test(value)){
+            return undefined;
+        }
+
+        return value.toLowerCase();
+    }
+
+    private getFgAnsi(color?:string):string
+    {
+        const rgb=this.hexToRgb(color);
+        return rgb?`\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m`:'\x1b[39m';
+    }
+
+    private getBgAnsi(color?:string):string
+    {
+        const rgb=this.hexToRgb(color);
+        return rgb?`\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m`:'\x1b[49m';
+    }
+
+    private hexToRgb(color?:string):{r:number;g:number;b:number}|undefined
+    {
+        if(!color || !/^#[0-9a-fA-F]{6}$/.test(color)){
+            return undefined;
+        }
+
+        return {
+            r:parseInt(color.slice(1, 3), 16),
+            g:parseInt(color.slice(3, 5), 16),
+            b:parseInt(color.slice(5, 7), 16),
+        };
+    }
+
+    private handleInput(data:any)
+    {
+        if(this._isDisposed){
+            return;
+        }
+
+        this.inputBuffer+=data?.toString?.()??String(data);
+
+        while(this.inputBuffer.length){
+            const consumed=this.consumeInput(this.inputBuffer);
+            if(consumed<=0){
+                break;
+            }
+            this.inputBuffer=this.inputBuffer.slice(consumed);
+        }
+    }
+
+    private consumeInput(input:string):number
+    {
+        if(input.startsWith('\x1b[<')){
+            const match=/^\x1b\[<(\d+);(\d+);(\d+)([mM])/.exec(input);
+            if(!match){
+                return 0;
+            }
+
+            const button=Number(match[1]);
+            const x=Number(match[2])-1;
+            const y=Number(match[3])-1;
+            const pressed=match[4]==='M';
+
+            if(pressed && (button&3)===0){
+                this.handleMouseClick(x, y);
+            }
+
+            return match[0].length;
+        }
+
+        if(input.startsWith('\x1b[Z')){
+            this.focusPrev();
+            return 3;
+        }
+
+        if(input.startsWith('\x1b[A')){
+            this.scrollActiveSprite(0, -1);
+            return 3;
+        }
+
+        if(input.startsWith('\x1b[B')){
+            this.scrollActiveSprite(0, 1);
+            return 3;
+        }
+
+        if(input.startsWith('\x1b[C')){
+            this.scrollActiveSprite(1, 0);
+            return 3;
+        }
+
+        if(input.startsWith('\x1b[D')){
+            this.scrollActiveSprite(-1, 0);
+            return 3;
+        }
+
+        const char=input[0]!;
+        if(char==='\x1b'){
+            return input.length>=2?2:0;
+        }
+
+        switch(char){
+            case '\x03':
+                this.dispose();
+                return 1;
+
+            case '\t':
+                this.focusNext();
+                return 1;
+
+            case '\r':
+            case '\n':
+                this.activateCurrentSprite();
+                return 1;
+
+            case '\x7f':
+            case '\b':
+                this.updateActiveInput(value=>value.slice(0, -1));
+                return 1;
+
+            case ' ':
+                if(!this.activateCurrentSprite()){
+                    this.updateActiveInput(value=>`${value} `);
+                }
+                return 1;
+
+            default:
+                if(char>=' ' && char!=='\x7f'){
+                    this.updateActiveInput(value=>`${value}${char}`);
+                }
+                return 1;
+        }
+    }
+
+    private handleMouseClick(x:number, y:number)
+    {
+        const id=this.bufferState.front[y]?.[x]?.i;
+        const screen=this._activeScreen;
+        if(!id || !screen){
+            return;
+        }
+
+        const sprite=this.findSpriteById(id, screen);
+        if(!sprite){
+            return;
+        }
+
+        this.activateSprite(sprite.id, screen);
+
+        if(sprite.isButton || sprite.link || sprite.onClick){
+            this.clickSprite(sprite, x, y);
+        }
+
+        this.render();
+    }
+
+    private activateCurrentSprite():boolean
+    {
+        const sprite=this.getActiveSprite();
+        if(!sprite || !(sprite.isButton || sprite.link || sprite.onClick)){
+            return false;
+        }
+
+        this.clickSprite(sprite, 0, 0);
+        this.render();
+        return true;
+    }
+
+    private clickSprite(sprite:Sprite, x:number, y:number)
+    {
+        const screen=this.findScreenContainingSprite(sprite)??this._activeScreen;
+        if(!screen){
+            return;
+        }
+
+        sprite.onClick?.({
+            type:'click',
+            sprite,
+            screen,
+            ctrl:this,
+            x,
+            y,
+        });
+
+        if(sprite.link){
+            this.followLink(sprite);
+        }
+    }
+
+    private updateActiveInput(update:(value:string)=>string)
+    {
+        const sprite=this.getActiveSprite();
+        const screen=this._activeScreen;
+        if(!sprite?.isInput || !screen){
+            return;
+        }
+
+        sprite.state??={};
+        sprite.state.inputValue=update(sprite.state.inputValue??'');
+
+        sprite.onInput?.({
+            type:'input',
+            sprite,
+            screen,
+            ctrl:this,
+            value:sprite.state.inputValue,
+        });
+
+        this.render();
+    }
+
+    private scrollActiveSprite(x:number, y:number)
+    {
+        const sprite=this.getActiveSprite();
+        if(!sprite?.scrollable){
+            return;
+        }
+
+        sprite.state??={};
+        sprite.state.scrollX=Math.max(0, (sprite.state.scrollX??0)+x);
+        sprite.state.scrollY=Math.max(0, (sprite.state.scrollY??0)+y);
+
+        this.render();
+    }
+
+    private focusNext()
+    {
+        this.focusByOffset(1);
+    }
+
+    private focusPrev()
+    {
+        this.focusByOffset(-1);
+    }
+
+    private focusByOffset(offset:number)
+    {
+        const screen=this._activeScreen;
+        if(!screen){
+            return;
+        }
+
+        const sprites=this.getFocusableSprites(screen);
+        if(!sprites.length){
+            return;
+        }
+
+        const activeId=screen.state?.activeSpriteId;
+        const activeIndex=Math.max(0, sprites.findIndex(item=>item.sprite.id===activeId));
+        const index=(activeIndex+offset+sprites.length)%sprites.length;
+
+        this.activateSprite(sprites[index]?.sprite.id??sprites[0]?.sprite.id, screen);
+    }
+
+    private getActiveSprite():Sprite|undefined
+    {
+        const screen=this._activeScreen;
+        const id=screen?.state?.activeSpriteId;
+        return id && screen?this.findSpriteById(id, screen):undefined;
+    }
+
+    private getFocusableSprites(screen:Screen):TuiFocusableSprite[]
+    {
+        const sprites:TuiFocusableSprite[]=[];
+        let order=0;
+
+        const visit=(sprite:Sprite)=>{
+            if(sprite.tabIndex===undefined || sprite.tabIndex>=0){
+                if(sprite.isInput || sprite.isButton || sprite.link){
+                    sprites.push({sprite,order});
+                }
+            }
+            order++;
+            for(const child of sprite.children??[]){
+                visit(child);
+            }
+        };
+
+        visit(screen.root);
+
+        return sprites.sort((a, b)=>{
+            const ai=a.sprite.tabIndex??a.order;
+            const bi=b.sprite.tabIndex??b.order;
+            return ai-bi || a.order-b.order;
+        });
+    }
+
+    private writeAnsi(value:string)
+    {
+        this.console.stdout.write(value);
     }
 }
