@@ -37,6 +37,12 @@ interface TuiFocusableSprite
     order:number;
 }
 
+interface TuiCursorPosition
+{
+    x:number;
+    y:number;
+}
+
 /**
  * Properties that are inherited from ancestors
  * Inherited properties are marked with the `@inherited` tag in the Sprite interface.
@@ -70,6 +76,7 @@ export class ConvoTuiCtrl
 
     private readonly cleanupCallbacks:(()=>void)[]=[];
     private inputBuffer='';
+    private inputCursor?:TuiCursorPosition;
     private isInitialized=false;
     private forceFullRender=true;
 
@@ -436,6 +443,7 @@ export class ConvoTuiCtrl
             return;
         }
 
+        this.inputCursor=undefined;
         this.resizeBuffers();
         this.clearBuffer(this.bufferState.back);
 
@@ -466,8 +474,9 @@ export class ConvoTuiCtrl
         this.copyBackBufferToFront();
         this.forceFullRender=false;
 
-        if(output){
-            this.writeAnsi(output);
+        const cursorOutput=this.getCursorAnsi();
+        if(output || cursorOutput){
+            this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
         }
     }
 
@@ -559,6 +568,15 @@ export class ConvoTuiCtrl
     private getCursorPositionAnsi(x:number, y:number):string
     {
         return `\x1b[${y+1};${x+1}H`;
+    }
+
+    private getCursorAnsi():string
+    {
+        if(!this.inputCursor){
+            return '\x1b[?25l';
+        }
+
+        return `${this.getCursorPositionAnsi(this.inputCursor.x, this.inputCursor.y)}\x1b[?25h`;
     }
 
     private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle, inheritedProps:TuiInheritedSpriteProps={})
@@ -668,6 +686,10 @@ export class ConvoTuiCtrl
         const lines=this.getInlineSpriteLines(value, rect.width, textWrap);
         const visibleLines=lines.slice(Math.max(0, scrollY), Math.max(0, scrollY)+rect.height);
 
+        if(sprite.isInput && this.isSpriteActive(sprite)){
+            this.updateInputCursor(sprite, rect, value, textWrap, textClipStyle, textAlign, scrollX, scrollY);
+        }
+
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
             const line=visibleLines[y]??'';
             const offset=Math.max(0, scrollX);
@@ -685,6 +707,50 @@ export class ConvoTuiCtrl
                 });
             }
         }
+    }
+
+    private updateInputCursor(
+        sprite:Sprite,
+        rect:TuiRect,
+        value:string,
+        textWrap:SpriteTextWrap,
+        textClipStyle:SpriteTextClipStyle,
+        textAlign:SpriteTextAlignment,
+        scrollX:number,
+        scrollY:number
+    ){
+        if(rect.width<=0 || rect.height<=0){
+            return;
+        }
+
+        const caret=this.getInputCaret(sprite, value);
+        const caretLines=this.getInlineSpriteLines(value.slice(0, caret), rect.width, textWrap);
+        const lineIndex=Math.max(0, caretLines.length-1);
+        const col=caretLines[lineIndex]?.length??0;
+        const lines=this.getInlineSpriteLines(value, rect.width, textWrap);
+        const line=lines[lineIndex]??'';
+        const offset=Math.max(0, scrollX);
+        const scrolledLine=line.slice(offset);
+        const clipped=scrolledLine.length>rect.width;
+        const text=this.clipText(scrolledLine, rect.width, textClipStyle, clipped);
+        const xOffset=scrollX>0?0:this.getTextAlignOffset(textAlign, text.length, rect.width);
+        const x=this.clampNumber(rect.x+xOffset+col-offset, rect.x, rect.x+rect.width-1);
+        const y=this.clampNumber(rect.y+lineIndex-Math.max(0, scrollY), rect.y, rect.y+rect.height-1);
+
+        this.inputCursor={x,y};
+    }
+
+    private getInputCaret(sprite:Sprite, value:string):number
+    {
+        const caret=sprite.state?.inputCaret;
+        return this.clampNumber(
+            typeof caret==='number' && Number.isFinite(caret)?
+                Math.floor(caret)
+            :
+                value.length,
+            0,
+            value.length
+        );
     }
 
     private drawChildren(sprite:Sprite, rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
@@ -1218,6 +1284,11 @@ export class ConvoTuiCtrl
         };
     }
 
+    private clampNumber(value:number, min:number, max:number):number
+    {
+        return Math.max(min, Math.min(max, value));
+    }
+
     private resolveColor(color?:string):string|undefined
     {
         if(!color){
@@ -1476,6 +1547,7 @@ export class ConvoTuiCtrl
 
         sprite.state??={};
         sprite.state.inputValue=update(sprite.state.inputValue??'');
+        sprite.state.inputCaret=sprite.state.inputValue.length;
 
         sprite.onInput?.({
             type:'input',

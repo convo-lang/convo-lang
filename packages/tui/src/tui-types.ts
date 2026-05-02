@@ -263,6 +263,11 @@ export interface SpriteState
     inputValue?:string;
 
     /**
+     * Zero-based caret index within the current input value. Defaults to the end of the input value.
+     */
+    inputCaret?:number;
+
+    /**
      * Horizontal scroll offset of the sprite
      */
     scrollX?:number;

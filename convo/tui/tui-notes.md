@@ -114,6 +114,12 @@
   - Backspace
   - arrow key scrolling for active scrollable sprites
   - Ctrl+C dispose
+- Added active input cursor support:
+  - `SpriteState.inputCaret` stores a minimal zero-based caret position
+  - active input sprites show the terminal cursor
+  - non-input active sprites hide the terminal cursor
+  - cursor defaults to the end of the input value
+  - cursor position respects sprite layout rect and sprite scroll offsets
 - Added mouse click support using SGR mouse mode.
 - Added resize support:
   - listens to stdout `resize`
@@ -123,7 +129,6 @@
 
 ## Deferred / future work
 
-- Cursor display/positioning for active input sprites.
 - Rich text support.
 - Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
 - More complete keyboard handling:
@@ -139,7 +144,6 @@
 
 ## Planned implementation convo scripts
 
-- `09_tui-input-cursor.convo`: add active input cursor visibility and positioning.
 - `10_tui-rich-text.convo`: add first-pass rich inline text spans with per-span style.
 - `11_tui-scroll-container-clipping.convo`: add drawing clip bounds for scrollable containers.
 - `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
