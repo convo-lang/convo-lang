@@ -16,9 +16,10 @@
   - `followLink(spriteOrId)`
 - Rendering flow for the first implementation pass:
   1. populate the back buffer
-  2. copy the back buffer to the front buffer
-  3. write the full front buffer to stdout using ANSI escape sequences
-- First render implementation can redraw the entire screen. Diff rendering is deferred.
+  2. compare the back buffer to the front buffer
+  3. write changed runs to stdout using ANSI escape sequences
+  4. copy the back buffer to the front buffer
+- First render and resize render use a full redraw.
 - Color handling should support theme variables and `#rrggbb` truecolor.
 - Layout should be split into two passes:
   1. determine natural layout size of inline sprites
@@ -62,12 +63,15 @@
   - disables mouse reporting
   - restores cursor and main screen buffer
 - Added buffer resize/allocation helpers.
-- Added full redraw rendering:
+- Added rendering:
   - clears the back buffer
   - draws active screen root
   - draws absolute sprites
-  - copies back buffer to front buffer
-  - writes ANSI truecolor output to stdout
+  - full redraws on first render and after resize
+  - diff renders after the first render by comparing front/back buffers
+  - emits changed character runs using cursor positioning escape sequences
+  - preserves ANSI foreground/background style changes for changed runs
+  - copies back buffer to front buffer after rendering
 - Added color resolution for theme variables and `#rrggbb`.
 - Added layouts:
   - inline
@@ -115,10 +119,10 @@
   - listens to stdout `resize`
   - recreates buffers
   - re-renders automatically
+  - forces a full redraw after buffer size changes
 
 ## Deferred / future work
 
-- Diff rendering to reduce terminal output.
 - Cursor display/positioning for active input sprites.
 - Rich text support.
 - Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
@@ -132,3 +136,12 @@
   - wheel scrolling
   - release events
 - Layout sizing refinements for grid rows and flex edge cases.
+
+## Planned implementation convo scripts
+
+- `09_tui-input-cursor.convo`: add active input cursor visibility and positioning.
+- `10_tui-rich-text.convo`: add first-pass rich inline text spans with per-span style.
+- `11_tui-scroll-container-clipping.convo`: add drawing clip bounds for scrollable containers.
+- `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
+- `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.
+- `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.

@@ -71,6 +71,7 @@ export class ConvoTuiCtrl
     private readonly cleanupCallbacks:(()=>void)[]=[];
     private inputBuffer='';
     private isInitialized=false;
+    private forceFullRender=true;
 
     private _activeScreen?:Screen;
     public get activeScreen(){return this._activeScreen}
@@ -396,19 +397,22 @@ export class ConvoTuiCtrl
         return this.activateLink(sprite.link, this.findScreenContainingSprite(sprite));
     }
 
-    private resizeBuffers()
+    private resizeBuffers():boolean
     {
         const width=this.console.stdout.columns??80;
         const height=this.console.stdout.rows??24;
 
         if(this.bufferState.width===width && this.bufferState.height===height){
-            return;
+            return false;
         }
 
         this.bufferState.width=width;
         this.bufferState.height=height;
         this.bufferState.front=this.createBuffer(width, height);
         this.bufferState.back=this.createBuffer(width, height);
+        this.forceFullRender=true;
+
+        return true;
     }
 
     private createBuffer(width:number, height:number):ScreenBuffer
@@ -452,8 +456,19 @@ export class ConvoTuiCtrl
             this.drawAbsoluteSprites(screen.root);
         }
 
+        const output=(
+            this.forceFullRender?
+                this.renderBufferAnsi(this.bufferState.back)
+            :
+                this.renderBufferDiffAnsi(this.bufferState.front, this.bufferState.back)
+        );
+
         this.copyBackBufferToFront();
-        this.writeAnsi(this.renderBufferAnsi(this.bufferState.front));
+        this.forceFullRender=false;
+
+        if(output){
+            this.writeAnsi(output);
+        }
     }
 
     private clearBuffer(buffer:ScreenBuffer)
@@ -496,6 +511,54 @@ export class ConvoTuiCtrl
         }
 
         return `${output}\x1b[0m`;
+    }
+
+    private renderBufferDiffAnsi(front:ScreenBuffer, back:ScreenBuffer):string
+    {
+        let output='';
+        let activeF:string|undefined;
+        let activeB:string|undefined;
+
+        for(let y=0;y<back.length;y++){
+            const backRow=back[y]!;
+            const frontRow=front[y]??[];
+
+            let x=0;
+            while(x<backRow.length){
+                if(this.isSameRenderChar(frontRow[x], backRow[x])){
+                    x++;
+                    continue;
+                }
+
+                output+=this.getCursorPositionAnsi(x, y);
+
+                while(x<backRow.length && !this.isSameRenderChar(frontRow[x], backRow[x])){
+                    const char=backRow[x]!;
+                    if(char.f!==activeF){
+                        output+=this.getFgAnsi(char.f);
+                        activeF=char.f;
+                    }
+                    if(char.b!==activeB){
+                        output+=this.getBgAnsi(char.b);
+                        activeB=char.b;
+                    }
+                    output+=char.c;
+                    x++;
+                }
+            }
+        }
+
+        return output?`\x1b[0m${output}\x1b[0m`:'';
+    }
+
+    private isSameRenderChar(a:Char|undefined, b:Char|undefined):boolean
+    {
+        return a?.c===b?.c && a?.f===b?.f && a?.b===b?.b;
+    }
+
+    private getCursorPositionAnsi(x:number, y:number):string
+    {
+        return `\x1b[${y+1};${x+1}H`;
     }
 
     private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle, inheritedProps:TuiInheritedSpriteProps={})
