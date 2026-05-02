@@ -1,0 +1,20 @@
+@import ./_tui.convo
+
+> user
+Refine layout sizing for grid rows and flex edge cases.
+
+Goals:
+- Review and improve natural sizing for row, column, and grid layouts.
+- Handle flex distribution edge cases more predictably.
+- Avoid division by zero when total flex is zero.
+- Improve grid row height calculations when constrained width is available.
+- Keep the existing layout model intact.
+
+Acceptance criteria:
+- Row and column layouts handle all-flex, no-flex, and mixed children predictably.
+- Grid layout handles fixed `cr` columns and flexible `fr` columns predictably.
+- Grid row heights are calculated from constrained child widths.
+- Layout code avoids negative sizes and divide-by-zero behavior.
+- Existing TUI screens render the same or better.
+
+Update notes at the end of your response

@@ -1,0 +1,24 @@
+@import ./_tui.convo
+
+> user
+Add more complete keyboard handling for input sprites.
+
+Goals:
+- Support Delete.
+- Support Home and End.
+- Support left/right cursor movement inside input text.
+- Support paste handling without treating escape/control sequences as printable text.
+- Use the input caret state introduced for cursor positioning.
+- Keep single-line input behavior for now unless multiline is already naturally supported.
+
+Acceptance criteria:
+- Backspace removes the character before the caret.
+- Delete removes the character at the caret.
+- Left/right arrows move the caret within the input value when an input sprite is active.
+- Home moves the caret to the start.
+- End moves the caret to the end.
+- Printable pasted text is inserted at the caret.
+- `onInput` fires when the input value changes.
+- Existing focus navigation and click activation still work.
+
+Update notes at the end of your response

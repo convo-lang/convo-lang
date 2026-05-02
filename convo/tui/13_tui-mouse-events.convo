@@ -1,0 +1,21 @@
+@import ./_tui.convo
+
+> user
+Add more robust mouse support.
+
+Goals:
+- Extend TUI event types to support mouse release, drag, and wheel scrolling.
+- Parse SGR mouse mode events for press, release, drag, and wheel actions.
+- Dispatch events to the sprite under the mouse when appropriate.
+- Use wheel events to scroll scrollable sprites.
+- Preserve existing click behavior.
+
+Acceptance criteria:
+- Existing click behavior still works.
+- Mouse release events can be handled by sprites.
+- Drag events can be handled by sprites.
+- Wheel up/down scrolls the sprite under the mouse when scrollable.
+- Event objects include terminal-relative x/y coordinates.
+- Notes describe any intentionally deferred mouse edge cases.
+
+Update notes at the end of your response

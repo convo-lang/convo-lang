@@ -1,0 +1,363 @@
+@import ./_tui.convo
+
+> user
+Create a plan to implement the "future work" in the `tui-notes.md` as a set of convo scripts.
+
+Create one script per step and use the following naming convention: `{index}_tui-{plan name}.convo`.
+Pad the start of the script name with zeros.
+Start at index 08.
+
+
+Here is an example:
+<EXAMPLE>
+@import ./_tui.convo
+
+\> user
+Add support for the active properties of the Sprite interface: `state.active`, `activeColor`, `activeBg`, `activeBorder`
+
+Update notes at the end of your response
+
+</EXAMPLE>
+
+Always start with importing `_tui.convo`
+
+
+
+@time 2026-05-02T13:12:15-04:00
+@tokenUsage 15753 / 3201 / $0.09477000000000001
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="08_tui-diff-rendering.convo" target-output-path="./08_tui-diff-rendering.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Implement diff rendering for `ConvoTuiCtrl`.
+
+Goals:
+- Stop writing the entire screen on every render when only a subset of characters changed.
+- Compare the back buffer to the front buffer and only write changed runs to stdout.
+- Preserve the current behavior of full redraw on first render and after buffer resize.
+- Keep ANSI style changes correct for foreground/background colors.
+- Keep the implementation simple and readable.
+- Avoid changing public APIs unless needed.
+
+Acceptance criteria:
+- `render()` still clears and draws into the back buffer.
+- Changed characters are emitted using cursor positioning escape sequences.
+- Unchanged characters are not emitted.
+- The front buffer is updated after rendering.
+- Resize still forces a full redraw.
+- Dispose/cleanup behavior is unchanged.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="09_tui-input-cursor.convo" target-output-path="./09_tui-input-cursor.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Add cursor display and positioning for the active input sprite.
+
+Goals:
+- Show the terminal cursor when an input sprite is active.
+- Hide the terminal cursor when no input sprite is active.
+- Position the cursor at the current input caret location.
+- Add minimal input caret state to `SpriteState`.
+- Keep existing text input behavior working.
+- Do not implement advanced editing in this step beyond cursor placement.
+
+Acceptance criteria:
+- Active input sprites display the cursor at the end of the input value by default.
+- Cursor position respects sprite layout position and scroll offsets.
+- Cursor is hidden for non-input active sprites.
+- Cursor is restored/hidden correctly during dispose.
+- Existing input callbacks still receive the current input value.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="10_tui-rich-text.convo" target-output-path="./10_tui-rich-text.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Add first-pass rich text support for inline sprites.
+
+Goals:
+- Extend the TUI types to allow inline text with styled spans.
+- Support foreground color, background color, and plain text per span.
+- Preserve existing `text` behavior for simple sprites.
+- Add rendering support for styled inline spans.
+- Keep wrapping/clipping behavior consistent with plain text as much as possible.
+- Keep the API compact and easy to use.
+
+Acceptance criteria:
+- A sprite can render plain `text` exactly as before.
+- A sprite can render rich inline content with per-span colors/backgrounds.
+- Theme color variables and `#rrggbb` colors work for rich text spans.
+- Wrapping and clipping still work for rich text.
+- Existing examples/tests continue to work without changes.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="11_tui-scroll-container-clipping.convo" target-output-path="./11_tui-scroll-container-clipping.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Improve clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
+
+Goals:
+- Add clipping bounds to drawing operations.
+- Ensure children of scrollable sprites are clipped to the sprite content rect.
+- Preserve absolute sprite behavior unless explicitly affected by clipping.
+- Keep clipping implementation minimal and internal to `ConvoTuiCtrl`.
+
+Acceptance criteria:
+- Scrolled children do not draw above, below, left, or right of the parent content rect.
+- Borders remain visible and are not overwritten by clipped children.
+- Nested scrollable containers clip correctly.
+- Inline text clipping continues to work.
+- Non-scrollable layouts render as before.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="12_tui-keyboard-editing.convo" target-output-path="./12_tui-keyboard-editing.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Add more complete keyboard handling for input sprites.
+
+Goals:
+- Support Delete.
+- Support Home and End.
+- Support left/right cursor movement inside input text.
+- Support paste handling without treating escape/control sequences as printable text.
+- Use the input caret state introduced for cursor positioning.
+- Keep single-line input behavior for now unless multiline is already naturally supported.
+
+Acceptance criteria:
+- Backspace removes the character before the caret.
+- Delete removes the character at the caret.
+- Left/right arrows move the caret within the input value when an input sprite is active.
+- Home moves the caret to the start.
+- End moves the caret to the end.
+- Printable pasted text is inserted at the caret.
+- `onInput` fires when the input value changes.
+- Existing focus navigation and click activation still work.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="13_tui-mouse-events.convo" target-output-path="./13_tui-mouse-events.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Add more robust mouse support.
+
+Goals:
+- Extend TUI event types to support mouse release, drag, and wheel scrolling.
+- Parse SGR mouse mode events for press, release, drag, and wheel actions.
+- Dispatch events to the sprite under the mouse when appropriate.
+- Use wheel events to scroll scrollable sprites.
+- Preserve existing click behavior.
+
+Acceptance criteria:
+- Existing click behavior still works.
+- Mouse release events can be handled by sprites.
+- Drag events can be handled by sprites.
+- Wheel up/down scrolls the sprite under the mouse when scrollable.
+- Event objects include terminal-relative x/y coordinates.
+- Notes describe any intentionally deferred mouse edge cases.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="14_tui-layout-refinements.convo" target-output-path="./14_tui-layout-refinements.convo">
+``` convo
+@import ./_tui.convo
+
+\> user
+Refine layout sizing for grid rows and flex edge cases.
+
+Goals:
+- Review and improve natural sizing for row, column, and grid layouts.
+- Handle flex distribution edge cases more predictably.
+- Avoid division by zero when total flex is zero.
+- Improve grid row height calculations when constrained width is available.
+- Keep the existing layout model intact.
+
+Acceptance criteria:
+- Row and column layouts handle all-flex, no-flex, and mixed children predictably.
+- Grid layout handles fixed `cr` columns and flexible `fr` columns predictably.
+- Grid row heights are calculated from constrained child widths.
+- Layout code avoids negative sizes and divide-by-zero behavior.
+- Existing TUI screens render the same or better.
+
+Update notes at the end of your response
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" last-commit="140159a41a38615e8897c436e344ab5cdc0cab2d">
+``` md
+# TUI Notes
+
+## ConvoTuiCtrl first-pass decisions
+
+- `ConvoTuiCtrlOptions` includes:
+  - `theme:TuiTheme`
+  - `defaultScreen?:string`
+- A theme is required and theme colors are expected to be `#rrggbb`.
+- Initial active screen is:
+  1. `defaultScreen`, when provided and found
+  2. otherwise the first screen in the `screens` array
+- Public navigation API should include:
+  - `activateScreen(id)`
+  - `activateSprite(id, screen?)`
+  - `activateLink(link, sourceScreen?)`
+  - `followLink(spriteOrId)`
+- Rendering flow for the first implementation pass:
+  1. populate the back buffer
+  2. copy the back buffer to the front buffer
+  3. write the full front buffer to stdout using ANSI escape sequences
+- First render implementation can redraw the entire screen. Diff rendering is deferred.
+- Color handling should support theme variables and `#rrggbb` truecolor.
+- Layout should be split into two passes:
+  1. determine natural layout size of inline sprites
+  2. share remaining layout space between row, column, grid, and flex children
+- Default `flex` is `0`.
+- Children without `flex` use natural size; remaining space is distributed by flex value.
+- Borders draw inside the assigned sprite rectangle and inset content by 1.
+- Input support planned:
+  - Tab / Shift+Tab navigation
+  - Enter / Space click activation
+  - text input editing
+  - Backspace
+  - link activation
+  - mouse support
+- Resize support planned:
+  - listen to stdout `resize`
+  - recreate buffers
+  - re-render automatically
+
+## Current implementation status
+
+- Added required controller options and public navigation API.
+- Added screen/sprite loading with generated ids and copied state.
+- Added active screen and active sprite state management.
+- Added active sprite state syncing:
+  - `state.active` is set on the active sprite
+  - previous active sprites are reset to `false`
+- Added active sprite visual properties:
+  - `activeColor`
+  - `activeBg`
+  - `activeBorder`
+- Added full-screen terminal initialization:
+  - alternate screen buffer
+  - hidden cursor
+  - raw stdin mode
+  - mouse reporting
+- Added cleanup/dispose handling:
+  - removes event listeners
+  - disables raw mode
+  - pauses stdin
+  - disables mouse reporting
+  - restores cursor and main screen buffer
+- Added buffer resize/allocation helpers.
+- Added full redraw rendering:
+  - clears the back buffer
+  - draws active screen root
+  - draws absolute sprites
+  - copies back buffer to front buffer
+  - writes ANSI truecolor output to stdout
+- Added color resolution for theme variables and `#rrggbb`.
+- Added layouts:
+  - inline
+  - row
+  - column
+  - grid
+  - flex distribution for row and column children
+- Added sprite borders:
+  - normal
+  - thick
+  - rounded
+  - double
+  - classic
+  - per-side border colors
+- Added scroll offsets for scrollable sprites.
+- Added inline text wrapping:
+  - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
+  - `wrap-hard` wraps exactly at the available width
+  - `clip` preserves explicit lines and clips horizontally
+  - explicit newlines are preserved
+  - `textClipStyle` supports no marker or ellipses for clipped text
+  - natural inline height updates when a constrained width is known
+- Added a manual text wrapping screen to `screen-test.ts` that demonstrates:
+  - default wrapping
+  - hard wrapping
+  - clipping with ellipses
+  - clipping without marker
+  - explicit newlines
+  - centered wrapped text
+- Added inline text alignment:
+  - `start`
+  - `center`
+  - `end`
+  - inherited from nearest ancestor when undefined
+  - applied only when drawing inline text
+- Added keyboard input:
+  - Tab / Shift+Tab focus navigation
+  - Enter / Space click activation
+  - printable character input
+  - Backspace
+  - arrow key scrolling for active scrollable sprites
+  - Ctrl+C dispose
+- Added mouse click support using SGR mouse mode.
+- Added resize support:
+  - listens to stdout `resize`
+  - recreates buffers
+  - re-renders automatically
+
+## Deferred / future work
+
+- Diff rendering to reduce terminal output.
+- Cursor display/positioning for active input sprites.
+- Rich text support.
+- Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
+- More complete keyboard handling:
+  - delete
+  - home/end
+  - cursor movement inside input
+  - paste handling
+- More robust mouse support:
+  - drag
+  - wheel scrolling
+  - release events
+- Layout sizing refinements for grid rows and flex edge cases.
+
+## Planned implementation convo scripts
+
+- `08_tui-diff-rendering.convo`: implement back/front buffer diff rendering and full redraw fallback on resize.
+- `09_tui-input-cursor.convo`: add active input cursor visibility and positioning.
+- `10_tui-rich-text.convo`: add first-pass rich inline text spans with per-span style.
+- `11_tui-scroll-container-clipping.convo`: add drawing clip bounds for scrollable containers.
+- `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
+- `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.
+- `14_tui-layout-refinements.convo`: refine grid/flex sizing edge cases.
+```
+</FILE_CONTENT>
+
+
+> user

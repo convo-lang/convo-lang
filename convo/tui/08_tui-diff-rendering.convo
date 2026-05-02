@@ -1,0 +1,22 @@
+@import ./_tui.convo
+
+> user
+Implement diff rendering for `ConvoTuiCtrl`.
+
+Goals:
+- Stop writing the entire screen on every render when only a subset of characters changed.
+- Compare the back buffer to the front buffer and only write changed runs to stdout.
+- Preserve the current behavior of full redraw on first render and after buffer resize.
+- Keep ANSI style changes correct for foreground/background colors.
+- Keep the implementation simple and readable.
+- Avoid changing public APIs unless needed.
+
+Acceptance criteria:
+- `render()` still clears and draws into the back buffer.
+- Changed characters are emitted using cursor positioning escape sequences.
+- Unchanged characters are not emitted.
+- The front buffer is updated after rendering.
+- Resize still forces a full redraw.
+- Dispose/cleanup behavior is unchanged.
+
+Update notes at the end of your response

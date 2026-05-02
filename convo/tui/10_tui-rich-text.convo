@@ -1,0 +1,21 @@
+@import ./_tui.convo
+
+> user
+Add first-pass rich text support for inline sprites.
+
+Goals:
+- Extend the TUI types to allow inline text with styled spans.
+- Support foreground color, background color, and plain text per span.
+- Preserve existing `text` behavior for simple sprites.
+- Add rendering support for styled inline spans.
+- Keep wrapping/clipping behavior consistent with plain text as much as possible.
+- Keep the API compact and easy to use.
+
+Acceptance criteria:
+- A sprite can render plain `text` exactly as before.
+- A sprite can render rich inline content with per-span colors/backgrounds.
+- Theme color variables and `#rrggbb` colors work for rich text spans.
+- Wrapping and clipping still work for rich text.
+- Existing examples/tests continue to work without changes.
+
+Update notes at the end of your response

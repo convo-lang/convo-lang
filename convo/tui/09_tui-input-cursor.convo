@@ -1,0 +1,21 @@
+@import ./_tui.convo
+
+> user
+Add cursor display and positioning for the active input sprite.
+
+Goals:
+- Show the terminal cursor when an input sprite is active.
+- Hide the terminal cursor when no input sprite is active.
+- Position the cursor at the current input caret location.
+- Add minimal input caret state to `SpriteState`.
+- Keep existing text input behavior working.
+- Do not implement advanced editing in this step beyond cursor placement.
+
+Acceptance criteria:
+- Active input sprites display the cursor at the end of the input value by default.
+- Cursor position respects sprite layout position and scroll offsets.
+- Cursor is hidden for non-input active sprites.
+- Cursor is restored/hidden correctly during dispose.
+- Existing input callbacks still receive the current input value.
+
+Update notes at the end of your response

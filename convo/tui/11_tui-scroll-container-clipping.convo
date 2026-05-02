@@ -1,0 +1,19 @@
+@import ./_tui.convo
+
+> user
+Improve clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
+
+Goals:
+- Add clipping bounds to drawing operations.
+- Ensure children of scrollable sprites are clipped to the sprite content rect.
+- Preserve absolute sprite behavior unless explicitly affected by clipping.
+- Keep clipping implementation minimal and internal to `ConvoTuiCtrl`.
+
+Acceptance criteria:
+- Scrolled children do not draw above, below, left, or right of the parent content rect.
+- Borders remain visible and are not overwritten by clipped children.
+- Nested scrollable containers clip correctly.
+- Inline text clipping continues to work.
+- Non-scrollable layouts render as before.
+
+Update notes at the end of your response
