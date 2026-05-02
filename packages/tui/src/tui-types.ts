@@ -97,9 +97,18 @@ export interface Sprite{
     text?:string;
 
     /**
+     * Controls the alignment of inline text.
+     */
+    textAlign?:SpriteTextAlignment;
+
+    /**
      * Foreground color. Can be a hex color or the name of a theme variable.
      */
     color?:string;
+    /**
+     * Foreground color used when the sprite is active
+     */
+    activeColor?:string;
 
     /**
      * Background color. Can be a hex color or the name of a theme variable.
@@ -114,11 +123,22 @@ export interface Sprite{
      */
     border?:string|SpriteBorder;
 
+
+    /**
+     * Background color used when the sprite is active
+     */
+    activeBg?:string;
+
     /**
      * Controls what set of characters are used to draw borders
      * @default 'normal'
      */
     borderStyle?:SpriteBorderStyle;
+
+    /**
+     * Border used when the sprite is active
+     */
+    activeBorder?:string|SpriteBorder;
 
     /**
      * Id of screen or other sprite to link to. When resolving link targets first the local
@@ -204,14 +224,26 @@ export interface Sprite{
 /**
  * The definition of a sprite. When loaded the `SpriteDef` will be converted into a `Sprite`.
  */
-export interface SpriteDef extends Omit<Sprite,'id'|'children'>
+export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'>
 {
     id?:string;
     children?:SpriteDef[];
 }
 
+export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
+{
+    id:string;
+    children?:SpriteDef[];
+}
+
 export interface SpriteState
 {
+
+    /**
+     * True when the sprite is active.
+     */
+    isActive?:boolean;
+
     /**
      * Current input value of the sprite
      */
@@ -260,6 +292,8 @@ export interface SpriteInputEvt extends SpriteEvtBase
 
 export type SpriteEvt=SpriteClickEvt|SpriteInputEvt;
 
+export type SpriteTextAlignment='start'|'center'|'end';
+
 
 /**
  * The absolute positioning of a sprite.
@@ -289,40 +323,26 @@ export interface SpriteAbsolutePosition
  * │   │
  * └───┘
  * 
- * ├ ┼ ┤
- * ┬ ┴ ┬
- * 
  * thick:
  * ┏━━━┓
  * ┃   ┃
  * ┗━━━┛
- * 
- * ┣ ╋ ┫
- * ┳ ┻ ┳
  * 
  * rounded:
  * ╭───╮
  * │   │
  * ╰───╯
  * 
- * ┢ ╂ ┪
- * ┭ ┵ ┮
- * 
  * double:
  * ╔═══╗
  * ║   ║
  * ╚═══╝
- * 
- * ╠ ╬ ╣
- * ╦ ╩ ╦
  *
  * classic:
  * +---+
  * |   |
  * +---+
- * 
- * + + +
- * + + +
+ *
  */
 export type SpriteBorderStyle='normal'|'thick'|'rounded'|'double'|'classic';
 

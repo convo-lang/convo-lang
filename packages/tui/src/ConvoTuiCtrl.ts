@@ -1,4 +1,4 @@
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 export interface ConvoTuiCtrlOptions
 {
@@ -92,6 +92,14 @@ export class ConvoTuiCtrl
         this.console.stdin.pause?.();
 
         this.writeAnsi('\x1b[0m\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l');
+    }
+
+    public addDisposeCallback(callback:()=>void){
+        if(this.isDisposed){
+            callback();
+            return;
+        }
+        this.cleanupCallbacks.push(callback);
     }
     
 
@@ -190,8 +198,12 @@ export class ConvoTuiCtrl
         return this.screens.find(screen=>screen.id===id);
     }
 
-    public findSpriteById(id:string, screen?:Screen):Sprite|undefined
+    public findSpriteById(id:string|null|undefined, screen?:Screen):Sprite|undefined
     {
+        if(id==null || id===undefined){
+            return undefined;
+        }
+
         if(screen){
             return this.findSpriteInTree(screen.root, id);
         }
@@ -1066,6 +1078,60 @@ export class ConvoTuiCtrl
         }
     }
 
+    /**
+     * Updates a sprite by merging the current sprite with the passed update.
+     * @param update Sprite update to merged with current sprite
+     * @param reRender If true or undefined the screen will be re-rendered
+     * @returns Returns true if a sprite is found with a matching id
+     */
+    public updateSprite(update:SpriteUpdate,reRender?:boolean):boolean;
+    /**
+     * Updates a sprite using a callback function.
+     * @param spriteId Id of sprite to update
+     * @param update A callback function that will update the sprite in-place. If false is returned from the callback the screen will not be updated.
+     * @returns Returns true if a sprite is found with a matching id
+     */
+    public updateSprite(spriteId:string,update:(sprite:Sprite)=>void|boolean):boolean;
+    updateSprite(sprite:string|SpriteUpdate,update?:((sprite:Sprite)=>void|boolean)|boolean):boolean{
+        let target:Sprite|undefined;
+        if(typeof sprite === 'string'){
+            target=this.findSpriteById(sprite);
+        }else if(sprite){
+            target=this.findSpriteById(sprite.id);
+        }
+        if(!target){
+            return false;
+        }
+
+        let render:boolean;
+
+        if(typeof sprite === 'object'){
+            for(const e in sprite){
+                if(e==='children'){
+                    const defs=sprite.children;
+                    if(defs){
+                        target.children=defs.map(d=>this.loadSprite(d));
+                    }
+                }else{
+                    (target as any)[e]=(sprite as any)[e];
+                }
+            }
+        }
+
+        if(typeof update === 'function'){
+            const r=update(target);
+            render=r!==false;
+        }else{
+            render=update!==false
+        }
+
+        if(render){
+            this.render();
+        }
+
+        return true;
+    }
+
     private handleMouseClick(x:number, y:number)
     {
         const id=this.bufferState.front[y]?.[x]?.i;
@@ -1223,4 +1289,10 @@ export class ConvoTuiCtrl
     {
         this.console.stdout.write(value);
     }
+}
+
+
+const wait=(ms=1000)=>{
+    const end=Date.now()+ms;
+    while(end>Date.now()){}
 }

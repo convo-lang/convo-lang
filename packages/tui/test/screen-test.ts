@@ -24,12 +24,14 @@ const theme:TuiTheme={
     danger:'#ef4444',
 };
 
-const status:SpriteDef={
+const status={
     id:'status',
     text:'Status: ready',
     color:'success',
-};
+    flex:1,
+} satisfies SpriteDef;
 
+let clickCount=0;
 const nameInput:SpriteDef={
     id:'name-input',
     text:'Type here...',
@@ -37,8 +39,10 @@ const nameInput:SpriteDef={
     bg:'panelAlt',
     isInput:true,
     onInput:evt=>{
-        status.text=`Status: input = ${evt.value || '(empty)'}`;
-    },
+        evt.ctrl.updateSprite(status.id,s=>{
+            s.text=`input: ${evt.value}`
+        })
+    }
 };
 
 const quitButton:SpriteDef={
@@ -106,13 +110,20 @@ const homeRoot:SpriteDef={
                             id:'set-status',
                             text:' Set status ',
                             border:'success',
-                            onClick:()=>{
-                                status.text='Status: button clicked';
+                            onClick:(evt)=>{
+                                evt.ctrl.updateSprite({
+                                    ...status,
+                                    text:`click: ${++clickCount}`
+                                });
                             },
                         },
                         status,
+                        {
+                            id:'timer',
+                            text:'Count: 0'
+                        }
                     ],
-                },
+                }
             ],
         },
         {
@@ -185,6 +196,14 @@ const ctrl=new ConvoTuiCtrl({
         },
     ],
 });
+
+let timerCount=0;
+const iv=setInterval(()=>{
+    ctrl.updateSprite('timer',t=>{
+        t.text=`Count: ${++timerCount}`;
+    })
+},1000);
+ctrl.addDisposeCallback(()=>clearInterval(iv));
 
 proc.on('exit', ()=>ctrl.dispose());
 proc.on('SIGTERM', ()=>{
