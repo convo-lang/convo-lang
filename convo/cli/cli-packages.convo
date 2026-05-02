@@ -446,3 +446,324 @@ main();
 
 
 > user
+Would it be possible to convert the `convo.js` file into a shell file that works on all target
+OSes and architectures. I would like to remove the overhead of using node to start a Bun process
+
+@time 2026-05-02T11:07:59-04:00
+@tokenUsage 4612 / 1411 / $0.030115000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+Not as a **single shell file** that works across all targets.
+
+A POSIX shell wrapper would work for:
+
+- linux-x64
+- linux-arm64
+- linux-x64-musl
+- linux-arm64-musl
+- darwin-x64
+- darwin-arm64
+
+But it would not reliably work on Windows because Windows does not include `/bin/sh`. npm can generate a `.cmd` shim, but if the package `bin` points at a shell script with a `#!/bin/sh` shebang, that shim still needs a shell such as Git Bash/MSYS.
+
+Practical options:
+
+1. **Keep the JS wrapper**  
+   Works everywhere, but starts Node before launching the real Bun/native binary.
+
+2. **Use a POSIX shell wrapper for Linux/macOS and a `.cmd` wrapper for Windows**  
+   Removes Node overhead on all platforms, but is slightly more complex. The npm package would need careful bin/shim handling.
+
+3. **Avoid the wrapper package entirely and publish/install the platform package directly**  
+   Best runtime performance, but worse UX because users need the correct package name.
+
+4. **Use a tiny native launcher binary as the wrapper**  
+   Best cross-platform UX and no Node overhead, but adds another compiled artifact to maintain.
+
+My recommendation is option 2 if you want to avoid Node overhead while keeping `@convo-lang/cli` as the public entry package:
+
+- `bin/convo` — POSIX shell wrapper for Linux/macOS.
+- `bin/convo.cmd` — Windows batch wrapper.
+- Keep platform binaries in the optional dependency packages.
+
+One caveat: npm’s generated Windows shim behavior depends on the `bin` target, so we may need to test the exact package layout. If you want, I can generate a shell + cmd wrapper setup next.
+
+
+> user
+Tell me more about option 4
+
+@time 2026-05-02T11:11:21-04:00
+@tokenUsage 5001 / 1592 / $0.032965
+@model gpt-5.5-2026-04-23
+> assistant
+Option 4 is to make `@convo-lang/cli` contain a **small native launcher executable** instead of a JS wrapper.
+
+The launcher’s only job is:
+
+1. Detect current OS/architecture/libc.
+2. Locate the matching optional dependency package.
+3. Execute that package’s real `bin/convo` / `bin/convo.exe`.
+4. Forward CLI args, stdio, signals, and exit code.
+
+So users still install:
+
+```bash
+npm install -g @convo-lang/cli
+```
+
+But running:
+
+```bash
+convo
+```
+
+starts a tiny native executable first, not Node.
+
+## Package shape
+
+The wrapper package would become something like:
+
+```text
+packages/cli/
+    package.json
+    bin/
+        convo              # native launcher for linux/macOS
+        convo.exe          # native launcher for Windows, if included
+    targets/
+        cli-linux-x64/
+            package.json
+            bin/convo
+        cli-linux-arm64/
+            package.json
+            bin/convo
+        cli-windows-x64/
+            package.json
+            bin/convo.exe
+        ...
+```
+
+However, there is an important catch: **a native launcher is itself platform-specific**.
+
+That means either:
+
+### A. Publish launcher variants too
+
+You publish platform-specific launcher packages:
+
+```text
+@convo-lang/cli              # JS/shell installer shim or meta package
+@convo-lang/cli-launcher-linux-x64
+@convo-lang/cli-launcher-linux-arm64
+@convo-lang/cli-launcher-windows-x64
+...
+@convo-lang/cli-linux-x64    # real CLI binary
+...
+```
+
+This is usually overkill because now you have platform packages for the launcher and for the real CLI.
+
+### B. Make `@convo-lang/cli` itself platform-specific
+
+Impossible for one npm package, because a package tarball is the same for every platform. You cannot publish different `bin/convo` files under the same package version for different OSes.
+
+### C. Include all launcher binaries in `@convo-lang/cli`
+
+This is workable:
+
+```text
+@convo-lang/cli
+    bin/
+        convo.js or shell/cmd tiny dispatcher
+    launchers/
+        linux-x64/convo-launcher
+        linux-arm64/convo-launcher
+        darwin-x64/convo-launcher
+        darwin-arm64/convo-launcher
+        windows-x64/convo-launcher.exe
+        windows-arm64/convo-launcher.exe
+```
+
+But then you still need **some dispatcher** to select the right launcher. That dispatcher is usually JS, shell/cmd, or npm-generated shim. This partially defeats the point, though the dispatcher can be much thinner.
+
+## The better native launcher design
+
+A more useful approach is to make the **platform target package binary itself** the thing npm exposes.
+
+That is how packages like `esbuild` avoid a persistent Node startup for the actual binary, but their top-level package still uses JS for installation/runtime resolution.
+
+For Convo-Lang, the install shape is:
+
+```text
+@convo-lang/cli
+    bin/convo.js       # tiny resolver/launcher
+
+@convo-lang/cli-linux-x64
+    bin/convo          # real executable
+```
+
+This is basically what you already have, except the wrapper is JS.
+
+If you truly want `convo` to execute native code immediately, the executable named by npm’s `"bin"` must itself be native for that platform. Since `@convo-lang/cli` is cross-platform, npm cannot choose different files inside it without a script/shim.
+
+## Pros
+
+Native launcher advantages:
+
+- Very fast startup compared with Node.
+- No Node dependency at runtime, apart from npm using Node during installation.
+- Better signal and process handling than shell wrappers.
+- Can provide clean error messages when optional dependencies are missing.
+- Can support musl detection robustly.
+- Can be written in Rust, Go, Zig, C, etc.
+
+## Cons
+
+Main drawbacks:
+
+- You must build and publish launcher binaries for every supported platform.
+- You still need a way for npm’s `bin` to point at the correct launcher.
+- Adds release complexity.
+- Duplicates platform targeting logic.
+- If your actual CLI is already a Bun-compiled binary, a separate native launcher may not save much compared with making the platform package directly executable.
+
+## Key npm limitation
+
+The core issue is this:
+
+```json
+{
+    "bin": {
+        "convo": "bin/convo"
+    }
+}
+```
+
+This path is static. npm does not support:
+
+```json
+{
+    "bin": {
+        "convo": {
+            "linux-x64": "...",
+            "darwin-arm64": "..."
+        }
+    }
+}
+```
+
+So the root package cannot directly expose a different native executable per platform.
+
+## Best native-oriented layout
+
+If avoiding Node overhead is the top priority, I would consider changing distribution UX slightly:
+
+### Recommended performance-first setup
+
+Users install the platform package directly:
+
+```bash
+npm install -g @convo-lang/cli-linux-x64
+```
+
+Then `convo` maps directly to the compiled binary.
+
+Pros:
+
+- Zero wrapper overhead.
+- Simplest runtime.
+- npm handles `os`, `cpu`, and possibly `libc` constraints.
+
+Cons:
+
+- Bad UX: users must know the correct package.
+
+### Recommended UX + performance hybrid
+
+Keep:
+
+```bash
+npm install -g @convo-lang/cli
+```
+
+But make install-time script create/copy the correct executable into the root package’s `bin` directory:
+
+```text
+@convo-lang/cli
+    package.json
+    scripts/postinstall.js
+    bin/convo        # generated/copied at install time
+```
+
+During `postinstall`, it detects platform and copies/symlinks:
+
+```text
+node_modules/@convo-lang/cli-linux-x64/bin/convo
+```
+
+to:
+
+```text
+node_modules/@convo-lang/cli/bin/convo
+```
+
+Then future `convo` executions directly run the native binary.
+
+This gives:
+
+- Good install UX.
+- No Node overhead when running `convo`.
+- Node only used during install.
+- No separate launcher binary.
+
+This is likely the best fit for what you want.
+
+## Caveats for postinstall copy/symlink
+
+There are some tradeoffs:
+
+- Some environments disable lifecycle scripts with `--ignore-scripts`.
+- Global npm installs may have permissions/symlink quirks.
+- Package managers differ slightly.
+- The copied binary may become stale if dependencies are manually changed.
+- Windows needs `.exe` handling.
+- You need a fallback error script if install scripts did not run.
+
+But for many CLI packages this is acceptable.
+
+## My recommendation
+
+Instead of a native launcher binary, I’d use an **install-time native bin materialization** approach:
+
+```text
+@convo-lang/cli
+    bin/
+        convo          # POSIX fallback script before install
+        convo.cmd      # Windows fallback script before install
+    scripts/
+        postinstall.js # copies/symlinks target binary into bin/convo or bin/convo.exe
+```
+
+At install time:
+
+- Detect target package.
+- Resolve matching optional dependency.
+- Copy executable into `@convo-lang/cli/bin/convo`.
+- On Windows, copy to `bin/convo.exe`.
+- npm’s generated shim invokes that native binary directly.
+
+Then runtime is:
+
+```text
+shell -> native Convo binary
+```
+
+not:
+
+```text
+shell -> node -> Bun/native Convo binary
+```
+
+This avoids Node startup cost without creating a separate native launcher project.
+
+
+> user
