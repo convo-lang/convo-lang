@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
 
 
-const createDb=()=>createTestDb('http');
+const createDb=()=>createTestDb('mem');
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
     path,
