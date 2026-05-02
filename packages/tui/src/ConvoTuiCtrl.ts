@@ -191,6 +191,27 @@ export class ConvoTuiCtrl
                 screen.state.activeSpriteId=sprite.id;
             }
         }
+        this.syncActiveSpriteStates(screen);
+    }
+
+    private syncActiveSpriteStates(screen:Screen)
+    {
+        const activeId=screen.state?.activeSpriteId;
+
+        const visit=(sprite:Sprite)=>{
+            const active=!!activeId && sprite.id===activeId;
+
+            if(sprite.state || active){
+                sprite.state??={};
+                sprite.state.active=active;
+            }
+
+            for(const child of sprite.children??[]){
+                visit(child);
+            }
+        };
+
+        visit(screen.root);
     }
 
     public findScreen(id:string):Screen|undefined
@@ -313,6 +334,7 @@ export class ConvoTuiCtrl
 
         targetScreen.state??={};
         targetScreen.state.activeSpriteId=sprite.id;
+        this.syncActiveSpriteStates(targetScreen);
 
         this.render();
 
@@ -400,6 +422,8 @@ export class ConvoTuiCtrl
 
         const screen=this._activeScreen;
         if(screen){
+            this.syncActiveSpriteStates(screen);
+
             const rect:TuiRect={
                 x:0,
                 y:0,
@@ -466,12 +490,17 @@ export class ConvoTuiCtrl
             return;
         }
 
-        const style:TuiStyle={
+        const active=this.isSpriteActive(sprite);
+        const baseStyle:TuiStyle={
             f:this.resolveColor(sprite.color)??parentStyle.f,
             b:this.resolveColor(sprite.bg)??parentStyle.b,
         };
+        const style:TuiStyle={
+            f:(active?this.resolveColor(sprite.activeColor):undefined)??baseStyle.f,
+            b:(active?this.resolveColor(sprite.activeBg):undefined)??baseStyle.b,
+        };
 
-        this.fillRect(rect, style, sprite.id);
+        this.fillRect(rect, baseStyle, sprite.id);
 
         const border=this.getBorderColors(sprite, style.f);
         if(border.hasBorder){
@@ -482,6 +511,8 @@ export class ConvoTuiCtrl
         if(contentRect.width<=0 || contentRect.height<=0){
             return;
         }
+
+        this.fillRect(contentRect, style, sprite.id);
 
         const layout=sprite.layout??'inline';
         if(layout==='inline'){
@@ -514,6 +545,11 @@ export class ConvoTuiCtrl
                 b:this.resolveColor(this.theme.background),
             });
         }
+    }
+
+    private isSpriteActive(sprite:Sprite):boolean
+    {
+        return sprite.state?.active===true;
     }
 
     private getAbsoluteSprites(root:Sprite):Sprite[]
@@ -831,7 +867,7 @@ export class ConvoTuiCtrl
 
     private getBorderColors(sprite:Sprite, fallback?:string)
     {
-        const border=sprite.border;
+        const border=this.isSpriteActive(sprite)?(sprite.activeBorder??sprite.border):sprite.border;
         const empty={
             hasBorder:false,
             top:undefined as string|undefined,

@@ -20,6 +20,8 @@ const theme:TuiTheme={
     panel:'#1c1c1c',
     panelAlt:'#242424',
     accent:'#60a5fa',
+    active:'#facc15',
+    activeBg:'#3f3f1f',
     success:'#22c55e',
     danger:'#ef4444',
 };
@@ -36,6 +38,9 @@ const nameInput:SpriteDef={
     id:'name-input',
     text:'Type here...',
     border:'accent',
+    activeColor:'active',
+    activeBg:'activeBg',
+    activeBorder:'active',
     bg:'panelAlt',
     isInput:true,
     onInput:evt=>{
@@ -49,7 +54,10 @@ const quitButton:SpriteDef={
     id:'quit-button',
     text:' Quit ',
     color:'danger',
+    activeColor:'background',
+    activeBg:'danger',
     border:'danger',
+    activeBorder:'active',
     onClick:evt=>evt.ctrl.dispose(),
 };
 
@@ -86,6 +94,9 @@ const homeRoot:SpriteDef={
                             text:' Help screen ',
                             link:'help',
                             border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
                         },
                         quitButton,
                     ],
@@ -110,6 +121,9 @@ const homeRoot:SpriteDef={
                             id:'set-status',
                             text:' Set status ',
                             border:'success',
+                            activeColor:'background',
+                            activeBg:'success',
+                            activeBorder:'active',
                             onClick:(evt)=>{
                                 evt.ctrl.updateSprite({
                                     ...status,
@@ -128,7 +142,7 @@ const homeRoot:SpriteDef={
         },
         {
             id:'footer',
-            text:' Ctrl+C exits | Arrow keys scroll active scrollable sprites ',
+            text:' Ctrl+C exits | Active sprites use activeColor, activeBg, and activeBorder ',
             color:'muted',
             bg:'panel',
         },
@@ -162,6 +176,7 @@ const helpRoot:SpriteDef={
                 {text:'Space activates buttons/links or types a space into inputs.'},
                 {text:'Backspace edits the active input.'},
                 {text:'Arrow keys scroll the active scrollable sprite.'},
+                {text:'Active sprites use activeColor, activeBg, and activeBorder.'},
                 {text:'Ctrl+C disposes the controller.'},
             ],
         },
@@ -170,6 +185,9 @@ const helpRoot:SpriteDef={
             text:' Back home ',
             link:'home',
             border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
         },
     ],
 };

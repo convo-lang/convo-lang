@@ -43,6 +43,13 @@
 - Added required controller options and public navigation API.
 - Added screen/sprite loading with generated ids and copied state.
 - Added active screen and active sprite state management.
+- Added active sprite state syncing:
+  - `state.active` is set on the active sprite
+  - previous active sprites are reset to `false`
+- Added active sprite visual properties:
+  - `activeColor`
+  - `activeBg`
+  - `activeBorder`
 - Added full-screen terminal initialization:
   - alternate screen buffer
   - hidden cursor
@@ -104,5 +111,4 @@
   - drag
   - wheel scrolling
   - release events
-- Active/focused sprite visual styling.
 - Layout sizing refinements for grid rows and flex edge cases.

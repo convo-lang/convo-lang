@@ -242,7 +242,7 @@ export interface SpriteState
     /**
      * True when the sprite is active.
      */
-    isActive?:boolean;
+    active?:boolean;
 
     /**
      * Current input value of the sprite
