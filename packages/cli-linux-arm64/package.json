@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/cli-linux-arm64",
-    "version": "0.9.2",
+    "version": "0.9.3",
     "description": "Convo-Lang CLI binary for Linux arm64.",
     "license": "Apache-2.0",
     "keywords": [
