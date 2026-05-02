@@ -1,4 +1,4 @@
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteTextAlignment, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 export interface ConvoTuiCtrlOptions
 {
@@ -37,6 +37,10 @@ interface TuiFocusableSprite
     order:number;
 }
 
+/**
+ * Properties that are inherited from ancestors
+ * Inherited properties are marked with the `@inherited` tag in the Sprite interface.
+ */
 interface TuiInheritedSpriteProps
 {
     textAlign?:SpriteTextAlignment;
@@ -594,14 +598,19 @@ export class ConvoTuiCtrl
     private drawInlineSprite(sprite:Sprite, rect:TuiRect, style:TuiStyle, textAlign:SpriteTextAlignment)
     {
         const value=this.getInlineSpriteText(sprite);
+        const textWrap=sprite.textWrap??'wrap';
+        const textClipStyle=sprite.textClipStyle??'ellipses';
         const scrollX=sprite.scrollable?(sprite.state?.scrollX??0):0;
         const scrollY=sprite.scrollable?(sprite.state?.scrollY??0):0;
-        const lines=this.wrapText(value, rect.width);
+        const lines=this.getInlineSpriteLines(value, rect.width, textWrap);
         const visibleLines=lines.slice(Math.max(0, scrollY), Math.max(0, scrollY)+rect.height);
 
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
             const line=visibleLines[y]??'';
-            const text=line.slice(Math.max(0, scrollX), Math.max(0, scrollX)+rect.width);
+            const offset=Math.max(0, scrollX);
+            const scrolledLine=line.slice(offset);
+            const clipped=scrolledLine.length>rect.width;
+            const text=this.clipText(scrolledLine, rect.width, textClipStyle, clipped);
             const xOffset=scrollX>0?0:this.getTextAlignOffset(textAlign, text.length, rect.width);
 
             for(let i=0;i<text.length && i<rect.width;i++){
@@ -764,7 +773,8 @@ export class ConvoTuiCtrl
 
         if(layout==='inline' || !children.length){
             const text=this.getInlineSpriteText(sprite);
-            const lines=contentWidth===undefined?this.getTextLines(text):this.wrapText(text, Math.max(1, contentWidth));
+            const textWrap=sprite.textWrap??'wrap';
+            const lines=contentWidth===undefined?this.getTextLines(text):this.getInlineSpriteLines(text, Math.max(1, contentWidth), textWrap);
             return {
                 width:(contentWidth===undefined?Math.max(1, ...lines.map(line=>line.length)):Math.max(1, contentWidth))+borderWidth,
                 height:Math.max(1, lines.length)+borderHeight,
@@ -832,6 +842,21 @@ export class ConvoTuiCtrl
         return text.split(/\r?\n/);
     }
 
+    private getInlineSpriteLines(text:string, width:number, textWrap:SpriteTextWrap):string[]
+    {
+        switch(textWrap){
+            case 'clip':
+                return this.getTextLines(text);
+
+            case 'wrap-hard':
+                return this.wrapTextHard(text, width);
+
+            case 'wrap':
+            default:
+                return this.wrapText(text, width);
+        }
+    }
+
     private wrapText(text:string, width:number):string[]
     {
         width=Math.max(1, Math.floor(width));
@@ -871,6 +896,45 @@ export class ConvoTuiCtrl
         }
 
         return lines.length?lines:[''];
+    }
+
+    private wrapTextHard(text:string, width:number):string[]
+    {
+        width=Math.max(1, Math.floor(width));
+
+        const lines:string[]=[];
+        const paragraphs=this.getTextLines(text);
+
+        for(const paragraph of paragraphs){
+            if(!paragraph){
+                lines.push('');
+                continue;
+            }
+
+            for(let i=0;i<paragraph.length;i+=width){
+                lines.push(paragraph.slice(i, i+width));
+            }
+        }
+
+        return lines.length?lines:[''];
+    }
+
+    private clipText(text:string, width:number, textClipStyle:SpriteTextClipStyle, clipped:boolean):string
+    {
+        width=Math.max(0, Math.floor(width));
+        if(width<=0){
+            return '';
+        }
+
+        if(!clipped || text.length<=width){
+            return text.slice(0, width);
+        }
+
+        if(textClipStyle==='ellipses'){
+            return width===1?'…':`${text.slice(0, width-1)}…`;
+        }
+
+        return text.slice(0, width);
     }
 
     private getTextAlignOffset(textAlign:SpriteTextAlignment, textLength:number, width:number):number

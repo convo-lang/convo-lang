@@ -98,6 +98,15 @@ const homeRoot:SpriteDef={
                             activeBg:'activeBg',
                             activeBorder:'active',
                         },
+                        {
+                            id:'wrap-link',
+                            text:' Text wrapping ',
+                            link:'wrap',
+                            border:'accent',
+                            activeColor:'active',
+                            activeBg:'activeBg',
+                            activeBorder:'active',
+                        },
                         quitButton,
                     ],
                 },
@@ -171,6 +180,7 @@ const helpRoot:SpriteDef={
             bg:'panelAlt',
             children:[
                 {text:'This screen verifies links, layout, borders, colors, input, and mouse clicks.'},
+                {text:'The text wrapping screen demonstrates wrap, wrap-hard, clipping, ellipses, and explicit newlines.'},
                 {text:'Tab moves focus forward.'},
                 {text:'Shift+Tab moves focus backward.'},
                 {text:'Enter activates the active button/link.'},
@@ -183,6 +193,116 @@ const helpRoot:SpriteDef={
         },
         {
             id:'back-link',
+            text:' Back home ',
+            link:'home',
+            border:'accent',
+            activeColor:'active',
+            activeBg:'activeBg',
+            activeBorder:'active',
+        },
+    ],
+};
+
+const wrapRoot:SpriteDef={
+    id:'wrap-root',
+    layout:'column',
+    border:'accent',
+    bg:'background',
+    children:[
+        {
+            id:'wrap-title',
+            text:' Text wrapping ',
+            color:'accent',
+            bg:'panel',
+            textAlign:'center',
+        },
+        {
+            id:'wrap-body',
+            layout:'column',
+            flex:1,
+            scrollable:true,
+            border:'muted',
+            bg:'panelAlt',
+            children:[
+                {
+                    text:'Resize the terminal to see each inline sprite recompute its wrapped lines.',
+                    color:'muted',
+                },
+                {
+                    text:'Default wrap',
+                    color:'accent',
+                },
+                {
+                    id:'wrap-default',
+                    text:'The default wrap mode breaks at whitespace when possible. If a word is too long, such as supercalifragilisticexpialidociouswhenneeded, it is hard wrapped so the text stays inside the available width.',
+                    border:'muted',
+                },
+                {
+                    text:'wrap-hard',
+                    color:'accent',
+                },
+                {
+                    id:'wrap-hard',
+                    text:'wrap-hard ignores word boundaries and slices text exactly at the available content width, even in the middle of words.',
+                    textWrap:'wrap-hard',
+                    border:'muted',
+                },
+                {
+                    text:'clip + ellipses',
+                    color:'accent',
+                },
+                {
+                    id:'clip-ellipses',
+                    text:'This line is intentionally too long for the available width and should be clipped with an ellipses marker at the right edge.',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    text:'clip + none',
+                    color:'accent',
+                },
+                {
+                    id:'clip-none',
+                    text:'This line is intentionally too long for the available width and should be clipped without adding a marker.',
+                    textWrap:'clip',
+                    textClipStyle:'none',
+                    border:'muted',
+                },
+                {
+                    text:'Explicit newlines with wrapping',
+                    color:'accent',
+                },
+                {
+                    id:'wrap-newlines',
+                    text:'Line one stays separate.\nLine two is longer and wraps within its own paragraph when the content area is narrow enough to require wrapping.\nLine three stays separate.',
+                    border:'muted',
+                },
+                {
+                    text:'Explicit newlines with clip',
+                    color:'accent',
+                },
+                {
+                    id:'clip-newlines',
+                    text:'First clipped line is intentionally long and should clip independently.\nSecond clipped line is also intentionally long and should clip independently.',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    text:'Centered wrapped text',
+                    color:'accent',
+                },
+                {
+                    id:'wrap-centered',
+                    text:'Each wrapped line can still use inline text alignment. These lines are centered after wrapping.',
+                    textAlign:'center',
+                    border:'muted',
+                },
+            ],
+        },
+        {
+            id:'wrap-back-link',
             text:' Back home ',
             link:'home',
             border:'accent',
@@ -212,6 +332,11 @@ const ctrl=new ConvoTuiCtrl({
             id:'help',
             defaultSprite:'back-link',
             root:helpRoot,
+        },
+        {
+            id:'wrap',
+            defaultSprite:'wrap-back-link',
+            root:wrapRoot,
         },
     ],
 });

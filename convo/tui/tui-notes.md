@@ -84,9 +84,19 @@
   - per-side border colors
 - Added scroll offsets for scrollable sprites.
 - Added inline text wrapping:
-  - wraps on whitespace when possible
-  - preserves explicit newlines
-  - updates natural inline height when a constrained width is known
+  - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
+  - `wrap-hard` wraps exactly at the available width
+  - `clip` preserves explicit lines and clips horizontally
+  - explicit newlines are preserved
+  - `textClipStyle` supports no marker or ellipses for clipped text
+  - natural inline height updates when a constrained width is known
+- Added a manual text wrapping screen to `screen-test.ts` that demonstrates:
+  - default wrapping
+  - hard wrapping
+  - clipping with ellipses
+  - clipping without marker
+  - explicit newlines
+  - centered wrapped text
 - Added inline text alignment:
   - `start`
   - `center`

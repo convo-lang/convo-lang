@@ -98,8 +98,21 @@ export interface Sprite{
 
     /**
      * Controls the alignment of inline text. If undefined textAlignment is inherited.
+     * @inherited
      */
     textAlign?:SpriteTextAlignment;
+
+    /**
+     * Controls how inline text is wrapped.
+     * @default 'wrap'
+     */
+    textWrap?:SpriteTextWrap;
+
+    /**
+     * Controls the style that is used to clip text with.
+     * @default 'ellipses'
+     */
+    textClipStyle?:SpriteTextClipStyle;
 
     /**
      * Foreground color. Can be a hex color or the name of a theme variable.
@@ -259,6 +272,20 @@ export interface SpriteState
      */
     scrollY?:number;
 }
+
+/**
+ * - `wrap`: Text wraps to span multiple lines and breaks at whitespace. If unable to break at whitespace a hard break will be used where words are split across lines.
+ * - `wrap-hard`: Text wraps to span multiple lines and breaks at the end of available space regardless where at in a word.
+ * - `clip`: Text is clipped at the end of available space
+ */
+export type SpriteTextWrap='wrap'|'wrap-hard'|'clip';
+
+/**
+ * - `none`: Text is clipped at the last visible character
+ * - `ellipses`: The last visible character of clipped text is replaced with the ellipses characters (…)
+ */
+export type SpriteTextClipStyle='none'|'ellipses';
+
 
 export type SpriteEvtType=SpriteEvt['type'];
 
