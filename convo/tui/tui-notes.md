@@ -107,6 +107,13 @@
   - `end`
   - inherited from nearest ancestor when undefined
   - applied only when drawing inline text
+- Added rich inline text:
+  - `Sprite.richText?:SpriteTextSpan[]`
+  - per-span `text`, `color`, and `bg`
+  - span colors support theme variables and `#rrggbb`
+  - plain `text` behavior is preserved when `richText` is not defined
+  - non-input inline sprites prefer `richText` over `text`
+  - wrapping, clipping, scrolling, and alignment use the same character layout rules as plain text
 - Added keyboard input:
   - Tab / Shift+Tab focus navigation
   - Enter / Space click activation
@@ -129,7 +136,10 @@
 
 ## Deferred / future work
 
-- Rich text support.
+- Rich text support beyond first-pass inline spans:
+  - nested style ranges
+  - markdown-like parsing
+  - links/actions per span
 - Better clipping for scrollable containers so offscreen children cannot draw outside the parent content rect.
 - More complete keyboard handling:
   - delete
@@ -144,7 +154,6 @@
 
 ## Planned implementation convo scripts
 
-- `10_tui-rich-text.convo`: add first-pass rich inline text spans with per-span style.
 - `11_tui-scroll-container-clipping.convo`: add drawing clip bounds for scrollable containers.
 - `12_tui-keyboard-editing.convo`: add delete, home/end, caret movement, and paste-aware input editing.
 - `13_tui-mouse-events.convo`: add release, drag, and wheel mouse handling.

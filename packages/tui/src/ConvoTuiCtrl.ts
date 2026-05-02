@@ -31,6 +31,11 @@ interface TuiStyle
     b?:string;
 }
 
+interface TuiInlineChar extends TuiStyle
+{
+    c:string;
+}
+
 interface TuiFocusableSprite
 {
     sprite:Sprite;
@@ -679,11 +684,12 @@ export class ConvoTuiCtrl
     private drawInlineSprite(sprite:Sprite, rect:TuiRect, style:TuiStyle, textAlign:SpriteTextAlignment)
     {
         const value=this.getInlineSpriteText(sprite);
+        const chars=this.getInlineSpriteChars(sprite, style);
         const textWrap=sprite.textWrap??'wrap';
         const textClipStyle=sprite.textClipStyle??'ellipses';
         const scrollX=sprite.scrollable?(sprite.state?.scrollX??0):0;
         const scrollY=sprite.scrollable?(sprite.state?.scrollY??0):0;
-        const lines=this.getInlineSpriteLines(value, rect.width, textWrap);
+        const lines=this.getInlineSpriteCharLines(chars, rect.width, textWrap);
         const visibleLines=lines.slice(Math.max(0, scrollY), Math.max(0, scrollY)+rect.height);
 
         if(sprite.isInput && this.isSpriteActive(sprite)){
@@ -691,18 +697,19 @@ export class ConvoTuiCtrl
         }
 
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
-            const line=visibleLines[y]??'';
+            const line=visibleLines[y]??[];
             const offset=Math.max(0, scrollX);
             const scrolledLine=line.slice(offset);
             const clipped=scrolledLine.length>rect.width;
-            const text=this.clipText(scrolledLine, rect.width, textClipStyle, clipped);
+            const text=this.clipInlineChars(scrolledLine, rect.width, textClipStyle, clipped, style);
             const xOffset=scrollX>0?0:this.getTextAlignOffset(textAlign, text.length, rect.width);
 
             for(let i=0;i<text.length && i<rect.width;i++){
+                const char=text[i]!;
                 this.setChar(rect.x+xOffset+i, rect.y+y, {
-                    c:text[i]??' ',
-                    f:style.f,
-                    b:style.b,
+                    c:char.c,
+                    f:char.f,
+                    b:char.b,
                     i:sprite.id,
                 });
             }
@@ -963,7 +970,36 @@ export class ConvoTuiCtrl
 
     private getInlineSpriteText(sprite:Sprite):string
     {
-        return sprite.isInput?(sprite.state?.inputValue??sprite.text??''):(sprite.text??'');
+        if(sprite.isInput){
+            return sprite.state?.inputValue??sprite.text??'';
+        }
+        return sprite.richText?.length?sprite.richText.map(span=>span.text).join(''):(sprite.text??'');
+    }
+
+    private getInlineSpriteChars(sprite:Sprite, style:TuiStyle):TuiInlineChar[]
+    {
+        if(sprite.isInput || !sprite.richText?.length){
+            return this.createInlineChars(this.getInlineSpriteText(sprite), style);
+        }
+
+        const chars:TuiInlineChar[]=[];
+        for(const span of sprite.richText){
+            chars.push(...this.createInlineChars(span.text, {
+                f:this.resolveColor(span.color)??style.f,
+                b:this.resolveColor(span.bg)??style.b,
+            }));
+        }
+
+        return chars;
+    }
+
+    private createInlineChars(text:string, style:TuiStyle):TuiInlineChar[]
+    {
+        return Array.from(text).map(c=>({
+            c,
+            f:style.f,
+            b:style.b,
+        }));
     }
 
     private getTextLines(text:string):string[]
@@ -984,6 +1020,42 @@ export class ConvoTuiCtrl
             default:
                 return this.wrapText(text, width);
         }
+    }
+
+    private getInlineSpriteCharLines(chars:TuiInlineChar[], width:number, textWrap:SpriteTextWrap):TuiInlineChar[][]
+    {
+        switch(textWrap){
+            case 'clip':
+                return this.getInlineCharTextLines(chars);
+
+            case 'wrap-hard':
+                return this.wrapInlineCharsHard(chars, width);
+
+            case 'wrap':
+            default:
+                return this.wrapInlineChars(chars, width);
+        }
+    }
+
+    private getInlineCharTextLines(chars:TuiInlineChar[]):TuiInlineChar[][]
+    {
+        const lines:TuiInlineChar[][]=[[]];
+
+        for(let i=0;i<chars.length;i++){
+            const char=chars[i]!;
+            if(char.c==='\r'){
+                if(chars[i+1]?.c==='\n'){
+                    i++;
+                }
+                lines.push([]);
+            }else if(char.c==='\n'){
+                lines.push([]);
+            }else{
+                lines[lines.length-1]!.push(char);
+            }
+        }
+
+        return lines;
     }
 
     private wrapText(text:string, width:number):string[]
@@ -1027,6 +1099,47 @@ export class ConvoTuiCtrl
         return lines.length?lines:[''];
     }
 
+    private wrapInlineChars(chars:TuiInlineChar[], width:number):TuiInlineChar[][]
+    {
+        width=Math.max(1, Math.floor(width));
+
+        const lines:TuiInlineChar[][]=[];
+        const paragraphs=this.getInlineCharTextLines(chars);
+
+        for(const paragraph of paragraphs){
+            if(!paragraph.length){
+                lines.push([]);
+                continue;
+            }
+
+            let remaining=paragraph;
+            while(remaining.length>width){
+                const nextChar=remaining[width];
+                let breakIndex=nextChar && /\s/.test(nextChar.c)?width:-1;
+
+                if(breakIndex<0){
+                    for(let i=width-1;i>0;i--){
+                        if(/\s/.test(remaining[i]?.c??'')){
+                            breakIndex=i;
+                            break;
+                        }
+                    }
+                }
+
+                if(breakIndex<=0){
+                    breakIndex=width;
+                }
+
+                lines.push(this.trimInlineCharsEnd(remaining.slice(0, breakIndex)));
+                remaining=this.trimInlineCharsStart(remaining.slice(breakIndex));
+            }
+
+            lines.push(remaining);
+        }
+
+        return lines.length?lines:[[]];
+    }
+
     private wrapTextHard(text:string, width:number):string[]
     {
         width=Math.max(1, Math.floor(width));
@@ -1048,6 +1161,45 @@ export class ConvoTuiCtrl
         return lines.length?lines:[''];
     }
 
+    private wrapInlineCharsHard(chars:TuiInlineChar[], width:number):TuiInlineChar[][]
+    {
+        width=Math.max(1, Math.floor(width));
+
+        const lines:TuiInlineChar[][]=[];
+        const paragraphs=this.getInlineCharTextLines(chars);
+
+        for(const paragraph of paragraphs){
+            if(!paragraph.length){
+                lines.push([]);
+                continue;
+            }
+
+            for(let i=0;i<paragraph.length;i+=width){
+                lines.push(paragraph.slice(i, i+width));
+            }
+        }
+
+        return lines.length?lines:[[]];
+    }
+
+    private trimInlineCharsStart(chars:TuiInlineChar[]):TuiInlineChar[]
+    {
+        let index=0;
+        while(index<chars.length && /[ \t]/.test(chars[index]?.c??'')){
+            index++;
+        }
+        return chars.slice(index);
+    }
+
+    private trimInlineCharsEnd(chars:TuiInlineChar[]):TuiInlineChar[]
+    {
+        let index=chars.length;
+        while(index>0 && /[ \t]/.test(chars[index-1]?.c??'')){
+            index--;
+        }
+        return chars.slice(0, index);
+    }
+
     private clipText(text:string, width:number, textClipStyle:SpriteTextClipStyle, clipped:boolean):string
     {
         width=Math.max(0, Math.floor(width));
@@ -1064,6 +1216,31 @@ export class ConvoTuiCtrl
         }
 
         return text.slice(0, width);
+    }
+
+    private clipInlineChars(chars:TuiInlineChar[], width:number, textClipStyle:SpriteTextClipStyle, clipped:boolean, style:TuiStyle):TuiInlineChar[]
+    {
+        width=Math.max(0, Math.floor(width));
+        if(width<=0){
+            return [];
+        }
+
+        if(!clipped || chars.length<=width){
+            return chars.slice(0, width);
+        }
+
+        if(textClipStyle==='ellipses'){
+            const ellipsesStyle=chars[Math.min(chars.length-1, Math.max(0, width-1))]??style;
+            if(width===1){
+                return [{c:'…',f:ellipsesStyle.f,b:ellipsesStyle.b}];
+            }
+            return [
+                ...chars.slice(0, width-1),
+                {c:'…',f:ellipsesStyle.f,b:ellipsesStyle.b},
+            ];
+        }
+
+        return chars.slice(0, width);
     }
 
     private getTextAlignOffset(textAlign:SpriteTextAlignment, textLength:number, width:number):number

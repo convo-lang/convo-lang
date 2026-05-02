@@ -97,6 +97,13 @@ export interface Sprite{
     text?:string;
 
     /**
+     * Rich inline content displayed by the sprite. If defined, `richText` is used instead of `text`
+     * for non-input inline sprites.
+     * @note Rich text is only displayed when a sprite uses the `inline` layout type.
+     */
+    richText?:SpriteTextSpan[];
+
+    /**
      * Controls the alignment of inline text. If undefined textAlignment is inherited.
      * @inherited
      */
@@ -232,6 +239,27 @@ export interface Sprite{
      * Current state of the sprite. The state of a sprite is a mutable object.
      */
     state?:SpriteState;
+}
+
+/**
+ * A rich inline text span.
+ */
+export interface SpriteTextSpan
+{
+    /**
+     * Plain text content of the span.
+     */
+    text:string;
+
+    /**
+     * Foreground color. Can be a hex color or the name of a theme variable.
+     */
+    color?:string;
+
+    /**
+     * Background color. Can be a hex color or the name of a theme variable.
+     */
+    bg?:string;
 }
 
 /**
