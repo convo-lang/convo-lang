@@ -81,6 +81,12 @@
   - column
   - grid
   - flex distribution for row and column children
+- Added sprite width and height support:
+  - explicit dimensions are normalized to non-negative integer terminal cells
+  - explicit dimensions override natural sprite size
+  - child `width` overrides flex distribution in row layouts
+  - child `height` overrides flex distribution in column layouts
+  - explicit cross-axis sizes are respected by row, column, and grid child drawing
 - Added layout sizing refinements:
   - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
   - flex remainder is assigned to the last positive-flex child for predictable total sizing

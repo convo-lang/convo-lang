@@ -91,6 +91,17 @@ export interface Sprite{
     absolutePosition?:SpriteAbsolutePosition;
 
     /**
+     * Discreet width of the sprite. Width will override flex values when the sprite is a child in a row.
+     */
+    width?:number;
+
+    /**
+     * Discreet width of the sprite. Height will override flex values when the sprite is a child in a column.
+     */
+    height?:number;
+
+
+    /**
      * Text displayed by the sprite.
      * @note Text is only displayed when a sprite uses the `inline` layout type.
      */

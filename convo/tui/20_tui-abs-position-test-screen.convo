@@ -1,3 +1,16 @@
+@import ../base.convo
+@import ../../packages/tui/test/screen-test.ts !file
+@import ../../packages/tui/src/tui-types.ts !file
+
+> user
+Add a screen that demonstrates absolute positioning to `screen-tests.ts`
+
+@time 2026-05-03T06:26:51-04:00
+@tokenUsage 13668 / 8904 / $0.11286000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="screen-test.ts" target-output-path="../../packages/tui/test/screen-test.ts" dirty file-hash="b72811dc4ffff14622a96e7e52275bf16bb112a6" last-commit="f2fdaa78648ef09c68d0d7fe1b6d627cbe8f83b6">
+```ts
 #!/usr/bin/env bun
 import { appendFile } from "node:fs/promises";
 import { ConvoTuiCtrl } from '../src/ConvoTuiCtrl.js';
@@ -1346,7 +1359,6 @@ const absoluteRoot:SpriteDef={
                 width:30,
                 height:7,
             },
-            width:30,
             border:'success',
             bg:'panel',
             children:[
@@ -1499,3 +1511,9 @@ proc.on('SIGTERM', ()=>{
 });
 
 ctrl.init();
+
+```
+</FILE_CONTENT>
+
+
+> user
