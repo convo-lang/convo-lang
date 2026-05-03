@@ -849,22 +849,9 @@ export class ConvoTuiCtrl
         let bottom=Number.MIN_SAFE_INTEGER;
         if(!sprite.inlineRenderer?.overlayContent){
             left=rect.x;
-            right=rect.x+rect.width;
+            right=rect.x+rect.width-1;
             top=rect.y;
-            bottom=rect.y+rect.height;
-            if(sprite.border){
-                if(typeof sprite.border==='string'){
-                    right-=1;
-                    bottom-=1;
-                }else{
-                    if(sprite.border.right){
-                        right-=1;
-                    }
-                    if(sprite.border.bottom){
-                        bottom-=1;
-                    }
-                }
-            }
+            bottom=rect.y+rect.height-1;
         }
 
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
@@ -907,14 +894,29 @@ export class ConvoTuiCtrl
             top!==Number.MAX_SAFE_INTEGER &&
             bottom!==Number.MIN_SAFE_INTEGER
         ){
-            const width=Math.max(0,right-left+1);
-            const height=Math.max(0,bottom-top+1);
+            const renderRect:TuiRect={
+                x:left,
+                y:top,
+                width:Math.max(0,right-left+1),
+                height:Math.max(0,bottom-top+1),
+            };
+            const clip=this.getCurrentClip()??{
+                x:0,
+                y:0,
+                width:this.bufferState.width,
+                height:this.bufferState.height,
+            };
+            const renderBounds=this.intersectRects(renderRect, clip);
+            const width=renderBounds.width;
+            const height=renderBounds.height;
             const _self=this;
             const ctx:SpriteInlineRenderCtx=(sprite as any)[this.inlineRenderCtxKey]??((sprite as any)[this.inlineRenderCtxKey]={
                 width,
                 height,
                 x:left,
                 y:top,
+                renderBounds,
+                clip,
                 count:0,
                 lastCall:Date.now(),
                 delta:0,
@@ -925,6 +927,16 @@ export class ConvoTuiCtrl
                     if(x<0 || x>=this.width || y<0 || y>=this.height){
                         return false;
                     }
+
+                    const set=(px:number,py:number,cc:string)=>{
+                        const ax=this.x+px;
+                        const ay=this.y+py;
+                        if(this.clip && (ax<this.clip.x || ay<this.clip.y || ax>=this.clip.x+this.clip.width || ay>=this.clip.y+this.clip.height)){
+                            return;
+                        }
+                        _self.setChar(ax,ay,cc,_self.resolveColor(f),_self.resolveColor(b),sprite.id);
+                    };
+
                     if(c.length>1){
                         for(let i=0;i<c.length;i++){
                             let cc=c[i] as string;
@@ -934,10 +946,10 @@ export class ConvoTuiCtrl
                             if(x+i>=this.width){
                                 break;
                             }
-                            _self.setChar(this.x+x+i,this.y+y,cc,_self.resolveColor(f),_self.resolveColor(b),sprite.id);
+                            set(x+i,y,cc);
                         }
                     }else{
-                        _self.setChar(this.x+x,this.y+y,c,_self.resolveColor(f),_self.resolveColor(b),sprite.id);
+                        set(x,y,c);
                     }
                     return true;
 
@@ -948,11 +960,13 @@ export class ConvoTuiCtrl
             ctx.y=top;
             ctx.width=width;
             ctx.height=height;
+            ctx.renderBounds=renderBounds;
+            ctx.clip=clip;
             const now=Date.now();
             ctx.delta=Math.max(1,now-ctx.lastCall);
             ctx.lastCall=now;
             sprite.inlineRenderer.render?.(ctx);
-            if(sprite.inlineRenderer && !this.animationCtxList.includes(ctx)){
+            if(sprite.inlineRenderer.intervalMs!==undefined && !this.animationCtxList.includes(ctx)){
                 this.startAnimation(ctx);
             }
         }
@@ -970,9 +984,12 @@ export class ConvoTuiCtrl
             ctx.delta=Math.max(1,now-ctx.lastCall);
             ctx.lastCall=now;
             ctx.sprite.inlineRenderer?.render?.(ctx);
-            const output=this.renderBufferDiffAnsi(this.bufferState.front,this.bufferState.back,ctx);
+            const bounds=ctx.renderBounds;
+            const output=bounds.width>0 && bounds.height>0?this.renderBufferDiffAnsi(this.bufferState.front,this.bufferState.back,bounds):'';
             const cursorOutput=this.getCursorAnsi();
-            this.copyBackBufferToFrontBound(ctx);
+            if(bounds.width>0 && bounds.height>0){
+                this.copyBackBufferToFrontBound(bounds);
+            }
             if(output || cursorOutput){
                 this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
             }

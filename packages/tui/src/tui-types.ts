@@ -660,6 +660,10 @@ export interface SpriteInlineRenderCtx
 
     lastCall:number;
 
+    renderBounds:TuiRect;
+    
+    clip:TuiRect;
+
     /**
      * Sets a character or a string of characters at the give position relative to layout area of
      * the sprites content. False is returned if an attempt to set a character outside of the
