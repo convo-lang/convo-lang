@@ -70,7 +70,6 @@ const status={
     id:'status',
     text:'Status: ready',
     color:'success',
-    flex:1,
 } satisfies SpriteDef;
 
 
@@ -244,6 +243,8 @@ const homeRoot:SpriteDef={
                             id:'logo-image',
                             image:logoSrc,
                             textAlign:'center',
+                            vTextAlign:'center',
+                            flex:1,
                         },
                         {
                             id:'timer',
@@ -1250,6 +1251,7 @@ const flexRoot:SpriteDef={
                             flex:1,
                             border:'muted',
                             textAlign:'center',
+                            vTextAlign:'center',
                         },
                         {
                             text:'Fixed footer keeps natural height',

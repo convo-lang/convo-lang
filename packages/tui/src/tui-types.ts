@@ -104,14 +104,16 @@ export interface Sprite{
     richText?:SpriteTextSpan[];
 
     /**
-     * Controls the alignment of inline text. If undefined textAlignment is inherited.
+     * Controls the alignment of inline text. Text alignment also consols the alignment of images.
+     * If undefined textAlignment is inherited.
      * @inherited
      */
     textAlign?:SpriteTextAlignment;
 
     /**
-     * Controls the vertical alignment of inline text. If undefined textAlignment is NOT inherited,
-     * this contrasts from the textAlign property.
+     * Controls the vertical alignment of inline text. Vertical text alignment also consols the
+     * alignment of images. If undefined textAlignment is NOT inherited, this contrasts from the
+     * textAlign property.
      */
     vTextAlign?:SpriteTextAlignment;
 

@@ -127,6 +127,11 @@
   - `end`
   - inherited from nearest ancestor when undefined
   - applied only when drawing inline text
+- Added vertical inline text and image alignment:
+  - `vTextAlign` supports `start`, `center`, and `end`
+  - applies to inline text, rich text, input cursor placement, and inline images
+  - unlike `textAlign`, `vTextAlign` is not inherited from ancestors
+  - vertical alignment is disabled while vertically scrolled away from the top
 - Added rich inline text:
   - `Sprite.richText?:SpriteTextSpan[]`
   - per-span `text`, `color`, and `bg`
