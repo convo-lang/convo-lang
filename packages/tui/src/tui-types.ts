@@ -100,6 +100,16 @@ export interface Sprite{
      */
     height?:number;
 
+    /**
+     * Margin placed around the outside edge of the sprite.
+     */
+    margin?:number|SpriteSides;
+
+    /**
+     * Padding placed around the inside of the sprite. When the sprite is given a width or height padding
+     * is applied inside of the given size and shrinks the content area.
+     */
+    padding?:number|SpriteSides;
 
     /**
      * Text displayed by the sprite.
@@ -469,13 +479,15 @@ export interface SpriteAbsolutePosition
     bottom?:number;
 
     /**
-     * If undefined width will be calculated by subtracting the left and right
+     * If undefined will fallback to the discreet width property of the sprite and if the discreet width
+     * of the sprite is undefined the value of width will be calculated by subtracting the left and right
      * values from the width of the terminal and if right is undefined, right will default to 0.
      */
     width?:number;
 
     /**
-     * If undefined height will be calculated by subtracting the top and bottom
+     * If undefined will fallback to the discreet height property of the sprite and if the discreet height
+     * of the sprite is undefined the value of height will be calculated by subtracting the top and bottom
      * values from the height of the terminal and if bottom is undefined, bottom will default to 0.
      */
     height?:number;
@@ -519,6 +531,18 @@ export interface SpriteBorder
     bottom?:string;
     left?:string;
     right?:string;
+}
+
+/**
+ * Represents the 4 sides of a sprite. Primarily used with padding and margins. Undefined values
+ * default to 0
+ */
+export interface SpriteSides
+{
+    top?:number;
+    bottom?:number;
+    left?:number;
+    right?:number;
 }
 
 /**

@@ -1160,24 +1160,28 @@ const flexRoot:SpriteDef={
                     bg:'panel',
                     children:[
                         {
-                            text:'flex 1',
+                            text:'flex 1 padding 2',
                             flex:1,
                             color:'success',
                             border:'success',
                             textAlign:'center',
+                            padding:2
                         },
                         {
-                            text:'flex 2 receives about twice the width',
+                            text:'flex 2 receives about twice the width and margin of 2',
                             flex:2,
                             border:'muted',
                             textAlign:'center',
+                            margin:2,
                         },
                         {
-                            text:'flex 1',
+                            text:'flex 1 margin and padding right:4 top:1',
                             flex:1,
                             color:'danger',
                             border:'danger',
-                            textAlign:'center',
+                            textAlign:'end',
+                            padding:{right:4,top:1},
+                            margin:{right:4,top:1},
                         },
                     ],
                 },
@@ -1343,7 +1347,6 @@ const absoluteRoot:SpriteDef={
             absolutePosition:{
                 left:4,
                 top:6,
-                width:30,
                 height:7,
             },
             width:30,

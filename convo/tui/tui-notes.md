@@ -87,6 +87,10 @@
   - child `width` overrides flex distribution in row layouts
   - child `height` overrides flex distribution in column layouts
   - explicit cross-axis sizes are respected by row, column, and grid child drawing
+- Added absolute sprite sizing support:
+  - `absolutePosition.width` and `absolutePosition.height` override all fallback sizing
+  - sprite `width` and `height` are used as fallbacks when absolute position width/height are undefined
+  - terminal-edge sizing using `left/right` and `top/bottom` is used when no explicit absolute or sprite dimension is defined
 - Added layout sizing refinements:
   - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
   - flex remainder is assigned to the last positive-flex child for predictable total sizing

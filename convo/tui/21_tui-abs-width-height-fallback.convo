@@ -1,5 +1,21 @@
+@import ./_tui.convo
+
+> user
+Implement the width and height fallback behavior of the `SpriteAbsolutePosition` interface.
+Currently `ConvoTuiCtrl` does not take into account the discreet width or height for absolute positioning.
+
+
+
+@time 2026-05-03T06:40:48-04:00
+@tokenUsage 25535 / 19957 / $0.22746000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+No questions.
+
+<FILE_CONTENT name="ConvoTuiCtrl.ts" target-output-path="../../packages/tui/src/ConvoTuiCtrl.ts" last-commit="527491496aafcf7a1bfd950a20e1b5b80cb032aa">
+``` ts
 import { convertB64TuiImage } from "./tui-image-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -57,14 +73,6 @@ interface TuiMouseTarget
     sprite:Sprite;
     screen:Screen;
     path:Sprite[];
-}
-
-interface TuiResolvedSides
-{
-    top:number;
-    bottom:number;
-    left:number;
-    right:number;
 }
 
 type TuiSgrMouseAction='press'|'release'|'drag'|'wheel';
@@ -646,10 +654,7 @@ export class ConvoTuiCtrl
     private drawSprite(sprite:Sprite, rect:TuiRect, parentStyle:TuiStyle, inheritedProps:TuiInheritedSpriteProps={})
     {
         rect=this.normalizeRect(rect);
-
-        const margin=this.getSpriteSides(sprite.margin);
-        const spriteRect=this.normalizeRect(this.insetRect(rect, margin));
-        if(spriteRect.width<=0 || spriteRect.height<=0){
+        if(rect.width<=0 || rect.height<=0){
             return;
         }
 
@@ -667,20 +672,15 @@ export class ConvoTuiCtrl
             b:(active?this.resolveColor(sprite.activeBg):undefined)??baseStyle.b,
         };
 
-        this.fillRect(spriteRect, baseStyle, sprite.id);
+        this.fillRect(rect, baseStyle, sprite.id);
 
         const border=this.getBorderColors(sprite, style.f);
         if(border.hasBorder){
-            this.drawBorder(spriteRect, border, sprite.borderStyle??'normal',sprite.id);
+            this.drawBorder(rect, border, sprite.borderStyle??'normal',sprite.id);
         }
 
-        const paddingBox=this.getContentRect(spriteRect, border);
-        const contentRect=this.normalizeRect(this.insetRect(paddingBox, this.getSpriteSides(sprite.padding)));
+        const contentRect=this.getContentRect(rect, border);
         this.spriteContentRects.set(sprite.id, contentRect);
-
-        if(paddingBox.width>0 && paddingBox.height>0){
-            this.fillRect(paddingBox, style, sprite.id);
-        }
 
         if(sprite.scrollable){
             this.clampSpriteScroll(sprite, contentRect);
@@ -689,6 +689,8 @@ export class ConvoTuiCtrl
         if(contentRect.width<=0 || contentRect.height<=0){
             return;
         }
+
+        this.fillRect(contentRect, style, sprite.id);
 
         const layout=sprite.layout??'inline';
         if(layout==='inline'){
@@ -708,18 +710,13 @@ export class ConvoTuiCtrl
                 continue;
             }
 
-            const margin=this.getSpriteSides(sprite.margin);
-            const marginWidth=margin.left+margin.right;
-            const marginHeight=margin.top+margin.bottom;
             const right=pos.right??0;
             const bottom=pos.bottom??0;
-            const width=this.getSpriteDiscreteSize(pos.width)??this.getSpriteDiscreteSize(sprite.width);
-            const height=this.getSpriteDiscreteSize(pos.height)??this.getSpriteDiscreteSize(sprite.height);
             const rect:TuiRect={
                 x:pos.left,
                 y:pos.top,
-                width:width===undefined?Math.max(0, this.bufferState.width-pos.left-right):width+marginWidth,
-                height:height===undefined?Math.max(0, this.bufferState.height-pos.top-bottom):height+marginHeight,
+                width:pos.width??this.getSpriteDiscreteSize(sprite.width)??Math.max(0, this.bufferState.width-pos.left-right),
+                height:pos.height??this.getSpriteDiscreteSize(sprite.height)??Math.max(0, this.bufferState.height-pos.top-bottom),
             };
 
             this.drawSprite(sprite, rect, {
@@ -1003,7 +1000,7 @@ export class ConvoTuiCtrl
                 x,
                 y:rect.y,
                 width,
-                height:this.getSpriteOuterDiscreteSize(child, 'height')??rect.height,
+                height:this.getSpriteDiscreteSize(child.height)??rect.height,
             }, style, inheritedProps);
             x+=width;
         });
@@ -1021,7 +1018,7 @@ export class ConvoTuiCtrl
             this.drawSprite(child, {
                 x:rect.x,
                 y,
-                width:this.getSpriteOuterDiscreteSize(child, 'width')??rect.width,
+                width:this.getSpriteDiscreteSize(child.width)??rect.width,
                 height,
             }, style, inheritedProps);
             y+=height;
@@ -1051,8 +1048,8 @@ export class ConvoTuiCtrl
                     this.drawSprite(child, {
                         x,
                         y,
-                        width:this.getSpriteOuterDiscreteSize(child, 'width')??width,
-                        height:this.getSpriteOuterDiscreteSize(child, 'height')??(rowHeights[row]??0),
+                        width:this.getSpriteDiscreteSize(child.width)??width,
+                        height:this.getSpriteDiscreteSize(child.height)??(rowHeights[row]??0),
                     }, style, inheritedProps);
                 }
                 x+=width;
@@ -1064,7 +1061,7 @@ export class ConvoTuiCtrl
     private getFlexDistributedSizes(children:Sprite[], totalSize:number, naturalSizes:number[], axis:'width'|'height'):number[]
     {
         totalSize=Math.max(0, Math.floor(totalSize));
-        const explicitSizes=children.map(child=>this.getSpriteOuterDiscreteSize(child, axis));
+        const explicitSizes=children.map(child=>this.getSpriteDiscreteSize(axis==='width'?child.width:child.height));
         const flexes=children.map((child, i)=>explicitSizes[i]===undefined?Math.max(0, child.flex??0):0);
         const totalFlex=flexes.reduce((sum, flex)=>sum+flex, 0);
         const baseSizes=naturalSizes.map((size, i)=>explicitSizes[i]??size);
@@ -1103,20 +1100,13 @@ export class ConvoTuiCtrl
 
     private getNaturalSize(sprite:Sprite, width?:number):TuiSize
     {
-        const margin=this.getSpriteSides(sprite.margin);
-        const padding=this.getSpriteSides(sprite.padding);
-        const marginWidth=margin.left+margin.right;
-        const marginHeight=margin.top+margin.bottom;
-        const paddingWidth=padding.left+padding.right;
-        const paddingHeight=padding.top+padding.bottom;
         const border=this.getBorderColors(sprite);
         const borderWidth=(border.left?1:0)+(border.right?1:0);
         const borderHeight=(border.top?1:0)+(border.bottom?1:0);
         const explicitWidth=this.getSpriteDiscreteSize(sprite.width);
         const explicitHeight=this.getSpriteDiscreteSize(sprite.height);
-        const availableWidth=width===undefined?undefined:Math.max(0, Math.floor(width)-marginWidth);
-        const measuredWidth=explicitWidth??availableWidth;
-        const contentWidth=measuredWidth===undefined?undefined:Math.max(0, Math.floor(measuredWidth)-borderWidth-paddingWidth);
+        const measuredWidth=explicitWidth??width;
+        const contentWidth=measuredWidth===undefined?undefined:Math.max(0, Math.floor(measuredWidth)-borderWidth);
         const children=(sprite.children??[]).filter(child=>!child.absolutePosition);
         const layout=sprite.layout??'inline';
         let size:TuiSize;
@@ -1125,19 +1115,19 @@ export class ConvoTuiCtrl
             if(sprite.image){
                 const imageSize=this.getImageCellSize(sprite.image);
                 size={
-                    width:(contentWidth===undefined?imageSize.width:Math.max(1, contentWidth))+paddingWidth+borderWidth,
-                    height:imageSize.height+paddingHeight+borderHeight,
+                    width:(contentWidth===undefined?imageSize.width:Math.max(1, contentWidth))+borderWidth,
+                    height:imageSize.height+borderHeight,
                 };
             }else{
                 const text=this.getInlineSpriteText(sprite);
                 const textWrap=sprite.textWrap??'wrap';
                 const lines=contentWidth===undefined?this.getTextLines(text):this.getInlineSpriteLines(text, Math.max(1, contentWidth), textWrap);
                 size={
-                    width:(contentWidth===undefined?Math.max(1, ...lines.map(line=>line.length)):Math.max(1, contentWidth))+paddingWidth+borderWidth,
-                    height:Math.max(1, lines.length)+paddingHeight+borderHeight,
+                    width:(contentWidth===undefined?Math.max(1, ...lines.map(line=>line.length)):Math.max(1, contentWidth))+borderWidth,
+                    height:Math.max(1, lines.length)+borderHeight,
                 };
             }
-            return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+            return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
         }
 
         if(layout==='row'){
@@ -1146,17 +1136,17 @@ export class ConvoTuiCtrl
             if(contentWidth!==undefined){
                 const widths=this.getFlexDistributedSizes(children, contentWidth, sizes.map(size=>size.width), 'width');
                 size={
-                    width:contentWidth+paddingWidth+borderWidth,
-                    height:Math.max(1, ...children.map((child, i)=>this.getNaturalSize(child, widths[i]??0).height))+paddingHeight+borderHeight,
+                    width:contentWidth+borderWidth,
+                    height:Math.max(1, ...children.map((child, i)=>this.getNaturalSize(child, widths[i]??0).height))+borderHeight,
                 };
-                return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+                return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
             }
 
             size={
-                width:sizes.reduce((sum, size)=>sum+size.width, 0)+paddingWidth+borderWidth,
-                height:Math.max(1, ...sizes.map(size=>size.height))+paddingHeight+borderHeight,
+                width:sizes.reduce((sum, size)=>sum+size.width, 0)+borderWidth,
+                height:Math.max(1, ...sizes.map(size=>size.height))+borderHeight,
             };
-            return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+            return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
         }
 
         if(layout==='grid'){
@@ -1174,10 +1164,10 @@ export class ConvoTuiCtrl
                 });
 
                 size={
-                    width:contentWidth+paddingWidth+borderWidth,
-                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0))+paddingHeight+borderHeight,
+                    width:contentWidth+borderWidth,
+                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0))+borderHeight,
                 };
-                return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+                return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
             }
 
             const sizes=children.map(child=>this.getNaturalSize(child));
@@ -1191,18 +1181,18 @@ export class ConvoTuiCtrl
             }
 
             size={
-                width:naturalWidth+paddingWidth+borderWidth,
-                height:Math.max(1, naturalHeight)+paddingHeight+borderHeight,
+                width:naturalWidth+borderWidth,
+                height:Math.max(1, naturalHeight)+borderHeight,
             };
-            return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+            return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
         }
 
         const sizes=children.map(child=>this.getNaturalSize(child, contentWidth));
         size={
-            width:Math.max(1, ...sizes.map(size=>size.width))+paddingWidth+borderWidth,
-            height:sizes.reduce((sum, size)=>sum+size.height, 0)+paddingHeight+borderHeight,
+            width:Math.max(1, ...sizes.map(size=>size.width))+borderWidth,
+            height:sizes.reduce((sum, size)=>sum+size.height, 0)+borderHeight,
         };
-        return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+        return this.applySpriteDiscreteSize(size, explicitWidth, explicitHeight);
     }
 
     private getSpriteDiscreteSize(size:number|undefined):number|undefined
@@ -1210,22 +1200,11 @@ export class ConvoTuiCtrl
         return typeof size==='number' && Number.isFinite(size)?Math.max(0, Math.floor(size)):undefined;
     }
 
-    private getSpriteOuterDiscreteSize(sprite:Sprite, axis:'width'|'height'):number|undefined
-    {
-        const size=this.getSpriteDiscreteSize(axis==='width'?sprite.width:sprite.height);
-        if(size===undefined){
-            return undefined;
-        }
-
-        const margin=this.getSpriteSides(sprite.margin);
-        return size+(axis==='width'?margin.left+margin.right:margin.top+margin.bottom);
-    }
-
-    private applySpriteOuterSize(size:TuiSize, width:number|undefined, height:number|undefined, margin:TuiResolvedSides):TuiSize
+    private applySpriteDiscreteSize(size:TuiSize, width:number|undefined, height:number|undefined):TuiSize
     {
         return {
-            width:(width??size.width)+margin.left+margin.right,
-            height:(height??size.height)+margin.top+margin.bottom,
+            width:width??size.width,
+            height:height??size.height,
         };
     }
 
@@ -1862,36 +1841,6 @@ export class ConvoTuiCtrl
             y:Math.floor(rect.y),
             width:Math.max(0, Math.floor(rect.width)),
             height:Math.max(0, Math.floor(rect.height)),
-        };
-    }
-
-    private insetRect(rect:TuiRect, sides:TuiResolvedSides):TuiRect
-    {
-        return {
-            x:rect.x+sides.left,
-            y:rect.y+sides.top,
-            width:Math.max(0, rect.width-sides.left-sides.right),
-            height:Math.max(0, rect.height-sides.top-sides.bottom),
-        };
-    }
-
-    private getSpriteSides(sides:number|SpriteSides|undefined):TuiResolvedSides
-    {
-        if(typeof sides==='number'){
-            const value=Number.isFinite(sides)?Math.max(0, Math.floor(sides)):0;
-            return {
-                top:value,
-                bottom:value,
-                left:value,
-                right:value,
-            };
-        }
-
-        return {
-            top:this.getSpriteDiscreteSize(sides?.top)??0,
-            bottom:this.getSpriteDiscreteSize(sides?.bottom)??0,
-            left:this.getSpriteDiscreteSize(sides?.left)??0,
-            right:this.getSpriteDiscreteSize(sides?.right)??0,
         };
     }
 
@@ -2646,3 +2595,250 @@ const wait=(ms=1000)=>{
     const end=Date.now()+ms;
     while(end>Date.now()){}
 }
+
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" last-commit="527491496aafcf7a1bfd950a20e1b5b80cb032aa">
+``` md
+# TUI Notes
+
+## ConvoTuiCtrl first-pass decisions
+
+- `ConvoTuiCtrlOptions` includes:
+  - `theme:TuiTheme`
+  - `defaultScreen?:string`
+- A theme is required and theme colors are expected to be `#rrggbb`.
+- Initial active screen is:
+  1. `defaultScreen`, when provided and found
+  2. otherwise the first screen in the `screens` array
+- Public navigation API should include:
+  - `activateScreen(id)`
+  - `activateSprite(id, screen?)`
+  - `activateLink(link, sourceScreen?)`
+  - `followLink(spriteOrId)`
+- Rendering flow for the first implementation pass:
+  1. populate the back buffer
+  2. compare the back buffer to the front buffer
+  3. write changed runs to stdout using ANSI escape sequences
+  4. copy the back buffer to the front buffer
+- First render and resize render use a full redraw.
+- Color handling should support theme variables and `#rrggbb`.
+- Layout should be split into two passes:
+  1. determine natural layout size of inline sprites
+  2. share remaining layout space between row, column, grid, and flex children
+- Default `flex` is `0`.
+- Children without `flex` use natural size; remaining space is distributed by flex value.
+- Borders draw inside the assigned sprite rectangle and inset content by 1.
+- Input support planned:
+  - Tab / Shift+Tab navigation
+  - Enter / Space click activation
+  - text input editing
+  - Backspace
+  - link activation
+  - mouse support
+- Resize support planned:
+  - listen to stdout `resize`
+  - recreate buffers
+  - re-render automatically
+
+## Current implementation status
+
+- Added required controller options and public navigation API.
+- Added screen/sprite loading with generated ids and copied state.
+- Added active screen and active sprite state management.
+- Added active sprite state syncing:
+  - `state.active` is set on the active sprite
+  - previous active sprites are reset to `false`
+- Added active sprite visual properties:
+  - `activeColor`
+  - `activeBg`
+  - `activeBorder`
+- Added full-screen terminal initialization:
+  - alternate screen buffer
+  - hidden cursor
+  - raw stdin mode
+  - mouse reporting
+  - bracketed paste mode
+- Added cleanup/dispose handling:
+  - removes event listeners
+  - disables raw mode
+  - pauses stdin
+  - disables mouse reporting
+  - disables bracketed paste mode
+  - restores cursor and main screen buffer
+- Added buffer resize/allocation helpers.
+- Added rendering:
+  - clears the back buffer
+  - draws active screen root
+  - draws absolute sprites
+  - full redraws on first render and after resize
+  - diff renders after the first render by comparing front/back buffers
+  - emits changed character runs using cursor positioning escape sequences
+  - preserves ANSI foreground/background style changes for changed runs
+  - copies back buffer to front buffer after rendering
+- Added color resolution for theme variables and `#rrggbb`.
+- Added layouts:
+  - inline
+  - row
+  - column
+  - grid
+  - flex distribution for row and column children
+- Added sprite width and height support:
+  - explicit dimensions are normalized to non-negative integer terminal cells
+  - explicit dimensions override natural sprite size
+  - child `width` overrides flex distribution in row layouts
+  - child `height` overrides flex distribution in column layouts
+  - explicit cross-axis sizes are respected by row, column, and grid child drawing
+- Added absolute sprite sizing support:
+  - `absolutePosition.width` and `absolutePosition.height` override all fallback sizing
+  - sprite `width` and `height` are used as fallbacks when absolute position width/height are undefined
+  - terminal-edge sizing using `left/right` and `top/bottom` is used when no explicit absolute or sprite dimension is defined
+- Added layout sizing refinements:
+  - row and column flex sizing now handles all-flex, no-flex, and mixed children without divide-by-zero behavior
+  - flex remainder is assigned to the last positive-flex child for predictable total sizing
+  - negative and invalid layout sizes are normalized before drawing
+  - row natural height can now account for constrained child widths
+  - grid `fr` sizing avoids divide-by-zero and assigns remainder to the last positive `fr` column
+  - grid row heights are calculated from constrained child column widths
+  - scrollable clipping preserves child layout coordinates so wrapped text scrolls without reflowing against the clipped viewport edge
+- Added sprite borders:
+  - normal
+  - thick
+  - rounded
+  - double
+  - classic
+  - per-side border colors
+- Added scroll offsets for scrollable sprites.
+- Added scroll bounds for scrollable sprites:
+  - scroll offsets are clamped using the current content viewport
+  - wheel and keyboard scrolling stop when the last content row reaches the bottom of the scroll viewport
+  - stale scroll offsets are clamped during render after resize or content changes
+- Added clipping bounds for scrollable container children:
+  - drawing operations respect an internal clip stack
+  - scrollable sprite children clip to the sprite content rect
+  - parent borders remain visible because clipping is scoped to children only
+  - nested scrollable containers clip by intersecting parent and child clip rects
+  - absolute sprites continue to be drawn by the existing absolute rendering pass
+- Added inline text wrapping:
+  - `wrap` wraps on whitespace when possible and hard wraps words that exceed available width
+  - `wrap-hard` wraps exactly at the available width
+  - `clip` preserves explicit lines and clips horizontally
+  - explicit newlines are preserved
+  - `textClipStyle` supports no marker or ellipses for clipped text
+  - natural inline height updates when a constrained width is known
+- Added a manual text wrapping screen to `screen-test.ts` that demonstrates:
+  - default wrapping
+  - hard wrapping
+  - clipping with ellipses
+  - clipping without marker
+  - explicit newlines
+  - centered wrapped text
+- Added inline text alignment:
+  - `start`
+  - `center`
+  - `end`
+  - inherited from nearest ancestor when undefined
+  - applied only when drawing inline text
+- Added vertical inline text and image alignment:
+  - `vTextAlign` supports `start`, `center`, and `end`
+  - applies to inline text, rich text, input cursor placement, and inline images
+  - unlike `textAlign`, `vTextAlign` is not inherited from ancestors
+  - vertical alignment is disabled while vertically scrolled away from the top
+- Added rich inline text:
+  - `Sprite.richText?:SpriteTextSpan[]`
+  - per-span `text`, `color`, and `bg`
+  - span colors support theme variables and `#rrggbb`
+  - plain `text` behavior is preserved when `richText` is not defined
+  - non-input inline sprites prefer `richText` over `text`
+  - wrapping, clipping, scrolling, and alignment use the same character layout rules as plain text
+- Added keyboard input:
+  - Tab / Shift+Tab focus navigation
+  - Enter / Space click activation
+  - printable character input
+  - Backspace
+  - arrow key scrolling for active scrollable sprites
+  - Ctrl+C dispose
+- Added more complete input sprite keyboard editing:
+  - Backspace removes the character before the caret
+  - Delete removes the character at the caret
+  - Left/right arrows move the caret within active input sprites
+  - Home and End move the caret to the start and end
+  - Ctrl+A and Ctrl+E move the caret to the start and end on macOS/Linux terminals
+  - printable pasted text is inserted at the caret
+  - bracketed paste input strips escape/control sequences before insertion
+  - `onInput` fires only when the input value changes
+  - non-input left/right arrow behavior continues to scroll active scrollable sprites
+- Added active input cursor support:
+  - `SpriteState.inputCaret` stores a minimal zero-based caret position
+  - active input sprites show the terminal cursor
+  - non-input active sprites hide the terminal cursor
+  - cursor defaults to the end of the input value
+  - cursor position respects sprite layout rect and sprite scroll offsets
+- Added mouse click support using SGR mouse mode.
+- Added more robust SGR mouse support:
+  - parses press, release, drag, and wheel events
+  - preserves existing left-button press click behavior
+  - dispatches `onMouseRelease`, `onMouseDrag`, and `onMouseWheel` to the sprite under the mouse
+  - mouse event objects include terminal-relative `x` and `y` coordinates
+  - mouse event objects include button/modifier metadata where applicable
+  - wheel up/down scrolls the nearest scrollable sprite under the mouse path
+- Added a manual mouse events screen to `screen-test.ts` that demonstrates:
+  - mouse release event callbacks
+  - mouse drag event callbacks
+  - mouse wheel event callbacks
+  - terminal-relative mouse coordinates
+  - reported mouse modifiers
+  - wheel scrolling on a scrollable panel
+- Added resize support:
+  - listens to stdout `resize`
+  - recreates buffers
+  - re-renders automatically
+  - forces a full redraw after buffer size changes
+- Added TUI image base64 decoding:
+  - accepts raw base64 strings and data URL base64 payloads
+  - validates the `Conv` header and 32-byte metadata block
+  - reads width, bytes per pixel, and height as little-endian unsigned 32-bit integers
+  - extracts the expected pixel data range
+  - returns a default red X image with `error` populated when image data is invalid
+- Added TUI image rendering:
+  - inline sprites with `image` render with upper-half block characters
+  - two vertical image pixels are packed into one terminal row using foreground/background colors
+  - image natural size is `width` columns by `ceil(height / 2)` terminal rows
+  - RGB and grayscale pixel data are supported, with transparent alpha falling back to the sprite background
+  - text/rich text can still render over an image without affecting image natural size
+- Added inline image horizontal alignment:
+  - inline images now respect inherited `textAlign`
+  - `start`, `center`, and `end` alignment are applied when the image is narrower than the sprite content rect
+  - horizontally scrolled images remain left-aligned to the viewport while scrolled
+
+## Deferred / future work
+
+- Rich text support beyond first-pass inline spans:
+  - nested style ranges
+  - markdown-like parsing
+  - links/actions per span
+- More advanced keyboard handling:
+  - multiline input editing
+  - word-wise cursor movement
+  - selection
+  - undo/redo
+- More robust mouse support:
+  - mouse capture / button ownership during drag sequences
+  - dedicated mouse press events separate from existing click behavior
+  - double-click / multi-click detection
+  - horizontal wheel scrolling
+  - pixel-level mouse modes
+  - release events over borders, since border chars currently do not retain sprite ids
+  - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
+
+## Planned implementation convo scripts
+
+- `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
+
+```
+</FILE_CONTENT>
+
+
+> user
