@@ -1,6 +1,14 @@
 {
     "name": "@convo-lang/tui",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "type": "module",
-    "sideEffects": false
+    "sideEffects": false,
+    "license": "Apache-2.0",
+    "keywords": [
+        "TUI"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang/tree/main/packages/tui"
+    }
 }
