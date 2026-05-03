@@ -80,7 +80,7 @@
                 "./packages/hono/src/*"
             ],
             "@convo-lang/tui/*": [
-                "./packages/hono/src/*"
+                "./packages/tui/src/*"
             ]
         }
     },

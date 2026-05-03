@@ -15,8 +15,8 @@ npm install @convo-lang/tui
 ## Quick start
 
 ```ts
-import { ConvoTuiCtrl } from '@convo-lang/tui';
-import type { SpriteDef, TuiConsole, TuiTheme } from '@convo-lang/tui';
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import type { SpriteDef, TuiConsole, TuiTheme } from '@convo-lang/tui/tui-types';
 
 const theme:TuiTheme={
     foreground:'#d7d7d7',
@@ -133,8 +133,8 @@ ctrl.init();
 Screens represent top-level terminal views. Each screen has an `id`, a `root` sprite, and an optional `defaultSprite` that receives focus the first time the screen is shown.
 
 ```ts
-import { ConvoTuiCtrl } from '@convo-lang/tui';
-import type { SpriteDef } from '@convo-lang/tui';
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const homeRoot:SpriteDef={
     id:'home-root',
@@ -198,7 +198,7 @@ ctrl.init();
 Screens can run callbacks when activated or deactivated.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const root:SpriteDef={
     id:'root',
@@ -237,7 +237,7 @@ const modalScreen={
 A sprite is the basic UI element. It can contain text, colors, borders, sizing, layout, event handlers, data, state, and children.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const card:SpriteDef={
     id:'profile-card',
@@ -263,7 +263,7 @@ const card:SpriteDef={
 The default sprite layout is `inline`. Inline sprites render their `text`, `richText`, `image`, or custom inline renderer.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const label:SpriteDef={
     id:'label',
@@ -278,7 +278,7 @@ const label:SpriteDef={
 Row layout places children horizontally.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const toolbar:SpriteDef={
     id:'toolbar',
@@ -306,7 +306,7 @@ const toolbar:SpriteDef={
 Column layout places children vertically.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const panel:SpriteDef={
     id:'panel',
@@ -341,7 +341,7 @@ Column units:
 - `fr`: fractional remaining width
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const grid:SpriteDef={
     id:'settings-grid',
@@ -380,7 +380,7 @@ const grid:SpriteDef={
 `flex` distributes remaining space between siblings in row and column layouts.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const splitView:SpriteDef={
     id:'split-view',
@@ -413,7 +413,7 @@ const splitView:SpriteDef={
 Use `width` and `height` to request a discrete size.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const fixedBox:SpriteDef={
     id:'fixed-box',
@@ -431,7 +431,7 @@ const fixedBox:SpriteDef={
 Spacing can be a single number or per-side values.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const spaced:SpriteDef={
     id:'spaced',
@@ -466,7 +466,7 @@ const spaced:SpriteDef={
 Absolute sprites are removed from normal layout and positioned relative to the terminal.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const root:SpriteDef={
     id:'root',
@@ -510,7 +510,7 @@ const root:SpriteDef={
 Inline sprites render `text` by default.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const message:SpriteDef={
     text:'Hello from the terminal',
@@ -523,7 +523,7 @@ const message:SpriteDef={
 Use `textAlign` for horizontal alignment and `vTextAlign` for vertical alignment.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const centered:SpriteDef={
     text:'Centered',
@@ -553,7 +553,7 @@ Supported values:
 - `none`
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const wrappingExamples:SpriteDef={
     id:'wrapping-examples',
@@ -584,7 +584,7 @@ const wrappingExamples:SpriteDef={
 Use `richText` for inline spans with per-span foreground and background colors.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const rich:SpriteDef={
     id:'rich-message',
@@ -617,7 +617,7 @@ const rich:SpriteDef={
 Colors can be direct hex colors or theme variable names.
 
 ```ts
-import type { SpriteDef, TuiTheme } from '@convo-lang/tui';
+import type { SpriteDef, TuiTheme } from '@convo-lang/tui/tui-types';
 
 const theme:TuiTheme={
     foreground:'#d7d7d7',
@@ -645,7 +645,7 @@ const themedButton:SpriteDef={
 Sprites can draw borders using a theme color, hex color, or per-side border object.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const bordered:SpriteDef={
     id:'bordered',
@@ -658,7 +658,7 @@ const bordered:SpriteDef={
 Per-side borders:
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const sideBorders:SpriteDef={
     text:'Only selected sides',
@@ -673,7 +673,7 @@ const sideBorders:SpriteDef={
 Border styles:
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const borderStyles:SpriteDef={
     layout:'column',
@@ -712,7 +712,7 @@ const borderStyles:SpriteDef={
 Interactive sprites can become active. Active sprites can use `activeColor`, `activeBg`, and `activeBorder`.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const button:SpriteDef={
     id:'focus-button',
@@ -734,7 +734,7 @@ const button:SpriteDef={
 A sprite with `link` can move focus to another sprite or activate another screen.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const nav:SpriteDef={
     id:'nav',
@@ -767,7 +767,7 @@ Link resolution checks:
 A sprite with `onClick` automatically behaves like a button. You can also set `isButton:true`.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const saveButton:SpriteDef={
     id:'save',
@@ -789,7 +789,7 @@ const saveButton:SpriteDef={
 A sprite with `isInput:true` behaves like a text input. The current input value is stored in `sprite.state.inputValue`.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const input:SpriteDef={
     id:'name-input',
@@ -810,7 +810,7 @@ const input:SpriteDef={
 Sprites can listen for mouse release, drag, and wheel events.
 
 ```ts
-import type { SpriteDef, SpriteMouseEvtBase } from '@convo-lang/tui';
+import type { SpriteDef, SpriteMouseEvtBase } from '@convo-lang/tui/tui-types';
 
 const formatMouse=(evt:SpriteMouseEvtBase)=>{
     const modifiers=[
@@ -858,7 +858,7 @@ const mousePad:SpriteDef={
 Set `scrollable:true` to allow a sprite's children to scroll when content is larger than the available layout area.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const scrollPanel:SpriteDef={
     id:'scroll-panel',
@@ -880,7 +880,7 @@ const scrollPanel:SpriteDef={
 Use `inlineRenderer` to draw custom content inside an inline sprite.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const custom:SpriteDef={
     id:'custom-renderer',
@@ -902,7 +902,7 @@ The renderer receives a bounded drawing area. Attempts to draw outside the area 
 Set `inlineRenderer.intervalMs` to redraw custom inline content at an interval while the screen is active.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const frames=['|','/','-','\\'];
 
@@ -924,7 +924,7 @@ const spinner:SpriteDef={
 Progress bar example:
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const progress:SpriteDef={
     id:'progress',
@@ -954,7 +954,7 @@ const progress:SpriteDef={
 Sprites can display encoded image data using the `image` property on `SpriteDef`.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 import { logoSrc } from './logo.js';
 
 const logo:SpriteDef={
@@ -976,7 +976,7 @@ const logo:SpriteDef={
 Use the controller to update sprites at runtime.
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const status:SpriteDef={
     id:'status',
@@ -1020,7 +1020,7 @@ Sprite state includes:
 - `scrollY`
 
 ```ts
-import type { SpriteDef } from '@convo-lang/tui';
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const input:SpriteDef={
     id:'search',
@@ -1057,8 +1057,8 @@ const screen={
 `@convo-lang/tui` can target any console-like object that provides compatible input and output streams.
 
 ```ts
-import { ConvoTuiCtrl } from '@convo-lang/tui';
-import type { TuiConsole } from '@convo-lang/tui';
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import type { TuiConsole } from '@convo-lang/tui/tui-types';
 
 const tuiConsole:TuiConsole={
     stdout:process.stdout,
@@ -1087,8 +1087,8 @@ ctrl.init();
 For larger apps, define screens as modules and compose them in one controller.
 
 ```ts
-import { ConvoTuiCtrl } from '@convo-lang/tui';
-import type { ScreenDef } from '@convo-lang/tui';
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import type { ScreenDef } from '@convo-lang/tui/tui-types';
 
 const homeScreen:ScreenDef={
     id:'home',
