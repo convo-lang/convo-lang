@@ -4,5 +4,8 @@
         "src/**/*.ts",
         "src/**/*.tsx"
     ],
-    "compilerOptions": {}
+    "compilerOptions": {
+        "composite": true
+    },
+    "references": []
 }
