@@ -807,7 +807,7 @@ export class ConvoTuiCtrl
 
                 this.setChar(rect.x+x, rect.y+y, {
                     c:'▀',
-                    f:top??style.f,
+                    f:top??style.b,
                     b:bottom??style.b,
                     i:sprite.id,
                 });

@@ -9,6 +9,7 @@ interface Args
     stdin?:boolean;
     out?:string;
     raw?:boolean;
+    alpha?:boolean;
     width?:number;
     help?:boolean;
     export?:string;
@@ -16,19 +17,21 @@ interface Args
 
 const header=Buffer.from([0x43, 0x6f, 0x6e, 0x76]);
 const headerSize=32;
-const bytesPerPixel=3;
+const rgbBytesPerPixel=3;
+const rgbaBytesPerPixel=4;
 
 function printUsage()
 {
     console.error([
-        'Usage: tui-image-encoder --in <path> [--width <pixels>] [--out <path>] [--raw]',
-        '       tui-image-encoder --stdin [--width <pixels>] [--out <path>] [--raw]',
+        'Usage: tui-image-encoder --in <path> [--width <pixels>] [--out <path>] [--raw] [--alpha]',
+        '       tui-image-encoder --stdin [--width <pixels>] [--out <path>] [--raw] [--alpha]',
         '',
         'Arguments:',
         '  --in <path>               Path to an image file',
         '  --stdin                   Read image data from stdin',
         '  --out <path>              File to write to. If omitted, writes to stdout',
         '  --raw                     Write raw Convo image bytes instead of base64 text',
+        '  --alpha                   Include an alpha channel in the output image',
         '  --width <pixels>          Resize image to the given width while preserving aspect ratio',
         '  --export <export name>    Outputs the image as an exported variable with the given name',
     ].join('\n'));
@@ -59,6 +62,8 @@ function parseArgs(argv:string[]):Args
             args.stdin=true;
         }else if(arg==='--raw'){
             args.raw=true;
+        }else if(arg==='--alpha'){
+            args.alpha=true;
         }else if(arg==='--help' || arg==='-h'){
             args.help=true;
         }else if(arg==='--in'){
@@ -115,10 +120,16 @@ async function readInput(args:Args):Promise<Buffer>
 
 async function encodeImage(input:Buffer, args:Args):Promise<Buffer>
 {
+    const bytesPerPixel=args.alpha?rgbaBytesPerPixel:rgbBytesPerPixel;
     const image=sharp(input)
         .rotate()
-        .toColourspace('srgb')
-        .removeAlpha();
+        .toColourspace('srgb');
+
+    if(args.alpha){
+        image.ensureAlpha();
+    }else{
+        image.removeAlpha();
+    }
 
     if(args.width!==undefined){
         image.resize({width:args.width});
