@@ -206,7 +206,7 @@ const homeRoot:SpriteDef={
                             activeBg:'activeBg',
                             activeBorder:'active',
                         },
-                        quitButton,
+                        quitButton
                     ],
                 },
                 {
@@ -243,7 +243,7 @@ const homeRoot:SpriteDef={
                         {
                             id:'logo-image',
                             image:logoSrc,
-                            textAlign:'center'
+                            textAlign:'center',
                         },
                         {
                             id:'timer',

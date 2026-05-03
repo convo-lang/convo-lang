@@ -22,14 +22,21 @@ export const convertB64TuiImage=(b64:string, options?:TuiImageConversionOptions)
         }
 
         const view=new DataView(data.buffer, data.byteOffset, data.byteLength);
-        const width=view.getUint32(4, true);
+        let width=view.getUint32(4, true);
         const bytesPerPixel=view.getUint32(8, true);
-        const height=view.getUint32(12, true);
+        let height=view.getUint32(12, true);
         const pixelLength=width*bytesPerPixel*height;
-        const pixelData=data.slice(imageHeaderSize, imageHeaderSize+pixelLength);
+        let pixelData:Uint8Array=data.slice(imageHeaderSize, imageHeaderSize+pixelLength);
 
         if(options?.cleanEdges??(bytesPerPixel>3?true:false)){
             makeTransparentPixelBorders(pixelData,width,height,bytesPerPixel);
+        }
+
+        const targetSize=getTuiImageTargetSize(width,height,options);
+        if(targetSize && (targetSize.width!==width || targetSize.height!==height)){
+            pixelData=resizeTuiImagePixels(pixelData,width,height,bytesPerPixel,targetSize.width,targetSize.height);
+            width=targetSize.width;
+            height=targetSize.height;
         }
 
         return {
@@ -118,6 +125,57 @@ const validateTuiImageBytes=(data:Uint8Array):string|undefined=>{
     }
 
     return undefined;
+}
+
+const getTuiImageTargetSize=(width:number, height:number, options?:TuiImageConversionOptions):{width:number;height:number}|undefined=>{
+    const optionWidth=getTuiImageDimension(options?.width);
+    const optionHeight=getTuiImageDimension(options?.height);
+
+    if(!optionWidth && !optionHeight){
+        return undefined;
+    }
+
+    const targetWidth=optionWidth??Math.max(1,Math.round(width*(optionHeight as number)/height));
+    const targetHeight=optionHeight??Math.max(1,Math.round(height*(optionWidth as number)/width));
+
+    return {width:targetWidth,height:targetHeight};
+}
+
+const getTuiImageDimension=(value:number|undefined):number|undefined=>{
+    if(value===undefined){
+        return undefined;
+    }
+
+    if(!Number.isFinite(value) || value<=0){
+        return undefined;
+    }
+
+    return Math.max(1,Math.round(value));
+}
+
+const resizeTuiImagePixels=(pixelData:Uint8Array, width:number, height:number, bytesPerPixel:number, targetWidth:number, targetHeight:number):Uint8Array=>{
+    const targetPixelLength=targetWidth*targetHeight*bytesPerPixel;
+    if(!Number.isSafeInteger(targetPixelLength)){
+        throw new Error('Invalid TUI image target pixel data length.');
+    }
+
+    const resized=new Uint8Array(targetPixelLength);
+
+    for(let y=0;y<targetHeight;y++){
+        const sourceY=Math.min(height-1,Math.floor((y*height)/targetHeight));
+
+        for(let x=0;x<targetWidth;x++){
+            const sourceX=Math.min(width-1,Math.floor((x*width)/targetWidth));
+            const sourceOffset=((sourceY*width)+sourceX)*bytesPerPixel;
+            const targetOffset=((y*targetWidth)+x)*bytesPerPixel;
+
+            for(let b=0;b<bytesPerPixel;b++){
+                resized[targetOffset+b]=pixelData[sourceOffset+b] as number;
+            }
+        }
+    }
+
+    return resized;
 }
 
 const makeTransparentPixelBorders=(pixelData:Uint8Array, width:number, height:number, bytesPerPixel:number):void=>{
