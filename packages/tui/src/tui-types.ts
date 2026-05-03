@@ -112,6 +112,11 @@ export interface Sprite{
     padding?:number|SpriteSides;
 
     /**
+     * Gap applied between children children when the sprite uses a `row`, `col` or `grid` layout.
+     */
+    gap?:number|SpriteGap;
+
+    /**
      * Text displayed by the sprite.
      * @note Text is only displayed when a sprite uses the `inline` layout type.
      */
@@ -543,6 +548,15 @@ export interface SpriteSides
     bottom?:number;
     left?:number;
     right?:number;
+}
+
+/**
+ * Used to apply gap values to axis independently
+ */
+export interface SpriteGap
+{
+    x?:number;
+    y?:number;
 }
 
 /**

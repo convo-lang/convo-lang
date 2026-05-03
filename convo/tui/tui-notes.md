@@ -87,6 +87,14 @@
   - child `width` overrides flex distribution in row layouts
   - child `height` overrides flex distribution in column layouts
   - explicit cross-axis sizes are respected by row, column, and grid child drawing
+- Added gap support:
+  - `gap:number` applies to both axes
+  - `gap:{x,y}` applies horizontal and vertical gaps independently
+  - omitted `x` and `y` values default to `0`
+  - row layouts apply horizontal gaps between children
+  - column layouts apply vertical gaps between children
+  - grid layouts apply horizontal gaps between columns and vertical gaps between rows
+  - gap size is included in natural layout sizes, flex distribution, grid column sizing, drawing offsets, and scroll bounds
 - Added absolute sprite sizing support:
   - `absolutePosition.width` and `absolutePosition.height` override all fallback sizing
   - sprite `width` and `height` are used as fallbacks when absolute position width/height are undefined

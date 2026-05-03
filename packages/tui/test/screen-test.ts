@@ -1216,7 +1216,7 @@ const flexRoot:SpriteDef={
                     ],
                 },
                 {
-                    text:'Column: all flex children share remaining height',
+                    text:'Column: all flex children share remaining height with gap of 2',
                     color:'accent',
                     bg:'panel',
                 },
@@ -1226,6 +1226,7 @@ const flexRoot:SpriteDef={
                     flex:2,
                     border:'accent',
                     bg:'panel',
+                    gap:2,
                     children:[
                         {
                             text:'flex 1 top',
