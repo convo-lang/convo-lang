@@ -1666,7 +1666,7 @@ const tuiConsole:TuiConsole={
 const ctrl=new ConvoTuiCtrl({
     console:tuiConsole,
     theme,
-    defaultScreen:'animations',
+    defaultScreen:'home',
     log,
     screens:[
         {
