@@ -604,17 +604,22 @@ export interface SpriteInlineRenderer
      * The render function is only called when the screen that contains the sprite is active.
      */
     intervalMs?:number;
+
+    /**
+     * If true the layout area give to the render function will overlay the bounds of the inline content.
+     */
+    overlayContent?:boolean;
 }
 
 export interface SpriteInlineRenderCtx
 {
     /**
-     * X position on screen;
+     * X position of layout area on screen;
      */
     x:number;
 
     /**
-     * Y position on screen
+     * Y position of layout area on screen
      */
     y:number;
 
@@ -823,4 +828,16 @@ export interface TuiConsole
 {
     stdout:TuiWriteStream;
     stdin:TuiReadStream;
+}
+
+export interface TuiSize
+{
+    width:number;
+    height:number;
+}
+
+export interface TuiRect extends TuiSize
+{
+    x:number;
+    y:number;
 }

@@ -1,5 +1,5 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -17,17 +17,7 @@ export interface ConvoTuiCtrlOptions
     log?:(...values:any[])=>void;
 }
 
-interface TuiSize
-{
-    width:number;
-    height:number;
-}
 
-interface TuiRect extends TuiSize
-{
-    x:number;
-    y:number;
-}
 
 interface TuiStyle
 {
@@ -857,6 +847,25 @@ export class ConvoTuiCtrl
         let right=Number.MIN_SAFE_INTEGER;
         let top=Number.MAX_SAFE_INTEGER;
         let bottom=Number.MIN_SAFE_INTEGER;
+        if(!sprite.inlineRenderer?.overlayContent){
+            left=rect.x;
+            right=rect.x+rect.width;
+            top=rect.y;
+            bottom=rect.y+rect.height;
+            if(sprite.border){
+                if(typeof sprite.border==='string'){
+                    right-=1;
+                    bottom-=1;
+                }else{
+                    if(sprite.border.right){
+                        right-=1;
+                    }
+                    if(sprite.border.bottom){
+                        bottom-=1;
+                    }
+                }
+            }
+        }
 
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
             const line=visibleLines[y]??[];
@@ -872,17 +881,19 @@ export class ConvoTuiCtrl
                 const cy=rect.y+yOffset+y;
 
                 if(sprite.inlineRenderer){
-                    if(cx<left){
-                        left=cx;
-                    }
-                    if(cy<top){
-                        top=cy;
-                    }
-                    if(cx>right){
-                        right=cx;
-                    }
-                    if(cy>bottom){
-                        bottom=cy;
+                    if(sprite.inlineRenderer.overlayContent){
+                        if(cx<left){
+                            left=cx;
+                        }
+                        if(cy<top){
+                            top=cy;
+                        }
+                        if(cx>right){
+                            right=cx;
+                        }
+                        if(cy>bottom){
+                            bottom=cy;
+                        }
                     }
                 }else{
                     this.setChar(cx, cy, char.c,char.f,char.b,sprite.id);
@@ -896,8 +907,8 @@ export class ConvoTuiCtrl
             top!==Number.MAX_SAFE_INTEGER &&
             bottom!==Number.MIN_SAFE_INTEGER
         ){
-            const width=right-left+1;
-            const height=bottom-top+1;
+            const width=Math.max(0,right-left+1);
+            const height=Math.max(0,bottom-top+1);
             const _self=this;
             const ctx:SpriteInlineRenderCtx=(sprite as any)[this.inlineRenderCtxKey]??((sprite as any)[this.inlineRenderCtxKey]={
                 width,

@@ -274,7 +274,8 @@ const homeRoot:SpriteDef={
                                     ctx.setChar(9,0,bChars[ctx.ivCount%bChars.length]??' ','danger');
                                     ctx.setChar(12,0,barChars[ctx.ivCount%barChars.length]??' ','#ffff00');
                                 },
-                                intervalMs:300
+                                intervalMs:300,
+                                overlayContent:true,
                             },
                             textAlign:'end',
                         },
@@ -285,7 +286,8 @@ const homeRoot:SpriteDef={
                                     ctx.setChar(0,0,ctx.sprite.text??'','muted');
                                     ctx.setChar(1,0,'='.repeat((ctx.ivCount%(ctx.width-2))+1),'muted');
                                 },
-                                intervalMs:100
+                                intervalMs:100,
+                                overlayContent:true,
                             },
                             textAlign:'end',
                         },
@@ -649,7 +651,8 @@ const animationsRoot:SpriteDef={
                             ctx.setChar(9,0,bChars[ctx.ivCount%bChars.length]??' ','danger');
                             ctx.setChar(12,0,barChars[ctx.ivCount%barChars.length]??' ','#ffff00');
                         },
-                        intervalMs:120
+                        intervalMs:120,
+                        overlayContent:true,
                     },
                     textAlign:'center',
                 },
@@ -692,7 +695,8 @@ const animationsRoot:SpriteDef={
                             ctx.setChar(0,0,' '.repeat(width));
                             ctx.setChar(x,0,'●',colors[ctx.ivCount%colors.length]);
                         },
-                        intervalMs:70
+                        intervalMs:70,
+                        overlayContent:true,
                     },
                 },
                 {
@@ -710,7 +714,8 @@ const animationsRoot:SpriteDef={
                                 ctx.setChar(i,0,text[i]??' ',colors[(i+ctx.ivCount)%colors.length]);
                             }
                         },
-                        intervalMs:140
+                        intervalMs:140,
+                        overlayContent:true
                     },
                     textAlign:'center',
                 },
@@ -744,7 +749,7 @@ const animationsRoot:SpriteDef={
                 },
                 {
                     id:'animation-matrix-rain',
-                    text:'#################################################################################\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#\n#',
+                    height:20,
                     border:'success',
                     bg:'#001100',
                     inlineRenderer:{
@@ -773,7 +778,7 @@ const animationsRoot:SpriteDef={
                                 }
                             }
                         },
-                        intervalMs:140
+                        intervalMs:140,
                     },
                 },
             ],
@@ -1661,7 +1666,7 @@ const tuiConsole:TuiConsole={
 const ctrl=new ConvoTuiCtrl({
     console:tuiConsole,
     theme,
-    defaultScreen:'home',
+    defaultScreen:'animations',
     log,
     screens:[
         {
