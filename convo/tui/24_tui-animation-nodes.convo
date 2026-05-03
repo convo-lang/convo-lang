@@ -1,3 +1,19 @@
+@import ./_tui.convo
+
+> user
+I added support for custom inline renderers and animations and optimized some of the buffer operations by reducing allocations.
+
+Update the notes to reflect
+
+
+
+
+@time 2026-05-03T11:31:14-04:00
+@tokenUsage 28502 / 3150 / $0.15826
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" last-commit="6e0f7b19ee303a5c0160d402354de36595b9b4f7">
+``` md
 # TUI Notes
 
 ## ConvoTuiCtrl first-pass decisions
@@ -258,3 +274,9 @@
 ## Planned implementation convo scripts
 
 - `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
+
+```
+</FILE_CONTENT>
+
+
+> user
