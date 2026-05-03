@@ -278,6 +278,11 @@ export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image
      * header = x43 x6f x6e x76
      */
     image?:string;
+
+    /**
+     * Options used to convert the image into pixel data
+     */
+    imageOptions?:TuiImageConversionOptions;
 }
 
 export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
@@ -547,6 +552,15 @@ export interface SpriteImage
      * Parsing error encounter when creating the image.
      */
     error?:string;
+}
+
+export interface TuiImageConversionOptions
+{
+    /**
+     * If true, pixels that border a transparent pixel will also be made transparent.
+     * Is true for images with an alpha channel
+     */
+    cleanEdges?:boolean;
 }
 
 

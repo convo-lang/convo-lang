@@ -1,9 +1,30 @@
-import { SpriteImage, TuiImageConversionOptions } from "./tui-types.js";
+@import ../base.convo
+@import ../../packages/tui/src/tui-image-lib.ts !file
+@import ../../packages/tui/src/tui-types.ts !file
+
+> user
+
+Add an option to the convertB64TuiImage function to make all pixels that border a transparent pixel to be made transparent.
+Create an ConvertTuiImageOptions interface to place the option in
+
+@time 2026-05-02T23:49:24-04:00
+@tokenUsage 6789 / 1936 / $0.043625000000000004
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="tui-image-lib.ts" target-output-path="../../packages/tui/src/tui-image-lib.ts" last-commit="02b2c5164aafbf8fd8bbd62c249612fc81cca57f">
+``` ts
+import { SpriteImage } from "./tui-types.js";
 
 const imageHeaderSize=32;
 const imageHeader=[0x43, 0x6f, 0x6e, 0x76];
 
-
+export interface ConvertTuiImageOptions
+{
+    /**
+     * If true, pixels that border a transparent pixel will also be made transparent.
+     */
+    transparentPixelBorder?:boolean;
+}
 
 /**
  * Converts a base64 string into a SpriteImage.* Data layout:
@@ -12,7 +33,7 @@ const imageHeader=[0x43, 0x6f, 0x6e, 0x76];
  *
  * If invalid data is supplied a default (X) image will be supplied with and the `error` property of the image will be populated.
  */
-export const convertB64TuiImage=(b64:string, options?:TuiImageConversionOptions):SpriteImage=>{
+export const convertB64TuiImage=(b64:string, options?:ConvertTuiImageOptions):SpriteImage=>{
     try{
         const data=decodeB64Bytes(b64);
         const error=validateTuiImageBytes(data);
@@ -28,7 +49,7 @@ export const convertB64TuiImage=(b64:string, options?:TuiImageConversionOptions)
         const pixelLength=width*bytesPerPixel*height;
         const pixelData=data.slice(imageHeaderSize, imageHeaderSize+pixelLength);
 
-        if(options?.cleanEdges??(bytesPerPixel>3?true:false)){
+        if(options?.transparentPixelBorder){
             makeTransparentPixelBorders(pixelData,width,height,bytesPerPixel);
         }
 
@@ -180,3 +201,9 @@ const createDefaultTuiImage=(error:string):SpriteImage=>{
         error,
     };
 }
+
+```
+</FILE_CONTENT>
+
+
+> user

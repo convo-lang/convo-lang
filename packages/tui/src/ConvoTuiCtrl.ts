@@ -218,7 +218,7 @@ export class ConvoTuiCtrl
             id:def.id??this.getNextId(),
             children:def.children?.map(child=>this.loadSprite(child)),
             state:def.state?{...def.state}:undefined,
-            image:def.image?convertB64TuiImage(def.image):undefined,
+            image:def.image?convertB64TuiImage(def.image,def.imageOptions):undefined,
         };
 
         if(sprite.onInput && sprite.isInput===undefined){
