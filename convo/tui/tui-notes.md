@@ -189,6 +189,10 @@
   - image natural size is `width` columns by `ceil(height / 2)` terminal rows
   - RGB and grayscale pixel data are supported, with transparent alpha falling back to the sprite background
   - text/rich text can still render over an image without affecting image natural size
+- Added inline image horizontal alignment:
+  - inline images now respect inherited `textAlign`
+  - `start`, `center`, and `end` alignment are applied when the image is narrower than the sprite content rect
+  - horizontally scrolled images remain left-aligned to the viewport while scrolled
 
 ## Deferred / future work
 

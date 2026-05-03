@@ -243,6 +243,7 @@ const homeRoot:SpriteDef={
                         {
                             id:'logo-image',
                             image:logoSrc,
+                            textAlign:'center'
                         },
                         {
                             id:'timer',
