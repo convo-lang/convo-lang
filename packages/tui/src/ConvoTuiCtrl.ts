@@ -1,5 +1,5 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -157,6 +157,7 @@ export class ConvoTuiCtrl
         for(const cb of this.cleanupCallbacks.splice(0)){
             cb();
         }
+        this.stopAnimations();
 
         this.console.stdin.setRawMode?.(false);
         this.console.stdin.pause?.();
@@ -383,6 +384,7 @@ export class ConvoTuiCtrl
             return screen;
         }
 
+        this.stopAnimations();
         const prev=this._activeScreen;
         if(prev){
             prev.onDeactivate?.({
@@ -538,7 +540,7 @@ export class ConvoTuiCtrl
             this.forceFullRender?
                 this.renderBufferAnsi(this.bufferState.back)
             :
-                this.renderBufferDiffAnsi(this.bufferState.front, this.bufferState.back)
+                this.renderBufferDiffAnsi(this.bufferState.front, this.bufferState.back,{x:0,y:0,width:this.bufferState.width,height:this.bufferState.height})
         );
 
         this.copyBackBufferToFront();
@@ -552,16 +554,80 @@ export class ConvoTuiCtrl
 
     private clearBuffer(buffer:ScreenBuffer)
     {
+        const f=this.resolveColor(this.theme.foreground);
+        const b=this.resolveColor(this.theme.background);
         for(let y=0;y<this.bufferState.height;y++){
+            let row=buffer[y];
+            if(!row){
+                row=[];
+                buffer[y]=row;
+            }
             for(let x=0;x<this.bufferState.width;x++){
-                buffer[y]![x]=this.createChar();
+                let c=row[x];
+                if(!c){
+                    c=this.createChar();
+                    row[x]=c;
+                }else{
+                    c.c=' ';
+                    c.f=f;
+                    c.b=f;
+                    c.i='';
+                }
+
             }
         }
     }
 
     private copyBackBufferToFront()
     {
-        this.bufferState.front=this.bufferState.back.map(row=>row.map(char=>({...char})));
+        const bs=this.bufferState;
+        if(bs.front.length===bs.back.length && bs.front[0]?.length===bs.back[0]?.length){
+            for(let y=0;y<=bs.back.length;y++){
+                const br=bs.back[y];
+                const fr=bs.front[y];
+                if(!br || !fr){
+                    continue;
+                }
+                for(let x=0;x<br.length;x++){
+                    const b=br[x];
+                    const f=fr[x];
+                    if(!b || !f){
+                        continue;
+                    }
+                    f.c=b.c;
+                    f.f=b.f;
+                    f.b=b.b;
+                    f.i=b.i;
+                }
+            }
+        }else{
+            this.bufferState.front=this.bufferState.back.map(row=>row.map(char=>({...char})));
+        }
+    }
+
+    private copyBackBufferToFrontBound(rect:TuiRect)
+    {
+        const bs=this.bufferState;
+        const xl=rect.x+rect.width;
+        const yl=rect.y+rect.height;
+        for(let y=rect.y;y<=yl;y++){
+            const br=bs.back[y];
+            const fr=bs.front[y];
+            if(!br || !fr){
+                continue;
+            }
+            for(let x=rect.x;x<xl;x++){
+                const b=br[x];
+                const f=fr[x];
+                if(!b || !f){
+                    continue;
+                }
+                f.c=b.c;
+                f.f=b.f;
+                f.b=b.b;
+                f.i=b.i;
+            }
+        }
     }
 
     private renderBufferAnsi(buffer:ScreenBuffer):string
@@ -592,18 +658,20 @@ export class ConvoTuiCtrl
         return `${output}\x1b[0m`;
     }
 
-    private renderBufferDiffAnsi(front:ScreenBuffer, back:ScreenBuffer):string
+    private renderBufferDiffAnsi(front:ScreenBuffer, back:ScreenBuffer, bounds:TuiRect):string
     {
         let output='';
         let activeF:string|undefined;
         let activeB:string|undefined;
 
-        for(let y=0;y<back.length;y++){
+        const yl=Math.min(bounds.y+bounds.height,back.length);
+        for(let y=bounds.y;y<yl;y++){
             const backRow=back[y]!;
             const frontRow=front[y]??[];
+            const xl=Math.min(bounds.x+bounds.width,backRow.length);
 
-            let x=0;
-            while(x<backRow.length){
+            let x=bounds.x;
+            while(x<xl){
                 if(this.isSameRenderChar(frontRow[x], backRow[x])){
                     x++;
                     continue;
@@ -784,6 +852,12 @@ export class ConvoTuiCtrl
             this.updateInputCursor(sprite, rect, value, textWrap, textClipStyle, textAlign, vTextAlign, scrollX, scrollY);
         }
 
+
+        let left=Number.MAX_SAFE_INTEGER;
+        let right=Number.MIN_SAFE_INTEGER;
+        let top=Number.MAX_SAFE_INTEGER;
+        let bottom=Number.MIN_SAFE_INTEGER;
+
         for(let y=0;y<visibleLines.length && y<rect.height;y++){
             const line=visibleLines[y]??[];
             const offset=Math.max(0, scrollX);
@@ -794,14 +868,115 @@ export class ConvoTuiCtrl
 
             for(let i=0;i<text.length && i<rect.width;i++){
                 const char=text[i]!;
-                this.setChar(rect.x+xOffset+i, rect.y+yOffset+y, {
-                    c:char.c,
-                    f:char.f,
-                    b:char.b,
-                    i:sprite.id,
-                });
+                const cx=rect.x+xOffset+i;
+                const cy=rect.y+yOffset+y;
+
+                if(sprite.inlineRenderer){
+                    if(cx<left){
+                        left=cx;
+                    }
+                    if(cy<top){
+                        top=cy;
+                    }
+                    if(cx>right){
+                        right=cx;
+                    }
+                    if(cy>bottom){
+                        bottom=cy;
+                    }
+                }else{
+                    this.setChar(cx, cy, char.c,char.f,char.b,sprite.id);
+                }
             }
         }
+
+        if( sprite.inlineRenderer && 
+            left!==Number.MAX_SAFE_INTEGER &&
+            right!==Number.MIN_SAFE_INTEGER &&
+            top!==Number.MAX_SAFE_INTEGER &&
+            bottom!==Number.MIN_SAFE_INTEGER
+        ){
+            const width=right-left+1;
+            const height=bottom-top+1;
+            const _self=this;
+            const ctx:SpriteInlineRenderCtx=(sprite as any)[this.inlineRenderCtxKey]??((sprite as any)[this.inlineRenderCtxKey]={
+                width,
+                height,
+                x:left,
+                y:top,
+                count:0,
+                lastCall:Date.now(),
+                delta:0,
+                ivCount:0,
+                sprite,
+                ctrl:this,
+                setChar(x,y,c,f,b){
+                    if(x<0 || x>=this.width || y<0 || y>=this.height){
+                        return false;
+                    }
+                    if(c.length>1){
+                        for(let i=0;i<c.length;i++){
+                            let cc=c[i] as string;
+                            if(cc==='\n' || cc==='\r'){
+                                cc=' ';
+                            }
+                            if(x+i>=this.width){
+                                break;
+                            }
+                            _self.setChar(this.x+x+i,this.y+y,cc,_self.resolveColor(f),_self.resolveColor(b),sprite.id);
+                        }
+                    }else{
+                        _self.setChar(this.x+x,this.y+y,c,_self.resolveColor(f),_self.resolveColor(b),sprite.id);
+                    }
+                    return true;
+
+                }
+            } satisfies SpriteInlineRenderCtx);
+            ctx.count++;
+            ctx.x=left;
+            ctx.y=top;
+            ctx.width=width;
+            ctx.height=height;
+            const now=Date.now();
+            ctx.delta=Math.max(1,now-ctx.lastCall);
+            ctx.lastCall=now;
+            sprite.inlineRenderer.render?.(ctx);
+            if(sprite.inlineRenderer && !this.animationCtxList.includes(ctx)){
+                this.startAnimation(ctx);
+            }
+        }
+    }
+
+    private readonly inlineRenderCtxKey=Symbol('inlineRenderCtxKey');
+    private animationCtxList:SpriteInlineRenderCtx[]=[];
+    private startAnimation(ctx:SpriteInlineRenderCtx){
+        this.animationCtxList.push(ctx);
+        clearInterval(ctx.iv);
+        ctx.iv=setInterval(()=>{
+            ctx.count++;
+            ctx.ivCount++;
+            const now=Date.now();
+            ctx.delta=Math.max(1,now-ctx.lastCall);
+            ctx.lastCall=now;
+            ctx.sprite.inlineRenderer?.render?.(ctx);
+            const output=this.renderBufferDiffAnsi(this.bufferState.front,this.bufferState.back,ctx);
+            const cursorOutput=this.getCursorAnsi();
+            this.copyBackBufferToFrontBound(ctx);
+            if(output || cursorOutput){
+                this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
+            }
+        },ctx.sprite.inlineRenderer?.intervalMs??200);
+    }
+    private stopAnimations()
+    {
+        if(!this.animationCtxList.length){
+            return;
+        }
+        for(const a of this.animationCtxList){
+            clearInterval(a.iv);
+            delete a.iv;
+        }
+        this.animationCtxList=[];
     }
 
     private drawInlineImage(sprite:Sprite, rect:TuiRect, style:TuiStyle, textAlign:SpriteTextAlignment, vTextAlign:SpriteTextAlignment, scrollX:number, scrollY:number)
@@ -837,12 +1012,7 @@ export class ConvoTuiCtrl
                 const top=this.getImagePixelColor(image, imageX, topPixelY);
                 const bottom=this.getImagePixelColor(image, imageX, topPixelY+1);
 
-                this.setChar(rect.x+xOffset+x, rect.y+yOffset+y, {
-                    c:'▀',
-                    f:top??style.b,
-                    b:bottom??style.b,
-                    i:sprite.id,
-                });
+                this.setChar(rect.x+xOffset+x, rect.y+yOffset+y,'▀',top??style.b,bottom??style.b,sprite.id);
             }
         }
     }
@@ -1680,12 +1850,7 @@ export class ConvoTuiCtrl
     {
         for(let y=rect.y;y<rect.y+rect.height;y++){
             for(let x=rect.x;x<rect.x+rect.width;x++){
-                this.setChar(x, y, {
-                    c:' ',
-                    f:style.f,
-                    b:style.b,
-                    i:spriteId,
-                });
+                this.setChar(x,y,' ',style.f,style.b,spriteId);
             }
         }
     }
@@ -1700,39 +1865,39 @@ export class ConvoTuiCtrl
 
         if(border.top){
             for(let x=x1;x<=x2;x++){
-                this.setChar(x, y1, {c:chars.h, f:border.top, b:undefined, i:spriteId});
+                this.setChar(x, y1, chars.h, border.top, undefined, spriteId);
             }
         }
 
         if(border.bottom){
             for(let x=x1;x<=x2;x++){
-                this.setChar(x, y2, {c:chars.h, f:border.bottom, b:undefined, i:spriteId});
+                this.setChar(x, y2, chars.h, border.bottom, undefined, spriteId);
             }
         }
 
         if(border.left){
             for(let y=y1;y<=y2;y++){
-                this.setChar(x1, y, {c:chars.v, f:border.left, b:undefined, i:spriteId});
+                this.setChar(x1, y, chars.v, border.left, undefined, spriteId);
             }
         }
 
         if(border.right){
             for(let y=y1;y<=y2;y++){
-                this.setChar(x2, y, {c:chars.v, f:border.right, b:undefined, i:spriteId});
+                this.setChar(x2, y, chars.v, border.right, undefined, spriteId);
             }
         }
 
         if(border.top && border.left){
-            this.setChar(x1, y1, {c:chars.tl, f:border.top, b:undefined, i:spriteId});
+            this.setChar(x1, y1, chars.tl, border.top, undefined, spriteId);
         }
         if(border.top && border.right){
-            this.setChar(x2, y1, {c:chars.tr, f:border.top, b:undefined, i:spriteId});
+            this.setChar(x2, y1, chars.tr, border.top, undefined, spriteId);
         }
         if(border.bottom && border.left){
-            this.setChar(x1, y2, {c:chars.bl, f:border.bottom, b:undefined, i:spriteId});
+            this.setChar(x1, y2, chars.bl, border.bottom, undefined, spriteId);
         }
         if(border.bottom && border.right){
-            this.setChar(x2, y2, {c:chars.br, f:border.bottom, b:undefined, i:spriteId});
+            this.setChar(x2, y2, chars.br, border.bottom, undefined, spriteId);
         }
     }
 
@@ -1812,7 +1977,7 @@ export class ConvoTuiCtrl
         }
     }
 
-    private setChar(x:number, y:number, char:Char)
+    private setChar(x:number, y:number, c:string, f:string|undefined, b:string|undefined, i:string)
     {
         const clip=this.getCurrentClip();
         if(clip && (x<clip.x || y<clip.y || x>=clip.x+clip.width || y>=clip.y+clip.height)){
@@ -1823,17 +1988,13 @@ export class ConvoTuiCtrl
             return;
         }
 
-        const prev=this.bufferState.back[y]?.[x];
-        if(!prev){
-            return;
+        const target=this.bufferState.back[y]?.[x];
+        if(target){
+            target.c=c;
+            target.f=f??target.f;
+            target.b=b??target.b;
+            target.i=i;
         }
-
-        this.bufferState.back[y]![x]={
-            c:char.c,
-            f:char.f??prev.f,
-            b:char.b??prev.b,
-            i:char.i,
-        };
     }
 
     private withClip<T>(clip:TuiRect, callback:()=>T):T
@@ -2679,10 +2840,4 @@ export class ConvoTuiCtrl
     {
         this.console.stdout.write(value);
     }
-}
-
-
-const wait=(ms=1000)=>{
-    const end=Date.now()+ms;
-    while(end>Date.now()){}
 }

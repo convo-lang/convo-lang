@@ -256,10 +256,30 @@ const homeRoot:SpriteDef={
                             flex:1,
                         },
                         {
-                            id:'timer',
-                            text:'Count: 0',
+                            text:'#  #  #  #  # ',
+                            inlineRenderer:{
+                                render:(ctx)=>{
+                                    ctx.setChar(0,0,spinChars[ctx.ivCount%spinChars.length]??' ','accent');
+                                    ctx.setChar(3,0,starChars[ctx.ivCount%starChars.length]??' ','#ff00ff');
+                                    ctx.setChar(6,0,clockChars[ctx.ivCount%clockChars.length]??' ','success');
+                                    ctx.setChar(9,0,bChars[ctx.ivCount%bChars.length]??' ','danger');
+                                    ctx.setChar(12,0,barChars[ctx.ivCount%barChars.length]??' ','#ffff00');
+                                },
+                                intervalMs:300
+                            },
                             textAlign:'end',
-                        }
+                        },
+                        {
+                            text:'[             ]',
+                            inlineRenderer:{
+                                render:(ctx)=>{
+                                    ctx.setChar(0,0,ctx.sprite.text??'','muted');
+                                    ctx.setChar(1,0,'='.repeat((ctx.ivCount%(ctx.width-2))+1),'muted');
+                                },
+                                intervalMs:100
+                            },
+                            textAlign:'end',
+                        },
                     ],
                 }
             ],
@@ -272,6 +292,13 @@ const homeRoot:SpriteDef={
         },
     ],
 };
+
+const spinChars=['|','/','-','\\'];
+const starChars=['·','✻','✽','✶','✳','✢'];
+const bChars=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+const clockChars=['◴','◷','◶','◵'];
+const barChars=['▃','▄','▅','▆','▇','█','▇','▆','▅','▄','▃'];
+const colors=['accent','#ff00ff','success','danger','#ffff00'];
 
 const helpRoot:SpriteDef={
     id:'help-root',
@@ -1488,13 +1515,6 @@ const ctrl=new ConvoTuiCtrl({
     ],
 });
 
-let timerCount=0;
-const iv=setInterval(()=>{
-    ctrl.updateSprite('timer',t=>{
-        t.text=`Count: ${++timerCount}`;
-    })
-},1000);
-ctrl.addDisposeCallback(()=>clearInterval(iv));
 
 proc.on('exit', ()=>ctrl.dispose());
 proc.on('SIGTERM', ()=>{

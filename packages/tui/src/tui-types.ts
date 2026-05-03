@@ -117,6 +117,14 @@ export interface Sprite{
     gap?:number|SpriteGap;
 
     /**
+     * Used to render custom inline content. The natural layout size of the sprite is still
+     * determined by inline content of the sprite but instead of rendering the inline content
+     * `inlineRenderer.render` is called to do the rendering. The renderer can only render to
+     * area defined by the layout size of the sprite and rendering outside of that area is ignored.
+     */
+    inlineRenderer?:SpriteInlineRenderer;
+
+    /**
      * Text displayed by the sprite.
      * @note Text is only displayed when a sprite uses the `inline` layout type.
      */
@@ -580,6 +588,85 @@ export type SpriteGridColUnit='cr'|'fr';
  * Represents the size of a column in a grid. Format = "{number}{cr|fr}"
  */
 export type SpriteGridColSize=`${number}${SpriteGridColUnit}`;
+
+
+///// Custom sprite rendering /////
+
+export interface SpriteInlineRenderer
+{
+    /**
+     * Will render the inline content of a sprite instead of rendering the actual content.
+     */
+    render:(ctx:SpriteInlineRenderCtx)=>void;
+
+    /**
+     * If defined `render` will be called at the specified internal to allow efficient animations.
+     * The render function is only called when the screen that contains the sprite is active.
+     */
+    intervalMs?:number;
+}
+
+export interface SpriteInlineRenderCtx
+{
+    /**
+     * X position on screen;
+     */
+    x:number;
+
+    /**
+     * Y position on screen
+     */
+    y:number;
+
+    /**
+     * Width of the layout area of the sprite
+     */
+    width:number;
+
+    /**
+     * Height of the layout area of the sprite
+     */
+    height:number;
+
+    /**
+     * The sprite being rendered
+     */
+    sprite:Sprite;
+
+    /**
+     * TUI Controller
+     */
+    ctrl:ConvoTuiCtrl;
+
+    /**
+     * The number of times the renderer has been called. The current call is part of the count so
+     * the first call with see a count of 1. This count tracks both the number of times the
+     * callback was called due to an interval and normal renders. Use `ivCount` to track
+     * the number of times an interval has been called.
+     */
+    count:number;
+
+    /**
+     * The number of times the renderer has been called due to a interval.
+     */
+    ivCount:number;
+
+    delta:number;
+
+    lastCall:number;
+
+    /**
+     * Sets a character or a string of characters at the give position relative to layout area of
+     * the sprites content. False is returned if an attempt to set a character outside of the
+     * bounds of the inline content is made.
+     */
+    setChar(x:number,y:number,c:string,f?:string,b?:string):boolean;
+
+    /**
+     * Interval reference
+     */
+    iv?:any;
+}
 
 
 ///// Image /////
