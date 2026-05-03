@@ -260,6 +260,7 @@ const homeRoot:SpriteDef={
                         {
                             id:'logo-image',
                             image:logoSrc,
+                            imageOptions:{width:75},
                             textAlign:'center',
                             vTextAlign:'center',
                             flex:1,
@@ -1624,7 +1625,7 @@ const absoluteRoot:SpriteDef={
                 left:10,
                 top:15,
                 right:10,
-                bottom:3,
+                bottom:5,
             },
             border:'danger',
             bg:'panel',
@@ -1635,7 +1636,7 @@ const absoluteRoot:SpriteDef={
                     textAlign:'center',
                 },
                 {
-                    text:'left:10 top:15 right:10 bottom:3',
+                    text:'left:10 top:15 right:10 bottom:5',
                     textAlign:'center',
                 },
                 {
