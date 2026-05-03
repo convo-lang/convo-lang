@@ -4,6 +4,8 @@ A resource efficient, zero dependency terminal user interface library for buildi
 
 `@convo-lang/tui` gives you a compact sprite-based UI model for terminal apps: screens, layout, focus navigation, input, mouse events, scrolling, rich text, colors, borders, images, and custom renderers. The library is designed for low overhead rendering while still supporting modern interface patterns.
 
+![demo](https://raw.githubusercontent.com/convo-lang/convo-lang/refs/heads/main/assets/tui.gif)
+
 ## Installation
 
 ```bash
@@ -1158,8 +1160,3 @@ Common keyboard behavior:
 - `Backspace`: edit active input
 - Arrow keys: scroll the active scrollable sprite
 - `Ctrl+C`: dispose the controller
-
-## License
-
-MIT
-`
