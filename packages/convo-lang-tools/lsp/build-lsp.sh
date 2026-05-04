@@ -28,6 +28,8 @@ npx esbuild \
     --external:'vscode-languageserver' \
     --external:'vscode-languageserver' \
     --external:'fsevents' \
+    --external:'typescript' \
+    --external:'shiki' \
     --outfile=server/out/server.js
 
 npx esbuild \
@@ -44,5 +46,24 @@ npx esbuild \
     --external:'vscode-languageserver-textdocument' \
     --external:'vscode-languageserver' \
     --external:'fsevents' \
+    --metafile=meta.json \
+    --external:'typescript' \
+    --external:'shiki' \
     --outfile=client/out/extension.js
-    #--packages=external \
+
+cd ..
+
+rm -rf ./dist
+mkdir -p ./dist/lsp/client/out
+mkdir -p ./dist/lsp/server/out
+cp lsp/client/out/extension.js ./dist/lsp/client/out/extension.js
+cp lsp/server/out/server.js ./dist/lsp/server/out/server.js
+cp -r ./assets ./dist/assets
+cp -r ./syntaxes ./dist/syntaxes
+cp ./lsp/client/package.json ./dist/lsp/client/package.json
+cp ./lsp/server/package.json ./dist/lsp/server/package.json
+cp ./convo-language-configuration.json ./dist/convo-language-configuration.json
+cp ./LICENSE ./dist/LICENSE
+cp ./package.json ./dist/package.json
+cp ./README.md ./dist/README.md
+touch ./dist/.vscodeignore
