@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/tui",
-    "version": "0.9.4",
+    "version": "0.9.5",
     "type": "module",
     "sideEffects": false,
     "license": "Apache-2.0",
