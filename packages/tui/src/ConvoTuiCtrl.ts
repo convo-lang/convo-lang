@@ -1,5 +1,6 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
+import { detectColorMode } from "./tui-lib.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextAlignment, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -7,6 +8,17 @@ export interface ConvoTuiCtrlOptions
     screens:ScreenDef[];
     console:TuiConsole;
     theme:TuiTheme;
+
+    /**
+     * If undefined an attempt to identity the current color mode using environment variables
+     * supplied via the `env` option will be made.
+     */
+    colorMode?:TuiColorMode|'auto';
+
+    /**
+     * Environment variables
+     */
+    env?:Record<string,string|undefined>;
 
     /**
      * Id of the screen to activate by default. If undefined the first screen in `screens`
@@ -111,6 +123,16 @@ export class ConvoTuiCtrl
     private inputCursor?:TuiCursorPosition;
     private isInitialized=false;
     private forceFullRender=true;
+    /**
+     * If undefined an attempt to identity the current color mode using environment variables
+     * supplied via the `env` option will be made.
+     */
+    public readonly colorMode:TuiColorMode;
+
+    /**
+     * Environment variables
+     */
+    public readonly env:Record<string,string|undefined>;
 
     private _activeScreen?:Screen;
     public get activeScreen(){return this._activeScreen}
@@ -121,10 +143,14 @@ export class ConvoTuiCtrl
         theme,
         defaultScreen,
         log=globalThis.console.log,
+        env,
+        colorMode,
     }:ConvoTuiCtrlOptions){
         this.log=log;
         this.console=console;
         this.theme=theme;
+        this.colorMode=(!colorMode || colorMode==='auto')?detectColorMode(env):colorMode
+        this.env=env??{};
         this.screens=this.loadScreens(screens);
         this._activeScreen=this.getInitialScreen(defaultScreen);
         if(this._activeScreen){
@@ -880,7 +906,7 @@ export class ConvoTuiCtrl
                         }
                     }
                 }else{
-                    this.setChar(cx, cy, char.c,char.f,char.b,sprite.id);
+                    this.setChar(cx, cy, char.c,sprite.getColor?.(char.c,1,sprite)??char.f,char.b,sprite.id);
                 }
             }
         }
@@ -2236,13 +2262,54 @@ export class ConvoTuiCtrl
     private getFgAnsi(color?:string):string
     {
         const rgb=this.hexToRgb(color);
-        return rgb?`\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m`:'\x1b[39m';
+        if(!rgb){
+            return '\x1b[39m';
+        }
+
+        switch(this.colorMode){
+            case '256':
+                return `\x1b[38;5;${this.rgbToAnsi256(rgb.r, rgb.g, rgb.b)}m`;
+
+            case 'truecolor':
+            default:
+                return `\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m`;
+        }
     }
 
     private getBgAnsi(color?:string):string
     {
         const rgb=this.hexToRgb(color);
-        return rgb?`\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m`:'\x1b[49m';
+        if(!rgb){
+            return '\x1b[49m';
+        }
+
+        switch(this.colorMode){
+            case '256':
+                return `\x1b[48;5;${this.rgbToAnsi256(rgb.r, rgb.g, rgb.b)}m`;
+
+            case 'truecolor':
+            default:
+                return `\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m`;
+        }
+    }
+
+    private rgbToAnsi256(r:number, g:number, b:number):number
+    {
+        if(r===g && g===b){
+            if(r<8){
+                return 16;
+            }
+            if(r>248){
+                return 231;
+            }
+            return Math.round(((r-8)/247)*24)+232;
+        }
+
+        const rc=Math.round((this.clampNumber(r, 0, 255)/255)*5);
+        const gc=Math.round((this.clampNumber(g, 0, 255)/255)*5);
+        const bc=Math.round((this.clampNumber(b, 0, 255)/255)*5);
+
+        return 16+(36*rc)+(6*gc)+bc;
     }
 
     private hexToRgb(color?:string):{r:number;g:number;b:number}|undefined

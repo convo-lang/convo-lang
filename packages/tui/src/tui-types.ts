@@ -874,3 +874,5 @@ export interface TuiRect extends TuiSize
     x:number;
     y:number;
 }
+
+export type TuiColorMode='truecolor'|'256';

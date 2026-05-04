@@ -247,6 +247,11 @@
   - inline images now respect inherited `textAlign`
   - `start`, `center`, and `end` alignment are applied when the image is narrower than the sprite content rect
   - horizontally scrolled images remain left-aligned to the viewport while scrolled
+Added color mode ANSI output support:
+  - `colorMode:'auto'` resolves through `detectColorMode(env)` during controller construction
+  - `colorMode:'truecolor'` emits 24-bit foreground/background SGR sequences
+  - `colorMode:'256'` quantizes RGB theme/image colors to the ANSI 256-color palette
+  - this avoids truecolor escape output in macOS Terminal.app when detected as 256-color
 
 ## Deferred / future work
 

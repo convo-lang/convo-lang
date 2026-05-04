@@ -1,6 +1,7 @@
 @import ../base.convo
 @import ../../packages/tui/src/tui-types.ts !file
 @import ../../packages/tui/src/ConvoTuiCtrl.ts !file
+@import ../../packages/tui/src/tui-lib.ts !file
 @import ./tui-notes.md !file
 
 > system
