@@ -29,7 +29,6 @@ npx esbuild \
     --external:'vscode-languageserver' \
     --external:'fsevents' \
     --external:'typescript' \
-    --external:'shiki' \
     --outfile=server/out/server.js
 
 npx esbuild \
@@ -48,7 +47,6 @@ npx esbuild \
     --external:'fsevents' \
     --metafile=meta.json \
     --external:'typescript' \
-    --external:'shiki' \
     --outfile=client/out/extension.js
 
 cd ..
