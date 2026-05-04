@@ -211,6 +211,37 @@ var createDefaultTuiImage = (error) => {
   };
 };
 
+// ../../packages/tui/src/tui-lib.ts
+var getEnvValue = (env, name) => {
+  return env[name] ?? env[name.toLowerCase()] ?? "";
+};
+var hasEnvValue = (env, name, pattern) => {
+  return pattern.test(getEnvValue(env, name));
+};
+var detectColorMode = (env = globalThis.process?.env) => {
+  if (!env) {
+    return "256";
+  }
+  const term = getEnvValue(env, "TERM").toLowerCase();
+  const termProgram = getEnvValue(env, "TERM_PROGRAM").toLowerCase();
+  if (termProgram === "apple_terminal") {
+    return "256";
+  }
+  if (hasEnvValue(env, "COLORTERM", /^(truecolor|24bit)$/i)) {
+    return "truecolor";
+  }
+  if (/^(iterm\.app|wezterm|kitty|ghostty|hyper|vscode|rio)$/i.test(termProgram)) {
+    return "truecolor";
+  }
+  if (/(truecolor|24bit|direct)/i.test(term)) {
+    return "truecolor";
+  }
+  if (/256color/i.test(term)) {
+    return "256";
+  }
+  return "256";
+};
+
 // ../../packages/tui/src/ConvoTuiCtrl.ts
 class ConvoTuiCtrl {
   screens = [];
@@ -230,6 +261,8 @@ class ConvoTuiCtrl {
   inputCursor;
   isInitialized = false;
   forceFullRender = true;
+  colorMode;
+  env;
   _activeScreen;
   get activeScreen() {
     return this._activeScreen;
@@ -239,11 +272,15 @@ class ConvoTuiCtrl {
     console,
     theme,
     defaultScreen,
-    log = globalThis.console.log
+    log = globalThis.console.log,
+    env,
+    colorMode
   }) {
     this.log = log;
     this.console = console;
     this.theme = theme;
+    this.colorMode = !colorMode || colorMode === "auto" ? detectColorMode(env) : colorMode;
+    this.env = env ?? {};
     this.screens = this.loadScreens(screens);
     this._activeScreen = this.getInitialScreen(defaultScreen);
     if (this._activeScreen) {
@@ -837,7 +874,7 @@ class ConvoTuiCtrl {
             }
           }
         } else {
-          this.setChar(cx, cy, char.c, char.f, char.b, sprite.id);
+          this.setChar(cx, cy, char.c, sprite.getColor?.(char.c, 1, sprite) ?? char.f, char.b, sprite.id);
         }
       }
     }
@@ -1014,19 +1051,10 @@ class ConvoTuiCtrl {
       return;
     }
     const caret = this.getInputCaret(sprite, value);
-    const caretLines = this.getInlineSpriteLines(value.slice(0, caret), rect.width, textWrap);
-    const lineIndex = Math.max(0, caretLines.length - 1);
-    const col = caretLines[lineIndex]?.length ?? 0;
-    const lines = this.getInlineSpriteLines(value, rect.width, textWrap);
-    const line = lines[lineIndex] ?? "";
-    const offset = Math.max(0, scrollX);
-    const scrolledLine = line.slice(offset);
-    const clipped = scrolledLine.length > rect.width;
-    const text = this.clipText(scrolledLine, rect.width, textClipStyle, clipped);
-    const xOffset = scrollX > 0 ? 0 : this.getTextAlignOffset(textAlign, text.length, rect.width);
-    const yOffset = scrollY > 0 ? 0 : this.getTextAlignOffset(vTextAlign, Math.min(lines.length, rect.height), rect.height);
-    const x = this.clampNumber(rect.x + xOffset + col - offset, rect.x, rect.x + rect.width - 1);
-    const y = this.clampNumber(rect.y + yOffset + lineIndex - Math.max(0, scrollY), rect.y, rect.y + rect.height - 1);
+    const position = this.getInputCaretDisplayPosition(sprite, rect, value, caret, textWrap, textClipStyle, textAlign, vTextAlign, scrollX, scrollY, true);
+    if (!position) {
+      return;
+    }
     const visibleRect = this.intersectRects(this.getCurrentClip() ?? {
       x: 0,
       y: 0,
@@ -1038,10 +1066,36 @@ class ConvoTuiCtrl {
       width: this.bufferState.width,
       height: this.bufferState.height
     });
-    if (x < visibleRect.x || y < visibleRect.y || x >= visibleRect.x + visibleRect.width || y >= visibleRect.y + visibleRect.height) {
+    if (position.x < visibleRect.x || position.y < visibleRect.y || position.x >= visibleRect.x + visibleRect.width || position.y >= visibleRect.y + visibleRect.height) {
       return;
     }
-    this.inputCursor = { x, y };
+    this.inputCursor = position;
+  }
+  getInputCaretDisplayPosition(sprite, rect, value, caret, textWrap, textClipStyle, textAlign, vTextAlign, scrollX, scrollY, clamp) {
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    caret = this.clampNumber(caret, 0, value.length);
+    const caretLines = this.getInlineSpriteLines(value.slice(0, caret), rect.width, textWrap);
+    const lineIndex = Math.max(0, caretLines.length - 1);
+    const col = caretLines[lineIndex]?.length ?? 0;
+    const lines = this.getInlineSpriteLines(value, rect.width, textWrap);
+    const line = lines[lineIndex] ?? "";
+    const offset = Math.max(0, scrollX);
+    const scrolledLine = line.slice(offset);
+    const clipped = scrolledLine.length > rect.width;
+    const text = this.clipText(scrolledLine, rect.width, textClipStyle, clipped);
+    const xOffset = scrollX > 0 ? 0 : this.getTextAlignOffset(textAlign, text.length, rect.width);
+    const yOffset = scrollY > 0 ? 0 : this.getTextAlignOffset(vTextAlign, Math.min(lines.length, rect.height), rect.height);
+    const rawX = rect.x + xOffset + col - offset;
+    const rawY = rect.y + yOffset + lineIndex - Math.max(0, scrollY);
+    if (!clamp && (rawY < rect.y || rawY >= rect.y + rect.height)) {
+      return;
+    }
+    return {
+      x: clamp ? this.clampNumber(rawX, rect.x, rect.x + rect.width - 1) : this.clampNumber(rawX, rect.x, rect.x + rect.width - 1),
+      y: clamp ? this.clampNumber(rawY, rect.y, rect.y + rect.height - 1) : rawY
+    };
   }
   getInputCaret(sprite, value) {
     const caret = sprite.state?.inputCaret;
@@ -1198,7 +1252,7 @@ class ConvoTuiCtrl {
           height: imageSize.height + paddingHeight + borderHeight
         };
       } else {
-        const text = this.getInlineSpriteText(sprite);
+        const text = this.getInlineSpriteLayoutText(sprite);
         const textWrap = sprite.textWrap ?? "wrap";
         const lines = contentWidth === undefined ? this.getTextLines(text) : this.getInlineSpriteLines(text, Math.max(1, contentWidth), textWrap);
         size = {
@@ -1290,7 +1344,7 @@ class ConvoTuiCtrl {
       if (sprite.image) {
         return this.getImageCellSize(sprite.image);
       }
-      const text = this.getInlineSpriteText(sprite);
+      const text = this.getInlineSpriteLayoutText(sprite);
       const textWrap = sprite.textWrap ?? "wrap";
       const lines = textWrap === "clip" ? this.getTextLines(text) : this.getInlineSpriteLines(text, Math.max(1, viewport.width), textWrap);
       return {
@@ -1353,12 +1407,26 @@ class ConvoTuiCtrl {
   }
   getInlineSpriteText(sprite) {
     if (sprite.isInput) {
-      return sprite.state?.inputValue ?? sprite.text ?? "";
+      return this.getInputSpriteValue(sprite);
     }
     return sprite.richText?.length ? sprite.richText.map((span) => span.text).join("") : sprite.text ?? "";
   }
+  getInlineSpriteLayoutText(sprite) {
+    const text = this.getInlineSpriteText(sprite);
+    return sprite.isInput && text === "" && sprite.placeholder ? sprite.placeholder : text;
+  }
+  getInputSpriteValue(sprite) {
+    return sprite.state?.inputValue ?? sprite.text ?? "";
+  }
   getInlineSpriteChars(sprite, style) {
-    if (sprite.isInput || !sprite.richText?.length) {
+    if (sprite.isInput) {
+      const value = this.getInputSpriteValue(sprite);
+      if (value || !sprite.placeholder) {
+        return this.createInlineChars(value, style);
+      }
+      return this.createInlineChars(sprite.placeholder, this.getPlaceholderStyle(sprite, style));
+    }
+    if (!sprite.richText?.length) {
       return this.createInlineChars(this.getInlineSpriteText(sprite), style);
     }
     const chars = [];
@@ -1369,6 +1437,12 @@ class ConvoTuiCtrl {
       }));
     }
     return chars;
+  }
+  getPlaceholderStyle(sprite, style) {
+    return {
+      f: this.resolveColor(sprite.placeholderColor) ?? this.darkenColor(style.f, 0.4) ?? style.f,
+      b: style.b
+    };
   }
   createInlineChars(text, style) {
     return Array.from(text).map((c) => ({
@@ -1822,13 +1896,54 @@ class ConvoTuiCtrl {
     }
     return value.toLowerCase();
   }
+  darkenColor(color, amount) {
+    const rgb = this.hexToRgb(color);
+    if (!rgb) {
+      return;
+    }
+    const factor = this.clampNumber(1 - amount, 0, 1);
+    return this.rgbToHex(rgb.r * factor, rgb.g * factor, rgb.b * factor);
+  }
   getFgAnsi(color) {
     const rgb = this.hexToRgb(color);
-    return rgb ? `\x1B[38;2;${rgb.r};${rgb.g};${rgb.b}m` : "\x1B[39m";
+    if (!rgb) {
+      return "\x1B[39m";
+    }
+    switch (this.colorMode) {
+      case "256":
+        return `\x1B[38;5;${this.rgbToAnsi256(rgb.r, rgb.g, rgb.b)}m`;
+      case "truecolor":
+      default:
+        return `\x1B[38;2;${rgb.r};${rgb.g};${rgb.b}m`;
+    }
   }
   getBgAnsi(color) {
     const rgb = this.hexToRgb(color);
-    return rgb ? `\x1B[48;2;${rgb.r};${rgb.g};${rgb.b}m` : "\x1B[49m";
+    if (!rgb) {
+      return "\x1B[49m";
+    }
+    switch (this.colorMode) {
+      case "256":
+        return `\x1B[48;5;${this.rgbToAnsi256(rgb.r, rgb.g, rgb.b)}m`;
+      case "truecolor":
+      default:
+        return `\x1B[48;2;${rgb.r};${rgb.g};${rgb.b}m`;
+    }
+  }
+  rgbToAnsi256(r, g, b) {
+    if (r === g && g === b) {
+      if (r < 8) {
+        return 16;
+      }
+      if (r > 248) {
+        return 231;
+      }
+      return Math.round((r - 8) / 247 * 24) + 232;
+    }
+    const rc = Math.round(this.clampNumber(r, 0, 255) / 255 * 5);
+    const gc = Math.round(this.clampNumber(g, 0, 255) / 255 * 5);
+    const bc = Math.round(this.clampNumber(b, 0, 255) / 255 * 5);
+    return 16 + 36 * rc + 6 * gc + bc;
   }
   hexToRgb(color) {
     if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -1861,7 +1976,7 @@ class ConvoTuiCtrl {
       if (endIndex < 0) {
         return 0;
       }
-      this.insertActiveInputText(input.slice(pasteStart.length, endIndex));
+      this.insertActiveInputText(input.slice(pasteStart.length, endIndex), true);
       return endIndex + pasteEnd.length;
     }
     if (input.startsWith("\x1B[<")) {
@@ -1872,6 +1987,18 @@ class ConvoTuiCtrl {
       const mouseEvt = this.parseSgrMouseEvent(Number(match[1]), Number(match[2]) - 1, Number(match[3]) - 1, match[4]);
       this.handleMouseEvent(mouseEvt);
       return match[0].length;
+    }
+    const ctrlEnterSequence = this.getMatchedInputSequence(input, [
+      "\x1B[13;5u",
+      "\x1B[10;5u",
+      "\x1B[27;5;13~",
+      "\x1B[27;5;10~"
+    ]);
+    if (ctrlEnterSequence) {
+      if (!this.submitActiveInput()) {
+        this.activateCurrentSprite();
+      }
+      return ctrlEnterSequence.length;
     }
     const homeSequence = this.getMatchedInputSequence(input, ["\x1B[H", "\x1B[1~", "\x1B[7~", "\x1BOH"]);
     if (homeSequence) {
@@ -1893,11 +2020,15 @@ class ConvoTuiCtrl {
       return 3;
     }
     if (input.startsWith("\x1B[A")) {
-      this.scrollActiveSprite(0, -1);
+      if (!this.moveActiveInputCaretLine(-1)) {
+        this.scrollActiveSprite(0, -1);
+      }
       return 3;
     }
     if (input.startsWith("\x1B[B")) {
-      this.scrollActiveSprite(0, 1);
+      if (!this.moveActiveInputCaretLine(1)) {
+        this.scrollActiveSprite(0, 1);
+      }
       return 3;
     }
     if (input.startsWith("\x1B[C")) {
@@ -1952,7 +2083,7 @@ class ConvoTuiCtrl {
       case "\r":
       case `
 `:
-        this.activateCurrentSprite();
+        this.handleEnterKey();
         return 1;
       case "":
       case "\b":
@@ -1975,9 +2106,23 @@ class ConvoTuiCtrl {
     }
     return value;
   }
-  getPrintableInputText(text) {
-    const withoutEsc = text.replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\x1b[@-_]/g, "");
-    return Array.from(withoutEsc).filter((char) => char >= " " && char !== "").join("");
+  getPrintableInputText(text, preserveNewLines = false) {
+    const withoutEsc = text.replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\x1b[@-_]/g, "").replace(/\r\n/g, `
+`).replace(/\r/g, `
+`);
+    return Array.from(withoutEsc).filter((char) => char >= " " && char !== "" || preserveNewLines && char === `
+`).join("");
+  }
+  handleEnterKey() {
+    const sprite = this.getActiveSprite();
+    if (sprite?.isInput) {
+      if (sprite.multiLineInput) {
+        return this.insertActiveInputText(`
+`, true);
+      }
+      return this.submitActiveInput();
+    }
+    return this.activateCurrentSprite();
   }
   updateSprite(sprite, update) {
     let target;
@@ -2100,10 +2245,50 @@ __________________________________________________
     const sprite = target.sprite;
     const screen = target.screen;
     this.activateSprite(sprite.id, screen);
+    if (sprite.isInput) {
+      this.setInputCaretFromMouse(sprite, target.path, x, y);
+    }
     if (sprite.isButton || sprite.link || sprite.onClick) {
       this.clickSprite(sprite, x, y);
     }
     this.render();
+  }
+  setInputCaretFromMouse(sprite, path, x, y) {
+    if (!sprite.isInput) {
+      return false;
+    }
+    const rect = this.spriteContentRects.get(sprite.id);
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+    const value = this.getInputSpriteValue(sprite);
+    const textWrap = sprite.textWrap ?? "wrap";
+    const textClipStyle = sprite.textClipStyle ?? "ellipses";
+    const textAlign = this.getResolvedTextAlign(path);
+    const vTextAlign = sprite.vTextAlign ?? "start";
+    const scrollX = sprite.scrollable ? sprite.state?.scrollX ?? 0 : 0;
+    const scrollY = sprite.scrollable ? sprite.state?.scrollY ?? 0 : 0;
+    let bestCaret = this.getInputCaret(sprite, value);
+    let bestDistance = Number.MAX_SAFE_INTEGER;
+    for (let caret = 0;caret <= value.length; caret++) {
+      const position = this.getInputCaretDisplayPosition(sprite, rect, value, caret, textWrap, textClipStyle, textAlign, vTextAlign, scrollX, scrollY, false);
+      if (!position) {
+        continue;
+      }
+      const distance = Math.abs(position.y - y) * 1e4 + Math.abs(position.x - x);
+      if (distance < bestDistance || distance === bestDistance && x >= position.x && caret > bestCaret) {
+        bestDistance = distance;
+        bestCaret = caret;
+      }
+    }
+    return this.setActiveInputCaret(bestCaret);
+  }
+  getResolvedTextAlign(path) {
+    let textAlign;
+    for (const sprite of path) {
+      textAlign = sprite.textAlign ?? textAlign;
+    }
+    return textAlign ?? "start";
   }
   handleMouseRelease(evt) {
     const target = this.getMouseTarget(evt.x, evt.y);
@@ -2198,7 +2383,7 @@ __________________________________________________
       return false;
     }
     sprite.state ??= {};
-    const value = sprite.state.inputValue ?? "";
+    const value = this.getInputSpriteValue(sprite);
     const caret = this.getInputCaret(sprite, value);
     const next = update(value, caret);
     const nextValue = next.value;
@@ -2222,8 +2407,9 @@ __________________________________________________
     this.render();
     return true;
   }
-  insertActiveInputText(text) {
-    const value = this.getPrintableInputText(text);
+  insertActiveInputText(text, preserveNewLines = false) {
+    const sprite = this.getActiveSprite();
+    const value = this.getPrintableInputText(text, preserveNewLines && sprite?.multiLineInput === true);
     if (!value) {
       return this.getActiveSprite()?.isInput === true;
     }
@@ -2231,6 +2417,27 @@ __________________________________________________
       value: `${current.slice(0, caret)}${value}${current.slice(caret)}`,
       caret: caret + value.length
     }));
+  }
+  submitActiveInput() {
+    const sprite = this.getActiveSprite();
+    const screen = this._activeScreen;
+    if (!sprite?.isInput || !screen) {
+      return false;
+    }
+    sprite.state ??= {};
+    const value = this.getInputSpriteValue(sprite);
+    const caret = this.getInputCaret(sprite, value);
+    sprite.state.inputValue = value;
+    sprite.state.inputCaret = caret;
+    sprite.onSubmit?.({
+      type: "submit",
+      sprite,
+      screen,
+      ctrl: this,
+      value
+    });
+    this.render();
+    return true;
   }
   backspaceActiveInput() {
     return this.editActiveInput((value, caret) => caret <= 0 ? { value, caret } : {
@@ -2249,16 +2456,49 @@ __________________________________________________
     if (!sprite?.isInput) {
       return false;
     }
-    const value = sprite.state?.inputValue ?? "";
+    const value = this.getInputSpriteValue(sprite);
     const caret = this.getInputCaret(sprite, value);
     return this.setActiveInputCaret(caret + offset);
+  }
+  moveActiveInputCaretLine(offset) {
+    const sprite = this.getActiveSprite();
+    if (!sprite?.isInput || !sprite.multiLineInput) {
+      return false;
+    }
+    const value = sprite.state?.inputValue ?? sprite.text ?? "";
+    const caret = this.getInputCaret(sprite, value);
+    const ranges = this.getInputLineRanges(value);
+    const lineIndex = Math.max(0, ranges.findIndex((range) => caret >= range.start && caret <= range.end));
+    const line = ranges[lineIndex] ?? ranges[0];
+    if (!line) {
+      return true;
+    }
+    const targetIndex = this.clampNumber(lineIndex + offset, 0, ranges.length - 1);
+    const target = ranges[targetIndex];
+    const column = caret - line.start;
+    const nextCaret = this.clampNumber(target.start + column, target.start, target.end);
+    this.setActiveInputCaret(nextCaret);
+    return true;
+  }
+  getInputLineRanges(value) {
+    const ranges = [];
+    let start = 0;
+    for (let i = 0;i < value.length; i++) {
+      if (value[i] === `
+`) {
+        ranges.push({ start, end: i });
+        start = i + 1;
+      }
+    }
+    ranges.push({ start, end: value.length });
+    return ranges;
   }
   setActiveInputCaretToEnd() {
     const sprite = this.getActiveSprite();
     if (!sprite?.isInput) {
       return false;
     }
-    return this.setActiveInputCaret((sprite.state?.inputValue ?? "").length);
+    return this.setActiveInputCaret(this.getInputSpriteValue(sprite).length);
   }
   setActiveInputCaret(caret) {
     const sprite = this.getActiveSprite();
