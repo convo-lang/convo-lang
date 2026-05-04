@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/cli",
-    "version": "0.9.3",
+    "version": "0.9.4",
     "description": "Convo-Lang CLI wrapper.",
     "license": "Apache-2.0",
     "keywords": [

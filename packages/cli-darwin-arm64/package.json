@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/cli-darwin-arm64",
-    "version": "0.9.3",
+    "version": "0.9.4",
     "description": "Convo-Lang CLI binary for macOS arm64.",
     "license": "Apache-2.0",
     "keywords": [

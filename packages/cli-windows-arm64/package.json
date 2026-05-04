@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/cli-windows-arm64",
-    "version": "0.9.3",
+    "version": "0.9.4",
     "description": "Convo-Lang CLI binary for Windows arm64.",
     "license": "Apache-2.0",
     "keywords": [
