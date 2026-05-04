@@ -1,5 +1,4 @@
 @import std://file-blocks.convo
-@import std://bash-blocks.convo
 @import ../coding-style.md !tag:CODING_STYLE
 
 > define

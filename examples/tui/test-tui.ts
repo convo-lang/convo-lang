@@ -55,8 +55,10 @@ const nameInput:SpriteDef={
     activeColor:'active',
     activeBg:'activeBg',
     activeBorder:'active',
+    height:10,
     bg:'panelAlt',
     isInput:true,
+    multiLineInput:true,
     onInput:evt=>{
         evt.ctrl.updateSprite(status.id,s=>{
             s.text=`input: ${evt.value}`

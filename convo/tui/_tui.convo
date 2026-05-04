@@ -7,4 +7,6 @@
 We are working on a terminal user interface (TUI). The defined types are in the `tui-types.ts` file.
 implementation will be taken care of by the `ConvoTuiCtrl` class.
 
+Always use file blocks for updating and creating new files.
+
 Save any notes to `./tui-notes.md`

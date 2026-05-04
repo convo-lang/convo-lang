@@ -192,12 +192,20 @@
   - bracketed paste input strips escape/control sequences before insertion
   - `onInput` fires only when the input value changes
   - non-input left/right arrow behavior continues to scroll active scrollable sprites
+- Added multiline input support:
+  - `multiLineInput` inputs insert a newline when Enter is pressed
+  - Ctrl+Enter submits multiline inputs when the terminal emits a distinct Ctrl+Enter escape sequence
+  - `onSubmit` can be used to handle input submission
+  - multiline bracketed paste preserves newline characters while still stripping escape/control sequences
+  - Up/down arrows move the caret between explicit lines in multiline inputs
+  - single-line inputs can submit with Enter through `onSubmit`
 - Added active input cursor support:
   - `SpriteState.inputCaret` stores a minimal zero-based caret position
   - active input sprites show the terminal cursor
   - non-input active sprites hide the terminal cursor
   - cursor defaults to the end of the input value
   - cursor position respects sprite layout rect and sprite scroll offsets
+  - clicking an input positions the caret at the closest visible rendered character position
 - Added mouse click support using SGR mouse mode.
 - Added more robust SGR mouse support:
   - parses press, release, drag, and wheel events
@@ -254,6 +262,7 @@
   - pixel-level mouse modes
   - release events over borders, since border chars currently do not retain sprite ids
   - child sprites inside a scrollable panel can be the direct wheel target while the parent still performs the automatic scroll
+- Ctrl+Enter support depends on the terminal sending a distinguishable sequence. Common enhanced keyboard sequences are handled, but some terminals report Ctrl+Enter the same as Enter.
 
 ## Planned implementation convo scripts
 
