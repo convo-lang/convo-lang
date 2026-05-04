@@ -206,6 +206,11 @@
   - cursor defaults to the end of the input value
   - cursor position respects sprite layout rect and sprite scroll offsets
   - clicking an input positions the caret at the closest visible rendered character position
+- Added input placeholder support:
+  - empty input sprites render `placeholder` text without using it as input value
+  - placeholder text does not affect input caret position
+  - `placeholderColor` supports theme variables and `#rrggbb`
+  - placeholder text defaults to the current foreground color darkened by 40%
 - Added mouse click support using SGR mouse mode.
 - Added more robust SGR mouse support:
   - parses press, release, drag, and wheel events

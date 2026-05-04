@@ -50,7 +50,8 @@ const setMouseStatus=(evt:SpriteMouseEvtBase, label:string)=>{
 
 const nameInput:SpriteDef={
     id:'name-input',
-    text:'Type here...',
+    text:'',
+    placeholder:'Enter yo name foo',
     border:'accent',
     activeColor:'active',
     activeBg:'activeBg',

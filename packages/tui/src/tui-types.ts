@@ -248,6 +248,16 @@ export interface Sprite{
     multiLineInput?:boolean;
 
     /**
+     * Placeholder text to display for inputs when value is empty
+     */
+    placeholder?:string;
+
+    /**
+     * Color to use for placeholder text. If undefined the current color darkened by 40% should be used.
+     */
+    placeholderColor?:string;
+
+    /**
      * If true the sprite will be treated as a clickable button. Will automatically be set to true
      * when the sprite is loaded if `onClick` is defined.
      */
