@@ -181,6 +181,12 @@ export interface Sprite{
     activeColor?:string;
 
     /**
+     * If defined getColor will be used in place of color when drawing inline text. `getColor` is
+     * commonly used for syntax highlighting.
+     */
+    getColor?:(char:string,charIndex:number,sprite:Sprite)=>string;
+
+    /**
      * Background color. Can be a hex color or the name of a theme variable.
      */
     bg?:string;
