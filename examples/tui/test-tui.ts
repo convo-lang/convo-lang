@@ -883,6 +883,94 @@ const mouseRoot:SpriteDef={
                             text:'Wheel Row 11 - final row.',
                             border:'muted',
                         },
+                        {
+                            text:'Wheel Row 01 - scrolling should move this content vertically.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 02 - scroll events also include terminal-relative coordinates.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 03 - wheel up uses deltaY=-1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 04 - wheel down uses deltaY=1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 05 - modifier keys are included when reported by the terminal.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 06 - the nearest scrollable sprite under the mouse path is scrolled.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 07 - child rows may receive the hit target while the parent still scrolls.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 08 - keep scrolling to verify clipping.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 09 - parent borders should remain visible.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 10 - release and drag handlers are also attached to this panel.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 11 - final row.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 01 - scrolling should move this content vertically.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 02 - scroll events also include terminal-relative coordinates.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 03 - wheel up uses deltaY=-1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 04 - wheel down uses deltaY=1.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 05 - modifier keys are included when reported by the terminal.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 06 - the nearest scrollable sprite under the mouse path is scrolled.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 07 - child rows may receive the hit target while the parent still scrolls.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 08 - keep scrolling to verify clipping.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 09 - parent borders should remain visible.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 10 - release and drag handlers are also attached to this panel.',
+                            border:'muted',
+                        },
+                        {
+                            text:'Wheel Row 11 - final row.',
+                            border:'muted',
+                        },
                     ],
                 },
             ],
@@ -932,6 +1020,96 @@ const scrollRoot:SpriteDef={
                     text:'Outer vertical scroll panel',
                     color:'accent',
                     textAlign:'center',
+                },
+                {
+                    text:'Rows above and below this panel should disappear cleanly at the content bounds while the border stays intact.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 01 - This row is intentionally plain so clipping at the top edge is easy to see.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 02 - Scroll down and this row should move behind the top border without overwriting it.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 03 - The parent content rect is the only drawable area for scrolled children.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 04 - Inline text clipping still applies inside each child sprite.',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    id:'scroll-horizontal',
+                    layout:'row',
+                    scrollable:true,
+                    isButton:true,
+                    border:'accent',
+                    activeBorder:'active',
+                    bg:'panel',
+                    children:[
+                        {
+                            text:'Horizontal A: use left and right arrows when this nested panel is active.',
+                            border:'success',
+                            color:'success',
+                        },
+                        {
+                            text:'Horizontal B: this child should clip at the right edge of the nested panel.',
+                            border:'accent',
+                            color:'accent',
+                        },
+                        {
+                            text:'Horizontal C: scroll right far enough and earlier children should not overwrite the left border.',
+                            border:'danger',
+                            color:'danger',
+                        },
+                        {
+                            text:'Horizontal D: nested clipping intersects with the outer scroll clipping.',
+                            border:'muted',
+                        },
+                    ],
+                },
+                {
+                    text:'Row 05 - The horizontal panel above is also inside the vertically scrollable parent.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 06 - Nested scrollable containers should clip to the intersection of both content rects.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 07 - Scroll this row partly above the viewport to check top clipping.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 08 - Scroll this row partly below the viewport to check bottom clipping.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 09 - Long clipped line: abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz',
+                    textWrap:'clip',
+                    textClipStyle:'ellipses',
+                    border:'muted',
+                },
+                {
+                    text:'Row 10 - Borders on this child should not leak outside the parent content rect.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 11 - Keep scrolling down to verify the parent border remains visible.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 12 - Bottom clipping should hide this row before it overwrites the footer link.',
+                    border:'muted',
+                },
+                {
+                    text:'Row 13 - Final row of the scroll clipping test.',
+                    border:'muted',
                 },
                 {
                     text:'Rows above and below this panel should disappear cleanly at the content bounds while the border stays intact.',
