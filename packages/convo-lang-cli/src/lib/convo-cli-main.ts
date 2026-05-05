@@ -15,9 +15,9 @@ import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js
 import { createNextAppAsync } from "../lib/create-next-app.js";
 import { convoCliHelpMessage } from "./convo-cli-help.js";
 
-export const getConvoCliArgs=(argv=globalThis.process?.argv??[])=>parseCliArgsT<ConvoCliOptions>({
+export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>parseCliArgsT<ConvoCliOptions>({
     args:argv,
-    startIndex:2,
+    startIndex,
     defaultKey:'source',
     restKey:'spawn',
     aliasMap:{help:'h'},
