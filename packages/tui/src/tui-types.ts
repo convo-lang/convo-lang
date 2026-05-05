@@ -138,18 +138,25 @@ export interface Sprite{
     richText?:SpriteTextSpan[];
 
     /**
-     * Controls the alignment of inline text. Text alignment also consols the alignment of images.
-     * If undefined textAlignment is inherited.
+     * Effects layouts as follows:
+     * - inline: controls the horizontal alignment of text and images. For inline layouts `stretch` is the same as `start`.
+     * - column: controls the horizontal alignment of the children of the sprite
+     * - row: controls the vertical alignment of the children of the sprite
+     * - grid: Has no effect
+     *
+     * If undefined align is inherited.
      * @inherited
      */
-    textAlign?:SpriteTextAlignment;
+    align?:SpriteAlignment;
 
     /**
-     * Controls the vertical alignment of inline text. Vertical text alignment also consols the
-     * alignment of images. If undefined textAlignment is NOT inherited, this contrasts from the
-     * textAlign property.
+     * Effects layouts as follows:
+     * - inline: controls the vertical alignment of text and images.
+     * - column: controls the vertical justification of the children of the sprite
+     * - row: controls the horizontal justification of the children of the sprite
+     * - grid: Has no effect
      */
-    vTextAlign?:SpriteTextAlignment;
+    justify?:SpriteJustification;
 
     /**
      * Controls how inline text is wrapped.
@@ -184,7 +191,7 @@ export interface Sprite{
      * If defined getColor will be used in place of color when drawing inline text. `getColor` is
      * commonly used for syntax highlighting.
      */
-    getColor?:(char:string,charIndex:number,sprite:Sprite)=>string;
+    onDraw?:(bounds:TuiRect,xOffset:number,yOffset:number,buffer:ScreenBuffer,sprite:Sprite)=>void;
 
     /**
      * Background color. Can be a hex color or the name of a theme variable.
@@ -513,7 +520,9 @@ export interface SpriteMouseWheelEvt extends SpriteMouseEvtBase
 
 export type SpriteEvt=SpriteClickEvt|SpriteInputEvt|SpriteSubmitEvt|SpriteMouseReleaseEvt|SpriteMouseDragEvt|SpriteMouseWheelEvt;
 
-export type SpriteTextAlignment='start'|'center'|'end';
+export type SpriteAlignment='start'|'center'|'end'|'stretch';
+
+export type SpriteJustification='start'|'center'|'end';
 
 
 /**

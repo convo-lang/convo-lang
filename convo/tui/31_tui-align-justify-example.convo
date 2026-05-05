@@ -1,3 +1,19 @@
+@import ./_tui.convo
+@import ../../examples/tui/test-tui.ts !file
+
+> user
+Add a screen that demos the `align` and `justify` properties of the the `Sprite` interface to the `test-tui.ts` file.
+
+All combinations of (`align` and `justify`) and (`inline`, `row` and `column`) should be shown.
+
+
+
+@time 2026-05-05T03:23:54-04:00
+@tokenUsage 18128 / 13675 / $0.15901500000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="test-tui.ts" target-output-path="../../examples/tui/test-tui.ts" dirty file-hash="449710eeb5af81d35befc7aacf83b0bbb4de671c" last-commit="6f1252deefb1d96f3153e6e8e1ddeb07cd2ca306">
+``` ts
 import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
 import type { SpriteAlignment, SpriteDef, SpriteJustification, SpriteLayoutType, SpriteMouseEvtBase, TuiConsole, TuiTheme } from '@convo-lang/tui/tui-types';
 import { log } from './logger';
@@ -11,7 +27,7 @@ if(!proc){
 
 if(!proc.stdin.isTTY){
     console.error('screen-test requires an interactive terminal.');
-    proc.exit(1);
+    proc.exit(1);   
 }
 
 const theme:TuiTheme={
@@ -312,9 +328,9 @@ const createAlignJustifyDemo=(layout:AlignJustifyLayout, align:SpriteAlignment, 
         layout,
         height:(
             layout==='column'?
-                16
+                8
             :
-                9
+                5
         ),
         border:'muted',
         bg:'panel',
@@ -2020,3 +2036,19 @@ proc.on('SIGTERM', ()=>{
 });
 
 ctrl.init();
+
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md">
+``` md
+# TUI Notes
+
+- Added an `align-justify` demo screen to `examples/tui/test-tui.ts`.
+- The screen demos every combination of `align` (`start`, `center`, `end`, `stretch`) and `justify` (`start`, `center`, `end`) for `inline`, `row`, and `column` layouts.
+- Added navigation and help entries for the new screen.
+```
+</FILE_CONTENT>
+
+
+> user

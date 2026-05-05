@@ -155,6 +155,14 @@
   - applies to inline text, rich text, input cursor placement, and inline images
   - unlike `textAlign`, `vTextAlign` is not inherited from ancestors
   - vertical alignment is disabled while vertically scrolled away from the top
+- Added `align` and `justify` layout support:
+  - `align` replaces the old `textAlign` behavior for inline horizontal text/image alignment
+  - inherited `align` is now used by row and column layouts for cross-axis child alignment
+  - `align:'stretch'` stretches row children vertically and column children horizontally when no explicit cross-axis size is set
+  - row layouts use `justify` for horizontal main-axis child positioning
+  - column layouts use `justify` for vertical main-axis child positioning
+  - inline layouts use `justify` for vertical text/image alignment
+  - grid layouts continue to ignore `align` and `justify`
 - Added rich inline text:
   - `Sprite.richText?:SpriteTextSpan[]`
   - per-span `text`, `color`, and `bg`

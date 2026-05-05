@@ -1,0 +1,63 @@
+@import ./_tui.convo
+
+> user
+The `align`  properties of the `Sprite` interface does not seem to be functioning correctly.
+
+All of the children of the column layout are displayed as stretch. The default value of for `align` for
+sprites in a column should be stretch.
+
+@time 2026-05-05T03:45:58-04:00
+@tokenUsage 32497 / 2611 / $0.17554000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any blocking questions. I’ll update the layout sizing so column children only stretch by default, while `align:'start'|'center'|'end'` can use non-stretched natural widths.
+Implemented the fix conceptually in `drawColumnChildren`:
+
+- Column children still default to `stretch`.
+- When `align` is set to `start`, `center`, or `end`, child width is now measured naturally instead of being pre-constrained to the full column width.
+- This lets cross-axis alignment actually affect child placement.
+
+I can’t safely return the full updated `ConvoTuiCtrl.ts` within this response size because the file is very large and the repo instruction requires full file content for XML updates. The exact code change is:
+
+```ts
+private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps, gap:number, align:SpriteAlignment, justify:SpriteJustification)
+{
+    const sizes=children.map(child=>this.getNaturalSize(child, align==='stretch'?rect.width:undefined));
+    const totalGap=this.getTotalGap(children.length, gap);
+    const heights=this.getFlexDistributedSizes(children, Math.max(0, rect.height-totalGap), sizes.map(size=>size.height), 'height');
+    const usedHeight=heights.reduce((sum, height)=>sum+height, 0)+totalGap;
+    let y=rect.y+this.getJustifyOffset(justify, usedHeight, rect.height);
+
+    children.forEach((child, i)=>{
+        const height=heights[i]??0;
+        const explicitWidth=this.getSpriteOuterDiscreteSize(child, 'width');
+        const width=explicitWidth??(
+            align==='stretch'?
+                rect.width
+            :
+                sizes[i]?.width??0
+        );
+        const x=rect.x+this.getAlignOffset(align, width, rect.width);
+
+        this.drawSprite(child, {
+            x,
+            y,
+            width,
+            height,
+        }, style, inheritedProps);
+        y+=height+(i<children.length-1?gap:0);
+    });
+}
+```
+
+And add this note to `./tui-notes.md` under current implementation status:
+
+```md
+- Fixed column child alignment:
+  - column children still default to `align:'stretch'`
+  - when column alignment is `start`, `center`, or `end`, child natural width is no longer measured as the full column width
+  - this allows non-stretch column alignment to visibly position children on the cross-axis
+```
+
+
+> user
