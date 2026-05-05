@@ -158,7 +158,6 @@ const toSortStr=(str:string)=>{
 }
 
 export const getStaticHonoRoutesAsync=async (app:Hono,root:string,embeddedFileMap?:Record<string,string>)=>{
-    
     const redirects=await getRegexRedirectMapAsync(root,embeddedFileMap);
     redirects.sort((a,b)=>toSortStr(a.path).localeCompare(toSortStr(b.path)))
     console.log('routes',redirects);
@@ -184,8 +183,7 @@ export const getStaticHonoRoutesAsync=async (app:Hono,root:string,embeddedFileMa
             r='/'+r;
         }
         app.get(':path{.+}?', c=>{
-            const path=rewriteRequestPath('/'+c.req.param('path'));
-
+            const path=rewriteRequestPath('/'+(c.req.param('path')??''));
             const f=embeddedFileMap[r+path];
             if(!f){
                 return c.notFound();
