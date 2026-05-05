@@ -150,6 +150,11 @@ export interface Sprite{
     align?:SpriteAlignment;
 
     /**
+     * Overrides the alignment default by the parent of the sprite 
+     */
+    selfAlign?:SpriteAlignment;
+
+    /**
      * Effects layouts as follows:
      * - inline: controls the vertical alignment of text and images.
      * - column: controls the vertical justification of the children of the sprite

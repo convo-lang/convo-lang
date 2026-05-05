@@ -1,0 +1,92 @@
+@import ./_tui.convo
+
+> user
+Implement the the `selfAlign` properties of the `Sprite` interface. 
+
+
+
+@time 2026-05-05T04:00:18-04:00
+@tokenUsage 32436 / 2341 / $0.173885
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any clarifying questions. I’ll implement `selfAlign` as an align-self style override for a sprite’s cross-axis positioning inside `row` and `column` parent layouts, and update the notes.
+<FILE_CONTENT name="ConvoTuiCtrl.ts" target-output-path="../../packages/tui/src/ConvoTuiCtrl.ts">
+```ts
+// Update the existing ConvoTuiCtrl.ts with these method replacements.
+
+    private drawRowChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps, gap:number, align:SpriteAlignment, justify:SpriteJustification)
+    {
+        const sizes=children.map(child=>this.getNaturalSize(child));
+        const totalGap=this.getTotalGap(children.length, gap);
+        const widths=this.getFlexDistributedSizes(children, Math.max(0, rect.width-totalGap), sizes.map(size=>size.width), 'width');
+        const usedWidth=widths.reduce((sum, width)=>sum+width, 0)+totalGap;
+        let x=rect.x+this.getJustifyOffset(justify, usedWidth, rect.width);
+
+        children.forEach((child, i)=>{
+            const childAlign=child.selfAlign??align;
+            const width=widths[i]??0;
+            const explicitHeight=this.getSpriteOuterDiscreteSize(child, 'height');
+            const height=explicitHeight??(
+                childAlign==='stretch'?
+                    rect.height
+                :
+                    this.getNaturalSize(child, width).height
+            );
+            const y=rect.y+this.getAlignOffset(childAlign, height, rect.height);
+
+            this.drawSprite(child, {
+                x,
+                y,
+                width,
+                height,
+            }, style, inheritedProps);
+            x+=width+(i<children.length-1?gap:0);
+        });
+    }
+
+    private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps, gap:number, align:SpriteAlignment, justify:SpriteJustification)
+    {
+        const sizes=children.map(child=>this.getNaturalSize(child, (child.selfAlign??align)==='stretch'?rect.width:undefined));
+        const totalGap=this.getTotalGap(children.length, gap);
+        const heights=this.getFlexDistributedSizes(children, Math.max(0, rect.height-totalGap), sizes.map(size=>size.height), 'height');
+        const usedHeight=heights.reduce((sum, height)=>sum+height, 0)+totalGap;
+        let y=rect.y+this.getJustifyOffset(justify, usedHeight, rect.height);
+
+        children.forEach((child, i)=>{
+            const childAlign=child.selfAlign??align;
+            const height=heights[i]??0;
+            const explicitWidth=this.getSpriteOuterDiscreteSize(child, 'width');
+            const width=explicitWidth??(
+                childAlign==='stretch'?
+                    rect.width
+                :
+                    sizes[i]?.width??0
+            );
+            const x=rect.x+this.getAlignOffset(childAlign, width, rect.width);
+
+            this.drawSprite(child, {
+                x,
+                y,
+                width,
+                height,
+            }, style, inheritedProps);
+            y+=height+(i<children.length-1?gap:0);
+        });
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md">
+```md
+Add to Current implementation status:
+
+- Added `selfAlign` layout support:
+  - `Sprite.selfAlign` overrides the parent `align` value for that sprite only.
+  - row layouts use `selfAlign` for vertical child positioning/stretching.
+  - column layouts use `selfAlign` for horizontal child positioning/stretching.
+  - `selfAlign` does not change inherited inline text alignment.
+```
+</FILE_CONTENT>
+
+
+> user

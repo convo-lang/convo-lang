@@ -1294,15 +1294,16 @@ export class ConvoTuiCtrl
         let x=rect.x+this.getJustifyOffset(justify, usedWidth, rect.width);
 
         children.forEach((child, i)=>{
+            const childAlign=child.selfAlign??align;
             const width=widths[i]??0;
             const explicitHeight=this.getSpriteOuterDiscreteSize(child, 'height');
             const height=explicitHeight??(
-                align==='stretch'?
+                childAlign==='stretch'?
                     rect.height
                 :
                     this.getNaturalSize(child, width).height
             );
-            const y=rect.y+this.getAlignOffset(align, height, rect.height);
+            const y=rect.y+this.getAlignOffset(childAlign, height, rect.height);
 
             this.drawSprite(child, {
                 x,
@@ -1315,33 +1316,34 @@ export class ConvoTuiCtrl
     }
 
     private drawColumnChildren(children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps, gap:number, align:SpriteAlignment, justify:SpriteJustification)
-{
-    const sizes=children.map(child=>this.getNaturalSize(child, align==='stretch'?rect.width:undefined));
-    const totalGap=this.getTotalGap(children.length, gap);
-    const heights=this.getFlexDistributedSizes(children, Math.max(0, rect.height-totalGap), sizes.map(size=>size.height), 'height');
-    const usedHeight=heights.reduce((sum, height)=>sum+height, 0)+totalGap;
-    let y=rect.y+this.getJustifyOffset(justify, usedHeight, rect.height);
+    {
+        const sizes=children.map(child=>this.getNaturalSize(child, (child.selfAlign??align)==='stretch'?rect.width:undefined));
+        const totalGap=this.getTotalGap(children.length, gap);
+        const heights=this.getFlexDistributedSizes(children, Math.max(0, rect.height-totalGap), sizes.map(size=>size.height), 'height');
+        const usedHeight=heights.reduce((sum, height)=>sum+height, 0)+totalGap;
+        let y=rect.y+this.getJustifyOffset(justify, usedHeight, rect.height);
 
-    children.forEach((child, i)=>{
-        const height=heights[i]??0;
-        const explicitWidth=this.getSpriteOuterDiscreteSize(child, 'width');
-        const width=explicitWidth??(
-            align==='stretch'?
-                rect.width
-            :
-                sizes[i]?.width??0
-        );
-        const x=rect.x+this.getAlignOffset(align, width, rect.width);
+        children.forEach((child, i)=>{
+            const childAlign=child.selfAlign??align;
+            const height=heights[i]??0;
+            const explicitWidth=this.getSpriteOuterDiscreteSize(child, 'width');
+            const width=explicitWidth??(
+                childAlign==='stretch'?
+                    rect.width
+                :
+                    sizes[i]?.width??0
+            );
+            const x=rect.x+this.getAlignOffset(childAlign, width, rect.width);
 
-        this.drawSprite(child, {
-            x,
-            y,
-            width,
-            height,
-        }, style, inheritedProps);
-        y+=height+(i<children.length-1?gap:0);
-    });
-}
+            this.drawSprite(child, {
+                x,
+                y,
+                width,
+                height,
+            }, style, inheritedProps);
+            y+=height+(i<children.length-1?gap:0);
+        });
+    }
 
     private drawGridChildren(sprite:Sprite, children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
     {
