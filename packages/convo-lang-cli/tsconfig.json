@@ -32,6 +32,12 @@
         },
         {
             "path": "../../packages/hono"
+        },
+        {
+            "path": "../../packages/tui"
+        },
+        {
+            "path": "../../packages/highlighter"
         }
     ]
 }
