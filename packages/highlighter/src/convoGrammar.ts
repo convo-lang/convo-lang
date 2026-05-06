@@ -1,0 +1,1371 @@
+export const convoLangGrammar={
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name":"convo",
+    "scopeName": "source.convo",
+    "autoLoadMdCodeBlocks":true,
+    "embeddedLangsLazy": [
+        "json","xml","javascript","python"
+    ],
+    "uuid": "B7A8C571-820A-4958-A997-76DFD822B0FE",
+    "fileTypes": ["convo"],
+    "patterns": [
+        { "include": "#expression" }
+    ],
+    "repository": {
+
+        "expression": {
+            "patterns": [
+                { "include": "#interpolation"},
+                { "include": "#topLevelStatements"},
+                { "include": "#controlFlowStatements"},
+                { "include": "#insert"},
+                { "include": "#nop"},
+                { "include": "#thinkingRole"},
+                { "include": "#function"},
+                { "include": "#specialContentRoles"},
+                { "include": "#routeRoles"},
+                { "include": "#role" },
+                { "include": "#functionBody"},
+                { "include": "#functionType"},
+                { "include": "#msgStringStartMsg"},
+                { "include": "#msgStringBackslash"},
+                { "include": "#embedEscape" },
+                { "include": "#embed" },
+                { "include": "#markdownLink" },
+                { "include": "#inlineCode" },
+                { "include": "#xml" },
+                { "include": "#specialWords" },
+                { "include": "#comment" },
+                { "include": "#tag" },
+                { "include": "#fenced_code_block"},
+                { "include": "#functionExternEmbed"}
+            ]
+        },
+        "interpolation":{
+            "contentName": "meta.embedded.line.ts",
+            "begin": "\\$\\{",
+            "beginCaptures": {
+                "0": {
+                    "name": "punctuation.definition.interpolation.begin.bracket.curly.scss punctuation.definition.template-expression.begin.js"
+                }
+            },
+            "end": "}",
+            "endCaptures": {
+                "0": {
+                    "name": "punctuation.definition.interpolation.end.bracket.curly.scss punctuation.definition.template-expression.end.js"
+                }
+            },
+            "name": "variable.interpolation.scss",
+            "patterns": [
+                {
+                    "include": "source.ts#expression"
+                },
+                {
+                    "include": "#interpolation"
+                }
+            ]
+        },
+        "specialContentRoles": {
+            "match": "^\\s*(>)\\s*(nodeEnd|node|goto|exitGraph)([ \\t]+[^\\n\\r]*)?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"variable"
+                }
+            }
+        },
+        "routeRoles": {
+            "match": "^\\s*(>)\\s*(exit|to|from)([ \\t]+[^\\n\\r]*)?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"entity.name.function"
+                },
+                "3":{
+                    "name":"variable"
+                }
+            }
+        },
+        "role": {
+            "match": "^\\s*(>)\\s*(\\w+)([ \\t]+[^\\n\\r]*)?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"storage.modifier"
+                },
+                "3":{
+                    "name":"variable"
+                }
+            }
+        },
+        "specialWords": {
+            "match": "(\\$\\$(RAG|CONTENT|CHILD|CHILDREN|SLOT_\\w+)\\$\\$)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                }
+            }
+        },
+        "thinkingRole": {
+            "match": "^\\s*(>)\\s*(thinking)\\s+([\\w \\t]+)((\\()([^\\)]*)(\\)))?",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"storage.modifier"
+                },
+                "3":{
+                    "name":"constant.character.escape",
+                    "patterns":[{"include":"#thinkingRoleTrigger"}]
+                },
+                "5":{"name":"constant.character.escape"},
+                "6":{"patterns":[{"include":"#stringMods"}]},
+                "7":{"name":"constant.character.escape"}
+            }
+        },
+        "thinkingRoleTrigger":{
+            "match":"(\\w+)\\s+(\\w+)",
+            "captures":{
+                "1":{"name":"variable"}
+            }
+        },
+        "embedEscape":{
+            "match":"(\\\\){\\{",
+            "captures": {
+                "1":{
+                    "name":"constant.character.escape"
+                }
+            }
+        },
+        "embed":{
+            "begin":"\\{\\{",
+            "end":"\\}\\}",
+            "beginCaptures": {
+                "0":{
+                    "name":"entity.name.tag"
+                }
+            },
+            "endCaptures": {
+                "0":{
+                    "name":"entity.name.tag"
+                }
+            },
+            "patterns":[{"include":"#lineExpression"}]
+        },
+        "topLevelStatements":{
+            "begin": "^\\s*(>)\\s*(do|thinkingResult|result|define|debug|end|target|make|stage|app|\\w+[ \\t]*(!))( |\\t|$)([ \\t]*[^\\n\\r]*)?",
+            "end": "(?=\\s*>)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"storage.modifier"
+                },
+                "5":{
+                    "name":"variable"
+                }
+            },
+            "patterns": [
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#functionCall"},
+                {"include":"#paramLineExpression"}
+            ]
+        },
+        "controlFlowStatements":{
+            "match": "^\\s*(>)\\s*(parallelEnd|parallel|insertEnd|agentEnd|queue|flush)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                }
+            }
+        },
+        "insert":{
+            "match": "^\\s*(>)\\s*(insert)\\s*((before|after)|(\\w+))\\s*(.*)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "4":{
+                    "name":"storage.modifier"
+                },
+                "5":{
+                    "name":"invalid"
+                },
+                "6":{
+                    "name":"string"
+                }
+            }
+        },
+        "nop":{
+            "match": "^\\s*(>)\\s*(nop|templateEnd|template)(\\s*|\\s(.*))$",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"constant.character.escape"
+                },
+                "3":{
+                    "name":"comment"
+                }
+            }
+        },
+        "function":{
+            "begin": "^\\s*(>)\\s*(agent|public|local)?\\s*(\\w+)?\\s+(\\w+)\\s*([\\*\\?!]*)\\s*(\\()",
+            "end": "\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"storage.modifier"
+                },
+                "4":{
+                    "name":"support.function"
+                },
+                "5":{
+                    "name":"entity.name.type"
+                },
+                "6":{
+                    "name":"keyword.control"
+                }
+            },
+            "endCaptures": {
+                "0":{
+                    "name":"keyword.control"
+                }
+            },
+            "patterns": [
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#functionCall"},
+                {"include":"#paramLineExpression"}
+            ]
+        },
+        "functionBody":{
+            "begin":"(\\w+)?\\s*(->)\\s*(\\w+)?\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"entity.name.type"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"entity.name.type"
+                },
+                "4":{
+                    "name":"keyword.control"
+                }
+            },
+            "endCaptures": {
+                "0":{
+                    "name":"keyword.control"
+                }
+            },
+            "patterns": [
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#functionCall"},
+                {"include":"#lineExpression"}
+            ]
+        },
+        "functionType":{
+            "match":"(\\w+)?\\s*(->)\\s*(\\w+)",
+            "captures": {
+                "1":{
+                    "name":"entity.name.type"
+                },
+                "2":{
+                    "name":"keyword.control"
+                },
+                "3":{
+                    "name":"entity.name.type"
+                }
+            },
+            "patterns": [
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#functionCall"},
+                {"include":"#lineExpression"}
+            ]
+        },
+        "functionExternEmbed":{
+            "match":"(->)",
+            "captures": {
+                "1":{
+                    "name":"keyword.control"
+                }
+            }
+        },
+        "functionCall":{
+            "patterns": [
+                { "include": "#functionCallSystem"},
+                { "include": "#functionCallOperator"},
+                { "include": "#functionCallLogic"},
+                { "include": "#functionCallType"},
+                { "include": "#functionCallDefault"}
+            ]
+        },
+        "functionCallSystem":{
+            "begin":"(elif|if|else|while|break|foreach|for|in|do|outInline|outTrim|out|then|fn|return|case|default|switch|test)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"keyword.control"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallOperator":{
+            "begin":"(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec|no)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"constant.character.escape"
+                },
+                "2":{
+                    "name":"constant.character.escape"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"constant.character.escape"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallType":{
+            "begin":"(enum|struct|array)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword.control"
+                },
+                "2":{
+                    "name":"keyword.control"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"keyword.control"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallLogic":{
+            "begin":"(and|or)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"keyword"
+                },
+                "2":{
+                    "name":"keyword"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"keyword"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "functionCallDefault":{
+            "begin":"(\\w+)\\s*(\\()",
+            "end":"\\)",
+            "beginCaptures": {
+                "1":{
+                    "name":"support.function"
+                },
+                "2":{
+                    "name":"support.function"
+                }
+            },
+            "endCaptures":{
+                "0":{
+                    "name":"support.function"
+                }
+            },
+            "patterns": [
+                { "include": "#lineExpression" }
+            ]
+        },
+        "bodyComment":{
+            "patterns":[
+                {
+                    "match":"#.*",
+                    "name":"comment"
+                },
+                {
+                    "match":"//.*",
+                    "name":"emphasis",
+                    "captures":{
+                        "0":{"name":"comment"}
+                    }
+                }
+            ]
+        },
+        "comment":{
+            "patterns":[
+                {
+                    "match":"^\\s*#.*",
+                    "name":"comment"
+                },
+                {
+                    "match":"^\\s*//.*",
+                    "name":"emphasis",
+                    "captures":{
+                        "0":{"name":"comment"}
+                    }
+                }
+            ]
+        },
+        "tag":{
+            "patterns": [
+                {"include":"#tagEvent"},
+                {"include":"#tagImport"},
+                {"include":"#tagImportMatch"},
+                {"include":"#tagMessageRef"},
+                {"include":"#tagVarRef"},
+                {"include":"#tagCondition"},
+                {"include":"#tagName"},
+                {"include":"#tagExitCondition"},
+                {"include":"#tagNodeConnection"},
+                {"include":"#tagLabeledCondition"},
+                {"include":"#tagTypeValue"},
+                {"include":"#tagDefault"}
+
+            ]
+        },
+
+        "tagEvent":{
+            "match":"^\\s*(@on)\\s+((user|assistant)|([\\w-]+))\\s*(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"name":"entity.name.type"},
+                "4":{"name":"variable"},
+                "5":{"patterns": [{"include":"#tagRequiredExpression"}]}
+            }
+        },
+
+        "tagImport":{
+            "match":"^\\s*(@import)\\s+(.*)",
+            "captures":{
+                "1":{"name":"keyword.control"},
+                "2":{"patterns": [{"include":"#tagImportValue"}]}
+            }
+        },
+
+        "tagImportMatch":{
+            "match":"^\\s*(@importMatch)\\s+(!)\\s+(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "2":{"name":"storage.modifier"},
+                "3":{"name":"string.regexp"}
+            }
+        },
+
+        "tagMessageRef":{
+            "match":"^\\s*(@(messageHandler))\\s+(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"patterns": [
+                    {"include":"#tagRefRole"},
+                    {"include":"#tagRefInvalid"}
+                ]}
+            }
+        },
+        "tagVarRef":{
+            "match":"^\\s*(@(dep|block|messageHandlerHeadProp))\\s+(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"patterns": [
+                    {"include":"#tagRefVar"},
+                    {"include":"#tagRefInvalid"}
+                ]}
+            }
+        },
+        "tagRefRole":{
+            "match":"[\\w \\t]",
+            "captures":{
+                "0":{"name":"keyword.control"}
+            }
+        },
+        "tagRefVar":{
+            "match":"[\\w \\t]",
+            "captures":{
+                "0":{"name":"variable"}
+            }
+        },
+        "tagRefInvalid":{
+            "match":".",
+            "captures":{
+                "0":{"name":"invalid"}
+            }
+        },
+
+        "tagName":{
+            "match":"^\\s*(@name)\\s+([\\w-]+)(\\s+(\\S+))?",
+            "captures":{
+                "1":{"name":"keyword.control"},
+                "2":{"name":"variable"},
+                "3":{"name":"invalid"}
+            }
+        },
+
+        "tagImportValue":{
+            "match":"(((as)[ \\t]+(\\w+))|(!\\S+:(\\S+))|(!\\S+)|(\\S+))",
+            "captures":{
+                "1":{"name":"string"},
+                "3":{"name":"keyword.control"},
+                "4":{"name":"variable"},
+                "5":{"name":"keyword.modifier"},
+                "6":{"name":"variable"},
+                "7":{"name":"keyword.modifier"}
+            }
+        },
+
+        "tagCondition":{
+            "match":"^\\s*(@(condition|disabled|taskName|taskDescription))\\s*(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"patterns": [{"include":"#tagExpressionValue"}]}
+            }
+        },
+
+        "tagLabeledCondition":{
+            "match":"^\\s*(@routeTo|@routeFrom)\\s+(\\w+)\\s*(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "2":{"name":"variable"},
+                "3":{"patterns": [{"include":"#tagRequiredExpression"}]}
+            }
+        },
+
+        "tagExitCondition":{
+            "match":"^\\s*(@exit)((\\s*(=.*))|(\\s+else[ \\t]*)|(.*))",
+            "captures":{
+                "1":{"name":"entity.name.function"},
+                "4":{"patterns": [{"include":"#tagRequiredExpression"}]},
+                "5":{"name":"keyword.control"},
+                "6":{"name":"string"}
+            }
+        },
+
+        "tagNodeConnection":{
+            "match":"^\\s*(@to|@from)\\s+(((auto|next)(.*))|((\\w+)\\s*((=.*)|(else[ \\t]*)|(.*))))",
+            "captures":{
+                "1":{"name":"entity.name.function"},
+                "2":{"name":"variable"},
+                "4":{"name":"keyword.control"},
+                "9":{"patterns": [{"include":"#tagRequiredExpression"}]},
+                "10":{"name":"keyword.control"},
+                "11":{"name":"string"}
+            }
+        },
+
+        "tagTypeValue":{
+            "match":"^\\s*(@json|@inputConversation|@inputType)\\s*(.*)",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "2":{"patterns": [
+                    {"include":"#interpolation"},
+                    {"include":"#typeExpression"}
+                ]}
+            }
+        },
+
+        "tagDefault":{
+            "match":"^\\s*(@\\w+)\\s*((=.*)|(.*))",
+            "captures":{
+                "1":{"name":"entity.name.tag"},
+                "3":{"name":"invalid"},
+                "4":{"name":"string"}
+            }
+        },
+
+        "tagExpressionValue":{
+            "match":"((=\\s*(.*))|(.*))",
+            "captures":{
+                "3":{"patterns": [{"include":"#lineExpression"}]},
+                "4":{"name":"string"}
+            }
+        },
+
+        "tagRequiredExpression":{
+            "match":"((=\\s*(.*))|(.*))",
+            "captures":{
+                "3":{"patterns": [{"include":"#lineExpression"}]},
+                "4":{"name":"invalid"}
+            }
+        },
+
+        "typeExpression":{
+            "patterns":[
+                {"include":"#functionCallType"},
+                {"include":"#typeKeyword"},
+                {"include":"#typeUserTypeExpression"}
+            ]
+        },
+
+        "typeUserTypeExpression":{
+            "match":"[A-Z_]\\w+(\\[\\s*\\])?",
+            "captures":{
+                "0":{"name":"entity.name.type"}
+            }
+        },
+
+        "lineExpression":{
+            "patterns":[
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#heredoc"},
+                {"include":"#stringPrompt"},
+                {"include":"#stringEmbed"},
+                {"include":"#stringDq"},
+                {"include":"#stringSq"},
+                {"include":"#inlineCode"},
+                {"include":"#pipe"},
+                {"include":"#functionCall"},
+                {"include":"#label"},
+                {"include":"#typeKeyword"},
+                {"include":"#number"},
+                {"include":"#constValue"},
+                {"include":"#userDefinedType"},
+                {"include":"#lineVar"}
+            ]
+        },
+        "paramLineExpression":{
+            "patterns":[
+                {"include":"#bodyComment"},
+                {"include":"#tag"},
+                {"include":"#heredoc"},
+                {"include":"#stringPrompt"},
+                {"include":"#stringEmbed"},
+                {"include":"#stringDq"},
+                {"include":"#stringSq"},
+                {"include":"#inlineCode"},
+                {"include":"#pipe"},
+                {"include":"#functionCall"},
+                {"include":"#paramLabel"},
+                {"include":"#typeKeyword"},
+                {"include":"#number"},
+                {"include":"#constValue"},
+                {"include":"#userDefinedType"},
+                {"include":"#lineVar"}
+            ]
+        },
+        "userDefinedType":{
+            "match":"\\b[A-Z]\\w*\\b",
+            "captures":{
+                "0":{
+                    "name":"entity.name.type"
+                }
+            }
+        },
+        "lineVar":{
+            "match":"\\b\\w+\\b",
+            "captures":{
+                "0":{
+                    "name":"variable"
+                }
+            }
+        },
+        "label":{
+            "match":"(\\w+)\\s*(\\?)?\\s*:",
+            "captures":{
+                "1":{
+                    "name":"entity.name"
+                }
+            }
+        },
+        "paramLabel":{
+            "match":"(\\w+)\\s*(\\?)?\\s*:",
+            "captures":{
+                "1":{
+                    "name":"variable"
+                }
+            }
+        },
+        "stringPrompt":{
+            "begin":"(\\?\\?\\?)\\s*((\\()([^)]*)(\\)))?",
+            "end":"\\?\\?\\?",
+            "beginCaptures":{
+                "1":{"name":"constant.character.escape"},
+                "3":{"name":"constant.character.escape"},
+                "4":{
+                    "patterns": [
+                        {"include":"#stringMods"}
+                    ]
+                },
+                "5":{"name":"constant.character.escape"}
+            },
+            "endCaptures":{
+                "0":{"name":"constant.character.escape"}
+            },
+            "patterns": [
+                {"include":"#expression"}
+            ]
+        },
+        "stringEmbed":{
+            "begin":"(===)\\s*((\\()([^)]*)(\\)))?",
+            "end":"===",
+            "beginCaptures":{
+                "1":{"name":"constant.character.escape"},
+                "3":{"name":"constant.character.escape"},
+                "4":{
+                    "patterns": [
+                        {"include":"#stringMods"}
+                    ]
+                },
+                "5":{"name":"constant.character.escape"}
+            },
+            "endCaptures":{
+                "0":{"name":"constant.character.escape"}
+            },
+            "patterns": [
+                {"include":"#expression"}
+            ]
+        },
+        "stringMods":{
+            "match":"(((task)\\s*:(.*))|(\\+|\\*)|(system|functions|transforms|replaceForModel|replace|append|prepend|prefix|suffix|respond|pre)|(boolean)|((\\w+)\\s*:\\s*(\\w+\\[?\\]?))|(/\\w+)|((\\w+)\\s*=)|(>>)|(!))",
+            "captures":{
+
+                "3":{"name":"variable"},
+                "4":{"name":"comment"},
+
+                "5":{"name":"keyword.control"},
+                "6":{"name":"keyword.modifier"},
+                "7":{"name":"keyword.modifier"},
+                "9":{"name":"entity.name.type"},
+                "10":{"name":"entity.name.type"},
+                "11":{"name":"keyword.modifier"},
+                "13":{"name":"variable"},
+
+                "14":{"name":"keyword.control"},
+
+                "15":{"name":"keyword.modifier"}
+            }
+        },
+        "stringDq":{
+            "begin":"\"",
+            "end":"\"",
+            "name":"string",
+            "patterns":[
+                {"include":"#stringBackslash"},
+                {
+                    "match":"(\\\\)(\")",
+                    "captures":{
+                        "1":{"name":"constant.character.escape"},
+                        "2":{"name":"string"}
+                    }
+                }
+            ]
+        },
+        "stringSq":{
+            "begin":"'",
+            "end":"'",
+            "name":"string",
+            "patterns":[
+                {"include":"#stringBackslash"},
+                {
+                    "match":"(\\\\)(')",
+                    "captures":{
+                        "1":{"name":"constant.character.escape"},
+                        "2":{"name":"string"}
+                    }
+                },
+                {"include":"#embedEscape"},
+                {"include":"#embed"}
+            ]
+        },
+        "inlineCode":{
+            "begin":"(?<!`)`(?!`)",
+            "beginCaptures":{
+                "0":{
+                    "name":"punctuation.definition.raw.markdown"
+                }
+            },
+            "end":"(?<!`)`(?!`)",
+            "endCaptures":{
+                "0":{
+                    "name":"punctuation.definition.raw.markdown"
+                }
+            },
+            "name":"markup.inline.raw.string.markdown",
+            "patterns":[
+                {
+                    "match":"[^`]+",
+                    "name":"markup.inline.raw.string.markdown"
+                }
+            ]
+        },
+        "markdownLink":{
+            "match":"(!?\\[)([^\\]]*)(\\])(\\()([^\\)]*)(\\))",
+            "captures":{
+                "1":{"name":"keyword.control"},
+                "2":{"name":"comment"},
+                "3":{"name":"keyword.control"},
+                "4":{"name":"keyword.control"},
+                "5":{"name":"string"},
+                "6":{"name":"keyword.control"}
+            }
+        },
+        "xml":{
+            "match":"(</?)([\\w-]+)([^>]*?)(/?>)",
+            "captures":{
+                "1":{"name":"entity.name.type"},
+                "2":{"name":"entity.name.type"},
+                "3":{
+                    "patterns": [
+                        {"include": "#xmlAttDbl"},
+                        {"include": "#xmlAttSingle"},
+                        {"include": "#xmlAtt"}
+                    ]
+                },
+                "4":{"name":"entity.name.type"}
+            }
+        },
+        "xmlAtt":{
+            "match":"\\w+",
+            "captures":{
+                "0":{"name":"variable"}
+            }
+        },
+        "xmlAttDbl":{
+            "match":"(\\w+)\\s*=\\s*(\"[^\"]*\")",
+            "captures":{
+                "1":{"name":"variable"},
+                "2":{"name":"string"}
+            }
+        },
+        "xmlAttSingle":{
+            "match":"(\\w+)\\s*=\\s*('[^']*')",
+            "captures":{
+                "1":{"name":"variable"},
+                "2":{"name":"string"}
+            }
+        },
+        "stringBackslash":{
+            "match":"(\\\\)\\\\",
+            "captures":{
+                "1":{"name":"constant.character.escape"}
+            }
+        },
+        "msgStringBackslash":{
+            "match":"(\\\\)\\\\(?=\\{\\{)",
+            "captures":{
+                "1":{"name":"constant.character.escape"}
+            }
+        },
+        "msgStringStartMsg":{
+            "match":"^[ \\t]*(\\\\)\\\\*>",
+            "captures":{
+                "1":{"name":"constant.character.escape"}
+            }
+        },
+        "typeKeyword":{
+            "match":"\\b(string|number|int|boolean|time|void|any|map|array|object)\\b",
+            "captures":{
+                "1":{
+                    "name":"entity.name.type"
+                }
+            }
+        },
+        "systemFunctions":{
+            "match":"\\b(elif|if|else|while|break|foreach|for|in|do|then|fn|return|case|default|switch|test)$",
+            "captures":{
+                "1":{
+                    "name":"keyword.control"
+                }
+            }
+        },
+        "operators":{
+            "match":"\\b(lt|lte|neq|eq|gt|gte|is|add|sub|mul|div|not|mod|pow|inc|dec)$",
+            "captures":{
+                "1":{
+                    "name":"keyword"
+                }
+            }
+        },
+        "logicOperators":{
+            "match":"\\b(and|or)$",
+            "captures":{
+                "1":{
+                    "name":"keyword"
+                }
+            }
+        },
+        "number":{
+            "match":"-?(\\d+\\.\\d+|\\.\\d+|\\d+)+",
+            "name":"entity.name.type"
+        },
+        "constValue":{
+            "match":"\\b(true|false|null|undefined|convo|__args|__return|__error|__debug|__disableAutoComplete|__file|__cwd)\\b",
+            "name":"constant.language"
+        },
+        "heredoc":{
+            "begin":"-{3,}",
+            "end":"-{3,}",
+            "beginCaptures":{
+                "0":{"name":"comment"}
+            },
+            "endCaptures":{
+                "0":{"name":"comment"}
+            },
+            "patterns": [
+                {"include":"#expression"}
+            ]
+        },
+        "pipe":{
+            "match":"<<",
+            "name":"keyword.control"
+        },
+
+        "fenced_code_block": {
+            "patterns": [
+                {"include": "#fenced_code_block_json"},
+                {"include": "#fenced_code_block_xml"},
+                {"include": "#fenced_code_block_js"},
+                {"include": "#fenced_code_block_ts"},
+                {"include": "#fenced_code_block_sql"},
+                {"include": "#fenced_code_block_shell"},
+                {"include": "#fenced_code_block_python"},
+                {"include": "#fenced_code_block_html"},
+                {"include": "#fenced_code_block_yaml"},
+                {"include": "#fenced_code_block_toml"},
+                {"include": "#fenced_code_block_diff"},
+                {"include": "#fenced_code_block_graphql"}
+            ]
+        },
+
+        "fenced_code_block_json": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(json|json5|sublime-settings|sublime-menu|sublime-keymap|sublime-mousemap|sublime-theme|sublime-build|sublime-project|sublime-completions)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        },
+        "5": {
+          "name": "fenced_code.block.language.attributes.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.json",
+          "patterns": [
+            {
+              "include": "source.json"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_xml": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(xml|xsd|tld|jsp|pt|cpt|dtml|rss|opml)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        },
+        "5": {
+          "name": "fenced_code.block.language.attributes.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.xml",
+          "patterns": [
+            {
+              "include": "text.xml"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_js": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(js|jsx|javascript|es6|mjs|cjs|dataviewjs|\\{\\.js.+?\\})((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        },
+        "5": {
+          "name": "fenced_code.block.language.attributes.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.javascript",
+          "patterns": [
+            {
+              "include": "source.js"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_ts": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(ts|tsx|typescript)(\\s+|:|,|\\{|\\?)[^`]*$|ts|tsx|typescript$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.typescript",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_sql": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(sql)(\\s+|:|,|\\{|\\?)[^`]*$|sql$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.sql",
+          "patterns": [
+            {
+              "include": "source.sql"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_shell": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(sh|bash|shell|shellscript|zsh)(\\s+|:|,|\\{|\\?)[^`]*$|sh|bash|shell|shellscript|zsh$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.shellscript",
+          "patterns": [
+            {
+              "include": "source.shell"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_python": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(python|py|py3|rpy|pyw|cpy|SConstruct|Sconstruct|sconstruct|SConscript|gyp|gypi|\\{\\.python.+?\\})((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        },
+        "5": {
+          "name": "fenced_code.block.language.attributes.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.python",
+          "patterns": [
+            {
+              "include": "source.python"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_html": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(html)(\\s+|:|,|\\{|\\?)[^`]*$|html$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.html",
+          "patterns": [
+            {
+              "include": "text.html.basic"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_yaml": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(yaml|yml)(\\s+|:|,|\\{|\\?)[^`]*$|yaml|yml$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.yaml",
+          "patterns": [
+            {
+              "include": "source.yaml"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_toml": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(toml)(\\s+|:|,|\\{|\\?)[^`]*$|toml$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.toml",
+          "patterns": [
+            {
+              "include": "source.toml"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_diff": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(diff|patch)(\\s+|:|,|\\{|\\?)[^`]*$|diff|patch$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.diff",
+          "patterns": [
+            {
+              "include": "source.diff"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_graphql": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(graphql|gql)(\\s+|:|,|\\{|\\?)[^`]*$|graphql|gql$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.graphql",
+          "patterns": [
+            {
+              "include": "source.graphql"
+            }
+          ]
+        }
+      ]
+    }
+
+
+    }
+
+};

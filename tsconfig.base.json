@@ -81,6 +81,9 @@
             ],
             "@convo-lang/tui/*": [
                 "./packages/tui/src/*"
+            ],
+            "@convo-lang/highlighter/*": [
+                "./packages/highlighter/src/*"
             ]
         }
     },
