@@ -287,6 +287,7 @@ const colors=['accent','#ff00ff','success','danger','#ffff00'];
 const matrixChars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&*+-/<>=';
 
 type AlignJustifyLayout=Extract<SpriteLayoutType,'inline'|'row'|'column'>;
+type SelfAlignLayout=Extract<SpriteLayoutType,'row'|'column'>;
 
 const alignJustifyAlignments:SpriteAlignment[]=['start','center','end','stretch'];
 const alignJustifyJustifications:SpriteJustification[]=['start','center','end'];
@@ -368,6 +369,73 @@ const createAlignJustifySection=(layout:AlignJustifyLayout):SpriteDef=>({
             gridCols:['1fr','1fr','1fr'],
             gap:{x:1,y:1},
             children:alignJustifyAlignments.flatMap(align=>alignJustifyJustifications.map(justify=>createAlignJustifyDemo(layout,align,justify))),
+        },
+    ],
+});
+
+const createSelfAlignDemo=(layout:SelfAlignLayout):SpriteDef=>({
+    id:`self-align-${layout}-demo`,
+    layout,
+    height:(
+        layout==='column'?
+            16
+        :
+            10
+    ),
+    border:'muted',
+    bg:'panel',
+    align:'center',
+    children:[
+        {
+            text:'default align=center',
+            border:'muted',
+            color:'muted',
+        },
+        {
+            text:'selfAlign=start',
+            selfAlign:'start',
+            border:'success',
+            color:'success',
+        },
+        {
+            text:'selfAlign=end',
+            selfAlign:'end',
+            border:'danger',
+            color:'danger',
+        },
+        {
+            text:'selfAlign=stretch',
+            selfAlign:'stretch',
+            border:'accent',
+            color:'accent',
+        },
+    ],
+});
+
+const createSelfAlignSection=():SpriteDef=>({
+    id:'self-align-section',
+    layout:'column',
+    border:'accent',
+    bg:'panelAlt',
+    children:[
+        {
+            text:'selfAlign overrides parent align',
+            color:'accent',
+            bg:'panel',
+            align:'center',
+        },
+        {
+            text:'Both examples use parent align=center. Individual children override it with selfAlign=start, end, or stretch.',
+            color:'muted',
+        },
+        {
+            layout:'grid',
+            gridCols:['1fr','1fr'],
+            gap:{x:1,y:1},
+            children:[
+                createSelfAlignDemo('row'),
+                createSelfAlignDemo('column'),
+            ],
         },
     ],
 });
@@ -1797,6 +1865,7 @@ const alignJustifyRoot:SpriteDef={
                 createAlignJustifySection('inline'),
                 createAlignJustifySection('row'),
                 createAlignJustifySection('column'),
+                createSelfAlignSection(),
             ],
         },
         {

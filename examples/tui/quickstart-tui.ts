@@ -20,14 +20,14 @@ const root:SpriteDef={
             text:' My TUI App ',
             color:'accent',
             bg:'panel',
-            textAlign:'center',
+            align:'center',
         },
         {
             id:'body',
             text:'Press Tab to focus the button, then Enter to quit.',
             flex:1,
-            textAlign:'center',
-            vTextAlign:'center',
+            align:'center',
+            justify:'center',
         },
         {
             id:'quit',

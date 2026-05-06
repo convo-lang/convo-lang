@@ -140,12 +140,12 @@ const stat=(label:string,value:string,color:string):SpriteDef=>({
         {
             text:value,
             color,
-            textAlign:'center',
+            align:'center',
         },
         {
             text:label,
             color:'muted',
-            textAlign:'center',
+            align:'center',
         },
     ],
 });
@@ -466,7 +466,7 @@ const repoBody:SpriteDef={
                     bg:'panel',
                     color:'active',
                     width:16,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     text:'Latest commit 8f31c0a by mona: tune sprite diff rendering',
@@ -582,7 +582,7 @@ const issuesBody:SpriteDef={
                     border:'border',
                     bg:'panel',
                     width:16,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     text:'128 Closed',
@@ -590,7 +590,7 @@ const issuesBody:SpriteDef={
                     border:'border',
                     bg:'panel',
                     width:16,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     id:'new-issue',
@@ -644,7 +644,7 @@ const pullCard=(pull:typeof pulls[number]):SpriteDef=>({
             text:pull.checks,
             color:pull.color,
             width:22,
-            textAlign:'end',
+            align:'end',
         },
     ],
 });

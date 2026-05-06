@@ -2,4 +2,4 @@
 set -e
 cd "$(dirname "$0")"
 
-bun build *-tui.ts  --outdir ./build --target=node --format cjs
+bun build *-tui.ts  --outdir ./build --target=node --format cjs --minify

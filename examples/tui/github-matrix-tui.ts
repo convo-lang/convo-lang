@@ -332,12 +332,12 @@ const stat=(label:string,value:string,color:string):SpriteDef=>({
         {
             text:value,
             color,
-            textAlign:'center',
+            align:'center',
         },
         {
             text:label,
             color:'muted',
-            textAlign:'center',
+            align:'center',
         },
     ],
 });
@@ -366,7 +366,7 @@ const header=(active:string):SpriteDef=>({
             text:'  MATRIX://GITHUB  ',
             color:'background',
             bg:'dim',
-            vTextAlign:'center',
+            justify:'center',
         },
         {
             id:`matrix-search-${active}`,
@@ -562,7 +562,7 @@ const dashboardBody:SpriteDef={
                         {
                             text:'OPERATOR',
                             color:'active',
-                            textAlign:'center',
+                            align:'center',
                         },
                         {
                             text:'handle: octocat',
@@ -721,7 +721,7 @@ const repoBody:SpriteDef={
                     bg:'panel',
                     color:'active',
                     width:18,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     text:'latest memory 8f31c0a by trinity: tune sprite diff rendering',
@@ -840,7 +840,7 @@ const issuesBody:SpriteDef={
                     border:'border',
                     bg:'panel',
                     width:22,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     text:'128 RESOLVED',
@@ -848,7 +848,7 @@ const issuesBody:SpriteDef={
                     border:'border',
                     bg:'panel',
                     width:18,
-                    textAlign:'center',
+                    align:'center',
                 },
                 {
                     id:'matrix-new-issue',
@@ -909,7 +909,7 @@ const pullCard=(pull:typeof pulls[number]):SpriteDef=>({
             text:pull.checks,
             color:pull.color,
             width:24,
-            textAlign:'end',
+            align:'end',
         },
     ],
 });
