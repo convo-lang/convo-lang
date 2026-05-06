@@ -342,15 +342,20 @@ export interface Sprite{
     data?:Record<string,any>;
 
     /**
+     * Called just before the sprite is rendered. `state.renderRect` is updated before calling.
+     */
+    beforeRender?:(sprite:Sprite,ctrl:ConvoTuiCtrl)=>void;
+
+    /**
      * Current state of the sprite. The state of a sprite is a mutable object.
      */
-    state?:SpriteState;
+    state:SpriteState;
 }
 
 /**
  * The definition of a sprite. When loaded the `SpriteDef` will be converted into a `Sprite`.
  */
-export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image'>
+export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image'|'state'>
 {
     id?:string;
     children?:SpriteDef[];
@@ -366,6 +371,8 @@ export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image
      * Options used to convert the image into pixel data
      */
     imageOptions?:TuiImageConversionOptions;
+
+    state?:SpriteState;
 }
 
 export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
@@ -422,6 +429,8 @@ export interface SpriteState
      * Vertical scroll offset of the sprite
      */
     scrollY?:number;
+
+    renderRect?:TuiRect;
 }
 
 /**
@@ -646,7 +655,7 @@ export interface SpriteInlineRenderer
     /**
      * Will render the inline content of a sprite instead of rendering the actual content.
      */
-    render:(ctx:SpriteInlineRenderCtx)=>void;
+    render:(ctx:SpriteInlineRenderCtx)=>void|undefined|boolean;
 
     /**
      * If defined `render` will be called at the specified internal to allow efficient animations.
@@ -712,6 +721,10 @@ export interface SpriteInlineRenderCtx
     renderBounds:TuiRect;
     
     clip:TuiRect;
+
+    scrollX:number;
+
+    scrollY:number;
 
     /**
      * Sets a character or a string of characters at the give position relative to layout area of

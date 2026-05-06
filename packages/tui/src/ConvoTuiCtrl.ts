@@ -1,11 +1,11 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
 import { detectColorMode } from "./tui-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
 {
-    screens:ScreenDef[];
+    screens?:ScreenDef[]|((ctrl:ConvoTuiCtrl)=>ScreenDef[]);
     console:TuiConsole;
     theme:TuiTheme;
 
@@ -134,6 +134,10 @@ export class ConvoTuiCtrl
      */
     public readonly env:Record<string,string|undefined>;
 
+    public readonly runPromise:Promise<void>;
+    private resolveEnd?:()=>void;
+    
+
     private _activeScreen?:Screen;
     public get activeScreen(){return this._activeScreen}
 
@@ -146,12 +150,18 @@ export class ConvoTuiCtrl
         env,
         colorMode,
     }:ConvoTuiCtrlOptions){
+        this.runPromise=new Promise<void>(resolve=>{
+            if(this.isDisposed){
+                resolve();
+            }
+            this.resolveEnd=resolve;
+        })
         this.log=log;
         this.console=console;
         this.theme=theme;
         this.colorMode=(!colorMode || colorMode==='auto')?detectColorMode(env):colorMode
         this.env=env??{};
-        this.screens=this.loadScreens(screens);
+        this.screens=this.loadScreens((typeof screens === 'function')?screens(this):(screens??[]));
         this._activeScreen=this.getInitialScreen(defaultScreen);
         if(this._activeScreen){
             this.prepareActiveScreen(this._activeScreen);
@@ -176,6 +186,7 @@ export class ConvoTuiCtrl
         this.console.stdin.pause?.();
 
         this.writeAnsi('\x1b[0m\x1b[?1000l\x1b[?1006l\x1b[?2004l\x1b[?25h\x1b[?1049l');
+        this.resolveEnd?.();
     }
 
     public addDisposeCallback(callback:()=>void){
@@ -185,7 +196,7 @@ export class ConvoTuiCtrl
         }
         this.cleanupCallbacks.push(callback);
     }
-    
+
 
     private nextId:number=1;
     /**
@@ -197,7 +208,7 @@ export class ConvoTuiCtrl
     }
 
     /**
-     * Intializes the terminal
+     * Initializes the terminal
      */
     public init(){
         if(this.isInitialized || this._isDisposed){
@@ -211,6 +222,7 @@ export class ConvoTuiCtrl
 
         this.console.stdin.setRawMode?.(true);
         this.console.stdin.resume?.();
+        (this.console.stdin as any).setEncoding('utf8');
 
         const onData=(data:any)=>this.handleInput(data);
         const onResize=()=>{
@@ -218,6 +230,7 @@ export class ConvoTuiCtrl
             this.render();
         };
 
+        
         this.console.stdin.on?.('data', onData);
         this.console.stdout.on?.('resize', onResize);
 
@@ -245,7 +258,7 @@ export class ConvoTuiCtrl
             ...def,
             id:def.id??this.getNextId(),
             children:def.children?.map(child=>this.loadSprite(child)),
-            state:def.state?{...def.state}:undefined,
+            state:def.state?{...def.state}:{},
             image:def.image?convertB64TuiImage(def.image,def.imageOptions):undefined,
         };
 
@@ -424,7 +437,7 @@ export class ConvoTuiCtrl
         return screen;
     }
 
-    public activateSprite(id:string|undefined|null, screen?:Screen|string):Sprite|undefined
+    public activateSprite(id:string|undefined|null, screen?:Screen|string, state?:SpriteState):Sprite|undefined
     {
         if(typeof id !== 'string'){
             return undefined;
@@ -441,7 +454,14 @@ export class ConvoTuiCtrl
 
         targetScreen.state??={};
         targetScreen.state.activeSpriteId=sprite.id;
+        if(state){
+            sprite.state??={};
+            for(const e in state){
+                (sprite.state as any)[e]=(state as any)[e];
+            }
+        }
         this.syncActiveSpriteStates(targetScreen);
+
 
         this.render();
 
@@ -736,9 +756,13 @@ export class ConvoTuiCtrl
 
         const margin=this.getSpriteSides(sprite.margin);
         const spriteRect=this.normalizeRect(this.insetRect(rect, margin));
+        
         if(spriteRect.width<=0 || spriteRect.height<=0){
+            sprite.state.renderRect={x:spriteRect.x,y:spriteRect.y,width:Math.max(0,spriteRect.width),height:Math.max(0,spriteRect.height)}
             return;
         }
+        sprite.state.renderRect=spriteRect;
+        sprite.beforeRender?.(sprite,this);
 
         const active=this.isSpriteActive(sprite);
         const nextInheritedProps:TuiInheritedSpriteProps={
@@ -938,6 +962,8 @@ export class ConvoTuiCtrl
                 height,
                 x:left,
                 y:top,
+                scrollX,
+                scrollY,
                 renderBounds,
                 clip,
                 count:0,
@@ -983,6 +1009,8 @@ export class ConvoTuiCtrl
             ctx.y=top;
             ctx.width=width;
             ctx.height=height;
+            ctx.scrollX=scrollX;
+            ctx.scrollY=scrollY;
             ctx.renderBounds=renderBounds;
             ctx.clip=clip;
             const now=Date.now();
@@ -1012,20 +1040,27 @@ export class ConvoTuiCtrl
         this.animationCtxList.push(ctx);
         clearInterval(ctx.iv);
         ctx.iv=setInterval(()=>{
-            ctx.count++;
-            ctx.ivCount++;
-            const now=Date.now();
-            ctx.delta=Math.max(1,now-ctx.lastCall);
-            ctx.lastCall=now;
-            ctx.sprite.inlineRenderer?.render?.(ctx);
-            const bounds=ctx.renderBounds;
-            const output=bounds.width>0 && bounds.height>0?this.renderBufferDiffAnsi(this.bufferState.front,this.bufferState.back,bounds):'';
-            const cursorOutput=this.getCursorAnsi();
-            if(bounds.width>0 && bounds.height>0){
-                this.copyBackBufferToFrontBound(bounds);
-            }
-            if(output || cursorOutput){
-                this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
+            try{
+                ctx.count++;
+                ctx.ivCount++;
+                const now=Date.now();
+                ctx.delta=Math.max(1,now-ctx.lastCall);
+                ctx.lastCall=now;
+                const updated=ctx.sprite.inlineRenderer?.render?.(ctx)??true;
+                if(!updated){
+                    return;
+                }
+                const bounds=ctx.renderBounds;
+                const output=bounds.width>0 && bounds.height>0?this.renderBufferDiffAnsi(this.bufferState.front,this.bufferState.back,bounds):'';
+                const cursorOutput=this.getCursorAnsi();
+                if(bounds.width>0 && bounds.height>0){
+                    this.copyBackBufferToFrontBound(bounds);
+                }
+                if(output || cursorOutput){
+                    this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
+                }
+            }catch(ex){
+                console.error('err',ex)
             }
         },ctx.sprite.inlineRenderer?.intervalMs??200);
     }
@@ -2430,7 +2465,10 @@ export class ConvoTuiCtrl
         }
 
         const ctrlEnterSequence=this.getMatchedInputSequence(input, [
+            "\u0012",
+            "\u001b\r",
             '\x1b[13;5u',
+            '\x1b[13;3u',
             '\x1b[10;5u',
             '\x1b[27;5;13~',
             '\x1b[27;5;10~',
@@ -3154,6 +3192,21 @@ export class ConvoTuiCtrl
         }
 
         this.scrollSprite(sprite, x, y);
+    }
+
+    public setSpriteScrollEnd(sprite:Sprite){
+        if(!sprite.scrollable){
+            return false;
+        }
+        sprite.state??={};
+        const rect=this.spriteContentRects.get(sprite.id);
+        const max=rect?this.getSpriteMaxScroll(sprite, rect):undefined;
+        if(max){
+            sprite.state.scrollY=max.y;
+            return true;
+        }else{
+            return false;
+        }
     }
 
     private scrollSprite(sprite:Sprite, x:number, y:number, reRender=true):boolean
