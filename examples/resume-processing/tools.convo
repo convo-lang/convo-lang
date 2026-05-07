@@ -1,0 +1,20 @@
+# Writes a file to disk
+> writeFile(
+    # Path to file to write. Use relative paths unless told otherwise
+    path:string
+    content:string
+) -> (
+    fsWrite(path content)
+    return("File written")
+)
+
+# Returns the most recent EOD for a stock ticker
+> getStock(
+    # Ticker of the company to get EOD for
+    ticker:string
+) -> (
+    result=httpGet('https://olatyj7sylyh2nthh5l5da5fe40kkzdy.lambda-url.us-east-1.on.aws?ticker={{
+        encodeURIComponent(ticker)
+    }}')
+    return(result)
+)

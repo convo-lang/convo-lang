@@ -11,9 +11,9 @@ import { executeCliCallConvoDbFunction, executeCliConvoDbCommands, executeCliCon
 import { generateEmbeddingAsync } from "../lib/convo-cli-embeddings.js";
 import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
-import { convertConvoInterfacesAsync } from "../lib/convo-interface-converter.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
 import { convoCliHelpMessage } from "./convo-cli-help.js";
+import { runConvoTuiAsync } from "./tui/lib/convo-tui-app.js";
 
 export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>parseCliArgsT<ConvoCliOptions>({
     args:argv,
@@ -28,7 +28,6 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         'cmdMode',
         'repl',
         'stdin',
-        'syncWatch',
         'printState',
         'printFlat',
         'printMessages',
@@ -56,9 +55,6 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         allowExec:args=>args[0] as any,
         prepend:args=>args[0],
         exeCwd:args=>args[0],
-        syncTsConfig:args=>args,
-        syncWatch:args=>args.length?true:false,
-        syncOut:args=>args[0],
         spawn:args=>args.join(' '),
         spawnDir:args=>args[0],
         printState:args=>args.length?true:false,
@@ -112,7 +108,9 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
 }).parsed;
 
 export const convoCliMain=async(args=getConvoCliArgs())=>{
-
+    if(!getObjKeyCount(args)){
+        args.repl=true;
+    }
     const cancel=new CancelToken();
     let done=false;
     let shutdownIv:any;
@@ -154,14 +152,6 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
 
     let toolPromises:Promise<any>[]=[];
     let disableREPL=false;
-
-    if(!getObjKeyCount(args)){
-        args.repl=true;
-    }
-
-    if(args.syncTsConfig?.length){
-        toolPromises.push(convertConvoInterfacesAsync(args,cancel));
-    }
 
     if(args.createNextApp){
         toolPromises.push(createNextAppAsync(args,cancel));
@@ -242,7 +232,10 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
 
     await Promise.all(toolPromises);
 
-    if(!toolPromises.length && !disableREPL){
+    if(args.repl && !disableREPL && process.stdin.isTTY){
+        await initConvoCliAsync(args);
+        await runConvoTuiAsync({},cancel);
+    }else if(!toolPromises.length && !disableREPL){
         const cli=await createConvoCliAsync(args);
         try{
             if(args.listModels){

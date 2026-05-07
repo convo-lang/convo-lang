@@ -84,6 +84,9 @@
             ],
             "@convo-lang/highlighter/*": [
                 "./packages/highlighter/src/*"
+            ],
+            "@convo-lang/studio/*": [
+                "./packages/studio/src/*"
             ]
         }
     },

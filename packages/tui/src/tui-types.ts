@@ -39,21 +39,24 @@ export interface Screen
     /**
      * Current state of the screen. `state` is a mutable object.
      */
-    state?:ScreenState;
+    state:ScreenState;
 }
 
 /**
  * A definition of a screen. When loaded the `ScreenDef` will be converted into a `Screen`.
  */
-export interface ScreenDef extends Omit<Screen,'root'|'id'>
+export interface ScreenDef extends Omit<Screen,'root'|'id'|'state'>
 {
     id?:string;
     root:SpriteDef;
+    state?:Omit<ScreenState,'mountedSprites'|'renderIndex'>;
 }
 
 export interface ScreenState
 {
     activeSpriteId?:string;
+    mountedSprites:Sprite[];
+    renderIndex:number;
 }
 
 export type ScreenEvtType='activate'|'deactivate';
@@ -131,6 +134,12 @@ export interface Sprite{
     text?:string;
 
     /**
+     * Text that is written overtop of the text of the sprite when the sprite is active. `activeTextMask`
+     * can be used to draw arrows or other decorations over text when active.
+     */
+    activeTextMask?:string;
+
+    /**
      * Rich inline content displayed by the sprite. If defined, `richText` is used instead of `text`
      * for non-input inline sprites.
      * @note Rich text is only displayed when a sprite uses the `inline` layout type.
@@ -204,18 +213,17 @@ export interface Sprite{
     bg?:string;
 
     /**
+     * Background color used when the sprite is active
+     */
+    activeBg?:string;
+
+    /**
      * If defined the sprite will have a 1 character wide border drawn around it using the given color.
      * `border` can either be a string that represents all 4 sides of the sprite or a SpriteBorder
      * object where each side can be set to individual colors or left undefined to not draw a border
      * on that side.
      */
     border?:string|SpriteBorder;
-
-
-    /**
-     * Background color used when the sprite is active
-     */
-    activeBg?:string;
 
     /**
      * Controls what set of characters are used to draw borders
@@ -310,11 +318,34 @@ export interface Sprite{
     onInput?:(evt:SpriteInputEvt)=>void;
 
     /**
+     * Use to filter or transform text input. For example you can use `inputFilter` to replaces
+     * spaces with dashes as the user types.
+     */
+    inputFilter?:(value:string)=>string;
+
+    /**
      * Called when an input is submitted. Single-line inputs submit with Enter. Multiline inputs
      * insert new lines with Enter and submit with Ctrl+Enter when the terminal emits a distinct
      * Ctrl+Enter escape sequence.
      */
     onSubmit?:(evt:SpriteSubmitEvt)=>void;
+
+    /**
+     * Called when the sprite is mounted after it's first render. onMount will only be called
+     * once per sprite.
+     */
+    onMount?:(evt:SpriteMountEvt)=>void;
+
+    /**
+     * Called after the sprite is unmounted and rendered for it last time. onUnmount will only be called
+     * once per sprite.
+     */
+    onUnmount?:(evt:SpriteUnmountEvt)=>void;
+
+    /**
+     * If true the sprite will be activated on mount
+     */
+    autoActivate?:boolean;
 
     /**
      * A flex layout value. After calculating the remaining display size of the sprites parent the
@@ -324,11 +355,19 @@ export interface Sprite{
 
 
     /**
-     * Column sizes to use with grid layout. Defaults to a single column where all children stack
+     * Column widths to use with grid layout. Defaults to a single column where all children stack
      * vertically.
      * @default ['1fr']
      */
-    gridCols?:SpriteGridColSize[];
+    gridCols?:SpriteGridColWidth[];
+
+
+    /**
+     * Row height to use with grid layout. Defaults to using `auto` for each row. If more rows
+     * rendered that grid rows heights `auto` will be used for the remaining rows. If less
+     * rows are rendered that grid rows heights empty rows will be rendered.
+     */
+    gridRows?:SpriteGridRowHeight[];
 
     /**
      * Children of the sprite.
@@ -358,7 +397,7 @@ export interface Sprite{
 export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image'|'state'>
 {
     id?:string;
-    children?:SpriteDef[];
+    children?:(SpriteDef|null|undefined|false|number|string)[];
     /**
      * Base64 encoded image.
      * Data layout:
@@ -372,7 +411,7 @@ export interface SpriteDef extends Omit<Sprite,'id'|'children'|'isActive'|'image
      */
     imageOptions?:TuiImageConversionOptions;
 
-    state?:SpriteState;
+    state?:Omit<SpriteState,'renderIndex'>;
 }
 
 export interface SpriteUpdate extends Partial<Omit<Sprite,'id'|'children'>>
@@ -431,6 +470,10 @@ export interface SpriteState
     scrollY?:number;
 
     renderRect?:TuiRect;
+
+    mounted?:boolean;
+
+    renderIndex:number;
 }
 
 /**
@@ -483,6 +526,16 @@ export interface SpriteSubmitEvt extends SpriteEvtBase
     value:string;
 }
 
+export interface SpriteMountEvt extends SpriteEvtBase
+{
+    type:'mount';
+}
+
+export interface SpriteUnmountEvt extends SpriteEvtBase
+{
+    type:'unmount';
+}
+
 export type SpriteMouseButton='left'|'middle'|'right'|'unknown';
 
 export interface SpriteMouseModifiers
@@ -532,7 +585,7 @@ export interface SpriteMouseWheelEvt extends SpriteMouseEvtBase
     deltaY:number;
 }
 
-export type SpriteEvt=SpriteClickEvt|SpriteInputEvt|SpriteSubmitEvt|SpriteMouseReleaseEvt|SpriteMouseDragEvt|SpriteMouseWheelEvt;
+export type SpriteEvt=SpriteClickEvt|SpriteInputEvt|SpriteSubmitEvt|SpriteMouseReleaseEvt|SpriteMouseDragEvt|SpriteMouseWheelEvt|SpriteMountEvt|SpriteUnmountEvt;
 
 export type SpriteAlignment='start'|'center'|'end'|'stretch';
 
@@ -640,12 +693,20 @@ export type SpriteLayoutType='inline'|'row'|'column'|'grid';
  * - cr: Character, width of a single character
  * - fr: Fractional unit, same as CSS fr unit type
  */
-export type SpriteGridColUnit='cr'|'fr';
+export type SpriteGridUnit='cr'|'fr';
 
 /**
- * Represents the size of a column in a grid. Format = "{number}{cr|fr}"
+ * Represents the width of a column in a grid. Format = "{number}{cr|fr}"
  */
-export type SpriteGridColSize=`${number}${SpriteGridColUnit}`;
+export type SpriteGridColWidth=`${number}${SpriteGridUnit}`;
+
+/**
+ * Represents the height of a row in a grid. Unit value and numbers function the same as SpriteGridColWidth
+ * but for the y axis. `auto` causes the natural height of the tales cell in a row to be used as the 
+ * height for the row and is the default behavior for rows.
+ * Format = "{number}{cr|fr}"|"auto"
+ */
+export type SpriteGridRowHeight=`${number}${SpriteGridUnit}`|'auto';
 
 
 ///// Custom sprite rendering /////

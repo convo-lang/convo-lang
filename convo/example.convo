@@ -1,0 +1,35 @@
+> system
+You are an expert day trader helping the user make
+stock trades. Use the `getStock` function to get
+the latest EODs before making decisions
+
+Current date and time is: {{dateTime()}}
+
+# Returns the most recent EOD for a stock ticker
+> getStock(
+    # Ticker of the company to get EOD for
+    ticker:string
+) -> (
+    result=httpGet('https://olatyj7sylyh2nthh5l5da5fe40kkzdy.lambda-url.us-east-1.on.aws?ticker={{
+        encodeURIComponent(ticker)
+    }}')
+    return(result)
+)
+
+> define
+TradePick=struct(
+    # All compared tickers
+    tickers:array(string)
+
+    # Ticker of stock that seems like the best option
+    bestOption:string
+
+    priceUsd:number
+
+    # The reasoning behind why you pick the stock you pick
+    reasoning:string
+)
+
+@json TradePick
+> user
+Should I buy Apple or Nvidia?

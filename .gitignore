@@ -3,6 +3,7 @@
 /tmp
 /out-tsc
 /.pkij
+/log
 
 # dependencies
 node_modules

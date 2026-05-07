@@ -1,0 +1,23 @@
+@import ./base.convo
+@import ./tools.convo
+@import ./paul.md !file
+@import ./jessica.md !file
+@import ./freddy.md !file
+
+> define
+ProfileData = struct(
+
+    name: string
+
+    # Must have 1 or more years of experience
+    yearsExperience: number
+
+    # List of skill relating to bio-tech.
+    # Must have at least one related skill
+    skills: array(string)
+)
+
+@json array(ProfileData)
+> user
+Extract the profiles from the resumes that meet
+the minimal requirements

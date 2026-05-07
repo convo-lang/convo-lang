@@ -1,6 +1,5 @@
 import { AppendConvoOptions, Conversation, ConvoNodeGraphCtrl, ConvoScope, ConvoWorker, ConvoWorkerCtx, convoVars, createConversationFromScope, escapeConvo, loadConvoProjectConfigFromVfsAsync, parseConvoCode } from '@convo-lang/convo-lang';
-import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
-import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
+import { getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
 import { CancelToken, DisposeContainer, createJsonRefReplacer, dupDeleteUndefined, getErrorMessage, initRootScope, normalizePath, parseConfigBool, rootScope, setValueByPath } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { pathExistsAsync, readFileAsJsonAsync, readFileAsStringAsync, readStdInAsStringAsync, readStdInLineAsync, startReadingStdIn } from "@iyio/node-common";
@@ -218,7 +217,6 @@ export class ConvoCli
         this.allowExec=options.allowExec;
         this.options=options;
         this.convo=createConversationFromScope(rootScope);
-        if(options.config)
         if(options.cmdMode){
             this.convo.dynamicFunctionCallback=this.dynamicFunctionCallback;
             startReadingStdIn();
@@ -568,20 +566,20 @@ The current date and time is: "{{dateTime()}}"
         if(!options){
             return;
         }
-        const ctrl=new ConvoMakeCtrl({
-            browserInf:new ConvoBrowserCtrl(),
-            ...options,
-        });
-        try{
-            if(this.options.makeTargets){
-                const debugOutput=await ctrl.getDebugOutputAsync();
-                await this.outAsync(JSON.stringify(debugOutput,null,4));
-            }else{
-                await ctrl.buildAsync();
-            }
-        }finally{
-            ctrl.dispose();
-        }
+        // const ctrl=new ConvoMakeCtrl({
+        //     browserInf:new ConvoBrowserCtrl(),
+        //     ...options,
+        // });
+        // try{
+        //     if(this.options.makeTargets){
+        //         const debugOutput=await ctrl.getDebugOutputAsync();
+        //         await this.outAsync(JSON.stringify(debugOutput,null,4));
+        //     }else{
+        //         await ctrl.buildAsync();
+        //     }
+        // }finally{
+        //     ctrl.dispose();
+        // }
     }
 
     private async convertCodeAsync(code:string){

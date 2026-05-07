@@ -1,6 +1,6 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
 import { detectColorMode } from "./tui-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColSize, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColWidth, SpriteGridRowHeight, SpriteGridUnit, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -203,8 +203,8 @@ export class ConvoTuiCtrl
      * Returns an id that can be used when converting screen and sprite definitions into 
      * screens and sprites.
      */
-    private getNextId():string{
-        return `_${this.nextId++}`;
+    public getNextId(suffix?:string):string{
+        return `_${this.nextId++}${suffix?`::${suffix}`:''}`;
     }
 
     /**
@@ -248,17 +248,40 @@ export class ConvoTuiCtrl
             ...def,
             id:def.id??this.getNextId(),
             root:this.loadSprite(def.root),
-            state:def.state?{...def.state}:undefined,
+            state:def.state?{...def.state,mountedSprites:[],renderIndex:0}:{mountedSprites:[],renderIndex:0},
         }));
     }
 
     private loadSprite(def:SpriteDef):Sprite
     {
+        let children:Sprite[]|undefined;
+        if(def.children){
+            for(const child of def.children){
+                if(!child){
+                    continue;
+                }
+                if(!children){
+                    children=[];
+                }
+                switch(typeof child){
+                    case 'string':
+                        children.push(this.loadSprite({text:child}));
+                        break;
+                    case 'number':
+                        children.push(this.loadSprite({text:child.toString()}));
+                        break;
+                    default:
+                        children.push(this.loadSprite(child));
+                        break;
+                }
+                
+            }
+        }
         const sprite:Sprite={
             ...def,
             id:def.id??this.getNextId(),
-            children:def.children?.map(child=>this.loadSprite(child)),
-            state:def.state?{...def.state}:{},
+            children,
+            state:def.state?{...def.state,renderIndex:0}:{renderIndex:0},
             image:def.image?convertB64TuiImage(def.image,def.imageOptions):undefined,
         };
 
@@ -282,7 +305,6 @@ export class ConvoTuiCtrl
 
     private prepareActiveScreen(screen:Screen)
     {
-        screen.state??={};
         if(!screen.state.activeSpriteId && screen.defaultSprite){
             const sprite=this.findSpriteById(screen.defaultSprite, screen);
             if(sprite){
@@ -292,6 +314,70 @@ export class ConvoTuiCtrl
         this.syncActiveSpriteStates(screen);
     }
 
+    private syncSpriteMounts(screen:Screen)
+    {
+        const index=screen.state.renderIndex;
+        const m=screen.state.mountedSprites;
+        let mounted:Sprite[]|undefined;
+        let unmounted:Sprite[]|undefined;
+        let activate:Sprite|undefined;
+
+        const visit=(sprite:Sprite)=>{
+            if(sprite.state.mounted===undefined){
+                sprite.state.mounted=true;
+                if(sprite.autoActivate){
+                    activate=sprite;
+                }
+                if(sprite.onMount){
+                    if(!mounted){
+                        mounted=[];
+                    }
+                    mounted.push(sprite);
+                }
+                m.push(sprite);
+            }
+            sprite.state.renderIndex=index;
+            for(const child of sprite.children??[]){
+                visit(child);
+            }
+        };
+        visit(screen.root);
+
+        
+        for(let i=0;i<m.length;i++){
+            const sprite=m[i];
+            if(!sprite || sprite.state.renderIndex===index){
+                continue;
+            }
+            if(sprite.onUnmount){
+                if(!unmounted){
+                    unmounted=[];
+                }
+                unmounted.push(sprite);
+            }
+            this.stopAnimationFor(sprite);
+            sprite.state.mounted=false;
+            m.splice(i,1);
+            i--;
+        }
+
+        if(unmounted){
+            for(const sprite of unmounted){
+                sprite.onUnmount?.({type:'unmount',sprite,ctrl:this,screen});
+            }
+        }
+
+        if(mounted){
+            for(const sprite of mounted){
+                sprite.onMount?.({type:'mount',sprite,ctrl:this,screen});
+            }
+        }
+
+        if(activate){
+            this.activateSprite(activate.id,screen);
+        }
+    }
+
     private syncActiveSpriteStates(screen:Screen)
     {
         const activeId=screen.state?.activeSpriteId;
@@ -299,10 +385,7 @@ export class ConvoTuiCtrl
         const visit=(sprite:Sprite)=>{
             const active=!!activeId && sprite.id===activeId;
 
-            if(sprite.state || active){
-                sprite.state??={};
-                sprite.state.active=active;
-            }
+            sprite.state.active=active;
 
             for(const child of sprite.children??[]){
                 visit(child);
@@ -419,7 +502,7 @@ export class ConvoTuiCtrl
                 ctrl:this,
             });
             if(prev.transient){
-                prev.state={};
+                prev.state={mountedSprites:[],renderIndex:0};
             }
         }
 
@@ -437,7 +520,7 @@ export class ConvoTuiCtrl
         return screen;
     }
 
-    public activateSprite(id:string|undefined|null, screen?:Screen|string, state?:SpriteState):Sprite|undefined
+    public activateSprite(id:string|undefined|null, screen?:Screen|string, state?:Partial<SpriteState>):Sprite|undefined
     {
         if(typeof id !== 'string'){
             return undefined;
@@ -452,10 +535,8 @@ export class ConvoTuiCtrl
             return undefined;
         }
 
-        targetScreen.state??={};
         targetScreen.state.activeSpriteId=sprite.id;
         if(state){
-            sprite.state??={};
             for(const e in state){
                 (sprite.state as any)[e]=(state as any)[e];
             }
@@ -554,6 +635,7 @@ export class ConvoTuiCtrl
 
         const screen=this._activeScreen;
         if(screen){
+            screen.state.renderIndex++;
             this.syncActiveSpriteStates(screen);
 
             const rect:TuiRect={
@@ -567,6 +649,7 @@ export class ConvoTuiCtrl
                 b:this.resolveColor(this.theme.background),
             });
             this.drawAbsoluteSprites(screen.root);
+            this.syncSpriteMounts(screen);
         }
 
         const output=(
@@ -1076,6 +1159,19 @@ export class ConvoTuiCtrl
         this.animationCtxList=[];
     }
 
+    private stopAnimationFor(sprite:Sprite){
+        const ctx:SpriteInlineRenderCtx=(sprite as any)[this.inlineRenderCtxKey];
+        if(!ctx){
+            return;
+        }
+        clearInterval(ctx.iv);
+        delete ctx.iv;
+        const i=this.animationCtxList.indexOf(ctx);
+        if(i!==-1){
+            this.animationCtxList.splice(i,1);
+        }
+    }
+
     private drawInlineImage(sprite:Sprite, rect:TuiRect, style:TuiStyle, textAlign:SpriteAlignment, vTextAlign:SpriteAlignment, scrollX:number, scrollY:number)
     {
         const image=sprite.image;
@@ -1385,18 +1481,22 @@ export class ConvoTuiCtrl
         const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
         const gap=this.getSpriteGap(sprite.gap);
         const totalColGap=this.getTotalGap(cols.length, gap.x);
-        const widths=this.getGridColWidths(cols as SpriteGridColSize[], Math.max(0, rect.width-totalColGap));
+        const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, rect.width-totalColGap));
         const colCount=Math.max(1, widths.length);
-        const rowHeights:number[]=[];
+        const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+        const autoRowHeights:number[]=[];
 
         children.forEach((child, i)=>{
             const col=i%colCount;
             const row=Math.floor(i/colCount);
-            rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+            autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
         });
 
+        const totalRowGap=this.getTotalGap(rowCount, gap.y);
+        const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, Math.max(0, rect.height-totalRowGap), autoRowHeights);
+
         let y=rect.y;
-        for(let row=0;row<rowHeights.length;row++){
+        for(let row=0;row<rowCount;row++){
             let x=rect.x;
             for(let col=0;col<colCount;col++){
                 const child=children[(row*colCount)+col];
@@ -1411,7 +1511,7 @@ export class ConvoTuiCtrl
                 }
                 x+=width+(col<colCount-1?gap.x:0);
             }
-            y+=(rowHeights[row]??0)+(row<rowHeights.length-1?gap.y:0);
+            y+=(rowHeights[row]??0)+(row<rowCount-1?gap.y:0);
         }
     }
 
@@ -1521,37 +1621,41 @@ export class ConvoTuiCtrl
             const totalColGap=this.getTotalGap(colCount, gap.x);
 
             if(contentWidth!==undefined){
-                const widths=this.getGridColWidths(cols as SpriteGridColSize[], Math.max(0, contentWidth-totalColGap));
-                const rowHeights:number[]=[];
+                const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, contentWidth-totalColGap));
+                const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+                const autoRowHeights:number[]=[];
 
                 children.forEach((child, i)=>{
                     const row=Math.floor(i/colCount);
                     const col=i%colCount;
-                    rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+                    autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
                 });
+
+                const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
 
                 size={
                     width:contentWidth+paddingWidth+borderWidth,
-                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowHeights.length, gap.y))+paddingHeight+borderHeight,
+                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y))+paddingHeight+borderHeight,
                 };
                 return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
             }
 
             const sizes=children.map(child=>this.getNaturalSize(child));
+            const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+            const autoRowHeights:number[]=[];
             let naturalWidth=0;
-            let naturalHeight=0;
-            let rowCount=0;
 
-            for(let i=0;i<sizes.length;i+=colCount){
-                const row=sizes.slice(i, i+colCount);
-                rowCount++;
-                naturalWidth=Math.max(naturalWidth, row.reduce((sum, size)=>sum+size.width, 0)+this.getTotalGap(row.length, gap.x));
-                naturalHeight+=Math.max(1, ...row.map(size=>size.height));
+            for(let row=0;row<rowCount;row++){
+                const rowSizes=sizes.slice(row*colCount, (row*colCount)+colCount);
+                naturalWidth=Math.max(naturalWidth, rowSizes.reduce((sum, size)=>sum+size.width, 0)+this.getTotalGap(rowSizes.length, gap.x));
+                autoRowHeights[row]=Math.max(0, ...rowSizes.map(size=>size.height));
             }
+
+            const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
 
             size={
                 width:naturalWidth+paddingWidth+borderWidth,
-                height:Math.max(1, naturalHeight+this.getTotalGap(rowCount, gap.y))+paddingHeight+borderHeight,
+                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y))+paddingHeight+borderHeight,
             };
             return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
         }
@@ -1562,6 +1666,97 @@ export class ConvoTuiCtrl
             height:sizes.reduce((sum, size)=>sum+size.height, 0)+this.getTotalGap(children.length, gap.y)+paddingHeight+borderHeight,
         };
         return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+    }
+
+    private getGridRowCount(childCount:number, colCount:number, rows:Sprite['gridRows']):number
+    {
+        return Math.max(
+            Math.ceil(childCount/Math.max(1, colCount)),
+            rows?.length??0
+        );
+    }
+
+    private getGridRowHeights(rows:SpriteGridRowHeight[]|undefined, rowCount:number, height:number|undefined, autoHeights:number[]):number[]
+    {
+        rowCount=Math.max(0, Math.floor(rowCount));
+        if(rowCount<=0){
+            return [];
+        }
+
+        const parsed=Array.from({length:rowCount}, (_, i)=>{
+            const row=rows?.[i]??'auto';
+            if(row==='auto'){
+                return {
+                    value:0,
+                    unit:'auto' as const,
+                };
+            }
+
+            const match=/^(\d+(?:\.\d+)?)(cr|fr)$/.exec(row);
+            const value=match?Number(match[1]):1;
+
+            return {
+                value:Number.isFinite(value)?Math.max(0, value):1,
+                unit:(match?.[2]??'auto') as SpriteGridUnit|'auto',
+            };
+        });
+
+        if(height===undefined){
+            return parsed.map((row, i)=>(
+                row.unit==='cr'?
+                    Math.max(0, Math.floor(row.value))
+                :
+                    Math.max(0, Math.floor(autoHeights[i]??0))
+            ));
+        }
+
+        height=Math.max(0, Math.floor(height));
+
+        const fixed=parsed.reduce((sum, row, i)=>(
+            sum+(
+                row.unit==='cr'?
+                    Math.max(0, Math.floor(row.value))
+                :row.unit==='auto'?
+                    Math.max(0, Math.floor(autoHeights[i]??0))
+                :
+                    0
+            )
+        ), 0);
+        const totalFr=parsed.reduce((sum, row)=>sum+(row.unit==='fr'?row.value:0), 0);
+        const remaining=Math.max(0, height-fixed);
+        let lastFrIndex=-1;
+
+        for(let i=0;i<parsed.length;i++){
+            const row=parsed[i]!;
+            if(row.unit==='fr' && row.value>0){
+                lastFrIndex=i;
+            }
+        }
+
+        let usedFr=0;
+        return parsed.map((row, i)=>{
+            if(row.unit==='cr'){
+                return Math.max(0, Math.floor(row.value));
+            }
+
+            if(row.unit==='auto'){
+                return Math.max(0, Math.floor(autoHeights[i]??0));
+            }
+
+            if(totalFr<=0 || row.value<=0){
+                return 0;
+            }
+
+            const rowHeight=(
+                i===lastFrIndex?
+                    remaining-usedFr
+                :
+                    Math.floor(remaining*(row.value/totalFr))
+            );
+
+            usedFr+=rowHeight;
+            return Math.max(0, rowHeight);
+        });
     }
 
     private getSpriteDiscreteSize(size:number|undefined):number|undefined
@@ -1626,19 +1821,22 @@ export class ConvoTuiCtrl
         if(layout==='grid'){
             const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
             const totalColGap=this.getTotalGap(cols.length, gap.x);
-            const widths=this.getGridColWidths(cols as SpriteGridColSize[], Math.max(0, viewport.width-totalColGap));
+            const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, viewport.width-totalColGap));
             const colCount=Math.max(1, widths.length);
-            const rowHeights:number[]=[];
+            const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+            const autoRowHeights:number[]=[];
 
             children.forEach((child, i)=>{
                 const row=Math.floor(i/colCount);
                 const col=i%colCount;
-                rowHeights[row]=Math.max(rowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+                autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
             });
+
+            const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
 
             return {
                 width:Math.max(viewport.width, widths.reduce((sum, width)=>sum+width, 0)+this.getTotalGap(widths.length, gap.x)),
-                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowHeights.length, gap.y)),
+                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y)),
             };
         }
 
@@ -1674,7 +1872,6 @@ export class ConvoTuiCtrl
             return;
         }
 
-        sprite.state??={};
         sprite.state.scrollX=nextX;
         sprite.state.scrollY=nextY;
     }
@@ -1684,7 +1881,15 @@ export class ConvoTuiCtrl
         if(sprite.isInput){
             return this.getInputSpriteValue(sprite);
         }
-        return sprite.richText?.length?sprite.richText.map(span=>span.text).join(''):(sprite.text??'');
+        let text=sprite.richText?.length?sprite.richText.map(span=>span.text).join(''):(sprite.text??'');
+        if(sprite.state.active && sprite.activeTextMask){
+            if(sprite.activeTextMask.length>text.length){
+                text=sprite.activeTextMask.substring(0,text.length);
+            }else{
+                text=sprite.activeTextMask+text.substring(sprite.activeTextMask.length);
+            }
+        }
+        return text;
     }
 
     private getInlineSpriteLayoutText(sprite:Sprite):string
@@ -2018,7 +2223,7 @@ export class ConvoTuiCtrl
         }
     }
 
-    private getGridColWidths(cols:SpriteGridColSize[]|undefined, width:number):number[]
+    private getGridColWidths(cols:SpriteGridColWidth[]|undefined, width:number):number[]
     {
         if(!cols?.length){
             return [Math.max(0, Math.floor(width))];
@@ -2999,12 +3204,10 @@ export class ConvoTuiCtrl
             return false;
         }
 
-        sprite.state??={};
-
         const value=this.getInputSpriteValue(sprite);
         const caret=this.getInputCaret(sprite, value);
         const next=update(value, caret);
-        const nextValue=next.value;
+        const nextValue=sprite.inputFilter?.(next.value)??next.value;
         const nextCaret=this.clampNumber(
             typeof next.caret==='number' && Number.isFinite(next.caret)?
                 Math.floor(next.caret)
@@ -3059,8 +3262,6 @@ export class ConvoTuiCtrl
         if(!sprite?.isInput || !screen){
             return false;
         }
-
-        sprite.state??={};
 
         const value=this.getInputSpriteValue(sprite);
         const caret=this.getInputCaret(sprite, value);
@@ -3198,7 +3399,6 @@ export class ConvoTuiCtrl
         if(!sprite.scrollable){
             return false;
         }
-        sprite.state??={};
         const rect=this.spriteContentRects.get(sprite.id);
         const max=rect?this.getSpriteMaxScroll(sprite, rect):undefined;
         if(max){
@@ -3214,8 +3414,6 @@ export class ConvoTuiCtrl
         if(!sprite.scrollable){
             return false;
         }
-
-        sprite.state??={};
 
         const currentX=sprite.state.scrollX??0;
         const currentY=sprite.state.scrollY??0;

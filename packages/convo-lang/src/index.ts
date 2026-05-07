@@ -74,6 +74,7 @@ export * from './lib/make/convo-make-common-lib.js';
 export * from './lib/make/convo-make-common-types.js';
 export * from './lib/make/convo-make-scope-functions.js';
 export * from './lib/MockConvoEmbeddingsService.js';
+export * from './lib/ObjectBinding.js';
 export * from './lib/providers/anthropic-lib.js';
 export * from './lib/providers/anthropic-models.js';
 export * from './lib/providers/anthropic-params.js';

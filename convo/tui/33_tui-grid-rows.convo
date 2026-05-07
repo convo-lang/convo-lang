@@ -1,3 +1,233 @@
+@import ./_tui.convo
+
+> user
+Implement the `gridRows` property of the `Sprite` interface.
+
+
+
+@time 2026-05-06T16:28:22-04:00
+@tokenUsage 33184 / 7596 / $0.20390000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any questions.
+
+Below are the intended updates. The main implementation is in `ConvoTuiCtrl.ts`; `gridRows` now affects grid drawing, natural sizing, and scroll bounds.
+
+<FILE_CONTENT name="ConvoTuiCtrl.ts" target-output-path="../../packages/tui/src/ConvoTuiCtrl.ts" dirty file-hash="f54801d972364a6265c5c5ce8ba3f72a7fa628cd" last-commit="6caeaa890b23ea92e55f148ae0e06bede78ef6f4">
+```ts
+// Update the existing import to include SpriteGridRowHeight:
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColWidth, SpriteGridRowHeight, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
+
+// Replace drawGridChildren with:
+
+    private drawGridChildren(sprite:Sprite, children:Sprite[], rect:TuiRect, style:TuiStyle, inheritedProps:TuiInheritedSpriteProps)
+    {
+        const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+        const gap=this.getSpriteGap(sprite.gap);
+        const totalColGap=this.getTotalGap(cols.length, gap.x);
+        const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, rect.width-totalColGap));
+        const colCount=Math.max(1, widths.length);
+        const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+        const autoRowHeights:number[]=[];
+
+        children.forEach((child, i)=>{
+            const col=i%colCount;
+            const row=Math.floor(i/colCount);
+            autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+        });
+
+        const totalRowGap=this.getTotalGap(rowCount, gap.y);
+        const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, Math.max(0, rect.height-totalRowGap), autoRowHeights);
+
+        let y=rect.y;
+        for(let row=0;row<rowCount;row++){
+            let x=rect.x;
+            for(let col=0;col<colCount;col++){
+                const child=children[(row*colCount)+col];
+                const width=widths[col]??0;
+                if(child){
+                    this.drawSprite(child, {
+                        x,
+                        y,
+                        width:this.getSpriteOuterDiscreteSize(child, 'width')??width,
+                        height:this.getSpriteOuterDiscreteSize(child, 'height')??(rowHeights[row]??0),
+                    }, style, inheritedProps);
+                }
+                x+=width+(col<colCount-1?gap.x:0);
+            }
+            y+=(rowHeights[row]??0)+(row<rowCount-1?gap.y:0);
+        }
+    }
+
+// In getNaturalSize, replace the layout==='grid' block with:
+
+        if(layout==='grid'){
+            const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+            const colCount=Math.max(1, cols.length);
+            const totalColGap=this.getTotalGap(colCount, gap.x);
+
+            if(contentWidth!==undefined){
+                const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, contentWidth-totalColGap));
+                const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+                const autoRowHeights:number[]=[];
+
+                children.forEach((child, i)=>{
+                    const row=Math.floor(i/colCount);
+                    const col=i%colCount;
+                    autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+                });
+
+                const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
+
+                size={
+                    width:contentWidth+paddingWidth+borderWidth,
+                    height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y))+paddingHeight+borderHeight,
+                };
+                return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+            }
+
+            const sizes=children.map(child=>this.getNaturalSize(child));
+            const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+            const autoRowHeights:number[]=[];
+            let naturalWidth=0;
+
+            for(let row=0;row<rowCount;row++){
+                const rowSizes=sizes.slice(row*colCount, (row*colCount)+colCount);
+                naturalWidth=Math.max(naturalWidth, rowSizes.reduce((sum, size)=>sum+size.width, 0)+this.getTotalGap(rowSizes.length, gap.x));
+                autoRowHeights[row]=Math.max(0, ...rowSizes.map(size=>size.height));
+            }
+
+            const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
+
+            size={
+                width:naturalWidth+paddingWidth+borderWidth,
+                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y))+paddingHeight+borderHeight,
+            };
+            return this.applySpriteOuterSize(size, explicitWidth, explicitHeight, margin);
+        }
+
+// In getScrollableContentSize, replace the layout==='grid' block with:
+
+        if(layout==='grid'){
+            const cols=sprite.gridCols?.length?sprite.gridCols:['1fr'];
+            const totalColGap=this.getTotalGap(cols.length, gap.x);
+            const widths=this.getGridColWidths(cols as SpriteGridColWidth[], Math.max(0, viewport.width-totalColGap));
+            const colCount=Math.max(1, widths.length);
+            const rowCount=this.getGridRowCount(children.length, colCount, sprite.gridRows);
+            const autoRowHeights:number[]=[];
+
+            children.forEach((child, i)=>{
+                const row=Math.floor(i/colCount);
+                const col=i%colCount;
+                autoRowHeights[row]=Math.max(autoRowHeights[row]??0, this.getNaturalSize(child, widths[col]??0).height);
+            });
+
+            const rowHeights=this.getGridRowHeights(sprite.gridRows, rowCount, undefined, autoRowHeights);
+
+            return {
+                width:Math.max(viewport.width, widths.reduce((sum, width)=>sum+width, 0)+this.getTotalGap(widths.length, gap.x)),
+                height:Math.max(1, rowHeights.reduce((sum, height)=>sum+height, 0)+this.getTotalGap(rowCount, gap.y)),
+            };
+        }
+
+// Add these helpers after getGridColWidths:
+
+    private getGridRowCount(childCount:number, colCount:number, rows:Sprite['gridRows']):number
+    {
+        return Math.max(
+            Math.ceil(childCount/Math.max(1, colCount)),
+            rows?.length??0
+        );
+    }
+
+    private getGridRowHeights(rows:SpriteGridRowHeight[]|undefined, rowCount:number, height:number|undefined, autoHeights:number[]):number[]
+    {
+        rowCount=Math.max(0, Math.floor(rowCount));
+        if(rowCount<=0){
+            return [];
+        }
+
+        const parsed=Array.from({length:rowCount}, (_, i)=>{
+            const row=rows?.[i]??'auto';
+            if(row==='auto'){
+                return {
+                    value:0,
+                    unit:'auto' as const,
+                };
+            }
+
+            const match=/^(\d+(?:\.\d+)?)(cr|fr)$/.exec(row);
+            const value=match?Number(match[1]):1;
+
+            return {
+                value:Number.isFinite(value)?Math.max(0, value):1,
+                unit:(match?.[2]??'auto') as SpriteGridUnit|'auto',
+            };
+        });
+
+        if(height===undefined){
+            return parsed.map((row, i)=>(
+                row.unit==='cr'?
+                    Math.max(0, Math.floor(row.value))
+                :
+                    Math.max(0, Math.floor(autoHeights[i]??0))
+            ));
+        }
+
+        height=Math.max(0, Math.floor(height));
+
+        const fixed=parsed.reduce((sum, row, i)=>(
+            sum+(
+                row.unit==='cr'?
+                    Math.max(0, Math.floor(row.value))
+                :row.unit==='auto'?
+                    Math.max(0, Math.floor(autoHeights[i]??0))
+                :
+                    0
+            )
+        ), 0);
+        const totalFr=parsed.reduce((sum, row)=>sum+(row.unit==='fr'?row.value:0), 0);
+        const remaining=Math.max(0, height-fixed);
+        let lastFrIndex=-1;
+
+        for(let i=0;i<parsed.length;i++){
+            const row=parsed[i]!;
+            if(row.unit==='fr' && row.value>0){
+                lastFrIndex=i;
+            }
+        }
+
+        let usedFr=0;
+        return parsed.map((row, i)=>{
+            if(row.unit==='cr'){
+                return Math.max(0, Math.floor(row.value));
+            }
+
+            if(row.unit==='auto'){
+                return Math.max(0, Math.floor(autoHeights[i]??0));
+            }
+
+            if(totalFr<=0 || row.value<=0){
+                return 0;
+            }
+
+            const rowHeight=(
+                i===lastFrIndex?
+                    remaining-usedFr
+                :
+                    Math.floor(remaining*(row.value/totalFr))
+            );
+
+            usedFr+=rowHeight;
+            return Math.max(0, rowHeight);
+        });
+    }
+```
+</FILE_CONTENT>
+
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md" last-commit="5b1c0a91486fa541ca83d2d922a46126c520ba99">
+```md
 # TUI Notes
 
 ## ConvoTuiCtrl first-pass decisions
@@ -294,3 +524,8 @@ Added color mode ANSI output support:
 ## Planned implementation convo scripts
 
 - `14_tui-layout-refinements.convo`: completed layout sizing refinements for row, column, grid, flex, and scroll-clipped wrapped text.
+```
+</FILE_CONTENT>
+
+
+> user

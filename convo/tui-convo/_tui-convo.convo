@@ -1,0 +1,18 @@
+@import ../base.convo
+@import ../../packages/tui/src/tui-types.ts !file
+
+> system
+We are building a TUI for Convo-Lang. 
+
+## Screens
+
+- file editor: The user can edit and run convo files. Left side of the screen has a file tree
+- db: The user can connect to ConvoDb instances and run queries and view a file tree of all data
+- api: The user can start and stop the HTTP api and manage API related settings
+- settings: The user can update general settings such as default model and manage API keys
+
+## Layout
+- Top bar with tabs to switch between screens
+- Left tool bar with content specific to each screen
+- Main content area
+- Bottom status bar
