@@ -310,14 +310,15 @@ export class BaseOpenAiConvoCompletionService implements
             if(!d){
                 continue;
             }
-            const call=calls[i]??(calls[i]={
+            const index=d.index??1;
+            const call=calls[index]??(calls[index]={
                 id:d.id??uuid(),
                 function:{name:d.function?.name??'',arguments:''},
                 type:'function',
             });
 
             if(d.function?.arguments){
-                const buf=argBuffers[i]??(argBuffers[i]=[]);
+                const buf=argBuffers[index]??(argBuffers[index]=[]);
                 buf.push(d.function.arguments);
                 if(ctx.onChunk){
                     await ctx.onChunk(this,{id:nextChunkId(),mid,type:'function',functionName:call.function.name,chunk:d.function.arguments},flat);
