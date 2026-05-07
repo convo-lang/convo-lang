@@ -83,9 +83,9 @@ export class ConvoTuiConvoCodeCtrl
 
             const path=normalizePath(
                 this.doc.uri.pathIsAbsolute?
-                    this.doc.uri.uri
+                    this.doc.uri.path
                 :this.doc.uri.workspacePath?
-                    joinPaths(this.doc.studio.workspacePath,this.doc.uri.uriBase)
+                    joinPaths(this.doc.studio.workspacePath,this.doc.uri.path)
                 :
                     ''
             )||undefined;
