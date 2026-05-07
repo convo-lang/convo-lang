@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 8317 --webpack",
-    "build": "next build --webpack",
+    "dev": "next dev -p 8317",
+    "build": "next build",
     "start": "next start"
   },
   "ignoreScripts": [
