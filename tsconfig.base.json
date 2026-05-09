@@ -73,8 +73,23 @@
             "@convo-lang/convo-lang-react": [
                 "./packages/convo-lang-react/src/index.ts"
             ],
+            "@convo-lang/db": [
+                "./packages/db/src/index.ts"
+            ],
             "@convo-lang/db/*": [
                 "./packages/db/src/*"
+            ],
+            "@convo-lang/db-bun": [
+                "./packages/db-bun/src/index.ts"
+            ],
+            "@convo-lang/db-bun/*": [
+                "./packages/db-bun/src/*"
+            ],
+            "@convo-lang/db-node": [
+                "./packages/db-node/src/index.ts"
+            ],
+            "@convo-lang/db-node/*": [
+                "./packages/db-node/src/*"
             ],
             "@convo-lang/hono/*": [
                 "./packages/hono/src/*"

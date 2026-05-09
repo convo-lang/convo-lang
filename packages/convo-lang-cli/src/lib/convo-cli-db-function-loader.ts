@@ -44,7 +44,7 @@ export const loadCliDbFunctionsAsync=async (dbMap:ConvoDbInstanceMap,options:Con
                 }
             }
 
-            const db=dbMap.getDb(item.dbName);
+            const db=await dbMap.getDbAsync(item.dbName);
             if(!db){
                 throw new Error(`Unable to get database by name: ${item.dbName}`);
             }

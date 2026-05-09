@@ -92,7 +92,7 @@ export const getConvoHonoRoutes=({
             throw new HTTPException(401);
         }
 
-        const db=dbMap?.getDb(dbName);
+        const db=await dbMap?.getDbAsync(dbName);
         if(!db){
             throw new HTTPException(401);
         }
@@ -473,7 +473,7 @@ export const getConvoHonoRoutes=({
 
         await initConvoHonoAsync();
 
-        const db=dbMap?.getDb(name);
+        const db=await dbMap?.getDbAsync(name);
         if(!db){
             return undefined;
         }

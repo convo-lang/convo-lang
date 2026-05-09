@@ -1,7 +1,7 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
-import { getErrorMessage, getFileName } from "@iyio/common";
+import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "@convo-lang/db/BaseSqliteConvoDb.js";
+import { getErrorMessage } from "@iyio/common";
 import type { Database } from "bun:sqlite";
-import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
 
 export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
 {
@@ -13,10 +13,6 @@ export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
 
 export class BunSqliteConvoDb extends BaseSqliteConvoDb
 {
-
-    public static fromConnectionString(connectionString?:string){
-        return new BunSqliteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
-    }
 
     private readonly dbPath?:string;
     private db?:Database;

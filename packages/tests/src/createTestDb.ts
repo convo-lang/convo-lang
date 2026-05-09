@@ -1,7 +1,7 @@
 import { HttpConvoCompletionService } from "@convo-lang/convo-lang";
-import { BunSqliteConvoDb } from "@convo-lang/db/BunSqliteConvoDb.js";
+import { BunSqliteConvoDb } from "@convo-lang/db-bun/BunSqliteConvoDb.js";
+import { NodeSQLiteConvoDb } from "@convo-lang/db-node/NodeSQLiteConvoDb.js";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
-import { NodeSQLiteConvoDb } from "@convo-lang/db/NodeSQLiteConvoDb.js";
 import { uuid } from "@iyio/common";
 
 export type DbType='bun-sqlite'|'node'|'mem'|'http';

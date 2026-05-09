@@ -1,0 +1,10 @@
+{
+    "name": "@convo-lang/db-node",
+    "version": "0.9.5",
+    "type": "module",
+    "sideEffects": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/convo-lang/convo-lang.git"
+    }
+}

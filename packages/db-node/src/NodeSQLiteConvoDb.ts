@@ -1,7 +1,7 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
+import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "@convo-lang/db/BaseSqliteConvoDb.js";
 import { getErrorMessage, getFileName } from "@iyio/common";
 import type { DatabaseSync } from "node:sqlite";
-import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "./BaseSqliteConvoDb.js";
 
 export interface NodeSQLiteConvoDbOptions extends BaseSqliteConvoDbOptions
 {

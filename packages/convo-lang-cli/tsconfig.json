@@ -28,6 +28,12 @@
             "path": "../../packages/db"
         },
         {
+            "path": "../../packages/db-bun"
+        },
+        {
+            "path": "../../packages/db-node"
+        },
+        {
             "path": "../../packages/highlighter"
         },
         {

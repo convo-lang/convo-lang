@@ -1,4 +1,4 @@
-import type { CancelToken, Scope } from "@iyio/common";
+import type { CancelToken } from "@iyio/common";
 import type { ZodType } from "zod";
 import type { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
 import type { ConvoDbAuthManager } from "./ConvoDbAuthManager.js";
@@ -1217,8 +1217,6 @@ export interface ConvoDbExport
     embeddings:ConvoNodeEmbedding[];
 }
 
-export type ConvoDbFactory=(scope:Scope)=>ConvoDb;
-
 /**
  * Stores and retrieves nodes.
  */
@@ -2208,4 +2206,14 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
  * the same cached db after called the first name. There is one exception to the caching rule.
  * '*' should return a new database every time called.
  */
-export type ConvoDbMap=Record<string,(name:string)=>ConvoDb>;
+export type ConvoDbMap=Record<string,ConvoDbFactory>;
+
+/**
+ * Used to lazy create a database
+ */
+export type ConvoDbFactory=(name:string)=>ConvoDb;
+
+/**
+ * Converts a connection string to a ConvoDbFactory
+ */
+export type ConvoDbConnectionStringHandler=(type:string,args:string[])=>ConvoDbFactory|null|undefined|Promise<ConvoDbFactory|null|undefined>;

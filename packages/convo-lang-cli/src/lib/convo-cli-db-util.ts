@@ -14,7 +14,7 @@ export const executeCliConvoDbCommands=async (dbMap:ConvoDbInstanceMap,options:C
         throw new Error('query must define dbName');
     }
 
-    const db=dbMap.getDb(query.dbName);
+    const db=await dbMap.getDbAsync(query.dbName);
     if(!db){
         throw new Error(`Db not found by name ${query.dbName}`);
     }
@@ -38,7 +38,7 @@ export const executeCliConvoDbQuery=async (dbMap:ConvoDbInstanceMap,options:Conv
         throw new Error('query must define dbName');
     }
 
-    const db=dbMap.getDb(query.dbName);
+    const db=await dbMap.getDbAsync(query.dbName);
     if(!db){
         throw new Error(`Db not found by name ${query.dbName}`);
     }
@@ -81,7 +81,7 @@ export const executeCliCallConvoDbFunction=async (dbMap:ConvoDbInstanceMap,optio
         throw new Error('path required by db function call');
     }
 
-    const db=dbMap.getDb(dbName);
+    const db=await dbMap.getDbAsync(dbName);
     if(!db){
         throw new Error(`Db not found by name ${dbName}`);
     }

@@ -1,4 +1,4 @@
-import { ConvoDbCommand, ConvoNodeQuery } from "@convo-lang/convo-lang";
+import { ConvoDbCommand, ConvoDbConnectionStringHandler, ConvoNodeQuery } from "@convo-lang/convo-lang";
 
 export type ConvoExecAllowMode='disable'|'ask'|'allow'
 
@@ -371,6 +371,13 @@ export interface ConvoCliOptions
      * @default 'default:sqlite'
      */
     dbMap?:string[];
+
+    /**
+     * Array of connection string handlers (ConvoDbConnectionStringHandler) that produce db factories.
+     * Provided string will be used to dynamically import modules containing factories.
+     * String format = {importPackageName}:{factoryFunctionName}
+     */
+    dbFactory?:(string|ConvoDbConnectionStringHandler)[];
 
     /**
      * List of function file to load into the ConvoDb. Each item in the list is a colon separated
