@@ -273,21 +273,14 @@ const db=new InMemoryConvoDb({
 
 ```ts
 import { ConvoDbInstanceMap } from '@convo-lang/convo-lang';
-import { getConvoDbMapFromStrings } from '@convo-lang/db/db-map.js';
 
-const mapResult=getConvoDbMapFromStrings([
-    'default:sqlite:./data/default.db',
-    'cache:mem',
-]);
+const dbMap=new ConvoDbInstanceMap();
 
-if(!mapResult.success){
-    throw new Error(mapResult.error);
-}
+await dbMap.addFactoryUsingConnectionStringAsync('default:sqlite:./data/default.db');
+await dbMap.addFactoryUsingConnectionStringAsync('cache:mem');
 
-const dbMap=new ConvoDbInstanceMap(mapResult.result);
-
-const defaultDb=dbMap.getDb('default');
-const cacheDb=dbMap.getDb('cache');
+const defaultDb=await dbMap.getDbAsync('default');
+const cacheDb=await dbMap.getDbAsync('cache');
 ```
 
 A `ConvoDbMap` maps names to functions that receive the requested name and return a database:
@@ -2943,4 +2936,13 @@ import {
     FsConvoDb,
     LayeredConvoDb,
 } from '@convo-lang/db';
+
+import {
+    BunSqliteConvoDb,
+    BunPostgresConvoDb,
+} from '@convo-lang/db-bun';
+
+import {
+    NodeSqliteConvoDb,
+} from '@convo-lang/db-node';
 ```
