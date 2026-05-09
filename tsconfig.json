@@ -47,7 +47,13 @@
             "path": "./packages/db-functions"
         },
         {
+            "path": "./packages/highlighter"
+        },
+        {
             "path": "./packages/hono"
+        },
+        {
+            "path": "./packages/studio"
         },
         {
             "path": "./packages/tests"

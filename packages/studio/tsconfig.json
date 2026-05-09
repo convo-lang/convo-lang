@@ -9,7 +9,7 @@
     },
     "references": [
         {
-            "path": "../convo-lang"
+            "path": "../../packages/convo-lang"
         }
     ]
 }

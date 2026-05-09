@@ -19,9 +19,6 @@
             "path": "../../packages/convo-lang"
         },
         {
-            "path": "../../packages/convo-lang-browser"
-        },
-        {
             "path": "../../packages/convo-lang-make"
         },
         {
@@ -31,16 +28,16 @@
             "path": "../../packages/db"
         },
         {
-            "path": "../../packages/hono"
-        },
-        {
-            "path": "../../packages/tui"
-        },
-        {
             "path": "../../packages/highlighter"
         },
         {
+            "path": "../../packages/hono"
+        },
+        {
             "path": "../../packages/studio"
+        },
+        {
+            "path": "../../packages/tui"
         }
     ]
 }
