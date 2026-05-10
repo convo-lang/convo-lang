@@ -3,9 +3,11 @@ import { BunSqliteConvoDb } from "@convo-lang/db-bun/BunSqliteConvoDb.js";
 import { NodeFsConvoDb } from "@convo-lang/db-node/NodeFsConvoDb.js";
 import { NodeSQLiteConvoDb } from "@convo-lang/db-node/NodeSQLiteConvoDb.js";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
+import { LocalStorageConvoDb } from "@convo-lang/db/LocalStorageConvoDb.js";
+import { LocalStorageConvoDbInfMock } from "@convo-lang/db/LocalStorageConvoDbInfMock.js";
 import { uuid } from "@iyio/common";
 
-export type DbType='bun-sqlite'|'node'|'mem'|'http'|'fs';
+export type DbType='bun-sqlite'|'node'|'mem'|'http'|'fs'|'local-storage';
 
 
 export const createTestDb=(type:DbType)=>{
@@ -17,6 +19,8 @@ export const createTestDb=(type:DbType)=>{
         new NodeSQLiteConvoDb({name:'default'})
     :type==='fs'?
         new NodeFsConvoDb({name:'default',root:`./data/fs-dbs/${uuid()}`})
+    :type==='local-storage'?
+        new LocalStorageConvoDb({name:'default',inf:new LocalStorageConvoDbInfMock()})
     :
         new InMemoryConvoDb({name:'default'}))
 }

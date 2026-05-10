@@ -2,7 +2,7 @@ import { ConvoNode } from "@convo-lang/convo-lang";
 import { describe, expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
 
-const createDb=()=>createTestDb('mem');
+const createDb=()=>createTestDb('local-storage');
 
 describe('convo db functions',()=>{
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createTestDb } from './createTestDb.js';
 
-const createDb=()=>createTestDb('bun-sqlite');
+const createDb=()=>createTestDb('local-storage');
 
 const readStreamTextAsync=async (stream:ReadableStream):Promise<string>=>{
     return await new Response(stream).text();
