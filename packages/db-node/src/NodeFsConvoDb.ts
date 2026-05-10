@@ -1,5 +1,6 @@
-import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoEmbeddingSearch, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeGroupCondition, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
+import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoEmbeddingSearch, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
 import { BaseConvoDb, BaseConvoDbOptions } from '@convo-lang/db/BaseConvoDb.js';
+import { doesJsonQueryEdgeMatchCondition, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from '@convo-lang/db/json-query.js';
 import { pathExistsAsync } from "@iyio/node-common";
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
@@ -203,7 +204,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
                     to.has(edge.to) &&
                     (!hasGrant || (edge.grant!==undefined && edge.grant!==0))
                 )
-                .map(edge=>this._pick(edge,keys));
+                .map(edge=>selectJsonQueryKeys(edge,keys));
         });
     }
 
@@ -217,14 +218,14 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
                 }
             }
             this._sortNodes(nodes,orderBy,paths);
-            return nodes.map(node=>this._pick(node,keys));
+            return nodes.map(node=>selectJsonQueryKeys(node,keys));
         });
     }
 
     public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
         return await this._runAsync(async ()=>{
             const paths=currentNodePaths??await this._readNodePathsAsync();
-            const selected=paths.filter(nodePath=>this._doesPathMatchStepPath(nodePath,step.path));
+            const selected=paths.filter(nodePath=>doesJsonQueryPathMatchStepPath(nodePath,step.path));
             return {
                 paths:await this._pageOrderedPathsAsync(selected,orderBy,limit,offset),
                 nextToken:undefined,
@@ -238,7 +239,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
             const selected:string[]=[];
             for(const nodePath of paths){
                 const node=await this._readNodeAsync(nodePath);
-                if(node && this._doesConditionMatch(node,step.condition)){
+                if(node && evaluateJsonQueryCondition(node,step.condition)){
                     selected.push(node.path);
                 }
             }
@@ -253,7 +254,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return await this._runAsync(async ()=>{
             const paths=currentNodePaths??await this._readNodePathsAsync();
             const edges=await this._readEdgesAsync();
-            const selected=paths.filter(nodePath=>this._hasPermission(edges,step.permissionFrom,nodePath,step.permissionRequired));
+            const selected=paths.filter(nodePath=>hasJsonQueryPermission(edges,step.permissionFrom,nodePath,step.permissionRequired));
             return {
                 paths:await this._pageOrderedPathsAsync(selected,orderBy,limit,offset),
                 nextToken:undefined,
@@ -284,38 +285,8 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
     public async selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
         return await this._runAsync(async ()=>{
             const sourcePaths=currentNodePaths??await this._readNodePathsAsync();
-            const sourceSet=new Set(sourcePaths);
-            const selected:string[]=[];
-            const selectedSet=new Set<string>();
             const edges=await this._readEdgesAsync();
-
-            for(const edge of edges){
-                if(!this._doesEdgeMatch(edge,step.edge)){
-                    continue;
-                }
-
-                const destinations:string[]=[];
-                if((step.edgeDirection==='forward' || step.edgeDirection==='bi') && sourceSet.has(edge.from)){
-                    destinations.push(edge.to);
-                }
-                if((step.edgeDirection==='reverse' || step.edgeDirection==='bi') && sourceSet.has(edge.to)){
-                    destinations.push(edge.from);
-                }
-
-                for(const dest of destinations){
-                    if(!selectedSet.has(dest)){
-                        selectedSet.add(dest);
-                        selected.push(dest);
-                        if(step.edgeLimit!==undefined && selected.length>=step.edgeLimit){
-                            break;
-                        }
-                    }
-                }
-
-                if(step.edgeLimit!==undefined && selected.length>=step.edgeLimit){
-                    break;
-                }
-            }
+            const selected=selectJsonQueryEdgeDestinationPaths(edges,step,sourcePaths);
 
             return {
                 paths:await this._pageOrderedPathsAsync(selected,orderBy,limit,offset),
@@ -415,7 +386,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return await this._runAsync(async ()=>{
             const offset=query.offset??0;
             const limit=query.limit??50;
-            const edges=(await this._readEdgesAsync()).filter(edge=>this._doesEdgeMatchQuery(edge,query));
+            const edges=(await this._readEdgesAsync()).filter(edge=>doesJsonQueryEdgeMatchQuery(edge,query));
             return {
                 edges:edges.slice(offset,offset+limit),
                 total:query.includeTotal?edges.length:undefined,
@@ -429,7 +400,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
             const offset=query.offset??0;
             const limit=query.limit??50;
             const embeddings=(await this._readEmbeddingsAsync())
-                .filter(embedding=>this._doesEmbeddingMatchQuery(embedding,query))
+                .filter(embedding=>doesJsonQueryEmbeddingMatchQuery(embedding,query))
                 .map(embedding=>query.includeVector?embedding:this._omitVector(embedding));
             return {
                 embeddings:embeddings.slice(offset,offset+limit),
@@ -491,26 +462,6 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     private _getEmbeddingFsPath(id:string):string{
         return path.join(this.embeddingsDirectory,`${id}.json`);
-    }
-
-    private async _blobToWritableAsync(blob:string|Blob|ReadableStream):Promise<string|Uint8Array>{
-        if(typeof blob==='string'){
-            return blob;
-        }
-        if(blob instanceof Blob){
-            return new Uint8Array(await blob.arrayBuffer());
-        }
-
-        const reader=blob.getReader();
-        const chunks:Uint8Array[]=[];
-        while(true){
-            const r=await reader.read();
-            if(r.done){
-                break;
-            }
-            chunks.push(typeof r.value==='string'?Buffer.from(r.value):r.value);
-        }
-        return Buffer.concat(chunks);
     }
 
     private async _writeNodeAsync(node:ConvoNode):Promise<void>{
@@ -629,18 +580,6 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return files;
     }
 
-    private _pick<T extends Record<string,any>>(value:T,keys:(keyof T)[]|'*'):Partial<T>{
-        if(keys==='*'){
-            return value;
-        }
-
-        const output:Partial<T>={};
-        for(const key of keys){
-            output[key]=value[key];
-        }
-        return output;
-    }
-
     private _assignNullable<T extends Record<string,any>,U extends Record<string,any>,K extends keyof T&keyof U>(target:T,source:U,key:K):void{
         if(source[key]===undefined){
             return;
@@ -650,14 +589,6 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         }else{
             target[key]=source[key];
         }
-    }
-
-    private _doesPathMatchStepPath(nodePath:string,stepPath:string):boolean{
-        if(!stepPath.includes('*')){
-            return nodePath===stepPath;
-        }
-        const prefix=stepPath.slice(0,-1);
-        return nodePath.startsWith(prefix) && nodePath.length>prefix.length;
     }
 
     private async _pageOrderedPathsAsync(paths:string[],orderBy:ConvoNodeOrderBy[],limit:number,offset:number):Promise<string[]>{
@@ -677,153 +608,11 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
     }
 
     private _sortNodes(nodes:ConvoNode[],orderBy:ConvoNodeOrderBy[],pathOrder?:string[]):void{
-        const pathIndex=pathOrder?new Map(pathOrder.map((nodePath,index)=>[nodePath,index])):undefined;
-        nodes.sort((a,b)=>{
-            for(const order of orderBy){
-                const av=this._getValue(a,order.prop);
-                const bv=this._getValue(b,order.prop);
-                const cmp=this._compare(av,bv);
-                if(cmp){
-                    return order.direction==='desc'?-cmp:cmp;
-                }
-            }
-            if(pathIndex){
-                return (pathIndex.get(a.path)??0)-(pathIndex.get(b.path)??0);
-            }
-            return a.path.localeCompare(b.path);
-        });
+        sortJsonQueryValues(nodes,orderBy,{pathOrder,getPath:node=>node.path,nullsLast:true});
     }
 
-    private _compare(a:any,b:any):number{
-        if(a===b){
-            return 0;
-        }
-        if(a===undefined || a===null){
-            return 1;
-        }
-        if(b===undefined || b===null){
-            return -1;
-        }
-        return a>b?1:-1;
-    }
-
-    private _doesConditionMatch(value:any,condition:ConvoNodeCondition):boolean{
-        return this._isGroupCondition(condition)?
-            this._doesGroupConditionMatch(value,condition):
-            this._doesPropertyConditionMatch(value,condition);
-    }
-
-    private _isGroupCondition(condition:ConvoNodeCondition):condition is ConvoNodeGroupCondition{
-        return 'groupOp' in condition;
-    }
-
-    private _doesGroupConditionMatch(value:any,condition:ConvoNodeGroupCondition):boolean{
-        if(!condition.conditions.length){
-            return false;
-        }
-        return condition.groupOp==='and'?
-            condition.conditions.every(c=>this._doesConditionMatch(value,c)):
-            condition.conditions.some(c=>this._doesConditionMatch(value,c));
-    }
-
-    private _doesPropertyConditionMatch(value:any,condition:ConvoNodePropertyCondition):boolean{
-        const target=this._getValue(value,condition.target);
-        switch(condition.op){
-            case '=':
-                return this._equals(target,condition.value);
-            case '!=':
-                return !this._equals(target,condition.value);
-            case '>':
-                return target>condition.value;
-            case '<':
-                return target<condition.value;
-            case '>=':
-                return target>=condition.value;
-            case '<=':
-                return target<=condition.value;
-            case 'in':
-                return Array.isArray(condition.value) && condition.value.some(v=>this._equals(v,target));
-            case 'all-in':
-                return Array.isArray(target) && Array.isArray(condition.value) && target.every(v=>condition.value.some((cv:any)=>this._equals(cv,v)));
-            case 'any-in':
-                return Array.isArray(target) && Array.isArray(condition.value) && target.some(v=>condition.value.some((cv:any)=>this._equals(cv,v)));
-            case 'contains':
-                return Array.isArray(target) && target.some(v=>this._equals(v,condition.value));
-            case 'contains-all':
-                return Array.isArray(target) && Array.isArray(condition.value) && condition.value.every(v=>target.some(tv=>this._equals(tv,v)));
-            case 'contains-any':
-                return Array.isArray(target) && Array.isArray(condition.value) && condition.value.some(v=>target.some(tv=>this._equals(tv,v)));
-            case 'like':
-                return this._wildcardMatch(String(target??''),String(condition.value),false);
-            case 'ilike':
-                return this._wildcardMatch(String(target??''),String(condition.value),true);
-            default:
-                return false;
-        }
-    }
-
-    private _getValue(value:any,prop:string):any{
-        let current=value;
-        for(const part of prop.split('.')){
-            if(current===undefined || current===null){
-                return undefined;
-            }
-            current=current[part];
-        }
-        return current;
-    }
-
-    private _equals(a:any,b:any):boolean{
-        if(a===b){
-            return true;
-        }
-        if(a===undefined || a===null || b===undefined || b===null){
-            return false;
-        }
-        return String(a)===String(b);
-    }
-
-    private _wildcardMatch(value:string,pattern:string,ignoreCase:boolean):boolean{
-        const escaped=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*');
-        return new RegExp(`^${escaped}$`,ignoreCase?'i':undefined).test(value);
-    }
-
-    private _hasPermission(edges:ConvoNodeEdge[],fromPath:string,toPath:string,required:ConvoNodePermissionType):boolean{
-        if(required===0){
-            return true;
-        }
-
-        let grant=0;
-        for(const edge of edges){
-            if(edge.from!==fromPath || edge.grant===undefined || edge.grant===0){
-                continue;
-            }
-            if(this._isSameOrAncestor(edge.to,toPath)){
-                grant|=edge.grant;
-            }
-        }
-
-        return (grant&required)===required;
-    }
-
-    private _isSameOrAncestor(ancestor:string,nodePath:string):boolean{
-        return ancestor==='/' || nodePath===ancestor || nodePath.startsWith(`${ancestor}/`);
-    }
-
-    private _doesEdgeMatch(edge:ConvoNodeEdge,condition:string|ConvoNodeCondition):boolean{
-        return typeof condition==='string'?
-            edge.type===condition:
-            this._doesConditionMatch(edge,condition);
-    }
-
-    private _doesEdgeMatchQuery(edge:ConvoNodeEdge,query:ConvoNodeEdgeQuery):boolean{
-        return (
-            (query.id===undefined || edge.id===query.id) &&
-            (query.from===undefined || edge.from===query.from) &&
-            (query.to===undefined || edge.to===query.to) &&
-            (query.type===undefined || edge.type===query.type) &&
-            (query.name===undefined || edge.name===query.name)
-        );
+    private _doesEdgeMatch(edge:ConvoNodeEdge,condition:string|ConvoNodeQueryStep['condition']):boolean{
+        return condition!==undefined && doesJsonQueryEdgeMatchCondition(edge,condition);
     }
 
     private async _doesEmbeddingMatchAsync(embedding:ConvoNodeEmbedding,search:ConvoEmbeddingSearch):Promise<boolean>{
@@ -848,16 +637,6 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
         const node=await this._readNodeAsync(embedding.path);
         return node?JSON.stringify(node).toLowerCase().includes(text):false;
-    }
-
-    private _doesEmbeddingMatchQuery(embedding:ConvoNodeEmbedding,query:ConvoNodeEmbeddingQuery):boolean{
-        return (
-            (query.id===undefined || embedding.id===query.id) &&
-            (query.path===undefined || embedding.path===query.path) &&
-            (query.type===undefined || embedding.type===query.type) &&
-            (query.name===undefined || embedding.name===query.name) &&
-            (query.prop===undefined || embedding.prop===query.prop)
-        );
     }
 
     private _omitVector(embedding:ConvoNodeEmbedding):ConvoNodeEmbedding{

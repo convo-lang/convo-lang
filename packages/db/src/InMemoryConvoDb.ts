@@ -1,6 +1,7 @@
-import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
-import { deepClone, starStringToRegex, uuid } from "@iyio/common";
+import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
+import { deepClone, uuid } from "@iyio/common";
 import { BaseConvoDb } from "./BaseConvoDb.js";
+import { doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues, compareJsonQueryValues } from "./json-query.js";
 
 
 export class InMemoryConvoDb extends BaseConvoDb
@@ -98,7 +99,7 @@ export class InMemoryConvoDb extends BaseConvoDb
                 if(hasGrant && !edge.grant){
                     continue;
                 }
-                edges.push(cloneSelected(edge,keys));
+                edges.push(selectJsonQueryKeys(edge,keys,deepClone));
             }
 
             return {
@@ -117,23 +118,20 @@ export class InMemoryConvoDb extends BaseConvoDb
                 }
             }
 
-            nodes.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(nodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
 
             return {
                 success:true,
-                result:nodes.map(node=>cloneSelected(node,keys)),
+                result:nodes.map(node=>selectJsonQueryKeys(node,keys,deepClone)),
             }
         },
         
         selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
-            const regex=step.path.includes('*')?starStringToRegex(step.path):undefined;
             const nodes=this.getCandidateNodes(currentNodePaths);
 
-            const matched=nodes.filter(node=>{
-                return regex?regex.test(node.path):node.path===step.path;
-            });
+            const matched=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
 
-            matched.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(matched,orderBy);
 
             return {
                 success:true,
@@ -144,9 +142,9 @@ export class InMemoryConvoDb extends BaseConvoDb
         selectNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const nodes=this.getCandidateNodes(currentNodePaths);
 
-            const matched=nodes.filter(node=>evaluateCondition(node,step.condition));
+            const matched=nodes.filter(node=>evaluateJsonQueryCondition(node,step.condition));
 
-            matched.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(matched,orderBy);
 
             return {
                 success:true,
@@ -156,16 +154,9 @@ export class InMemoryConvoDb extends BaseConvoDb
 
         selectNodePathsForPermissionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const nodes=this.getCandidateNodes(currentNodePaths);
-            const matched:ConvoNode[]=[];
+            const matched=nodes.filter(node=>hasJsonQueryPermission(this.edges.values(),step.permissionFrom,node.path,step.permissionRequired));
 
-            for(const node of nodes){
-                const permission=this.getPermissionValue(step.permissionFrom,node.path);
-                if((permission&step.permissionRequired)===step.permissionRequired){
-                    matched.push(node);
-                }
-            }
-
-            matched.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(matched,orderBy);
 
             return {
                 success:true,
@@ -190,7 +181,7 @@ export class InMemoryConvoDb extends BaseConvoDb
                     continue;
                 }
 
-                const value=getValueByPath(node,embedding.prop);
+                const value=getJsonQueryValueByPath(node,embedding.prop);
                 const text=value===undefined || value===null?'':String(value);
                 if(text.toLowerCase().includes(step.embedding.text.toLowerCase())){
                     matchedPaths.push(embedding.path);
@@ -198,7 +189,7 @@ export class InMemoryConvoDb extends BaseConvoDb
             }
 
             const matchedNodes=matchedPaths.map(path=>this.nodes.get(path)).filter(v=>v) as ConvoNode[];
-            matchedNodes.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(matchedNodes,orderBy);
 
             return {
                 success:true,
@@ -207,59 +198,9 @@ export class InMemoryConvoDb extends BaseConvoDb
         },
 
         selectEdgeNodePathsForConditionAsync:async (step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
-            const currentSet=currentNodePaths?new Set(currentNodePaths):undefined;
-            const condition:ConvoNodeCondition=(typeof step.edge==='string')?
-                {
-                    target:'type',
-                    op:'=',
-                    value:step.edge,
-                }
-            :
-                step.edge;
-
-            const resultPaths:string[]=[];
-
-            for(const edge of this.edges.values()){
-                if(!evaluateCondition(edge,condition)){
-                    continue;
-                }
-
-                switch(step.edgeDirection){
-                    case 'forward':
-                        if(!currentSet || currentSet.has(edge.from)){
-                            resultPaths.push(edge.to);
-                        }
-                        break;
-
-                    case 'reverse':
-                        if(!currentSet || currentSet.has(edge.to)){
-                            resultPaths.push(edge.from);
-                        }
-                        break;
-
-                    case 'bi':
-                        if(!currentSet){
-                            resultPaths.push(edge.to);
-                            resultPaths.push(edge.from);
-                        }else{
-                            if(currentSet.has(edge.from)){
-                                resultPaths.push(edge.to);
-                            }
-                            if(currentSet.has(edge.to)){
-                                resultPaths.push(edge.from);
-                            }
-                        }
-                        break;
-                }
-            }
-
-            let paths=resultPaths;
-            if(step.edgeLimit!==undefined){
-                paths=paths.slice(0,Math.max(0,step.edgeLimit));
-            }
-
+            const paths=selectJsonQueryEdgeDestinationPaths(this.edges.values(),step,currentNodePaths);
             const matchedNodes=paths.map(path=>this.nodes.get(path)).filter(v=>v) as ConvoNode[];
-            matchedNodes.sort((a,b)=>compareByOrder(a,b,orderBy));
+            sortJsonQueryValues(matchedNodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
 
             return {
                 success:true,
@@ -563,23 +504,8 @@ export class InMemoryConvoDb extends BaseConvoDb
             const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
             const offset=Math.max(0,query.offset??0);
 
-            let edges=[...this.edges.values()];
+            let edges=[...this.edges.values()].filter(edge=>doesJsonQueryEdgeMatchQuery(edge,query));
 
-            if(query.id!==undefined){
-                edges=edges.filter(edge=>edge.id===query.id);
-            }
-            if(query.from!==undefined){
-                edges=edges.filter(edge=>edge.from===query.from);
-            }
-            if(query.to!==undefined){
-                edges=edges.filter(edge=>edge.to===query.to);
-            }
-            if(query.type!==undefined){
-                edges=edges.filter(edge=>edge.type===query.type);
-            }
-            if(query.name!==undefined){
-                edges=edges.filter(edge=>edge.name===query.name);
-            }
             if(query.permissionFrom!==undefined){
                 edges=edges.filter(edge=>{
                     const fromPermission=this.getPermissionValue(query.permissionFrom!,edge.from);
@@ -589,7 +515,7 @@ export class InMemoryConvoDb extends BaseConvoDb
                 });
             }
 
-            edges.sort((a,b)=>comparePrimitive(a.id,b.id));
+            edges.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
 
             const total=query.includeTotal?edges.length:undefined;
             const resultEdges=edges.slice(offset,offset+limit).map(edge=>deepClone(edge));
@@ -607,23 +533,8 @@ export class InMemoryConvoDb extends BaseConvoDb
             const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
             const offset=Math.max(0,query.offset??0);
 
-            let embeddings=[...this.embeddings.values()];
+            let embeddings=[...this.embeddings.values()].filter(embedding=>doesJsonQueryEmbeddingMatchQuery(embedding,query));
 
-            if(query.id!==undefined){
-                embeddings=embeddings.filter(embedding=>embedding.id===query.id);
-            }
-            if(query.path!==undefined){
-                embeddings=embeddings.filter(embedding=>embedding.path===query.path);
-            }
-            if(query.type!==undefined){
-                embeddings=embeddings.filter(embedding=>embedding.type===query.type);
-            }
-            if(query.name!==undefined){
-                embeddings=embeddings.filter(embedding=>embedding.name===query.name);
-            }
-            if(query.prop!==undefined){
-                embeddings=embeddings.filter(embedding=>embedding.prop===query.prop);
-            }
             if(query.permissionFrom!==undefined){
                 embeddings=embeddings.filter(embedding=>{
                     const permission=this.getPermissionValue(query.permissionFrom!,embedding.path);
@@ -631,7 +542,7 @@ export class InMemoryConvoDb extends BaseConvoDb
                 });
             }
 
-            embeddings.sort((a,b)=>comparePrimitive(a.id,b.id));
+            embeddings.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
 
             const total=query.includeTotal?embeddings.length:undefined;
             const resultEmbeddings=embeddings
@@ -669,140 +580,6 @@ export class InMemoryConvoDb extends BaseConvoDb
     }
 
     private getPermissionValue(fromPath:string,toPath:string):ConvoNodePermissionType{
-        const targets:string[]=['/'];
-        if(toPath!=="/"){
-            const parts=toPath.split('/').filter(Boolean);
-            let current='';
-            for(const part of parts){
-                current+='/'+part;
-                targets.push(current);
-            }
-        }
-
-        let grant=ConvoNodePermissionType.none;
-        for(const edge of this.edges.values()){
-            if(edge.from===fromPath && targets.includes(edge.to) && edge.grant){
-                grant|=edge.grant;
-            }
-        }
-
-        return grant;
+        return getJsonQueryPermissionValue(this.edges.values(),fromPath,toPath);
     }
-}
-
-const cloneSelected=<T extends Record<string,any>>(source:T,keys:(keyof T)[]|'*'):Partial<T>=>{
-    if(keys==='*'){
-        return deepClone(source);
-    }
-
-    const obj:Partial<T>={};
-    for(const key of keys){
-        obj[key]=deepClone(source[key]);
-    }
-    return obj;
-}
-
-const getValueByPath=(obj:any,path:string):any=>{
-    if(!path){
-        return undefined;
-    }
-
-    const parts=path.split('.');
-    let current=obj;
-
-    for(const part of parts){
-        if(current===undefined || current===null){
-            return undefined;
-        }
-        current=current[part];
-    }
-
-    return current;
-}
-
-const evaluateCondition=(target:any,condition:ConvoNodeCondition):boolean=>{
-    if(isConvoNodePropertyCondition(condition)){
-        const left=getValueByPath(target,condition.target);
-        const right=condition.value;
-
-        switch(condition.op){
-            case '=':
-                return left===right;
-            case '!=':
-                return left!==right;
-            case '>':
-                return left>right;
-            case '<':
-                return left<right;
-            case '>=':
-                return left>=right;
-            case '<=':
-                return left<=right;
-            case 'in':
-                return Array.isArray(right)?right.includes(left):false;
-            case 'all-in':
-                return Array.isArray(left) && Array.isArray(right)?left.every(v=>right.includes(v)):false;
-            case 'any-in':
-                return Array.isArray(left) && Array.isArray(right)?left.some(v=>right.includes(v)):false;
-            case 'contains':
-                return Array.isArray(left)?left.includes(right):false;
-            case 'contains-all':
-                return Array.isArray(left) && Array.isArray(right)?right.every(v=>left.includes(v)):false;
-            case 'contains-any':
-                return Array.isArray(left) && Array.isArray(right)?right.some(v=>left.includes(v)):false;
-            case 'like':
-                return starStringToRegex(String(right)).test(String(left));
-            case 'ilike':
-                return starStringToRegex(String(right),'i').test(String(left));
-            default:
-                return false;
-        }
-    }
-
-    if(isConvoNodeGroupCondition(condition)){
-        if(!condition.conditions.length){
-            return false;
-        }
-        switch(condition.groupOp){
-            case 'and':
-                return condition.conditions.every(c=>evaluateCondition(target,c));
-            case 'or':
-                return condition.conditions.some(c=>evaluateCondition(target,c));
-            default:
-                return false;
-        }
-    }
-
-    return false;
-}
-
-const compareByOrder=(a:any,b:any,orderBy:ConvoNodeOrderBy[]):number=>{
-    for(const order of orderBy){
-        const av=getValueByPath(a,order.prop);
-        const bv=getValueByPath(b,order.prop);
-        const cmp=comparePrimitive(av,bv);
-        if(cmp!==0){
-            return order.direction==='desc'?-cmp:cmp;
-        }
-    }
-    return 0;
-}
-
-const comparePrimitive=(a:any,b:any):number=>{
-    if(a===b){
-        return 0;
-    }
-    if(a===undefined || a===null){
-        return -1;
-    }
-    if(b===undefined || b===null){
-        return 1;
-    }
-    if(a>b){
-        return 1;
-    }
-    if(a<b){
-        return -1;
-    }
-    return String(a).localeCompare(String(b));
 }

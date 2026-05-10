@@ -1,0 +1,285 @@
+import { ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
+
+export interface JsonQuerySortOptions<T>
+{
+    pathOrder?:string[];
+    getPath?:(value:T)=>string;
+    nullsLast?:boolean;
+}
+
+/**
+ * Selects keys from a JSON object.
+ */
+export const selectJsonQueryKeys=<T extends Record<string,any>>(source:T,keys:(keyof T)[]|'*',cloneValue?:(value:any)=>any):Partial<T>=>{
+    if(keys==='*'){
+        return cloneValue?cloneValue(source):source;
+    }
+
+    const obj:Partial<T>={};
+    for(const key of keys){
+        obj[key]=cloneValue?cloneValue(source[key]):source[key];
+    }
+    return obj;
+}
+
+/**
+ * Gets a nested value from an object using dot notation.
+ */
+export const getJsonQueryValueByPath=(obj:any,path:string):any=>{
+    if(!path){
+        return undefined;
+    }
+
+    const parts=path.split('.');
+    let current=obj;
+
+    for(const part of parts){
+        if(current===undefined || current===null){
+            return undefined;
+        }
+        current=current[part];
+    }
+
+    return current;
+}
+
+/**
+ * Evaluates a ConvoNodeCondition against any JSON object.
+ */
+export const evaluateJsonQueryCondition=(target:any,condition:ConvoNodeCondition):boolean=>{
+    if(isConvoNodePropertyCondition(condition)){
+        const left=getJsonQueryValueByPath(target,condition.target);
+        const right=condition.value;
+
+        switch(condition.op){
+            case '=':
+                return areJsonQueryValuesEqual(left,right);
+            case '!=':
+                return !areJsonQueryValuesEqual(left,right);
+            case '>':
+                return left>right;
+            case '<':
+                return left<right;
+            case '>=':
+                return left>=right;
+            case '<=':
+                return left<=right;
+            case 'in':
+                return Array.isArray(right)?right.some(v=>areJsonQueryValuesEqual(v,left)):false;
+            case 'all-in':
+                return Array.isArray(left) && Array.isArray(right)?left.every(v=>right.some(rv=>areJsonQueryValuesEqual(rv,v))):false;
+            case 'any-in':
+                return Array.isArray(left) && Array.isArray(right)?left.some(v=>right.some(rv=>areJsonQueryValuesEqual(rv,v))):false;
+            case 'contains':
+                return Array.isArray(left)?left.some(v=>areJsonQueryValuesEqual(v,right)):false;
+            case 'contains-all':
+                return Array.isArray(left) && Array.isArray(right)?right.every(v=>left.some(lv=>areJsonQueryValuesEqual(lv,v))):false;
+            case 'contains-any':
+                return Array.isArray(left) && Array.isArray(right)?right.some(v=>left.some(lv=>areJsonQueryValuesEqual(lv,v))):false;
+            case 'like':
+                return jsonQueryWildcardMatch(String(left??''),String(right),false);
+            case 'ilike':
+                return jsonQueryWildcardMatch(String(left??''),String(right),true);
+            default:
+                return false;
+        }
+    }
+
+    if(isConvoNodeGroupCondition(condition)){
+        if(!condition.conditions.length){
+            return false;
+        }
+        switch(condition.groupOp){
+            case 'and':
+                return condition.conditions.every(c=>evaluateJsonQueryCondition(target,c));
+            case 'or':
+                return condition.conditions.some(c=>evaluateJsonQueryCondition(target,c));
+            default:
+                return false;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Compares JSON primitive values. Non-strict equality falls back to string comparison.
+ */
+export const areJsonQueryValuesEqual=(a:any,b:any):boolean=>{
+    if(a===b){
+        return true;
+    }
+    if(a===undefined || a===null || b===undefined || b===null){
+        return false;
+    }
+    return String(a)===String(b);
+}
+
+/**
+ * Matches a string against a `*` wildcard pattern.
+ */
+export const jsonQueryWildcardMatch=(value:string,pattern:string,ignoreCase=false):boolean=>{
+    const escaped=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*');
+    return new RegExp(`^${escaped}$`,ignoreCase?'i':undefined).test(value);
+}
+
+/**
+ * Matches a node path against a query step path.
+ */
+export const doesJsonQueryPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
+    if(!stepPath.includes('*')){
+        return nodePath===stepPath;
+    }
+    const prefix=stepPath.slice(0,-1);
+    return nodePath.startsWith(prefix) && nodePath.length>prefix.length;
+}
+
+/**
+ * Sorts JSON values by ConvoNodeOrderBy rules.
+ */
+export const sortJsonQueryValues=<T>(values:T[],orderBy:ConvoNodeOrderBy[],options?:JsonQuerySortOptions<T>):void=>{
+    const pathIndex=options?.pathOrder && options.getPath?
+        new Map(options.pathOrder.map((path,index)=>[path,index])):
+        undefined;
+
+    values.sort((a,b)=>{
+        for(const order of orderBy){
+            const av=getJsonQueryValueByPath(a,order.prop);
+            const bv=getJsonQueryValueByPath(b,order.prop);
+            const cmp=compareJsonQueryValues(av,bv,options?.nullsLast);
+            if(cmp!==0){
+                return order.direction==='desc'?-cmp:cmp;
+            }
+        }
+        if(pathIndex && options?.getPath){
+            return (pathIndex.get(options.getPath(a))??0)-(pathIndex.get(options.getPath(b))??0);
+        }
+        return 0;
+    });
+}
+
+/**
+ * Compares JSON primitive values.
+ */
+export const compareJsonQueryValues=(a:any,b:any,nullsLast=false):number=>{
+    if(a===b){
+        return 0;
+    }
+    if(a===undefined || a===null){
+        return nullsLast?1:-1;
+    }
+    if(b===undefined || b===null){
+        return nullsLast?-1:1;
+    }
+    if(a>b){
+        return 1;
+    }
+    if(a<b){
+        return -1;
+    }
+    return String(a).localeCompare(String(b));
+}
+
+/**
+ * Returns the permission granted from a source path to a target path.
+ */
+export const getJsonQueryPermissionValue=(edges:Iterable<ConvoNodeEdge>,fromPath:string,toPath:string):ConvoNodePermissionType=>{
+    let grant=ConvoNodePermissionType.none;
+
+    for(const edge of edges){
+        if(edge.from===fromPath && edge.grant && isJsonQuerySameOrAncestorPath(edge.to,toPath)){
+            grant|=edge.grant;
+        }
+    }
+
+    return grant;
+}
+
+/**
+ * Checks if a permission grant exists.
+ */
+export const hasJsonQueryPermission=(edges:Iterable<ConvoNodeEdge>,fromPath:string,toPath:string,required:ConvoNodePermissionType):boolean=>{
+    if(required===ConvoNodePermissionType.none){
+        return true;
+    }
+    const grant=getJsonQueryPermissionValue(edges,fromPath,toPath);
+    return (grant&required)===required;
+}
+
+/**
+ * Returns true when `ancestor` is the same path as `nodePath` or an ancestor path.
+ */
+export const isJsonQuerySameOrAncestorPath=(ancestor:string,nodePath:string):boolean=>{
+    return ancestor==='/' || nodePath===ancestor || nodePath.startsWith(`${ancestor}/`);
+}
+
+/**
+ * Matches an edge against a query-step edge condition.
+ */
+export const doesJsonQueryEdgeMatchCondition=(edge:ConvoNodeEdge,condition:string|ConvoNodeCondition):boolean=>{
+    return typeof condition==='string'?
+        edge.type===condition:
+        evaluateJsonQueryCondition(edge,condition);
+}
+
+/**
+ * Selects destination node paths by traversing JSON edges.
+ */
+export const selectJsonQueryEdgeDestinationPaths=(edges:Iterable<ConvoNodeEdge>,step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,sourcePaths:string[]|null):string[]=>{
+    const sourceSet=sourcePaths?new Set(sourcePaths):undefined;
+    const selected:string[]=[];
+    const selectedSet=new Set<string>();
+
+    for(const edge of edges){
+        if(!doesJsonQueryEdgeMatchCondition(edge,step.edge)){
+            continue;
+        }
+
+        if((step.edgeDirection==='forward' || step.edgeDirection==='bi') && (!sourceSet || sourceSet.has(edge.from))){
+            addJsonQuerySelectedPath(edge.to,selected,selectedSet);
+        }
+
+        if((step.edgeDirection==='reverse' || step.edgeDirection==='bi') && (!sourceSet || sourceSet.has(edge.to))){
+            addJsonQuerySelectedPath(edge.from,selected,selectedSet);
+        }
+
+        if(step.edgeLimit!==undefined && selected.length>=step.edgeLimit){
+            break;
+        }
+    }
+
+    return step.edgeLimit===undefined?selected:selected.slice(0,Math.max(0,step.edgeLimit));
+}
+
+const addJsonQuerySelectedPath=(path:string,selected:string[],selectedSet:Set<string>):void=>{
+    if(!selectedSet.has(path)){
+        selectedSet.add(path);
+        selected.push(path);
+    }
+}
+
+/**
+ * Matches an edge against a raw edge query.
+ */
+export const doesJsonQueryEdgeMatchQuery=(edge:ConvoNodeEdge,query:ConvoNodeEdgeQuery):boolean=>{
+    return (
+        (query.id===undefined || edge.id===query.id) &&
+        (query.from===undefined || edge.from===query.from) &&
+        (query.to===undefined || edge.to===query.to) &&
+        (query.type===undefined || edge.type===query.type) &&
+        (query.name===undefined || edge.name===query.name)
+    );
+}
+
+/**
+ * Matches an embedding against a raw embedding query.
+ */
+export const doesJsonQueryEmbeddingMatchQuery=(embedding:ConvoNodeEmbedding,query:ConvoNodeEmbeddingQuery):boolean=>{
+    return (
+        (query.id===undefined || embedding.id===query.id) &&
+        (query.path===undefined || embedding.path===query.path) &&
+        (query.type===undefined || embedding.type===query.type) &&
+        (query.name===undefined || embedding.name===query.name) &&
+        (query.prop===undefined || embedding.prop===query.prop)
+    );
+}
