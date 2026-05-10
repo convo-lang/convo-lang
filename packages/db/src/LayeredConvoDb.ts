@@ -1,6 +1,10 @@
 import { ConvoDb, ConvoDbDriver, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 
+const db:ConvoDb=null as any;
+
+
+
 const hasSupport=(layer:ConvoDbLayerConfig,support:ConvoDbLayerSupport)=>{
     return (
         (support.supportsNodes?layer.supportsNodes===true:true) &&
@@ -81,6 +85,13 @@ export interface LayeredConvoDbOptions extends BaseConvoDbOptions
     dbId?:string;
 }
 
+/**
+ * A ConvoDb implementation that allows you to layer multiple databases on top of each other 
+ * with a shared name space. 
+ *
+ * # Limitations
+ * LayeredConvoDb has several important limitations to consider when being
+ */
 export class LayeredConvoDb extends BaseConvoDb
 {
 

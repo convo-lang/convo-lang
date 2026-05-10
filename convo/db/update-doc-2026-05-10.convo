@@ -1,3 +1,39 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+
+> user
+Update the `convo-db.md` document. I just add support for storing blobs in ConvoDb.
+
+Do refer to updates as updates in the document or use language like "now supports" or "previously ...".
+
+Blobs should be used to store binary data such as images, videos and source document files such
+as spreed sheets or word documents.
+
+Blobs are loosely coupled to node only through sharing the same path and following the same
+permissions rules. This is intentional to allow different storage implementations for blobs
+and nodes.
+
+Large text based documents and source code should continue to be stored in nodes.
+
+A common use for blobs is for storing uploaded files that are then processed and converted to markdown
+and the markdown is used to generate embeddings.
+
+When using a node as metadata for a blob the node and blob should share the same path. Avoid storing
+the path to blobs as values in the data property of nodes, in most cases a node related to a blob
+will share the same path.
+
+
+@time 2026-05-10T13:04:52-04:00
+@tokenUsage 50114 / 17641 / $0.33877500000000005
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md" last-commit="0bf6d055670f5862a2ac08ab3ddc0a5a4afd17c4">
+```md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, authentication flows, and other agentic systems.
@@ -194,6 +230,19 @@ await db.writeBlobAsync(
     '/uploads/report-q1',
     spreadsheetBlob,
 );
+```
+
+Avoid storing blob paths as values in node `data` in most cases:
+
+```ts
+// Avoid this pattern in most cases
+await db.insertNodeAsync({
+    path:'/uploads/report-q1-metadata',
+    type:'uploaded-file',
+    data:{
+        blobPath:'/uploads/report-q1',
+    },
+});
 ```
 
 A common pattern is:
@@ -1243,7 +1292,7 @@ Deleting a node also deletes:
 - connected edges
 - embeddings pointing to the node
 
-Blob storage is separate from node storage. Deleting a node does not imply deleting a blob at the same path.
+Blob storage is separate from node storage. Deleting a node does not imply deleting a blob at the same path unless an adapter or application layer explicitly implements that behavior.
 
 ```ts
 await db.deleteNodeAsync('/agents/researcher');
@@ -1336,10 +1385,9 @@ await db.insertNodeAsync({
     },
 });
 
-const httpRequest=await fetch('https://comapny-xyz.io/reports/report-q1.xlsx');
 await db.writeBlobAsync(
     '/uploads/report-q1',
-    httpRequest.body,
+    fileBlob,
 );
 ```
 
@@ -1582,10 +1630,10 @@ const r=await db.queryNodesAsync({
 This wildcard behavior does not apply to:
 
 - `ConvoNode.path`
+- blob paths
 - `ConvoNodeEdge.from`
 - `ConvoNodeEdge.to`
 - `ConvoNodeQueryStep.path`
-- blob paths
 
 ### Grouped conditions
 
@@ -2539,7 +2587,7 @@ Best for:
 
 ---
 
-### `NodeFsConvoDb`
+### `FsConvoDb`
 
 Uses the local file system for storage.
 
@@ -3397,6 +3445,7 @@ import {
     HttpConvoDb,
     LocalStorageConvoDb,
     IndexDbConvoDb,
+    FsConvoDb,
     LayeredConvoDb,
 } from '@convo-lang/db';
 
@@ -3407,6 +3456,10 @@ import {
 
 import {
     NodeSqliteConvoDb,
-    NodeFsConvoDb,
 } from '@convo-lang/db-node';
 ```
+```
+</FILE_CONTENT>
+
+
+> user
