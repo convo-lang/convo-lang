@@ -1,3 +1,17 @@
+@import ./_db-drivers.convo
+@import ../../packages/db/src/IndexDbConvoDb.ts !file
+@import ../../packages/db/src/json-query.ts !file
+
+> user
+Replace the JSON querying logic of `IndexDbConvoDb` with the function in `json-query.ts`
+
+
+@time 2026-05-10T15:34:37-04:00
+@tokenUsage 28432 / 7159 / $0.177955
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="IndexDbConvoDb.ts" target-output-path="../../packages/db/src/IndexDbConvoDb.ts" last-commit="f92381322e7993d225112ae668eea7f553424618">
+``` ts
 import type {
     ConvoDbDriver,
     ConvoDbDriverNextToken,
@@ -780,3 +794,9 @@ const applyNullableUpdate=<T extends Record<string,any>,U extends Record<string,
     }
     target[key]=update[key];
 };
+
+```
+</FILE_CONTENT>
+
+
+> user
