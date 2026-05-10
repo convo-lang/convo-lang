@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
 
 
-const createDb=()=>createTestDb('local-storage');
+const createDb=()=>createTestDb();
 
 const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
     path,

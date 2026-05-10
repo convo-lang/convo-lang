@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
 
 const createProxiedDb=():ConvoDb=>{
-    return createTestDb('local-storage') as ConvoDb;
+    return createTestDb() as ConvoDb;
 }
 
 interface PermissionTestDb
