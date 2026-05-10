@@ -1,0 +1,169 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-auth-types.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+
+> system
+You are creating a ConvoDb implementations by extending the `BaseConvoDb` class. The
+`BaseConvoDb` class implements all properties and methods of the `ConvoDb` interface with the
+exception of the _driver property which is an object that implements `ConvoDbDriver`.
+
+Example Implementation: `ExampleConvoDb.ts`
+``` ts
+import { ConvoDbDriver, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
+import { BaseConvoDb, BaseConvoDbOptions } from "@convo-lang/db/BaseConvoDb.js";
+import { ExampleConvoDbDriver } from "./ExampleConvoDbDriver.js";
+
+export interface ExampleConvoDbOptions extends BaseConvoDbOptions
+{
+    exampleOption:string;
+
+    /**
+     * Example description
+     * @default "someValue"
+     */
+    otherOption?:string;
+
+    /**
+     * This option is needed by the driver
+     */
+    option2:string;
+}
+
+export class ExampleConvoDb extends BaseConvoDb
+{
+    public readonly exampleOption:string;
+
+    public readonly otherOption:string;
+
+    override readonly _driver:ConvoDbDriver;
+
+    private readonly _driverT:ExampleConvoDbDriver;
+
+    public constructor({
+        exampleOption,
+        otherOption='someValue',
+        option2,
+        ...baseOptions
+    }:ExampleConvoDbOptions){
+        super(baseOptions);
+        this.exampleOption=exampleOption;
+        this.otherOption=otherOption;
+        this._driver=this._driverT=new ExampleConvoDbDriver({option2});
+    }
+
+    protected override async _initAsync():PromiseResultTypeVoid{
+        const r=await super.initAsync();
+        if(!r.success){
+            return r;
+        }
+
+        // do initialization here if needed
+
+        return {
+            success:true,
+        }
+    }
+
+    protected override _dispose(): void {
+        this._driverT.dispose();
+        // clean up here
+    }
+
+}
+```
+
+Example driver: `ExampleConvoDbDriver.ts`
+``` ts
+import { ConvoDbDriver } from "@convo-lang/convo-lang";
+
+export interface ExampleConvoDbDriverOptions
+{
+    option2:string;
+}
+
+export class ExampleConvoDbDriver implements ConvoDbDriver
+{
+
+    public readonly option2:string;
+
+    public constructor({
+        option2,
+    }:ExampleConvoDbDriverOptions){
+        this.option2=option2;
+    }
+
+    public dispose()
+    {
+        
+    }
+
+    // implement driver here
+}
+```
+
+Properties defined in options classes with a default should be required on their implementation class.
+
+
+Options and constructor of `BaseConvoDb` class
+``` ts
+
+export interface BaseConvoDbOptions
+{
+    /**
+     * embeddings service to use for generating embeddings
+     */
+    embeddingsService?:ConvoEmbeddingsService;
+
+    /**
+     * Default options for generating embeddings
+     */
+    embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
+
+    /**
+     * Options used to create Conversation instances for natural language processing
+     */
+    convoOptions?:ConversationOptions;
+
+    /**
+     * Name of the database
+     */
+    name:string;
+}
+
+
+
+export abstract class BaseConvoDb implements ConvoDb
+{
+    protected embeddingsService?:ConvoEmbeddingsService;
+    protected embeddingOptions?:Partial<Omit<ConvoEmbeddingsGenerationRequest,'text'>>;
+    protected convoOptions?:ConversationOptions;
+
+    public readonly auth:ConvoDbAuthManager;
+
+    public readonly dbName:string;
+
+    public constructor({
+        embeddingsService,
+        embeddingOptions,
+        convoOptions,
+        name,
+    }:BaseConvoDbOptions)
+    {
+        this.embeddingsService=embeddingsService;
+        this.embeddingOptions=embeddingOptions;
+        this.convoOptions=convoOptions;
+        this.dbName=name;
+        this.auth=new ConvoDbAuthManager(this);
+    }
+
+    abstract readonly _driver: ConvoDbDriver;
+
+
+    // all other properties and methods for ConvoDb are implemented
+}
+```
+
+Keep in mind that BaseConvoDb will validate all paths and permissions before calling methods
+of the driver interface, so the driver interface does not have to validate paths or check
+permissions.
