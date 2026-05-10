@@ -104,6 +104,48 @@ export abstract class BaseConvoDb implements ConvoDb
         this.auth=new ConvoDbAuthManager(this);
     }
 
+    public async initAsync():PromiseResultTypeVoid
+    {
+        try{
+            return await this._initAsync();
+        }catch(ex){
+            return {
+                success:false,
+                error:`Database initialization error: ${getErrorMessage(ex)}`,
+                statusCode:500
+            }
+        }
+    }
+
+    protected _initAsync():PromiseResultTypeVoid
+    {
+        return Promise.resolve({
+            success:true,
+        })
+    }
+
+    private _isDisposed=false;
+    public get isDisposed(){return this._isDisposed}
+    public dispose()
+    {
+        if(this._isDisposed){
+            return;
+        }
+        this._isDisposed=true;
+        try{
+            this._dispose();
+        }catch(ex){
+            console.error('Dispose database failed',ex);
+        }
+    }
+
+    protected _dispose()
+    {
+        // do nothing
+    }
+
+
+
     abstract readonly _driver: ConvoDbDriver;
 
     protected loggingEnabled=false;

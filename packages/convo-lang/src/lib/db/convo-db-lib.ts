@@ -22,7 +22,7 @@ import { ConvoDbCommand, ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunc
 export const normalizeConvoNodePath=(path:string|null|undefined,wildcard:'none'|'end'|'any'):string|undefined=>{
     path=path?.trim();
 
-    if(!path){
+    if(!path || path.includes(reservedPathSuffix)){
         return undefined;
     }
 
@@ -98,8 +98,14 @@ export const validateConvoNodeCondition=(condition:ConvoNodeCondition):string|un
     return undefined;
 }
 
+const reservedPathSuffix='.@db-';
+
 export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined=>{
-    if(query.permissionFrom!==undefined && normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom){
+    if( query.permissionFrom!==undefined && (
+            normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom ||
+            query.permissionFrom.includes(reservedPathSuffix)
+        )
+    ){
         return `Invalid query permissionFrom. permissionFrom:${query.permissionFrom}`
     }
     for(let i=0;i<query.steps.length;i++){
@@ -107,10 +113,18 @@ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined
         if(!step){
             return `Undefined step at index ${i}`;
         }
-        if(step.path!==undefined && normalizeConvoNodePath(step.path,'end')!==step.path){
+        if( step.path!==undefined && (
+                normalizeConvoNodePath(step.path,'end')!==step.path ||
+                step.path.includes(reservedPathSuffix)
+            )
+        ){
             return `Invalid step path. stepIndex: ${i}, path:${step.path}`
         }
-        if(step.permissionFrom!==undefined && normalizeConvoNodePath(step.permissionFrom,'none')!==step.permissionFrom){
+        if( step.permissionFrom!==undefined && (
+                normalizeConvoNodePath(step.permissionFrom,'none')!==step.permissionFrom ||
+                step.permissionFrom.includes(reservedPathSuffix)
+            )
+        ){
             return `Invalid step permissionFrom. stepIndex: ${i}, permissionFrom:${step.permissionFrom}`
         }
 

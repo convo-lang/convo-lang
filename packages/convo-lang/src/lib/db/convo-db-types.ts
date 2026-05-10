@@ -10,6 +10,7 @@ import type { ConvoDbAuthManager } from "./ConvoDbAuthManager.js";
  * - `path` is a normalized absolute file system like path that starts with `/`
  * - trailing slashes are removed during normalization except for `/`
  * - duplicate slashes are converted to a single slash during normalization
+ * - `.@db-` is not allowed to appear in `path`. This is to allow for filesystems and other simple keystores to store nodes and metadata in the same namespace.
  * - paths are case-sensitive
  * - `.` and `..` are not allowed
  * - `*` is not allowed in stored node paths
@@ -1235,6 +1236,21 @@ export interface ConvoDb
     readonly auth:ConvoDbAuthManager;
 
     /**
+     * Initializes the database
+     */
+    initAsync():PromiseResultTypeVoid;
+
+    /**
+     * Is true if the db has been disposed.
+     */
+    get isDisposed():boolean;
+
+    /**
+     * Disposes of the db
+     */
+    dispose():void;
+
+    /**
      * Convenience function for calling `queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom})`.
      * Returns the data of the first node returned by the called function or undefined if the function
      * returns no nodes. If you need to call a node that return multiple nodes use `queryNodesAsync`.
@@ -1421,6 +1437,22 @@ export interface ConvoDbDriverNextToken
  */
 export interface ConvoDbDriver
 {
+
+    /**
+     * Opens a read stream pointing to a Blob
+     */
+    openBlobAsync(path:string):PromiseResultType<ReadableStream>;
+
+    /**
+     * Writes a blob
+     */
+    writeBlobAsync(path:string,blob:string|Blob|ReadableStream):PromiseResultTypeVoid;
+
+    /**
+     * Checks if a blob exists
+     */
+    hasBlobAsync(path:string):PromiseResultType<boolean>;
+
     /**
      * Returns edges whose `from` path is contained in `fromPathsIn` and whose `to` path is contained
      * in `toPathsIn`.
