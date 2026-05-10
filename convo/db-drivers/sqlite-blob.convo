@@ -1,3 +1,31 @@
+@import ./_db-drivers.convo
+@import ../../packages/db/src/BaseSqliteConvoDb.ts !file
+
+> user
+Implement the blob functions of `BaseSqliteConvoDb` and its drivers.
+
+Blobs should be stored in a table with a default name of "blob"
+
+
+Blob table:
+``` sql
+CREATE TABLE IF NOT EXISTS ${n} (
+    path TEXT PRIMARY KEY,
+    data BLOB,
+    metadata BLOB,
+    UNIQUE(path)
+)
+```
+
+
+The metadata field will store JSON, but is not used right now
+
+@time 2026-05-10T10:41:38-04:00
+@tokenUsage 28834 / 12500 / $0.20667000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="BaseSqliteConvoDb.ts" target-output-path="../../packages/db/src/BaseSqliteConvoDb.ts" dirty file-hash="285f19d4f324cda5a11ed7668e1950bd7833bfec" last-commit="e2ccc3b9b99f83f9d6bf3d0a3abd6039070d9a47">
+``` ts
 import { ConvoDbDriverPathsResult, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
 import { deepClone, getErrorMessage, uuid } from "@iyio/common";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
@@ -37,11 +65,6 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
     }
 
     protected override async _initAsync(): PromiseResultTypeVoid {
-
-        const init=await super._initAsync();
-        if(!init.success){
-            return init;
-        }
 
         await this._execSqlAsync("PRAGMA foreign_keys = ON;");
         await this._execSqlAsync("PRAGMA journal_mode = WAL;");
@@ -939,7 +962,7 @@ const readReadableStreamAsync=async (stream:ReadableStream):Promise<Uint8Array>=
     }
 
     if(chunks.length===1){
-        return chunks[0]!;
+        return chunks[0];
     }
 
     const data=new Uint8Array(size);
@@ -1385,3 +1408,9 @@ const buildEdgeConditionWhereClause=(edge:string|ConvoNodeCondition,bind:any[],i
     const sql=buildConditionSql(condition,'edge',bind);
     return includeWhere?`WHERE ${sql}`:sql;
 }
+
+```
+</FILE_CONTENT>
+
+
+> user

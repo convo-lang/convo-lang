@@ -44,6 +44,31 @@ export class ConvoDbPermissionBoundary implements ConvoDb
         this.parentAuth=auth;
     }
 
+    public initAsync():PromiseResultTypeVoid{
+        return Promise.resolve({
+            success:true,
+        })
+    }
+
+    public get isDisposed(){return this.proxiedDb.isDisposed}
+
+    public dispose():void{
+        // do nothing
+    }
+
+    
+    public openBlobAsync(path:string):PromiseResultType<ReadableStream>{
+        return this.proxiedDb.openBlobAsync(path,this.identityPath);
+    }
+
+    public writeBlobAsync(path:string,blob:string|Blob|ReadableStream):PromiseResultTypeVoid{
+        return this.proxiedDb.writeBlobAsync(path,blob,this.identityPath);
+    }
+    
+    public hasBlobAsync(path:string):PromiseResultType<boolean>{
+        return this.proxiedDb.hasBlobAsync(path,this.identityPath);
+    }
+
     public callFunctionAsync<T extends Record<string, any> = Record<string, any>>(path: string, args: Record<string, any>, _permissionFrom?: string): PromiseResultType<T | undefined> {
         return this.proxiedDb.callFunctionAsync(path,args,this.identityPath);
     }

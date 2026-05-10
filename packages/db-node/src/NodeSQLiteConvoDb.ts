@@ -35,7 +35,7 @@ export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
     {
         const Db=(await import('node:sqlite')).default.DatabaseSync;
         this.db=new Db(this.dbPath||"test.db");
-        await super._initAsync();
+        return await super._initAsync();
     }
 
     protected override async _execSqlAsync(sql:string,bind:any[]=[]):PromiseResultType<any[]>{

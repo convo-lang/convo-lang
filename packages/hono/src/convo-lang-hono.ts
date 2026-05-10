@@ -1,5 +1,5 @@
-import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDb, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbInstanceMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
-import { CancelToken, minuteMs, uuid } from "@iyio/common";
+import { completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnyModelName, ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, convoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionServiceFeatureSupport, convoConversationConverterProvider, ConvoDb, ConvoDbActionDeleteEdge, ConvoDbActionDeleteEmbedding, ConvoDbActionDeleteNode, ConvoDbActionInsertEdge, ConvoDbActionInsertEmbedding, ConvoDbActionInsertNode, ConvoDbActionUpdateEdge, ConvoDbActionUpdateEmbedding, ConvoDbActionUpdateNode, ConvoDbCommand, ConvoDbDriverBlobStream, ConvoDbInstanceMap, ConvoEmbeddingsGenerationSupportRequest, convoEmbeddingsService, type ConvoHttpToInputRequest, type ConvoModelInfo, ConvoNodeQuery, ConvoNodeStreamItem, convoTranscriptionRequestToSupportRequest, convoTranscriptionService, ConvoTtsRequest, convoTtsService, type FlatConvoConversation, FlatConvoConversationBase, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from "@convo-lang/convo-lang";
+import { CancelToken, getContentType, minuteMs, uuid } from "@iyio/common";
 import { Context, Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { decode } from "hono/jwt";
@@ -97,7 +97,7 @@ export const getConvoHonoRoutes=({
             throw new HTTPException(401);
         }
 
-        await jwtVerifier.getDbTokenAsync(c,db);
+        return await jwtVerifier.getDbTokenAsync(c,db);
 
     }
     
@@ -532,6 +532,18 @@ export const getConvoHonoRoutes=({
             return c.json(result.error,result.statusCode);
         }
 
+        for(const r of result.result){
+            if(typeof (r.openBlob as ConvoDbDriverBlobStream)?.isBase64 !== 'boolean'){
+                const stream=r.openBlob as ReadableStream;
+                const response=new Response(stream);
+                const b64=Buffer.from(await response.arrayBuffer()).toBase64();
+                r.openBlob={
+                    isBase64:true,
+                    value:b64
+                }
+            }
+        }
+
         return c.json(result.result,200);
     });
 
@@ -938,6 +950,64 @@ export const getConvoHonoRoutes=({
             }
 
         });
+    });
+
+
+    routes.post('/db/:dbName/blob/:path{.*}',timeout(completionTimeoutMs),async (c)=>{
+
+        const store=await getDbAsync(c);
+
+        let permissionFrom:string|undefined=c.req.query('permissionFrom');
+
+        if(requireSignIn){
+            const token=await verifySignedIn(c);
+            permissionFrom=token.identityPath;
+        }
+
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const path='/'+c.req.param('path');
+
+        if(!c.req.raw.body){
+            return c.text('Stream body required',400);
+        }
+
+        const r=await store.writeBlobAsync(path,c.req.raw.body,permissionFrom);
+
+        if(r.success){
+            return c.body(null,201);
+        }else{
+            return c.body(r.error,r.statusCode);
+        }
+    });
+
+    routes.get('/db/:dbName/blob/:path{.*}',timeout(completionTimeoutMs),async (c)=>{
+
+
+        const store=await getDbAsync(c);
+
+        let permissionFrom:string|undefined=c.req.query('permissionFrom');
+
+        if(requireSignIn){
+            const token=await verifySignedIn(c);
+            permissionFrom=token.identityPath;
+        }
+
+        if(!store){
+            return c.json('No database found by name',404);
+        }
+
+        const path='/'+c.req.param('path');
+
+        const r=await store.openBlobAsync(path,permissionFrom);
+
+        if(!r.success){
+            return c.text(r.error,r.statusCode);
+        }
+        c.header('Content-Type',getContentType(path));
+        return c.body(r.result,200);
     });
 
     return routes;

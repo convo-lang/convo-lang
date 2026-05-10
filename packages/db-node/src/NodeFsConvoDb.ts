@@ -1,8 +1,12 @@
 import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoEmbeddingSearch, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeGroupCondition, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
 import { BaseConvoDb, BaseConvoDbOptions } from '@convo-lang/db/BaseConvoDb.js';
+import { pathExistsAsync } from "@iyio/node-common";
 import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 
 export interface NodeFsConvoDbOptions extends BaseConvoDbOptions
@@ -140,17 +144,37 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
     }
 
     public async openBlobAsync(blobPath:string):PromiseResultType<ReadableStream>{
+        if(!await pathExistsAsync(this._getBlobFsPath(blobPath))){
+            return {
+                success:false,
+                error:'Not found',
+                statusCode:404,
+            }
+        }
         return await this._runAsync(async ()=>{
-            const data=await readFile(this._getBlobFsPath(blobPath));
-            return new Blob([data as any]).stream();
+            const s=createReadStream(this._getBlobFsPath(blobPath));
+            return Readable.toWeb(s) as any as ReadableStream;
         });
     }
 
-    public async writeBlobAsync(blobPath:string,blob:string|Blob|ReadableStream):PromiseResultTypeVoid{
+    public async writeBlobAsync(blobPath:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid{
         return await this._runVoidAsync(async ()=>{
             const fsPath=this._getBlobFsPath(blobPath);
+            if(blob==null){
+                await rm(fsPath,{force:true});
+                return;
+            }
             await mkdir(path.dirname(fsPath),{recursive:true});
-            await writeFile(fsPath,await this._blobToWritableAsync(blob));
+            if(typeof blob==='string'){
+                await writeFile(fsPath,blob);
+            }else if(blob instanceof Blob){
+                await writeFile(fsPath,new Uint8Array(await blob.arrayBuffer()));
+            }else{
+                await pipeline(
+                    blob,
+                    createWriteStream(fsPath)
+                );
+            }
         });
     }
 

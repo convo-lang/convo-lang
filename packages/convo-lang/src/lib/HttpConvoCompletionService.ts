@@ -5,6 +5,7 @@ import { convoRagService } from "./convo-rag-lib.js";
 import { ConvoRagSearch, ConvoRagSearchResult, ConvoRagService } from "./convo-rag-types.js";
 import { ConvoCompletionChunk, ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoHttpToInputRequest, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { convoCompletionService, convoTranscriptionService, convoTtsService } from "./convo.deps.js";
+import { normalizeConvoNodePath } from "./db/convo-db-lib.js";
 import type { ConvoDb, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriverFunction, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "./db/convo-db-types.js";
 import { ConvoDbAuthManager } from "./db/ConvoDbAuthManager.js";
 import { PromiseResultType, PromiseResultTypeVoid, ResultType, StatusCode } from "./result-type.js";
@@ -130,6 +131,22 @@ export class HttpConvoCompletionService implements
             return options;
         }
         this.auth=new ConvoDbAuthManager(this);
+    }
+
+    public initAsync(): PromiseResultTypeVoid {
+        return Promise.resolve({
+            success:true,
+        })
+    }
+
+    private _isDisposed=false;
+    public get isDisposed(){return this._isDisposed}
+    public dispose()
+    {
+        if(this._isDisposed){
+            return;
+        }
+        this._isDisposed=true;
     }
 
     public canComplete(model:string|undefined,flat:FlatConvoConversationBase):boolean
@@ -668,11 +685,162 @@ export class HttpConvoCompletionService implements
         updateEmbeddingAsync:(...args:any[])=>this.proxyDriverCallAsync('updateEmbeddingAsync',args),
         queryEdgesAsync:(...args:any[])=>this.proxyDriverCallAsync('queryEdgesAsync',args),
         queryEmbeddingsAsync:(...args:any[])=>this.proxyDriverCallAsync('queryEmbeddingsAsync',args),
+        hasBlobAsync:(...args:any[])=>this.proxyDriverCallAsync('hasBlobAsync',args),
+        openBlobAsync:(path:string):PromiseResultType<ReadableStream>=>{
+            return this._openBlobAsync(path);
+        },
+        writeBlobAsync:(path:string,blob:string|Blob|ReadableStream):PromiseResultTypeVoid=>{
+            return this._writeBlobAsync(path,blob);
+        }
+    }
+
+    private async _openBlobAsync(path:string,permissionFrom?:string):PromiseResultType<ReadableStream>{
+        try{
+            const p=normalizeConvoNodePath(path,'none');
+            if(!p){
+                return {
+                    success:false,
+                    error:'Invalid path',
+                    statusCode:400,
+                }
+            }
+            const r=await httpClient().requestAsync<Response>(
+                'GET',
+                joinPaths(this.getEndpoint(),`/db/${this.dbName}/blob${p}${permissionFrom?`?permissionFrom=${encodeURIComponent(permissionFrom)}`:''}`),
+                undefined,
+                {
+                    ...await this.getRequestOptions?.(),
+                    returnFetchResponse:true,
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:'Empty http response',
+                    statusCode:500
+                }
+            }
+            if(!r.ok){
+                try{
+                    return {
+                        success:false,
+                        error:await r.text(),
+                        statusCode:r.status as any,
+                    }
+                }catch{
+                    return {
+                        success:false,
+                        error:'HTTP request failed',
+                        statusCode:r.status as any,
+                    }
+                }
+            }
+            if(r.body){
+                return {
+                    success:true,
+                    result:r.body,
+                }
+            }else{
+                return {
+                    success:true,
+                    result:(await r.blob()).stream(),
+                }
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500,
+            }
+        }
+    }
+    
+    private async _writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null,permissionFrom?:string):PromiseResultTypeVoid{
+        try{
+            const p=normalizeConvoNodePath(path,'none');
+            if(!p){
+                return {
+                    success:false,
+                    error:'Invalid path',
+                    statusCode:400,
+                }
+            }
+            const stream=(blob instanceof Blob)?blob.stream():blob;
+            const options=await this.getRequestOptions?.();
+            const r=await httpClient().requestAsync<Response>(
+                'POST',
+                joinPaths(this.getEndpoint(),`/db/${this.dbName}/blob${p}${permissionFrom?`?permissionFrom=${encodeURIComponent(permissionFrom)}`:''}`),
+                stream,
+                {
+                    ...options,
+                    returnFetchResponse:true,
+                    rawBody:true,
+                    headers:{
+                        ...options?.headers,
+                        "Content-Type":"application/octet-stream"
+                    }
+
+                }
+            );
+            if(!r){
+                return {
+                    success:false,
+                    error:'Empty http response',
+                    statusCode:500
+                }
+            }
+            if(!r.ok){
+                try{
+                    return {
+                        success:false,
+                        error:await r.text(),
+                        statusCode:r.status as any,
+                    }
+                }catch{
+                    return {
+                        success:false,
+                        error:'HTTP request failed',
+                        statusCode:r.status as any,
+                    }
+                }
+            }
+            return {
+                success:true,
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500,
+            }
+        }
+    }
+
+    public async openBlobAsync(path:string,permissionFrom?:string):PromiseResultType<ReadableStream>
+    {
+        return await this._openBlobAsync(path,permissionFrom);
+    }
+
+    
+    public async writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null,permissionFrom?:string):PromiseResultTypeVoid
+    {
+        if(typeof blob === 'string'){
+            const r=await this.executeCommandAsync({writeBlob:{path,blob,permissionFrom}});
+            return r.success?{success:true}:r;
+        }else{
+            return await this._writeBlobAsync(path,blob,permissionFrom);
+        }
+    }
+
+    public async hasBlobAsync(path:string,permissionFrom?:string):PromiseResultType<boolean>
+    {
+        const r=await this.executeCommandAsync({hasBlob:{path,permissionFrom}});
+        return r.success?{success:true,result:r.result.hasBlob!}:r;
     }
 
     public async getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>
     {
-        const r=await this.executeCommandAsync({getNodesByPath:{path,permissionFrom}});
+        const r=await this.executeCommandAsync({openBlob:{path,permissionFrom}});
         return r.success?{success:true,result:r.result.getNodesByPath!}:r;
     }
 

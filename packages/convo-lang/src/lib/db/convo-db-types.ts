@@ -1251,6 +1251,21 @@ export interface ConvoDb
     dispose():void;
 
     /**
+     * Opens a read stream to the given node path. If no blob exists at the path a 404 is returned.
+     */
+    openBlobAsync(path:string,permissionFrom?:string):PromiseResultType<ReadableStream>;
+
+    /**
+     * Writes a blob to the given location. If blob is null the blob will be deleted.
+     */
+    writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null,permissionFrom?:string):PromiseResultTypeVoid;
+
+    /**
+     * Returns true if a blob exists at the given location. Read permission is required for the given path.
+     */
+    hasBlobAsync(path:string,permissionFrom?:string):PromiseResultType<boolean>;
+
+    /**
      * Convenience function for calling `queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom})`.
      * Returns the data of the first node returned by the called function or undefined if the function
      * returns no nodes. If you need to call a node that return multiple nodes use `queryNodesAsync`.
@@ -1444,9 +1459,9 @@ export interface ConvoDbDriver
     openBlobAsync(path:string):PromiseResultType<ReadableStream>;
 
     /**
-     * Writes a blob
+     * Writes a blob. If blob is null the blob will be deleted
      */
-    writeBlobAsync(path:string,blob:string|Blob|ReadableStream):PromiseResultTypeVoid;
+    writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid;
 
     /**
      * Checks if a blob exists
@@ -1746,6 +1761,9 @@ export const convoDbDriverFunctions=[
     'updateEmbeddingAsync',
     'queryEdgesAsync',
     'queryEmbeddingsAsync',
+    'openBlobAsync',
+    'writeBlobAsync',
+    'hasBlobAsync'
 ] satisfies (keyof ConvoDbDriver)[];
 
 /**
@@ -1855,6 +1873,21 @@ export interface ConvoDbCommand<TKeys extends ConvoNodeKeySelection='*'>
      * Calls `ConvoDb.deleteEmbeddingAsync`
      */
     deleteEmbedding?:ConvoDbActionDeleteEmbedding;
+
+    /**
+     * Calls `ConvoDb.hasBlobAsync`
+     */
+    hasBlob?:ConvoDbActionHasBlob;
+
+    /**
+     * Calls `ConvoDb.openBlobAsync`
+     */
+    openBlob?:ConvoDbActionOpenBlob;
+
+    /**
+     * Calls `ConvoDb.writeBlobAsync`
+     */
+    writeBlob?:ConvoDbActionWriteBlob;
 
     /**
      * Calls `ConvoDb._driver[fn]`
@@ -2130,6 +2163,59 @@ export interface ConvoDbActionDeleteEmbedding
 }
 
 /**
+ * Arguments for `ConvoDb.hasBlobAsync`
+ */
+export interface ConvoDbActionHasBlob
+{
+    /**
+     * Blob path
+     */
+    path:string;
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
+ * Arguments for `ConvoDb.openBlobAsync`
+ */
+export interface ConvoDbActionOpenBlob
+{
+    /**
+     * Blob path
+     */
+    path:string;
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
+ * Arguments for `ConvoDb.writeBlobAsync`
+ */
+export interface ConvoDbActionWriteBlob
+{
+    /**
+     * Blob path
+     */
+    path:string;
+
+    /**
+     * Blob to write
+     */
+    blob:string|Blob|ReadableStream|null
+
+    /**
+     * Optional permission source path
+     */
+    permissionFrom?:string;
+}
+
+/**
  * Result values for `ConvoDbCommand`.
  *
  * Property names mirror `ConvoDbCommand`.
@@ -2231,6 +2317,18 @@ export interface ConvoDbCommandResult<TKeys extends ConvoNodeKeySelection='*'>
      * Result of `ConvoDb._driver[fn]`
      */
     driverCmd?:any;
+
+    hasBlob?:boolean;
+
+    writeBlob?:true;
+
+    openBlob?:ReadableStream|ConvoDbDriverBlobStream;
+}
+
+export interface ConvoDbDriverBlobStream
+{
+    isBase64:boolean;
+    value:string;
 }
 
 /**

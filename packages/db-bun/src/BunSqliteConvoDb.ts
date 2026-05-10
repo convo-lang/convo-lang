@@ -31,7 +31,7 @@ export class BunSqliteConvoDb extends BaseSqliteConvoDb
     {
         const sqliteMod=await import('bun:sqlite');
         this.db=new sqliteMod.Database(this.dbPath||'');
-        await super._initAsync();
+        return await super._initAsync();
     }
 
     protected override async _execSqlAsync(sql:string,bind:any[]=[]):PromiseResultType<any[]>{

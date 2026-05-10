@@ -104,17 +104,22 @@ export abstract class BaseConvoDb implements ConvoDb
         this.auth=new ConvoDbAuthManager(this);
     }
 
-    public async initAsync():PromiseResultTypeVoid
+    
+    private initPromise?:PromiseResultTypeVoid;
+
+    public initAsync():PromiseResultTypeVoid
     {
-        try{
-            return await this._initAsync();
-        }catch(ex){
-            return {
-                success:false,
-                error:`Database initialization error: ${getErrorMessage(ex)}`,
-                statusCode:500
+        return this.initPromise??(this.initPromise=(async ()=>{
+            try{
+                return await this._initAsync();
+            }catch(ex){
+                return {
+                    success:false,
+                    error:`Database initialization error: ${getErrorMessage(ex)}`,
+                    statusCode:500
+                }
             }
-        }
+        })());
     }
 
     protected _initAsync():PromiseResultTypeVoid
@@ -155,8 +160,106 @@ export abstract class BaseConvoDb implements ConvoDb
         this.loggingEnabled=true;
     }
 
+    
+
+    /**
+     * Opens a read stream to the given node path. If no blob exists at the path a 404 is returned.
+     */
+    public async openBlobAsync(path:string,permissionFrom?:string):PromiseResultType<ReadableStream>
+    {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+
+        const p=normalizeConvoNodePath(path,'none');
+        if(!p){
+            return {
+                success:false,
+                error:'Invalid path',
+                statusCode:400,
+            }
+        }
+
+        if(permissionFrom){
+            const permission=await this.checkNodePermissionAsync(
+                permissionFrom,
+                path,
+                ConvoNodePermissionType.read,
+            );
+            if(!permission.success){
+                return permission;
+            }
+        }
+
+        return await this._driver.openBlobAsync(path);
+    }
+
+    /**
+     * Writes a blob to the given location
+     */
+    public async writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null,permissionFrom?:string):PromiseResultTypeVoid
+    {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+
+        const p=normalizeConvoNodePath(path,'none');
+        if(!p){
+            return {
+                success:false,
+                error:'Invalid path',
+                statusCode:400,
+            }
+        }
+
+        if(permissionFrom){
+            const permission=await this.checkNodePermissionAsync(
+                permissionFrom,
+                path,
+                ConvoNodePermissionType.write,
+            );
+            if(!permission.success){
+                return permission;
+            }
+        }
+
+        return await this._driver.writeBlobAsync(path,blob);
+    }
+
+    /**
+     * Returns true if a blob exists at the given location. Read permission is required for the given path.
+     */
+    public async hasBlobAsync(path:string,permissionFrom?:string):PromiseResultType<boolean>
+    {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+
+        const p=normalizeConvoNodePath(path,'none');
+        if(!p){
+            return {
+                success:false,
+                error:'Invalid path',
+                statusCode:400,
+            }
+        }
+
+        if(permissionFrom){
+            const permission=await this.checkNodePermissionAsync(
+                permissionFrom,
+                path,
+                ConvoNodePermissionType.read,
+            );
+            if(!permission.success){
+                return permission;
+            }
+        }
+
+        return await this._driver.hasBlobAsync(path);
+    }
+
     public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
         if(!r.success){
             return r;
@@ -169,6 +272,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async callFunctionWithSchemaAsync<TInput,TOutput>(inputSchema:ZodType<TInput>,outputSchema:ZodType<TOutput>,path:string,args:TInput,permissionFrom?:string):PromiseResultType<TOutput>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const inputParsed=inputSchema.safeParse(args);
         if(inputParsed.error){
             return {
@@ -201,6 +307,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async callFunctionReturnValueAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const r=await this.callFunctionReturnNodeAsync(path,args,permissionFrom);
         if(!r.success){
             return r;
@@ -223,6 +332,9 @@ export abstract class BaseConvoDb implements ConvoDb
     
     public async callFunctionReturnNodeAsync(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const r=await this.queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom});
         if(!r.success){
             return r;
@@ -251,6 +363,9 @@ export abstract class BaseConvoDb implements ConvoDb
         :
             keyof ConvoNode
     >>{
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const stateResult=parseToken(query.nextToken);
         if(!stateResult.success){
             return stateResult;
@@ -319,6 +434,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async getNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode|undefined>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const r=await this.queryNodesAsync({steps:[{path}],limit:1,permissionFrom});
         if(!r.success){
             return r;
@@ -331,6 +449,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async requireNodeByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNode>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const node=await this.getNodeByPathAsync(path,permissionFrom);
         if(!node.success){
             return node;
@@ -391,6 +512,9 @@ export abstract class BaseConvoDb implements ConvoDb
         :
             keyof ConvoNode
     >>{
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(!stateResult.success){
             yield errorResultToConvoNodeStreamItem(stateResult,undefined);
             return;
@@ -945,6 +1069,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async getNodePermissionAsync(fromPath:string,toPath:string):PromiseResultType<ConvoNodePermissionType>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const to=normalizeConvoNodePath(toPath,'none')?.split('/');
         const from=normalizeConvoNodePath(fromPath,'none');
         if(to===undefined || from===undefined){
@@ -977,6 +1104,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async checkNodePermissionAsync(fromPath:string,toPath:string,type:ConvoNodePermissionType,matchAny?:boolean):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const r=await this.getNodePermissionAsync(fromPath,toPath);
         if(!r.success){
             return r;
@@ -999,6 +1129,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async insertNodeAsync(node:ConvoNode,options?:InsertConvoNodeOptions):PromiseResultType<ConvoNode>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(node.path!==normalizeConvoNodePath(node.path,'none')){
             return {
                 success:false,
@@ -1029,6 +1162,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async updateNodeAsync(node:ConvoNodeUpdate,options?:UpdateConvoNodeOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(node.path!==normalizeConvoNodePath(node.path,'none')){
             return {
                 success:false,
@@ -1076,6 +1212,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async deleteNodeAsync(path:string,options?:DeleteConvoNodeOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(path!==normalizeConvoNodePath(path,'none')){
             return {
                 success:false,
@@ -1112,6 +1251,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async getEdgeByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEdge>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
             return {
                 success:false,
@@ -1140,6 +1282,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async insertEdgeAsync(edge:Omit<ConvoNodeEdge,"id">,options?:InsertConvoNodeEdgeOptions):PromiseResultType<ConvoNodeEdge>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(edge.from!==normalizeConvoNodePath(edge.from,'none')){
             return {
                 success:false,
@@ -1178,6 +1323,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async updateEdgeAsync(update:ConvoNodeEdgeUpdate,options?:UpdateConvoNodeEdgeOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1208,6 +1356,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async deleteEdgeAsync(id:string,options?:DeleteConvoNodeEdgeOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1240,6 +1391,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async getEmbeddingByIdAsync(id:string,permissionFrom?:string):PromiseResultType<ConvoNodeEmbedding>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(permissionFrom!==undefined && permissionFrom!==normalizeConvoNodePath(permissionFrom,'none')){
             return {
                 success:false,
@@ -1268,6 +1422,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,"id">,options?:InsertConvoNodeEmbeddingOptions):PromiseResultType<ConvoNodeEmbedding>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(embedding.path!==normalizeConvoNodePath(embedding.path,'none')){
             return {
                 success:false,
@@ -1293,6 +1450,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,options?:UpdateConvoNodeEmbeddingOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1317,6 +1477,9 @@ export abstract class BaseConvoDb implements ConvoDb
 
     public async deleteEmbeddingAsync(id:string,options?:DeleteConvoNodeEmbeddingOptions):PromiseResultTypeVoid
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         if(options?.permissionFrom!==undefined && options.permissionFrom!==normalizeConvoNodePath(options.permissionFrom,'none')){
             return {
                 success:false,
@@ -1363,6 +1526,9 @@ export abstract class BaseConvoDb implements ConvoDb
      */
     public async generateEmbeddingVectorAsync(embedding:ConvoNodeEmbedding):PromiseResultType<any>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const nodeResult=await this.selectNodeByPathAsync(embedding.path,'*');
         if(!nodeResult.success){
             return nodeResult;
@@ -1419,13 +1585,19 @@ export abstract class BaseConvoDb implements ConvoDb
 
     }
 
-    public queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>{
-        return this._driver.queryEdgesAsync(query);
+    public async queryEdgesAsync(query:ConvoNodeEdgeQuery):PromiseResultType<ConvoNodeEdgeQueryResult>{
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
+        return await this._driver.queryEdgesAsync(query);
     }
 
-    public queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>
+    public async queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<ConvoNodeEmbeddingQueryResult>
     {
-        return this._driver.queryEmbeddingsAsync(query);
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
+        return await this._driver.queryEmbeddingsAsync(query);
     }
 
     protected async generateEmbeddingsAsync(request:ConvoEmbeddingsGenerationRequest):PromiseResultType<ConvoEmbeddingsGenerationResult>
@@ -1446,6 +1618,9 @@ export abstract class BaseConvoDb implements ConvoDb
         command:ConvoDbCommand<TKeys>
     ):PromiseResultType<ConvoDbCommandResult<TKeys>>
     {
+        const init=await this.initAsync();
+        if(!init.success){return init}
+        
         const actionNames=Object.keys(command);
         const action=actionNames[0] as keyof ConvoDbCommand<TKeys>;
         if(actionNames.length!==1 || !action){
@@ -1616,6 +1791,24 @@ export abstract class BaseConvoDb implements ConvoDb
                     command.deleteEmbedding!.id,
                     command.deleteEmbedding!.options,
                 );
+                if(r.success){
+                    result={success:true,result:true};
+                }else{
+                    result=r;
+                }
+                break;
+            }
+
+            case 'hasBlob':
+                result=await this.hasBlobAsync(command.hasBlob!.path,command.hasBlob!.permissionFrom);
+                break;
+
+            case 'openBlob':
+                result=await this.openBlobAsync(command.openBlob!.path,command.openBlob!.permissionFrom);
+                break;
+
+            case 'writeBlob':{
+                const r=await this.writeBlobAsync(command.writeBlob!.path,command.writeBlob!.blob,command.writeBlob!.permissionFrom);
                 if(r.success){
                     result={success:true,result:true};
                 }else{

@@ -31,6 +31,11 @@ export interface ConvoDbLayerSupport
      * If true the layer can be used for embedding operations.
      */
     supportsEmbeddings?:boolean;
+
+    /**
+     * If true the layer can be used for blob operations.
+     */
+    supportsBlobs?:boolean;
 }
 
 export interface ConvoDbLayerConfig extends Required<ConvoDbLayerSupport>

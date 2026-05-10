@@ -9,6 +9,7 @@ export class InMemoryConvoDb extends BaseConvoDb
     private readonly nodes=new Map<string,ConvoNode>();
     private readonly edges=new Map<string,ConvoNodeEdge>();
     private readonly embeddings=new Map<string,ConvoNodeEmbedding>();
+    private readonly blobs=new Map<string,Blob>();
 
     public exportData():ConvoDbExport{
         return {
@@ -40,6 +41,51 @@ export class InMemoryConvoDb extends BaseConvoDb
     }
 
     override _driver={
+
+        
+        openBlobAsync:async (path:string):PromiseResultType<ReadableStream>=>{
+            const blob=this.blobs.get(path);
+            if(!blob){
+                return {
+                    success:false,
+                    error:'Blob not found',
+                    statusCode:404,
+                }
+            }
+
+            return {
+                success:true,
+                result:blob.stream(),
+            }
+        },
+
+        writeBlobAsync:async (path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid=>{
+            
+            if(typeof blob === 'string'){
+                blob=new Blob([blob]);
+            }else if(!(blob instanceof Blob)){
+                const response=new Response(blob);
+                blob=await response.blob();
+            }else if(blob){
+                blob=structuredClone(blob);
+            }
+            if(blob===null){
+                this.blobs.delete(path);
+            }else{
+                this.blobs.set(path,blob);
+            }
+            return {
+                success:true,
+            }
+        },
+
+        hasBlobAsync:(path:string):PromiseResultType<boolean>=>{
+            return Promise.resolve({
+                success:true,
+                result:this.blobs.has(path),
+            });
+        },
+
         selectEdgesByPathsAsync:async (keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>=>{
             const fromSet=new Set(fromPathsIn);
             const toSet=new Set(toPathsIn);

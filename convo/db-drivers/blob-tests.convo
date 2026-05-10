@@ -1,0 +1,303 @@
+@import ./_db-drivers.convo
+
+> user
+Write a set of tests to test the blob functions of `ConvoDb`:
+- `openBlobAsync`
+- `writeBlobAsync`
+- `hasBlobAsync`
+
+Use the Bun testing framework.
+
+Use the `createTestDb` to create test databases.
+
+``` ts
+import { createTestDb } from "./createTestDb.js";
+
+
+const createDb=()=>createTestDb('fs');
+```
+
+save to `../../packages/tests/src/convo-db-blob.test.ts`
+
+@time 2026-05-09T22:21:03-04:00
+@tokenUsage 19319 / 1280 / $0.10299500000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db-blob.test.ts" target-output-path="../../packages/tests/src/convo-db-blob.test.ts">
+``` ts
+import { describe, expect, test } from 'bun:test';
+import { createTestDb } from './createTestDb.js';
+
+const createDb=()=>createTestDb('fs');
+
+const readStreamTextAsync=async (stream:ReadableStream):Promise<string>=>{
+    return await new Response(stream).text();
+}
+
+describe('ConvoDb blob functions',()=>{
+    test('hasBlobAsync returns false for missing blobs',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+
+            const has=await db.hasBlobAsync(path);
+
+            expect(has.success).toBe(true);
+            if(has.success){
+                expect(has.result).toBe(false);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes string blobs and openBlobAsync reads them',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='hello blob';
+
+            const write=await db.writeBlobAsync(path,value);
+            expect(write.success).toBe(true);
+
+            const has=await db.hasBlobAsync(path);
+            expect(has.success).toBe(true);
+            if(has.success){
+                expect(has.result).toBe(true);
+            }
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes Blob values',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='blob value';
+
+            const write=await db.writeBlobAsync(path,new Blob([value],{type:'text/plain'}));
+            expect(write.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes ReadableStream values',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='stream value';
+
+            const write=await db.writeBlobAsync(path,new Blob([value]).stream());
+            expect(write.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync overwrites existing blobs',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const first='first value';
+            const second='second value';
+
+            const firstWrite=await db.writeBlobAsync(path,first);
+            expect(firstWrite.success).toBe(true);
+
+            const secondWrite=await db.writeBlobAsync(path,second);
+            expect(secondWrite.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(second);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+});
+```
+</FILE_CONTENT>
+
+
+> user
+Add test for deleting blobs by passing null as a blob
+
+@time 2026-05-10T10:15:01-04:00
+@tokenUsage 20604 / 1134 / $0.10869000000000001
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db-blob.test.ts" target-output-path="../../packages/tests/src/convo-db-blob.test.ts">
+``` ts
+import { describe, expect, test } from 'bun:test';
+import { createTestDb } from './createTestDb.js';
+
+const createDb=()=>createTestDb('fs');
+
+const readStreamTextAsync=async (stream:ReadableStream):Promise<string>=>{
+    return await new Response(stream).text();
+};
+
+describe('ConvoDb blob functions',()=>{
+    test('hasBlobAsync returns false for missing blobs',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+
+            const has=await db.hasBlobAsync(path);
+
+            expect(has.success).toBe(true);
+            if(has.success){
+                expect(has.result).toBe(false);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes string blobs and openBlobAsync reads them',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='hello blob';
+
+            const write=await db.writeBlobAsync(path,value);
+            expect(write.success).toBe(true);
+
+            const has=await db.hasBlobAsync(path);
+            expect(has.success).toBe(true);
+            if(has.success){
+                expect(has.result).toBe(true);
+            }
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes Blob values',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='blob value';
+
+            const write=await db.writeBlobAsync(path,new Blob([value],{type:'text/plain'}));
+            expect(write.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync writes ReadableStream values',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='stream value';
+
+            const write=await db.writeBlobAsync(path,new Blob([value]).stream());
+            expect(write.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(value);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync overwrites existing blobs',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const first='first value';
+            const second='second value';
+
+            const firstWrite=await db.writeBlobAsync(path,first);
+            expect(firstWrite.success).toBe(true);
+
+            const secondWrite=await db.writeBlobAsync(path,second);
+            expect(secondWrite.success).toBe(true);
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(true);
+            if(open.success){
+                expect(await readStreamTextAsync(open.result)).toBe(second);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+
+    test('writeBlobAsync deletes blobs when blob is null',async ()=>{
+        const db=createDb();
+        try{
+            const path=`/blob-test/${crypto.randomUUID()}.txt`;
+            const value='delete me';
+
+            const write=await db.writeBlobAsync(path,value);
+            expect(write.success).toBe(true);
+
+            const hasBeforeDelete=await db.hasBlobAsync(path);
+            expect(hasBeforeDelete.success).toBe(true);
+            if(hasBeforeDelete.success){
+                expect(hasBeforeDelete.result).toBe(true);
+            }
+
+            const del=await db.writeBlobAsync(path,null);
+            expect(del.success).toBe(true);
+
+            const hasAfterDelete=await db.hasBlobAsync(path);
+            expect(hasAfterDelete.success).toBe(true);
+            if(hasAfterDelete.success){
+                expect(hasAfterDelete.result).toBe(false);
+            }
+
+            const open=await db.openBlobAsync(path);
+            expect(open.success).toBe(false);
+            if(!open.success){
+                expect(open.statusCode).toBe(404);
+            }
+        }finally{
+            db.dispose();
+        }
+    });
+});
+```
+</FILE_CONTENT>
+
+
+> user
