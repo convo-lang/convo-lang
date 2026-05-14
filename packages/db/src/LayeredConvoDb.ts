@@ -1,7 +1,5 @@
-import { ConvoDb, ConvoDbDriver, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
+import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
-
-const db:ConvoDb=null as any;
 
 
 
@@ -9,7 +7,8 @@ const hasSupport=(layer:ConvoDbLayerConfig,support:ConvoDbLayerSupport)=>{
     return (
         (support.supportsNodes?layer.supportsNodes===true:true) &&
         (support.supportsEdges?layer.supportsEdges===true:true) &&
-        (support.supportsEmbeddings?layer.supportsEmbeddings===true:true)
+        (support.supportsEmbeddings?layer.supportsEmbeddings===true:true) &&
+        (support.supportsBlobs?layer.supportsBlobs===true:true)
     )
 }
 
@@ -88,9 +87,6 @@ export interface LayeredConvoDbOptions extends BaseConvoDbOptions
 /**
  * A ConvoDb implementation that allows you to layer multiple databases on top of each other 
  * with a shared name space. 
- *
- * # Limitations
- * LayeredConvoDb has several important limitations to consider when being
  */
 export class LayeredConvoDb extends BaseConvoDb
 {
@@ -117,8 +113,52 @@ export class LayeredConvoDb extends BaseConvoDb
         });
     }
 
-    public getLayersByPath(support:ConvoDbLayerSupport,path:string,wildcard?:boolean,layers:LayerInst[]=[]):LayerInst[]{
+    private scopePathToMountPoint(path:string,mountPoint:string):string{
+        if(!path.endsWith('*') || path.length>mountPoint.length){
+            return path;
+        }else{
+            return (mountPoint.endsWith('/')?mountPoint:mountPoint+'/')+'*'
+        }
 
+    }
+
+    private filterCurrentPaths(currentPaths:string[]|null,mountPoint:string):string[]|null{
+        if(!currentPaths){
+            return null;
+        }
+        if(!mountPoint.endsWith('/')){
+            mountPoint+='/';
+        }
+        return currentPaths.filter(p=>p.startsWith(mountPoint));
+    }
+
+    private getPathGroups(support:ConvoDbLayerSupport,paths:string[]):ScopedPathGroup[]{
+        const groups:ScopedPathGroup[]=[];
+        for(const path of paths){
+            const layers=this.getLayersByPath(support,path);
+            for(const layer of layers){
+                const db=layer.db;
+                const match=groups.find(g=>g.db===db);
+                const p=this.scopePathToMountPoint(path,layer.mountPoint);
+                if(match){
+                    if(!match.paths.includes(p)){
+                        match.paths.push(p);
+                    }
+                }else{
+                    groups.push({db,layer:layer,paths:[p]});
+                }
+            }
+        }
+        return groups;
+    }
+
+    public getLayerByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst|undefined{
+        return this.getLayersByPath(support,path,1)[0];
+    }
+
+    public getLayersByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst[]{
+
+        const layers:LayerInst[]=[];
 
         const p=normalizeConvoNodePath(path,'end');
         if(!p){
@@ -126,20 +166,21 @@ export class LayeredConvoDb extends BaseConvoDb
         }
         path=p;
 
-        if(wildcard===undefined){
-            wildcard=path.endsWith('*');
+        const wildcard=path.endsWith('*');
+        
+        if(path.endsWith('*')){
+            path=path.substring(0,path.length-1);
         }
         if(!path.endsWith('/')){
             path+='/'
         }
 
 
-        for(let i=0;i<this.layers.length && (wildcard || !layers.length);i++){
+        for(let i=0;i<this.layers.length && (wildcard || !layers.length) && (limit===undefined?true:layers.length<limit);i++){
             const layer=this.layers[i];
             if( !layer ||
-                !path.startsWith(layer.mountPoint) ||
                 !hasSupport(layer,support) ||
-                layers.some(d=>layer.mountPoint.startsWith(d.mountPoint))
+                !(path.startsWith(layer.mountPoint) || (wildcard?layer.mountPoint.startsWith(path):false))
             ){
                 continue;
             }
@@ -169,24 +210,113 @@ export class LayeredConvoDb extends BaseConvoDb
         return layers;
     }
 
-    private getPathGroups(support:ConvoDbLayerSupport,paths:string[]){
-        const groups:{paths:string[],db:ConvoDb}[]=[];
-        for(const path of paths){
-            const db=this.getLayersByPath(support,path)[0]?.db;
-            if(!db){
-                continue
-            }
-            const match=groups.find(g=>g.db===db);
-            if(match){
-                match.paths.push(path);
-            }else{
-                groups.push({paths:[path],db});
+    async selectForStepAsync(
+        step: ConvoNodeQueryStep,
+        currentNodePaths: string[] | null,
+        orderBy: ConvoNodeOrderBy[],
+        limit: number,
+        offset: number,
+        nextToken: string | undefined,
+        select:(
+            state:SelectToken,
+            group:ScopedPathGroup,
+            path:string,
+            step: ConvoNodeQueryStep,
+            currentNodePaths: string[] | null,
+            orderBy: ConvoNodeOrderBy[],
+            limit: number,
+            offset: number,
+            nextToken: string | undefined,
+        )=>PromiseResultType<ConvoDbDriverPathsResult>
+    ): PromiseResultType<ConvoDbDriverPathsResult>{
+        const groups=this.getPathGroups({supportsNodes:true},currentNodePaths??['/*']);
+        const state=getSelectToken(nextToken);
+        if(offset<state.o){
+            return {
+                success:true,
+                result:{paths:[]}
             }
         }
-        return groups;
+        for(;state.i<groups.length;state.i++){
+            const group=groups[state.i]!;
+            for(;state.g<group.paths.length;state.g++){
+                const path=group.paths[state.g]!;
+                const r=await select(
+                    state,group,path,step,
+                    this.filterCurrentPaths(currentNodePaths,group.layer.mountPoint),
+                    orderBy,limit,offset-state.o,state.t
+                );
+                if(!r.success){
+                    return r;
+                }
+                if(r.result.paths.length){
+                    state.t=r.result.nextToken;
+                    state.l+=r.result.paths.length;
+                    return {
+                        success:true,
+                        result:{
+                            paths:r.result.paths,
+                            nextToken:JSON.stringify(state)
+                        }
+                    }
+                }
+                state.o+=state.l;
+                state.l=0;
+            }
+            state.g=0;
+
+        }
+        return {
+            success:true,
+            result:{
+                paths:[],
+            },
+        }
     }
 
     override readonly _driver:ConvoDbDriver={
+
+        openBlobAsync:async (path:string):PromiseResultType<ReadableStream>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            return await layer.db._driver.openBlobAsync(path);
+        },
+
+        writeBlobAsync:async (path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            return await layer.db._driver.writeBlobAsync(path,blob);
+
+        },
+
+        hasBlobAsync:async (path:string):PromiseResultType<boolean>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            return await layer.db._driver.hasBlobAsync(path);
+        },
+
+
         selectEdgesByPathsAsync:async (keys: (keyof ConvoNodeEdge)[] | "*", fromPathsIn: string[], toPathsIn: string[], hasGrant: boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>=>{
             const groups=this.getPathGroups({supportsEdges:true},fromPathsIn);
             const results=await Promise.all(groups.map(g=>g.db._driver.selectEdgesByPathsAsync(keys,g.paths,toPathsIn,hasGrant)));
@@ -220,55 +350,457 @@ export class LayeredConvoDb extends BaseConvoDb
             }
         },
         selectNodePathsForPathAsync:(step: Required<Pick<ConvoNodeQueryStep, "path">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
-            throw new Error("Function not implemented.");
+            return this.selectForStepAsync(
+                step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPathAsync(
+                        {path},currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
         },
-        selectNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
-            throw new Error("Function not implemented.");
+        selectNodePathsForConditionAsync:(step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return this.selectForStepAsync(
+                step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
         },
-        selectNodePathsForPermissionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
-            throw new Error("Function not implemented.");
+        selectNodePathsForPermissionAsync:(step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return this.selectForStepAsync(
+                step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPermissionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
         },
-        selectNodePathsForEmbeddingAsync:async (step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
-            throw new Error("Function not implemented.");
+        selectNodePathsForEmbeddingAsync:(step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return this.selectForStepAsync(
+                step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForEmbeddingAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
         },
-        selectEdgeNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
-            throw new Error("Function not implemented.");
+        selectEdgeNodePathsForConditionAsync:(step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return this.selectForStepAsync(
+                step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectEdgeNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
         },
         insertNodeAsync:async (node: ConvoNode, options: Omit<InsertConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNode> =>{
-            throw new Error("Method not implemented.");
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            return await layer.db._driver.insertNodeAsync(node,options);
+
         },
         updateNodeAsync:async (node: ConvoNodeUpdate, options: Omit<UpdateConvoNodeOptions, "permissionFrom" | "mergeData"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            return await layer.db._driver.updateNodeAsync(node,options);
         },
         deleteNodeAsync:async (path: string, options: Omit<DeleteConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const layer=this.getLayerByPath({supportsNodes:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${path}`,
+                    statusCode:404
+                }
+            }
+            return await layer.db._driver.deleteNodeAsync(path,options);
         },
         insertEdgeAsync:async (edge: Omit<ConvoNodeEdge, "id">, options: Omit<InsertConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEdge> =>{
-            throw new Error("Method not implemented.");
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            return await layer.db._driver.insertEdgeAsync(edge,options);
         },
         updateEdgeAsync:async (update: ConvoNodeEdgeUpdate, options: Omit<UpdateConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const edgeR=await this._driver.queryEdgesAsync({id:update.id,limit:1});
+            const edge=edgeR.success?edgeR.result.edges[0]:undefined;
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            return layer.db._driver.updateEdgeAsync(update,options);
         },
         deleteEdgeAsync:async (id: string, options: Omit<DeleteConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const edgeR=await this._driver.queryEdgesAsync({id,limit:1});
+            const edge=edgeR.success?edgeR.result.edges[0]:undefined;
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            return layer.db._driver.deleteEdgeAsync(id,options);
         },
         insertEmbeddingAsync:async (embedding: Omit<ConvoNodeEmbedding, "id">, options: Omit<InsertConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEmbedding> =>{
-            throw new Error("Method not implemented.");
-        },
-        deleteEmbeddingAsync:async (id: string, options: Omit<DeleteConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            return await layer.db._driver.insertEmbeddingAsync(embedding,options);
         },
         updateEmbeddingAsync:async (update: ConvoNodeEmbeddingUpdate, options: Omit<UpdateConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
-            throw new Error("Method not implemented.");
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id:update.id,limit:1});
+            const embedding=embeddingR.success?embeddingR.result.embeddings[0]:undefined;
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            return layer.db._driver.updateEmbeddingAsync(update,options);
         },
-        queryEdgesAsync:(query: ConvoNodeEdgeQuery): PromiseResultType<ConvoNodeEdgeQueryResult>=>{
-            throw new Error("Method not implemented.");
+        deleteEmbeddingAsync:async (id: string, options: Omit<DeleteConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id,limit:1});
+            const embedding=embeddingR.success?embeddingR.result.embeddings[0]:undefined;
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            return layer.db._driver.deleteEmbeddingAsync(id,options);
         },
-        queryEmbeddingsAsync:(query: ConvoNodeEmbeddingQuery): PromiseResultType<ConvoNodeEmbeddingQueryResult>=>{
-            throw new Error("Method not implemented.");
+        queryEdgesAsync:async (query: ConvoNodeEdgeQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{edges:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const r=await layer.db._driver.queryEdgesAsync({
+                    ...query,
+                    offset:offset-state.o,
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.edges.length;
+                state.t=r.result.nextToken;
+
+                if(r.result.edges.length===0){
+                    state.i++;
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEdgeTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:JSON.stringify(state),
+                        edges:r.result.edges,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEdgeTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    edges:[],
+                    total,
+                }
+            }
+            
+        },
+        queryEmbeddingsAsync:async (query: ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{embeddings:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const r=await layer.db._driver.queryEmbeddingsAsync({
+                    ...query,
+                    offset:offset-state.o,
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.embeddings.length;
+                state.t=r.result.nextToken;
+
+                if(r.result.embeddings.length===0){
+                    state.i++;
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEmbeddingTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:JSON.stringify(state),
+                        embeddings:r.result.embeddings,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEmbeddingTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    embeddings:[],
+                    total,
+                }
+            }
         },
         
+    }
+
+    private async getEdgeTotalAsync(query:ConvoNodeEdgeQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+        for(const layer of layers){
+            const r=await layer.db._driver.queryEdgesAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            total+=(r.result.total??0);
+        }
+        return {
+            success:true,
+            result:total,
+        }
+    }
+
+    private async getEmbeddingTotalAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+        for(const layer of layers){
+            const r=await layer.db._driver.queryEmbeddingsAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            total+=(r.result.total??0);
+        }
+        return {
+            success:true,
+            result:total,
+        }
     }
     
 }
 
+const getQueryToken=(token?:string):QueryToken=>{
+    if(!token){
+        return {
+            i:0,
+            o:0,
+            l:0,
+        }
+    }
+
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+
+}
+
+interface QueryToken
+{
+    /**
+     * Layer Index
+     */
+    i:number;
+
+    /**
+     * Layer offset. The total of all items returned by layers that have already been passed.
+     * Will offset the offset value passed to driver functions
+     */
+    o:number;
+
+    /**
+     * Current layer total
+     */
+    l:number;
+
+    /**
+     * Layer next token
+     */
+    t?:string;
+}
+
+interface SelectToken extends QueryToken 
+{
+
+    /**
+     * Group index
+     */
+    g:number;
+
+
+}
+
+const getSelectToken=(token:string|undefined):SelectToken=>{
+    if(!token){
+        return {i:0,g:0,o:0,l:0}
+    }
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+}
+
+interface ScopedPathGroup
+{
+    paths:string[];
+    db:ConvoDb;
+    layer:LayerInst;
+}
