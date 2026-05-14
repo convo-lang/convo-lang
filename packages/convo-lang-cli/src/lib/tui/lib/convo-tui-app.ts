@@ -14,12 +14,11 @@ import { tuiFileLogger } from "./tui-file-logger.js"
 
 export const getConvoTuiScreens=(ctx:ConvoCliTuiCtx)=>{
 
-    const {tui,studio:app}=ctx;
     return [
         fileEditorScreen(ctx),
-        dbScreen(),
-        apiScreen(),
-        settingsScreen(),
+        dbScreen(ctx),
+        apiScreen(ctx),
+        settingsScreen(ctx),
     ]
 }
 

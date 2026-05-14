@@ -39,6 +39,8 @@ export const cellView=(ctx:ConvoCliTuiCtx,cell:CellCtrl):SpriteDef=>{
     const updateTabs=()=>{
         ctx.tui.updateSprite({
             id:tabsId,
+            border:{bottom:'border'},
+            scrollable:true,
             children:getTabs(),
         })
     }

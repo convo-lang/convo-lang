@@ -1,122 +1,51 @@
 import type { ScreenDef } from "@convo-lang/tui/tui-types.js";
-import { mainLayout } from "../components/main-layout.js";
+import { screenView } from "../components/screen-view.js";
+import { ConvoCliTuiCtx } from "../lib/convo-cli-tui-types.js";
 
 const buttonPadding={left:1,right:1};
 
-export const settingsScreen=():ScreenDef=>{
-    return mainLayout({
+export const settingsScreen=(ctx:ConvoCliTuiCtx):ScreenDef=>{
+    return screenView({
+        ctx,
         id:'settings',
-        layout:'row',
-        gap:1,
-        padding:1,
-        bg:'background',
-        children:[
-            {
-                id:'settings-toolbar',
-                layout:'column',
-                width:30,
-                padding:1,
-                gap:1,
-                border:'border-soft',
-                borderStyle:'rounded',
-                bg:'sidebar',
-                color:'sidebar-foreground',
-                children:[
-                    {
-                        id:'settings-toolbar-title',
-                        text:'Settings',
-                        color:'sidebar-primary',
-                    },
-                    {
-                        id:'settings-general-section',
-                        text:'General',
-                        isButton:true,
-                        padding:buttonPadding,
-                        color:'accent-foreground',
-                        bg:'convo-green-muted',
-                        activeBg:'accent',
-                        activeColor:'accent-foreground',
-                    },
-                    {
-                        id:'settings-model-section',
-                        text:'Models',
-                        isButton:true,
-                        padding:buttonPadding,
-                        color:'foreground',
-                        bg:'sidebar-accent',
-                        activeBg:'convo-bright',
-                        activeColor:'primary-foreground',
-                    },
-                    {
-                        id:'settings-api-keys-section',
-                        text:'API Keys',
-                        isButton:true,
-                        padding:buttonPadding,
-                        color:'foreground',
-                        bg:'sidebar-accent',
-                        activeBg:'convo-bright',
-                        activeColor:'primary-foreground',
-                    },
-                    {
-                        id:'settings-storage-section',
-                        text:'Storage',
-                        isButton:true,
-                        padding:buttonPadding,
-                        color:'foreground',
-                        bg:'sidebar-accent',
-                        activeBg:'convo-bright',
-                        activeColor:'primary-foreground',
-                    },
-                ],
-            },
-            {
-                id:'settings-main',
-                layout:'column',
-                flex:1,
-                padding:1,
-                gap:1,
-                border:'border-soft',
-                borderStyle:'rounded',
-                bg:'card',
-                color:'card-foreground',
-                children:[
-                    {
-                        id:'settings-main-title',
-                        text:'General Settings',
-                        color:'accent',
-                    },
-                    {
-                        id:'settings-default-model-placeholder',
-                        height:5,
-                        border:'border-muted',
-                        borderStyle:'rounded',
-                        padding:1,
-                        bg:'input',
-                        text:'Default model configuration will appear here.',
-                        color:'card-foreground',
-                    },
-                    {
-                        id:'settings-api-keys-placeholder',
-                        height:7,
-                        border:'border-muted',
-                        borderStyle:'rounded',
-                        padding:1,
-                        bg:'input',
-                        text:'API key management will appear here.',
-                        color:'card-foreground',
-                    },
-                    {
-                        id:'settings-other-placeholder',
-                        flex:1,
-                        border:'border-muted',
-                        borderStyle:'rounded',
-                        padding:1,
-                        bg:'muted',
-                        text:'Additional Convo-Lang settings will appear here.',
-                        color:'muted-foreground',
-                    },
-                ],
-            },
-        ],
-    })
+        main:{
+            id:'db-main',
+            layout:'column',
+            flex:1,
+            padding:1,
+            gap:1,
+            border:'border',
+            borderStyle:'rounded',
+            children:[
+                {
+                    id:'settings-main-title',
+                    text:'General Settings',
+                },
+                {
+                    id:'settings-default-model-placeholder',
+                    height:5,
+                    border:'border-muted',
+                    borderStyle:'rounded',
+                    padding:1,
+                    text:'Default model configuration will appear here.',
+                },
+                {
+                    id:'settings-api-keys-placeholder',
+                    height:7,
+                    border:'border-muted',
+                    borderStyle:'rounded',
+                    padding:1,
+                    text:'API key management will appear here.',
+                },
+                {
+                    id:'settings-other-placeholder',
+                    flex:1,
+                    border:'border-muted',
+                    borderStyle:'rounded',
+                    padding:1,
+                    text:'Additional Convo-Lang settings will appear here.',
+                },
+            ],
+        }
+    });
 }
