@@ -1,3 +1,276 @@
+@import ./_db-drivers.convo
+@import ../../packages/db/src/LayeredConvoDb.ts !file
+
+> user
+Do you see any issues with the `LayeredConvoDb` class
+
+@time 2026-05-10T23:39:43-04:00
+@tokenUsage 24997 / 5006 / $0.150015
+@model gpt-5.5-2026-04-23
+> assistant
+No questions from me.
+
+Yes — I see several likely issues in `LayeredConvoDb`, some of them significant.
+
+### 1. `selectNodePathsForPathAsync` appears to ignore `step.path`
+
+In `_driver.selectNodePathsForPathAsync`, the selected path passed to the child DB comes from `getPathGroups(...)`, which is based on `currentNodePaths??['/*']`, not `step.path`.
+
+```ts
+const groups=this.getPathGroups({supportsNodes:true},currentNodePaths??['/*']);
+```
+
+Then the closure calls:
+
+```ts
+group.db._driver.selectNodePathsForPathAsync(
+    {path},currentNodePaths,orderBy,limit,offset,nextToken
+)
+```
+
+That means a query like:
+
+```ts
+{path:'/users/*'}
+```
+
+with `currentNodePaths===null` may query every layer mount point instead of `/users/*`.
+
+This is probably the biggest correctness bug.
+
+---
+
+### 2. Non-path selection stages are not scoped when `currentNodePaths` is `null`
+
+For condition, permission, embedding, and edge traversal stages, when `currentNodePaths` is `null`, each child DB receives `null` too:
+
+```ts
+this.filterCurrentPaths(currentNodePaths,group.layer.mountPoint)
+```
+
+returns `null`.
+
+So each mounted DB may search its entire backing store, including paths outside its mount point, if that backing store contains more than just mounted data.
+
+This affects:
+
+- `selectNodePathsForConditionAsync`
+- `selectNodePathsForPermissionAsync`
+- `selectNodePathsForEmbeddingAsync`
+- `selectEdgeNodePathsForConditionAsync`
+- possibly raw edge / embedding queries too
+
+---
+
+### 3. `filterCurrentPaths` excludes the mount root node
+
+Layers normalize mount points to include a trailing slash:
+
+```ts
+/foo/
+```
+
+But stored node paths generally do not have trailing slashes:
+
+```ts
+/foo
+```
+
+Then this check fails:
+
+```ts
+p.startsWith(mountPoint)
+```
+
+Example:
+
+```ts
+p='/foo'
+mountPoint='/foo/'
+```
+
+Result: `false`.
+
+So a node exactly at the mount point can be lost during filtering.
+
+---
+
+### 4. Grouping by `db` can use the wrong `layer.mountPoint`
+
+`getPathGroups` groups paths by DB instance:
+
+```ts
+const match=groups.find(g=>g.db===db);
+```
+
+But the group stores only one layer:
+
+```ts
+groups.push({db,layer:layer,paths:[p]});
+```
+
+If the same DB instance is mounted at multiple mount points, later logic uses only the first layer’s `mountPoint`, especially here:
+
+```ts
+this.filterCurrentPaths(currentNodePaths,group.layer.mountPoint)
+```
+
+That can incorrectly filter paths for the other mount points.
+
+---
+
+### 5. Child DBs are never initialized or disposed
+
+`LayeredConvoDb` lazily resolves child DBs, but it does not call:
+
+```ts
+await child.initAsync()
+```
+
+when a DB is created/resolved.
+
+It also does not dispose child DBs in `_dispose`.
+
+Depending on the child DB implementation, this can cause queries against uninitialized drivers or resource leaks.
+
+---
+
+### 6. Underlying query errors are hidden as 404s
+
+In `updateEdgeAsync`, `deleteEdgeAsync`, `updateEmbeddingAsync`, and `deleteEmbeddingAsync`, failed lookup queries are treated the same as “not found”:
+
+```ts
+const edgeR=await this._driver.queryEdgesAsync({id:update.id,limit:1});
+const edge=edgeR.success?edgeR.result.edges[0]:undefined;
+if(!edge){
+    return {
+        success:false,
+        error:"No edge found by id",
+        statusCode:404,
+    }
+}
+```
+
+If `queryEdgesAsync` fails with a real DB error, this converts it into a misleading 404.
+
+Same issue for embeddings.
+
+---
+
+### 7. Embedding error messages say “edge”
+
+These two return the wrong error message:
+
+```ts
+error:"No edge found by id",
+```
+
+inside embedding update/delete.
+
+Should probably be:
+
+```ts
+error:'No embedding found by id',
+```
+
+---
+
+### 8. Raw edge / embedding queries may not be properly scoped
+
+For example:
+
+```ts
+const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+```
+
+If `query.from` is undefined, every edge-supporting layer is queried with the original unscoped query.
+
+If an underlying DB contains paths outside its mounted namespace, those results can leak through the layered DB abstraction.
+
+Similar issue exists for embeddings when `query.path` is undefined.
+
+---
+
+### 9. Pagination state looks fragile / possibly incorrect
+
+The custom token state tracks:
+
+```ts
+i // layer index
+o // layer offset
+l // current layer total
+t // child next token
+```
+
+But in `queryEdgesAsync` and `queryEmbeddingsAsync`, when a child driver returns items without a `nextToken`, the layered DB still returns a token:
+
+```ts
+nextToken:JSON.stringify(state)
+```
+
+If the caller resumes with that token and does not change `offset`, the same child query may repeat the same result page.
+
+This is especially risky because `ConvoDbDriverNextToken` says some drivers may not return tokens even when there are more results.
+
+---
+
+### 10. `LayeredConvoDbOptions.dbId` is unused
+
+```ts
+export interface LayeredConvoDbOptions extends BaseConvoDbOptions
+{
+    layers:ConvoDbLayerConfig[];
+    dbId?:string;
+}
+```
+
+`dbId` is never read. It is passed through to `super(options)` at runtime but ignored by `BaseConvoDb`.
+
+Could be harmless, but it looks stale or incomplete.
+
+---
+
+### 11. Layer support flags are required, but probably should have defaults
+
+`ConvoDbLayerConfig` extends:
+
+```ts
+Required<ConvoDbLayerSupport>
+```
+
+So callers must provide all of:
+
+```ts
+supportsNodes
+supportsEdges
+supportsEmbeddings
+supportsBlobs
+```
+
+That may be intentional, but in practice layer configs often default missing support to `true` or `false`. Current behavior is strict and easy to misconfigure.
+
+---
+
+## Main concerns
+
+If I had to prioritize, I’d fix these first:
+
+1. `selectNodePathsForPathAsync` ignoring `step.path`.
+2. Selection stages leaking outside mount points when `currentNodePaths===null`.
+3. Mount root path filtering bug.
+4. Child DB initialization/disposal.
+5. Hidden lookup errors in update/delete methods.
+
+
+> user
+Fix all the issues you saw
+
+@time 2026-05-14T14:46:27-04:00
+@tokenUsage 26366 / 10969 / $0.186675
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="LayeredConvoDb.ts" target-output-path="../../packages/db/src/LayeredConvoDb.ts" last-commit="2713f18e45dca7a81ce7ec074a9caa7983ec8140">
+``` ts
 import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 
@@ -327,7 +600,7 @@ export class LayeredConvoDb extends BaseConvoDb
                 const r=await select(
                     state,group,path,step,
                     scopedCurrentPaths,
-                    orderBy,limit,getSelectLayerOffset(offset,state),state.t
+                    orderBy,limit,offset-state.o,state.t
                 );
                 if(!r.success){
                     return r;
@@ -340,7 +613,7 @@ export class LayeredConvoDb extends BaseConvoDb
                         success:true,
                         result:{
                             paths,
-                            nextToken:JSON.stringify(state)
+                            nextToken:state.t===undefined && r.result.paths.length<limit?undefined:JSON.stringify(state)
                         }
                     }
                 }
@@ -713,7 +986,7 @@ export class LayeredConvoDb extends BaseConvoDb
                 }
                 const r=await layer.db._driver.queryEdgesAsync({
                     ...query,
-                    offset:getLayerOffset(offset,state),
+                    offset:offset-state.o,
                     nextToken:state.t,
                     includeTotal:false,
                 });
@@ -728,6 +1001,7 @@ export class LayeredConvoDb extends BaseConvoDb
                 const edges=this.filterEdgesToMountPoint(r.result.edges,layer.mountPoint);
 
                 if(edges.length===0){
+                    state.i++;
                     state.o+=state.l;
                     state.l=0;
                     state.t=undefined;
@@ -793,7 +1067,7 @@ export class LayeredConvoDb extends BaseConvoDb
                 }
                 const r=await layer.db._driver.queryEmbeddingsAsync({
                     ...query,
-                    offset:getLayerOffset(offset,state),
+                    offset:offset-state.o,
                     nextToken:state.t,
                     includeTotal:false,
                 });
@@ -808,6 +1082,7 @@ export class LayeredConvoDb extends BaseConvoDb
                 const embeddings=this.filterEmbeddingsToMountPoint(r.result.embeddings,layer.mountPoint);
 
                 if(embeddings.length===0){
+                    state.i++;
                     state.o+=state.l;
                     state.l=0;
                     state.t=undefined;
@@ -916,14 +1191,6 @@ export class LayeredConvoDb extends BaseConvoDb
     
 }
 
-const getLayerOffset=(offset:number,state:QueryToken):number=>{
-    return Math.max(0,offset-state.o)+(state.t===undefined?state.l:0);
-}
-
-const getSelectLayerOffset=(offset:number,state:QueryToken):number=>{
-    return Math.max(0,offset-state.o);
-}
-
 const getQueryToken=(token?:string):QueryToken=>{
     if(!token){
         return {
@@ -993,3 +1260,8 @@ interface ScopedPathGroup
     db:ConvoDb;
     layer:LayerInst;
 }
+```
+</FILE_CONTENT>
+
+
+> user

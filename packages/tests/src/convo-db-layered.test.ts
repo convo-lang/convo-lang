@@ -1,0 +1,346 @@
+import { type ConvoNode, type ConvoNodeEdge, type ConvoNodeEmbedding } from "@convo-lang/convo-lang";
+import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
+import { LayeredConvoDb } from "@convo-lang/db/LayeredConvoDb.js";
+import { expect, test } from "bun:test";
+
+const createLayer=(name:string)=>new InMemoryConvoDb({name});
+
+const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
+    path,
+    type:'test-node',
+    data:{value:path},
+    ...overrides,
+});
+
+const createEdge=(from:string,to:string,overrides:Partial<Omit<ConvoNodeEdge,'id'>>={}):Omit<ConvoNodeEdge,'id'>=>({
+    type:'test-edge',
+    from,
+    to,
+    ...overrides,
+});
+
+const createEmbedding=(path:string,overrides:Partial<Omit<ConvoNodeEmbedding,'id'>>={}):Omit<ConvoNodeEmbedding,'id'>=>({
+    path,
+    prop:'data',
+    type:'test-embedding',
+    ...overrides,
+});
+
+test("LayeredConvoDb routes node writes to mounted layers and reads across layers",async ()=>{
+    const users=createLayer('users');
+    const docs=createLayer('docs');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/users',
+                db:users,
+            },
+            {
+                mountPoint:'/docs',
+                db:docs,
+            },
+        ],
+    });
+
+    expect((await store.insertNodeAsync(createNode('/users/alex',{displayName:'Alex'}))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/users/bob',{displayName:'Bob'}))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/docs/readme',{displayName:'Readme'}))).success).toBe(true);
+
+    const userLayerNode=await users.getNodeByPathAsync('/users/alex');
+    expect(userLayerNode.success).toBe(true);
+    if(!userLayerNode.success){
+        throw new Error('expected success');
+    }
+    expect(userLayerNode.result?.displayName).toBe('Alex');
+
+    const docsLayerUser=await docs.getNodeByPathAsync('/users/alex');
+    expect(docsLayerUser.success).toBe(true);
+    if(!docsLayerUser.success){
+        throw new Error('expected success');
+    }
+    expect(docsLayerUser.result).toBeUndefined();
+
+    const all=await store.queryNodesAsync({
+        steps:[
+            {
+                path:'/*',
+            }
+        ],
+        readBatchSize:1,
+    });
+    expect(all.success).toBe(true);
+    if(!all.success){
+        throw new Error('expected success');
+    }
+
+    const paths=all.result.nodes.map(n=>n.path).sort();
+    expect(paths).toEqual([
+        '/docs/readme',
+        '/users/alex',
+        '/users/bob',
+    ]);
+});
+
+test("LayeredConvoDb respects overlapping mount priority",async ()=>{
+    const tenant=createLayer('tenant');
+    const root=createLayer('root');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/tenant',
+                db:tenant,
+            },
+            {
+                mountPoint:'/',
+                db:root,
+            },
+        ],
+    });
+
+    expect((await store.insertNodeAsync(createNode('/tenant/a'))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/other/a'))).success).toBe(true);
+
+    const tenantNode=await tenant.getNodeByPathAsync('/tenant/a');
+    expect(tenantNode.success).toBe(true);
+    if(!tenantNode.success){
+        throw new Error('expected success');
+    }
+    expect(tenantNode.result?.path).toBe('/tenant/a');
+
+    const rootTenantNode=await root.getNodeByPathAsync('/tenant/a');
+    expect(rootTenantNode.success).toBe(true);
+    if(!rootTenantNode.success){
+        throw new Error('expected success');
+    }
+    expect(rootTenantNode.result).toBeUndefined();
+
+    const rootNode=await root.getNodeByPathAsync('/other/a');
+    expect(rootNode.success).toBe(true);
+    if(!rootNode.success){
+        throw new Error('expected success');
+    }
+    expect(rootNode.result?.path).toBe('/other/a');
+});
+
+test("LayeredConvoDb skips layers without node support",async ()=>{
+    const unsupported=createLayer('unsupported');
+    const supported=createLayer('supported');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/',
+                db:unsupported,
+                supportsNodes:false,
+            },
+            {
+                mountPoint:'/',
+                db:supported,
+            },
+        ],
+    });
+
+    expect((await unsupported.insertNodeAsync(createNode('/hidden'))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/visible'))).success).toBe(true);
+
+    const hidden=await store.getNodeByPathAsync('/hidden');
+    expect(hidden.success).toBe(true);
+    if(!hidden.success){
+        throw new Error('expected success');
+    }
+    expect(hidden.result).toBeUndefined();
+
+    const directVisible=await supported.getNodeByPathAsync('/visible');
+    expect(directVisible.success).toBe(true);
+    if(!directVisible.success){
+        throw new Error('expected success');
+    }
+    expect(directVisible.result?.path).toBe('/visible');
+});
+
+test("LayeredConvoDb routes edge operations by edge from path",async ()=>{
+    const left=createLayer('left');
+    const right=createLayer('right');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/left',
+                db:left,
+            },
+            {
+                mountPoint:'/right',
+                db:right,
+            },
+        ],
+    });
+
+    await store.insertNodeAsync(createNode('/left/a'));
+    await store.insertNodeAsync(createNode('/left/b'));
+    await store.insertNodeAsync(createNode('/right/a'));
+    await store.insertNodeAsync(createNode('/right/b'));
+
+    const insertedLeft=await store.insertEdgeAsync(createEdge('/left/a','/left/b',{
+        displayName:'left edge',
+    }));
+    expect(insertedLeft.success).toBe(true);
+    if(!insertedLeft.success){
+        throw new Error('expected success');
+    }
+
+    const insertedRight=await store.insertEdgeAsync(createEdge('/right/a','/right/b',{
+        displayName:'right edge',
+    }));
+    expect(insertedRight.success).toBe(true);
+    if(!insertedRight.success){
+        throw new Error('expected success');
+    }
+
+    const leftEdges=await left.queryEdgesAsync({from:'/left/a'});
+    expect(leftEdges.success).toBe(true);
+    if(!leftEdges.success){
+        throw new Error('expected success');
+    }
+    expect(leftEdges.result.edges.map(e=>e.id)).toEqual([insertedLeft.result.id]);
+
+    const rightEdges=await right.queryEdgesAsync({from:'/right/a'});
+    expect(rightEdges.success).toBe(true);
+    if(!rightEdges.success){
+        throw new Error('expected success');
+    }
+    expect(rightEdges.result.edges.map(e=>e.id)).toEqual([insertedRight.result.id]);
+
+    const update=await store.updateEdgeAsync({
+        id:insertedRight.result.id,
+        displayName:'updated right edge',
+    });
+    expect(update.success).toBe(true);
+
+    const updated=await right.getEdgeByIdAsync(insertedRight.result.id);
+    expect(updated.success).toBe(true);
+    if(!updated.success){
+        throw new Error('expected success');
+    }
+    expect(updated.result.displayName).toBe('updated right edge');
+
+    const deleted=await store.deleteEdgeAsync(insertedRight.result.id);
+    expect(deleted.success).toBe(true);
+
+    const missing=await right.getEdgeByIdAsync(insertedRight.result.id);
+    expect(missing.success).toBe(false);
+    if(missing.success){
+        throw new Error('expected failure');
+    }
+    expect(missing.statusCode).toBe(404);
+});
+
+test("LayeredConvoDb routes embedding operations by embedding path",async ()=>{
+    const left=createLayer('left');
+    const right=createLayer('right');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/left',
+                db:left,
+            },
+            {
+                mountPoint:'/right',
+                db:right,
+            },
+        ],
+    });
+
+    await store.insertNodeAsync(createNode('/left/a'));
+    await store.insertNodeAsync(createNode('/right/a'));
+
+    const insertedLeft=await store.insertEmbeddingAsync(createEmbedding('/left/a',{
+        description:'left embedding',
+        vector:[1,2,3],
+    }));
+    expect(insertedLeft.success).toBe(true);
+    if(!insertedLeft.success){
+        throw new Error('expected success');
+    }
+
+    const insertedRight=await store.insertEmbeddingAsync(createEmbedding('/right/a',{
+        description:'right embedding',
+        vector:[4,5,6],
+    }));
+    expect(insertedRight.success).toBe(true);
+    if(!insertedRight.success){
+        throw new Error('expected success');
+    }
+
+    const leftEmbeddings=await left.queryEmbeddingsAsync({path:'/left/a',includeVector:true});
+    expect(leftEmbeddings.success).toBe(true);
+    if(!leftEmbeddings.success){
+        throw new Error('expected success');
+    }
+    expect(leftEmbeddings.result.embeddings.map(e=>e.id)).toEqual([insertedLeft.result.id]);
+
+    const rightEmbeddings=await right.queryEmbeddingsAsync({path:'/right/a',includeVector:true});
+    expect(rightEmbeddings.success).toBe(true);
+    if(!rightEmbeddings.success){
+        throw new Error('expected success');
+    }
+    expect(rightEmbeddings.result.embeddings.map(e=>e.id)).toEqual([insertedRight.result.id]);
+
+    const update=await store.updateEmbeddingAsync({
+        id:insertedRight.result.id,
+        description:'updated right embedding',
+    });
+    expect(update.success).toBe(true);
+
+    const updated=await right.getEmbeddingByIdAsync(insertedRight.result.id);
+    expect(updated.success).toBe(true);
+    if(!updated.success){
+        throw new Error('expected success');
+    }
+    expect(updated.result.description).toBe('updated right embedding');
+
+    const deleted=await store.deleteEmbeddingAsync(insertedRight.result.id);
+    expect(deleted.success).toBe(true);
+
+    const missing=await right.getEmbeddingByIdAsync(insertedRight.result.id);
+    expect(missing.success).toBe(false);
+    if(missing.success){
+        throw new Error('expected failure');
+    }
+    expect(missing.statusCode).toBe(404);
+});
+
+test("LayeredConvoDb lazily creates and disposes owned layers",async ()=>{
+    let created:InMemoryConvoDb|undefined;
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/lazy',
+                createDb:()=>{
+                    created=new InMemoryConvoDb({name:'lazy'});
+                    return created;
+                },
+            },
+        ],
+    });
+
+    expect(created).toBeUndefined();
+
+    const insert=await store.insertNodeAsync(createNode('/lazy/node'));
+    expect(insert.success).toBe(true);
+    expect(created).toBeDefined();
+
+    const node=await created?.getNodeByPathAsync('/lazy/node');
+    expect(node?.success).toBe(true);
+    if(!node?.success){
+        throw new Error('expected success');
+    }
+    expect(node.result?.path).toBe('/lazy/node');
+
+    expect(created?.isDisposed).toBe(false);
+    store.dispose();
+    expect(created?.isDisposed).toBe(true);
+});

@@ -1,0 +1,2408 @@
+@import ./_db-drivers.convo
+@import ../../packages/db/src/LayeredConvoDb.ts !file
+@import ../../packages/tests/src/convo-db-layered.test.ts !file
+
+> user
+Write harder tests to test for edge cases
+
+@time 2026-05-14T15:12:36-04:00
+@tokenUsage 29011 / 304 / $0.146575
+@model gpt-5.5-2026-04-23
+> assistant
+What edge cases do you want prioritized?
+
+A few likely candidates for `LayeredConvoDb` harder tests are:
+
+1. Overlapping wildcard reads like `/tenant/*` with `/tenant` and `/` mounts.
+2. Query pagination / `nextToken` across multiple layers.
+3. `offset`, `limit`, and `includeTotal` for edges and embeddings across layers.
+4. Blob routing and unsupported blob layers.
+5. Duplicate paths across overlapping layers and priority behavior.
+6. Edge/embedding lookup by id when ids exist in non-mounted/unsupported layers.
+7. Invalid mount points and lazy layer failures.
+
+Should I append these to `../../packages/tests/src/convo-db-layered.test.ts`, or create a separate harder edge-case test file?
+
+
+> user
+Create a new test file called `../../packages/tests/src/convo-db-layered-edge.test.ts`
+
+@time 2026-05-14T15:14:59-04:00
+@tokenUsage 29194 / 5030 / $0.17112000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db-layered-edge.test.ts" target-output-path="../../packages/tests/src/convo-db-layered-edge.test.ts">
+``` ts
+import { type ConvoNode, type ConvoNodeEdge } from "@convo-lang/convo-lang";
+import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
+import { LayeredConvoDb } from "@convo-lang/db/LayeredConvoDb.js";
+import { expect, test } from "bun:test";
+
+const createLayer=(name:string)=>new InMemoryConvoDb({name});
+
+const createNode=(path:string,overrides:Partial<ConvoNode>={}):ConvoNode=>({
+    path,
+    type:'test-node',
+    data:{value:path},
+    ...overrides,
+});
+
+const createEdge=(from:string,to:string,overrides:Partial<Omit<ConvoNodeEdge,'id'>>={}):Omit<ConvoNodeEdge,'id'>=>({
+    type:'test-edge',
+    from,
+    to,
+    ...overrides,
+});
+
+test("LayeredConvoDb keeps mount path boundaries distinct",async ()=>{
+    const app=createLayer('app');
+    const apple=createLayer('apple');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/app',
+                db:app,
+            },
+            {
+                mountPoint:'/apple',
+                db:apple,
+            },
+        ],
+    });
+
+    expect((await store.insertNodeAsync(createNode('/app',{displayName:'App root'}))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/app/child',{displayName:'App child'}))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/apple/child',{displayName:'Apple child'}))).success).toBe(true);
+
+    const appRoot=await store.getNodeByPathAsync('/app');
+    expect(appRoot.success).toBe(true);
+    if(!appRoot.success){
+        throw new Error('expected success');
+    }
+    expect(appRoot.result?.displayName).toBe('App root');
+
+    const appWildcard=await store.queryNodesAsync({
+        steps:[
+            {
+                path:'/app/*',
+            },
+        ],
+        readBatchSize:1,
+    });
+    expect(appWildcard.success).toBe(true);
+    if(!appWildcard.success){
+        throw new Error('expected success');
+    }
+    expect(appWildcard.result.nodes.map(n=>n.path).sort()).toEqual(['/app/child']);
+
+    const appAppleNode=await app.getNodeByPathAsync('/apple/child');
+    expect(appAppleNode.success).toBe(true);
+    if(!appAppleNode.success){
+        throw new Error('expected success');
+    }
+    expect(appAppleNode.result).toBeUndefined();
+
+    const badInsert=await store.insertNodeAsync(createNode('/application/node'));
+    expect(badInsert.success).toBe(false);
+    if(badInsert.success){
+        throw new Error('expected failure');
+    }
+    expect(badInsert.statusCode).toBe(404);
+});
+
+test("LayeredConvoDb falls through layers without blob support",async ()=>{
+    const blocked=createLayer('blocked');
+    const blobStore=createLayer('blob-store');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/',
+                db:blocked,
+                supportsBlobs:false,
+            },
+            {
+                mountPoint:'/',
+                db:blobStore,
+            },
+        ],
+    });
+
+    const write=await store.writeBlobAsync('/files/readme.txt','hello');
+    expect(write.success).toBe(true);
+
+    const blockedHas=await blocked.hasBlobAsync('/files/readme.txt');
+    expect(blockedHas.success).toBe(true);
+    if(!blockedHas.success){
+        throw new Error('expected success');
+    }
+    expect(blockedHas.result).toBe(false);
+
+    const blobStoreHas=await blobStore.hasBlobAsync('/files/readme.txt');
+    expect(blobStoreHas.success).toBe(true);
+    if(!blobStoreHas.success){
+        throw new Error('expected success');
+    }
+    expect(blobStoreHas.result).toBe(true);
+
+    const storeHas=await store.hasBlobAsync('/files/readme.txt');
+    expect(storeHas.success).toBe(true);
+    if(!storeHas.success){
+        throw new Error('expected success');
+    }
+    expect(storeHas.result).toBe(true);
+});
+
+test("LayeredConvoDb returns not found when all matching layers lack blob support",async ()=>{
+    const blocked=createLayer('blocked');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/files',
+                db:blocked,
+                supportsBlobs:false,
+            },
+        ],
+    });
+
+    const has=await store.hasBlobAsync('/files/readme.txt');
+    expect(has.success).toBe(false);
+    if(has.success){
+        throw new Error('expected failure');
+    }
+    expect(has.statusCode).toBe(404);
+
+    const write=await store.writeBlobAsync('/files/readme.txt','hello');
+    expect(write.success).toBe(false);
+    if(write.success){
+        throw new Error('expected failure');
+    }
+    expect(write.statusCode).toBe(404);
+});
+
+test("LayeredConvoDb hides unsupported edge layers and writes to the next supported layer",async ()=>{
+    const unsupported=createLayer('unsupported');
+    const supported=createLayer('supported');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/',
+                db:unsupported,
+                supportsEdges:false,
+            },
+            {
+                mountPoint:'/',
+                db:supported,
+            },
+        ],
+    });
+
+    expect((await store.insertNodeAsync(createNode('/a'))).success).toBe(true);
+    expect((await store.insertNodeAsync(createNode('/b'))).success).toBe(true);
+    expect((await supported.insertNodeAsync(createNode('/a'))).success).toBe(true);
+    expect((await supported.insertNodeAsync(createNode('/b'))).success).toBe(true);
+
+    const hidden=await unsupported.insertEdgeAsync(createEdge('/a','/b',{
+        name:'hidden',
+        displayName:'Hidden edge',
+    }));
+    expect(hidden.success).toBe(true);
+
+    const visible=await store.insertEdgeAsync(createEdge('/a','/b',{
+        name:'visible',
+        displayName:'Visible edge',
+    }));
+    expect(visible.success).toBe(true);
+    if(!visible.success){
+        throw new Error('expected success');
+    }
+
+    const edges=await store.queryEdgesAsync({from:'/a',limit:10});
+    expect(edges.success).toBe(true);
+    if(!edges.success){
+        throw new Error('expected success');
+    }
+    expect(edges.result.edges.map(e=>e.name)).toEqual(['visible']);
+
+    const supportedEdges=await supported.queryEdgesAsync({from:'/a',limit:10});
+    expect(supportedEdges.success).toBe(true);
+    if(!supportedEdges.success){
+        throw new Error('expected success');
+    }
+    expect(supportedEdges.result.edges.map(e=>e.id)).toEqual([visible.result.id]);
+});
+
+test("LayeredConvoDb driver paginates edge queries across layers and reports totals",async ()=>{
+    const left=createLayer('left');
+    const right=createLayer('right');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/left',
+                db:left,
+            },
+            {
+                mountPoint:'/right',
+                db:right,
+            },
+        ],
+    });
+
+    await store.insertNodeAsync(createNode('/left/a'));
+    await store.insertNodeAsync(createNode('/left/b'));
+    await store.insertNodeAsync(createNode('/right/a'));
+    await store.insertNodeAsync(createNode('/right/b'));
+
+    const expectedNames=['left-1','left-2','right-1','right-2'];
+
+    for(const name of expectedNames){
+        const prefix=name.startsWith('left')?'/left':'/right';
+        const from=name.endsWith('1')?`${prefix}/a`:`${prefix}/b`;
+        const to=name.endsWith('1')?`${prefix}/b`:`${prefix}/a`;
+        const inserted=await store.insertEdgeAsync(createEdge(from,to,{name}));
+        expect(inserted.success).toBe(true);
+    }
+
+    const names:string[]=[];
+    let nextToken:string|undefined;
+    let total:number|undefined;
+
+    for(let i=0;i<10;i++){
+        const page=await store._driver.queryEdgesAsync({
+            limit:1,
+            includeTotal:true,
+            nextToken,
+        });
+        expect(page.success).toBe(true);
+        if(!page.success){
+            throw new Error('expected success');
+        }
+
+        total=page.result.total;
+        names.push(...page.result.edges.map(e=>e.name??''));
+        nextToken=page.result.nextToken;
+
+        if(!nextToken){
+            break;
+        }
+    }
+
+    expect(total).toBe(4);
+    expect(names.sort()).toEqual(expectedNames);
+    expect(nextToken).toBeUndefined();
+});
+```
+</FILE_CONTENT>
+
+
+> user
+Test Results:
+
+<TEST_RESULTS>
+bun test v1.3.13 (bf2e2cec)
+
+packages/tests/src/convo-db-layered-edge.test.ts:
+--------------------- Bun Inspector ---------------------
+Listening on unix:///var/folders/z5/vxrd1mk94l1bggq8rm7xj0sh0000gn/T/naviqxszrys.sock
+--------------------- Bun Inspector ---------------------
+✓ LayeredConvoDb keeps mount path boundaries distinct [5.15ms]
+✓ LayeredConvoDb falls through layers without blob support [0.32ms]
+✓ LayeredConvoDb returns not found when all matching layers lack blob support [0.18ms]
+✓ LayeredConvoDb hides unsupported edge layers and writes to the next supported layer [0.41ms]
+255 |             break;
+256 |         }
+257 |     }
+258 | 
+259 |     expect(total).toBe(4);
+260 |     expect(names.sort()).toEqual(expectedNames);
+                               ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "left-1",
+    "left-2",
+-   "right-1",
+-   "right-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
++   "left-2",
+  ]
+
+- Expected  - 3
++ Received  + 9
+
+      at <anonymous> (/Users/scott/docs/convo-lang/packages/tests/src/convo-db-layered-edge.test.ts:260:26)
+✗ LayeredConvoDb driver paginates edge queries across layers and reports totals [1.15ms]
+
+ 4 pass
+ 1 fail
+ 48 expect() calls
+Ran 5 tests across 1 file. [111.00ms]
+</TEST_RESULTS>
+
+@time 2026-05-14T15:18:44-04:00
+@tokenUsage 31532 / 9250 / $0.20391000000000004
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t need any additional details; the failing test exposed a real pagination issue in `LayeredConvoDb` when an underlying driver returns exactly `limit` items without a `nextToken`.
+<FILE_CONTENT name="LayeredConvoDb.ts" target-output-path="../../packages/db/src/LayeredConvoDb.ts" dirty file-hash="f949f13e288eac8d667f248b202b1490bdd6e8ff" last-commit="2713f18e45dca7a81ce7ec074a9caa7983ec8140">
+``` ts
+import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+
+
+
+const hasSupport=(layer:Required<ConvoDbLayerSupport>,support:ConvoDbLayerSupport)=>{
+    return (
+        (support.supportsNodes?layer.supportsNodes===true:true) &&
+        (support.supportsEdges?layer.supportsEdges===true:true) &&
+        (support.supportsEmbeddings?layer.supportsEmbeddings===true:true) &&
+        (support.supportsBlobs?layer.supportsBlobs===true:true)
+    )
+}
+
+const isPathInMountPoint=(path:string,mountPoint:string):boolean=>{
+    if(mountPoint==='/'){
+        return path.startsWith('/');
+    }
+
+    const root=mountPoint.endsWith('/')?mountPoint.substring(0,mountPoint.length-1):mountPoint;
+    return path===root || path.startsWith(mountPoint);
+}
+
+interface PathsToken
+{
+    layerIndex:number;
+    offset:number;
+}
+
+export interface ConvoDbLayerSupport
+{
+    /**
+     * If true the layer can be used for node operations.
+     * @default true
+     */
+    supportsNodes?:boolean;
+
+    /**
+     * If true the layer can be used for edge operations.
+     * @default true
+     */
+    supportsEdges?:boolean;
+
+    /**
+     * If true the layer can be used for embedding operations.
+     * @default true
+     */
+    supportsEmbeddings?:boolean;
+
+    /**
+     * If true the layer can be used for blob operations.
+     * @default true
+     */
+    supportsBlobs?:boolean;
+}
+
+export interface ConvoDbLayerConfig extends ConvoDbLayerSupport
+{
+    /**
+     * The path where the db will be mounted
+     */
+    mountPoint:string;
+
+    /**
+     * A tag to pass to the convoDbService function to return a ConvoDb by tag. A ConvoDb with a
+     * matching tag can be registered to scope initialization.
+     */
+    serviceTag?:string;
+    
+    /**
+     * Returns a new instance of a ConvoDb to mount at the given point. `createDb` will be called
+     * the first time a resource is accessed in the layer's mount point.
+     */
+    createDb?:()=>ConvoDb;
+
+    /**
+     * Pre-created ConvoDb instance
+     */
+    db?:ConvoDb;
+
+    
+}
+
+type Layer=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
+    db?:ConvoDb;
+    ownsDb?:boolean;
+}
+
+type LayerInst=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
+    db:ConvoDb;
+    ownsDb?:boolean;
+}
+
+export interface LayeredConvoDbOptions extends BaseConvoDbOptions
+{
+    layers:ConvoDbLayerConfig[];
+    dbId?:string;
+}
+
+/**
+ * A ConvoDb implementation that allows you to layer multiple databases on top of each other 
+ * with a shared name space. 
+ */
+export class LayeredConvoDb extends BaseConvoDb
+{
+
+    private readonly layers:Layer[]=[];
+
+    private readonly initializedDbs=new WeakSet<ConvoDb>();
+
+    public readonly dbId:string|undefined;
+
+    public constructor({
+        layers,
+        dbId,
+        ...options
+    }:LayeredConvoDbOptions){
+        super(options);
+
+        this.dbId=dbId;
+
+        this.layers=layers.map<Layer>(l=>{
+            const layer:Layer={
+                supportsNodes:true,
+                supportsEdges:true,
+                supportsEmbeddings:true,
+                supportsBlobs:true,
+                ...l,
+            };
+            const p=normalizeConvoNodePath(layer.mountPoint,'none');
+            if(!p){
+                throw new Error(`Invalid ConvoDb layer mountPoint path - ${layer.mountPoint}`);
+            }
+            layer.mountPoint=p;
+            if(!layer.mountPoint.endsWith('/')){
+                layer.mountPoint+='/';
+            }
+            return layer;
+        });
+    }
+
+    protected override _dispose(): void {
+        const disposed=new Set<ConvoDb>();
+        for(const layer of this.layers){
+            if(!layer.ownsDb || !layer.db || disposed.has(layer.db)){
+                continue;
+            }
+            disposed.add(layer.db);
+            layer.db.dispose();
+        }
+    }
+
+    private scopePathToMountPoint(path:string,mountPoint:string):string{
+        if(!path.endsWith('*') || path.length>mountPoint.length){
+            return path;
+        }else{
+            return (mountPoint.endsWith('/')?mountPoint:mountPoint+'/')+'*';
+        }
+
+    }
+
+    private filterCurrentPaths(currentPaths:string[]|null,mountPoint:string):string[]|null{
+        if(!currentPaths){
+            return null;
+        }
+        if(!mountPoint.endsWith('/')){
+            mountPoint+='/';
+        }
+        return currentPaths.filter(p=>isPathInMountPoint(p,mountPoint));
+    }
+
+    private filterPathsToMountPoint(paths:string[],mountPoint:string):string[]{
+        return paths.filter(p=>isPathInMountPoint(p,mountPoint));
+    }
+
+    private filterEdgesToMountPoint(edges:ConvoNodeEdge[],mountPoint:string):ConvoNodeEdge[]{
+        return edges.filter(e=>isPathInMountPoint(e.from,mountPoint));
+    }
+
+    private filterEmbeddingsToMountPoint(embeddings:ConvoNodeEmbedding[],mountPoint:string):ConvoNodeEmbedding[]{
+        return embeddings.filter(e=>isPathInMountPoint(e.path,mountPoint));
+    }
+
+    private getPathGroups(support:ConvoDbLayerSupport,paths:string[]):ScopedPathGroup[]{
+        const groups:ScopedPathGroup[]=[];
+        for(const path of paths){
+            const layers=this.getLayersByPath(support,path);
+            for(const layer of layers){
+                const match=groups.find(g=>g.layer===layer);
+                const p=this.scopePathToMountPoint(path,layer.mountPoint);
+                if(match){
+                    if(!match.paths.includes(p)){
+                        match.paths.push(p);
+                    }
+                }else{
+                    groups.push({db:layer.db,layer:layer,paths:[p]});
+                }
+            }
+        }
+        return groups;
+    }
+
+    private getDbForLayer(layer:Layer):ConvoDb|undefined{
+        if(layer.db){
+            return layer.db;
+        }
+
+        if(layer.serviceTag){
+            const db=convoDbService.get(layer.serviceTag);
+            if(db){
+                layer.db=db;
+                return db;
+            }
+        }
+
+        if(layer.createDb){
+            const db=layer.createDb();
+            layer.db=db;
+            layer.ownsDb=true;
+            return db;
+        }
+
+        return undefined;
+    }
+
+    private async initLayerAsync(layer:LayerInst):PromiseResultTypeVoid{
+        if(this.initializedDbs.has(layer.db)){
+            return {
+                success:true,
+            }
+        }
+
+        const r=await layer.db.initAsync();
+        if(!r.success){
+            return r;
+        }
+
+        this.initializedDbs.add(layer.db);
+
+        return {
+            success:true,
+        }
+    }
+
+    public getLayerByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst|undefined{
+        return this.getLayersByPath(support,path,1)[0];
+    }
+
+    public getLayersByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst[]{
+
+        const layers:LayerInst[]=[];
+
+        const p=normalizeConvoNodePath(path,'end');
+        if(!p){
+            return [];
+        }
+        path=p;
+
+        const wildcard=path.endsWith('*');
+        
+        if(path.endsWith('*')){
+            path=path.substring(0,path.length-1);
+        }
+        if(!path.endsWith('/')){
+            path+='/'
+        }
+
+
+        for(let i=0;i<this.layers.length && (wildcard || !layers.length) && (limit===undefined?true:layers.length<limit);i++){
+            const layer=this.layers[i];
+            if( !layer ||
+                !hasSupport(layer,support) ||
+                !(path.startsWith(layer.mountPoint) || (wildcard?layer.mountPoint.startsWith(path):false))
+            ){
+                continue;
+            }
+
+            const db=this.getDbForLayer(layer);
+            if(db){
+                layers.push(layer as LayerInst);
+            }
+        }
+
+        return layers;
+    }
+
+    async selectForStepAsync(
+        groupPaths:string[],
+        step: ConvoNodeQueryStep,
+        currentNodePaths: string[] | null,
+        orderBy: ConvoNodeOrderBy[],
+        limit: number,
+        offset: number,
+        nextToken: string | undefined,
+        select:(
+            state:SelectToken,
+            group:ScopedPathGroup,
+            path:string,
+            step: ConvoNodeQueryStep,
+            currentNodePaths: string[] | null,
+            orderBy: ConvoNodeOrderBy[],
+            limit: number,
+            offset: number,
+            nextToken: string | undefined,
+        )=>PromiseResultType<ConvoDbDriverPathsResult>
+    ): PromiseResultType<ConvoDbDriverPathsResult>{
+        const groups=this.getPathGroups({supportsNodes:true},groupPaths);
+        const state=getSelectToken(nextToken);
+        if(offset<state.o){
+            return {
+                success:true,
+                result:{paths:[]}
+            }
+        }
+        for(;state.i<groups.length;state.i++){
+            const group=groups[state.i]!;
+            const initR=await this.initLayerAsync(group.layer);
+            if(!initR.success){
+                return initR;
+            }
+            const scopedCurrentPaths=this.filterCurrentPaths(currentNodePaths,group.layer.mountPoint);
+            if(scopedCurrentPaths && !scopedCurrentPaths.length){
+                continue;
+            }
+            for(;state.g<group.paths.length;state.g++){
+                const path=group.paths[state.g]!;
+                const r=await select(
+                    state,group,path,step,
+                    scopedCurrentPaths,
+                    orderBy,limit,getLayerOffset(offset,state),state.t
+                );
+                if(!r.success){
+                    return r;
+                }
+                state.t=r.result.nextToken;
+                state.l+=r.result.paths.length;
+                const paths=this.filterPathsToMountPoint(r.result.paths,group.layer.mountPoint);
+                if(paths.length){
+                    return {
+                        success:true,
+                        result:{
+                            paths,
+                            nextToken:JSON.stringify(state)
+                        }
+                    }
+                }
+                state.o+=state.l;
+                state.l=0;
+                state.t=undefined;
+            }
+            state.g=0;
+
+        }
+        return {
+            success:true,
+            result:{
+                paths:[],
+            },
+        }
+    }
+
+    override readonly _driver:ConvoDbDriver={
+
+        openBlobAsync:async (path:string):PromiseResultType<ReadableStream>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.openBlobAsync(path);
+        },
+
+        writeBlobAsync:async (path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.writeBlobAsync(path,blob);
+
+        },
+
+        hasBlobAsync:async (path:string):PromiseResultType<boolean>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.hasBlobAsync(path);
+        },
+
+
+        selectEdgesByPathsAsync:async (keys: (keyof ConvoNodeEdge)[] | "*", fromPathsIn: string[], toPathsIn: string[], hasGrant: boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>=>{
+            const groups=this.getPathGroups({supportsEdges:true},fromPathsIn);
+            const edges:Partial<ConvoNodeEdge>[]=[];
+            for(const group of groups){
+                const initR=await this.initLayerAsync(group.layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await group.db._driver.selectEdgesByPathsAsync(keys,group.paths,toPathsIn,hasGrant);
+                if(!r.success){
+                    return r;
+                }
+                edges.push(...r.result);
+            }
+
+            return {
+                success:true,
+                result:edges,
+            }
+        },
+        selectNodesByPathsAsync:async (keys: (keyof ConvoNode)[] | "*", paths: string[], orderBy: ConvoNodeOrderBy[]): PromiseResultType<Partial<ConvoNode>[]> =>{
+            const groups=this.getPathGroups({supportsNodes:true},paths);
+            const nodes:Partial<ConvoNode>[]=[];
+            for(const group of groups){
+                const initR=await this.initLayerAsync(group.layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await group.db._driver.selectNodesByPathsAsync(keys,group.paths,orderBy);
+                if(!r.success){
+                    return r;
+                }
+                nodes.push(...r.result);
+            }
+
+            return {
+                success:true,
+                result:nodes,
+            }
+        },
+        selectNodePathsForPathAsync:async (step: Required<Pick<ConvoNodeQueryStep, "path">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                [step.path],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPathAsync(
+                        {path},currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForPermissionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPermissionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForEmbeddingAsync:async (step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForEmbeddingAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectEdgeNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectEdgeNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        insertNodeAsync:async (node: ConvoNode, options: Omit<InsertConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNode> =>{
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertNodeAsync(node,options);
+
+        },
+        updateNodeAsync:async (node: ConvoNodeUpdate, options: Omit<UpdateConvoNodeOptions, "permissionFrom" | "mergeData"> | undefined): PromiseResultTypeVoid =>{
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.updateNodeAsync(node,options);
+        },
+        deleteNodeAsync:async (path: string, options: Omit<DeleteConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const layer=this.getLayerByPath({supportsNodes:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.deleteNodeAsync(path,options);
+        },
+        insertEdgeAsync:async (edge: Omit<ConvoNodeEdge, "id">, options: Omit<InsertConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEdge> =>{
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertEdgeAsync(edge,options);
+        },
+        updateEdgeAsync:async (update: ConvoNodeEdgeUpdate, options: Omit<UpdateConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const edgeR=await this._driver.queryEdgesAsync({id:update.id,limit:1});
+            if(!edgeR.success){
+                return edgeR;
+            }
+            const edge=edgeR.result.edges[0];
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.updateEdgeAsync(update,options);
+        },
+        deleteEdgeAsync:async (id: string, options: Omit<DeleteConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const edgeR=await this._driver.queryEdgesAsync({id,limit:1});
+            if(!edgeR.success){
+                return edgeR;
+            }
+            const edge=edgeR.result.edges[0];
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.deleteEdgeAsync(id,options);
+        },
+        insertEmbeddingAsync:async (embedding: Omit<ConvoNodeEmbedding, "id">, options: Omit<InsertConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEmbedding> =>{
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertEmbeddingAsync(embedding,options);
+        },
+        updateEmbeddingAsync:async (update: ConvoNodeEmbeddingUpdate, options: Omit<UpdateConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id:update.id,limit:1});
+            if(!embeddingR.success){
+                return embeddingR;
+            }
+            const embedding=embeddingR.result.embeddings[0];
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No embedding found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.updateEmbeddingAsync(update,options);
+        },
+        deleteEmbeddingAsync:async (id: string, options: Omit<DeleteConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id,limit:1});
+            if(!embeddingR.success){
+                return embeddingR;
+            }
+            const embedding=embeddingR.result.embeddings[0];
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No embedding found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.deleteEmbeddingAsync(id,options);
+        },
+        queryEdgesAsync:async (query: ConvoNodeEdgeQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{edges:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const initR=await this.initLayerAsync(layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await layer.db._driver.queryEdgesAsync({
+                    ...query,
+                    offset:getLayerOffset(offset,state),
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.edges.length;
+                state.t=r.result.nextToken;
+
+                const edges=this.filterEdgesToMountPoint(r.result.edges,layer.mountPoint);
+
+                if(edges.length===0){
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEdgeTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:state.t===undefined && r.result.edges.length<(query.limit??50)?undefined:JSON.stringify(state),
+                        edges,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEdgeTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    edges:[],
+                    total,
+                }
+            }
+            
+        },
+        queryEmbeddingsAsync:async (query: ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{embeddings:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const initR=await this.initLayerAsync(layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await layer.db._driver.queryEmbeddingsAsync({
+                    ...query,
+                    offset:getLayerOffset(offset,state),
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.embeddings.length;
+                state.t=r.result.nextToken;
+
+                const embeddings=this.filterEmbeddingsToMountPoint(r.result.embeddings,layer.mountPoint);
+
+                if(embeddings.length===0){
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEmbeddingTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:state.t===undefined && r.result.embeddings.length<(query.limit??50)?undefined:JSON.stringify(state),
+                        embeddings,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEmbeddingTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    embeddings:[],
+                    total,
+                }
+            }
+        },
+        
+    }
+
+    private async getEdgeTotalAsync(query:ConvoNodeEdgeQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+        for(const layer of layers){
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            const r=await layer.db._driver.queryEdgesAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            if(query.from===undefined){
+                const edges=this.filterEdgesToMountPoint(r.result.edges,layer.mountPoint);
+                total+=edges.length?r.result.total??0:0;
+            }else{
+                total+=(r.result.total??0);
+            }
+        }
+        return {
+            success:true,
+            result:total,
+        }
+    }
+
+    private async getEmbeddingTotalAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+        for(const layer of layers){
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            const r=await layer.db._driver.queryEmbeddingsAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            if(query.path===undefined){
+                const embeddings=this.filterEmbeddingsToMountPoint(r.result.embeddings,layer.mountPoint);
+                total+=embeddings.length?r.result.total??0:0;
+            }else{
+                total+=(r.result.total??0);
+            }
+        }
+        return {
+            success:true,
+            result:total,
+        }
+    }
+    
+}
+
+const getLayerOffset=(offset:number,state:QueryToken):number=>{
+    return Math.max(0,offset-state.o)+(state.t===undefined?state.l:0);
+}
+
+const getQueryToken=(token?:string):QueryToken=>{
+    if(!token){
+        return {
+            i:0,
+            o:0,
+            l:0,
+        }
+    }
+
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+
+}
+
+interface QueryToken
+{
+    /**
+     * Layer Index
+     */
+    i:number;
+
+    /**
+     * Layer offset. The total of all items returned by layers that have already been passed.
+     * Will offset the offset value passed to driver functions
+     */
+    o:number;
+
+    /**
+     * Current layer total
+     */
+    l:number;
+
+    /**
+     * Layer next token
+     */
+    t?:string;
+}
+
+interface SelectToken extends QueryToken 
+{
+
+    /**
+     * Group index
+     */
+    g:number;
+
+
+}
+
+const getSelectToken=(token:string|undefined):SelectToken=>{
+    if(!token){
+        return {i:0,g:0,o:0,l:0}
+    }
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+}
+
+interface ScopedPathGroup
+{
+    paths:string[];
+    db:ConvoDb;
+    layer:LayerInst;
+}
+
+```
+</FILE_CONTENT>
+
+@import ../../packages/tests/src/convo-db-layered.test.ts !file
+> user
+No a test in convo-db-layered.test.ts is failing:
+
+<TEST_RESULTS>
+> bun test ./packages/tests/src/convo-db-layered.test.ts
+
+bun test v1.3.13 (bf2e2cec)
+
+packages/tests/src/convo-db-layered.test.ts:
+--------------------- Bun Inspector ---------------------
+Listening on unix:///var/folders/z5/vxrd1mk94l1bggq8rm7xj0sh0000gn/T/t4i66us3ot.sock
+--------------------- Bun Inspector ---------------------
+73 |     if(!all.success){
+74 |         throw new Error('expected success');
+75 |     }
+76 | 
+77 |     const paths=all.result.nodes.map(n=>n.path).sort();
+78 |     expect(paths).toEqual([
+                       ^
+error: expect(received).toEqual(expected)
+
+  [
+    "/docs/readme",
+    "/users/alex",
+-   "/users/bob",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Users/scott/docs/convo-lang/packages/tests/src/convo-db-layered.test.ts:78:19)
+✗ LayeredConvoDb routes node writes to mounted layers and reads across layers [6.43ms]
+✓ LayeredConvoDb respects overlapping mount priority [0.30ms]
+✓ LayeredConvoDb skips layers without node support [0.24ms]
+✓ LayeredConvoDb routes edge operations by edge from path [1.26ms]
+✓ LayeredConvoDb routes embedding operations by embedding path [0.96ms]
+✓ LayeredConvoDb lazily creates and disposes owned layers [0.21ms]
+
+ 5 pass
+ 1 fail
+ 54 expect() calls
+Ran 6 tests across 1 file. [135.00ms]
+</TEST_RESULTS>
+
+@time 2026-05-14T15:26:38-04:00
+@tokenUsage 39463 / 8695 / $0.24079000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+No questions. The issue is node-step pagination uses an advancing `offset` from `BaseConvoDb`, while edge/embedding driver pagination may reuse `offset=0` with `nextToken`. This update keeps those behaviors separate.
+
+<FILE_CONTENT name="LayeredConvoDb.ts" target-output-path="../../packages/db/src/LayeredConvoDb.ts" dirty file-hash="3bcd3e131424c2a6628b8738beaa8a562bf4de97" last-commit="2713f18e45dca7a81ce7ec074a9caa7983ec8140">
+``` ts
+import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+
+
+
+const hasSupport=(layer:Required<ConvoDbLayerSupport>,support:ConvoDbLayerSupport)=>{
+    return (
+        (support.supportsNodes?layer.supportsNodes===true:true) &&
+        (support.supportsEdges?layer.supportsEdges===true:true) &&
+        (support.supportsEmbeddings?layer.supportsEmbeddings===true:true) &&
+        (support.supportsBlobs?layer.supportsBlobs===true:true)
+    )
+}
+
+const isPathInMountPoint=(path:string,mountPoint:string):boolean=>{
+    if(mountPoint==='/'){
+        return path.startsWith('/');
+    }
+
+    const root=mountPoint.endsWith('/')?mountPoint.substring(0,mountPoint.length-1):mountPoint;
+    return path===root || path.startsWith(mountPoint);
+}
+
+interface PathsToken
+{
+    layerIndex:number;
+    offset:number;
+}
+
+export interface ConvoDbLayerSupport
+{
+    /**
+     * If true the layer can be used for node operations.
+     * @default true
+     */
+    supportsNodes?:boolean;
+
+    /**
+     * If true the layer can be used for edge operations.
+     * @default true
+     */
+    supportsEdges?:boolean;
+
+    /**
+     * If true the layer can be used for embedding operations.
+     * @default true
+     */
+    supportsEmbeddings?:boolean;
+
+    /**
+     * If true the layer can be used for blob operations.
+     * @default true
+     */
+    supportsBlobs?:boolean;
+}
+
+export interface ConvoDbLayerConfig extends ConvoDbLayerSupport
+{
+    /**
+     * The path where the db will be mounted
+     */
+    mountPoint:string;
+
+    /**
+     * A tag to pass to the convoDbService function to return a ConvoDb by tag. A ConvoDb with a
+     * matching tag can be registered to scope initialization.
+     */
+    serviceTag?:string;
+    
+    /**
+     * Returns a new instance of a ConvoDb to mount at the given point. `createDb` will be called
+     * the first time a resource is accessed in the layer's mount point.
+     */
+    createDb?:()=>ConvoDb;
+
+    /**
+     * Pre-created ConvoDb instance
+     */
+    db?:ConvoDb;
+
+    
+}
+
+type Layer=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
+    db?:ConvoDb;
+    ownsDb?:boolean;
+}
+
+type LayerInst=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
+    db:ConvoDb;
+    ownsDb?:boolean;
+}
+
+export interface LayeredConvoDbOptions extends BaseConvoDbOptions
+{
+    layers:ConvoDbLayerConfig[];
+    dbId?:string;
+}
+
+/**
+ * A ConvoDb implementation that allows you to layer multiple databases on top of each other 
+ * with a shared name space. 
+ */
+export class LayeredConvoDb extends BaseConvoDb
+{
+
+    private readonly layers:Layer[]=[];
+
+    private readonly initializedDbs=new WeakSet<ConvoDb>();
+
+    public readonly dbId:string|undefined;
+
+    public constructor({
+        layers,
+        dbId,
+        ...options
+    }:LayeredConvoDbOptions){
+        super(options);
+
+        this.dbId=dbId;
+
+        this.layers=layers.map<Layer>(l=>{
+            const layer:Layer={
+                supportsNodes:true,
+                supportsEdges:true,
+                supportsEmbeddings:true,
+                supportsBlobs:true,
+                ...l,
+            };
+            const p=normalizeConvoNodePath(layer.mountPoint,'none');
+            if(!p){
+                throw new Error(`Invalid ConvoDb layer mountPoint path - ${layer.mountPoint}`);
+            }
+            layer.mountPoint=p;
+            if(!layer.mountPoint.endsWith('/')){
+                layer.mountPoint+='/';
+            }
+            return layer;
+        });
+    }
+
+    protected override _dispose(): void {
+        const disposed=new Set<ConvoDb>();
+        for(const layer of this.layers){
+            if(!layer.ownsDb || !layer.db || disposed.has(layer.db)){
+                continue;
+            }
+            disposed.add(layer.db);
+            layer.db.dispose();
+        }
+    }
+
+    private scopePathToMountPoint(path:string,mountPoint:string):string{
+        if(!path.endsWith('*') || path.length>mountPoint.length){
+            return path;
+        }else{
+            return (mountPoint.endsWith('/')?mountPoint:mountPoint+'/')+'*';
+        }
+
+    }
+
+    private filterCurrentPaths(currentPaths:string[]|null,mountPoint:string):string[]|null{
+        if(!currentPaths){
+            return null;
+        }
+        if(!mountPoint.endsWith('/')){
+            mountPoint+='/';
+        }
+        return currentPaths.filter(p=>isPathInMountPoint(p,mountPoint));
+    }
+
+    private filterPathsToMountPoint(paths:string[],mountPoint:string):string[]{
+        return paths.filter(p=>isPathInMountPoint(p,mountPoint));
+    }
+
+    private filterEdgesToMountPoint(edges:ConvoNodeEdge[],mountPoint:string):ConvoNodeEdge[]{
+        return edges.filter(e=>isPathInMountPoint(e.from,mountPoint));
+    }
+
+    private filterEmbeddingsToMountPoint(embeddings:ConvoNodeEmbedding[],mountPoint:string):ConvoNodeEmbedding[]{
+        return embeddings.filter(e=>isPathInMountPoint(e.path,mountPoint));
+    }
+
+    private getPathGroups(support:ConvoDbLayerSupport,paths:string[]):ScopedPathGroup[]{
+        const groups:ScopedPathGroup[]=[];
+        for(const path of paths){
+            const layers=this.getLayersByPath(support,path);
+            for(const layer of layers){
+                const match=groups.find(g=>g.layer===layer);
+                const p=this.scopePathToMountPoint(path,layer.mountPoint);
+                if(match){
+                    if(!match.paths.includes(p)){
+                        match.paths.push(p);
+                    }
+                }else{
+                    groups.push({db:layer.db,layer:layer,paths:[p]});
+                }
+            }
+        }
+        return groups;
+    }
+
+    private getDbForLayer(layer:Layer):ConvoDb|undefined{
+        if(layer.db){
+            return layer.db;
+        }
+
+        if(layer.serviceTag){
+            const db=convoDbService.get(layer.serviceTag);
+            if(db){
+                layer.db=db;
+                return db;
+            }
+        }
+
+        if(layer.createDb){
+            const db=layer.createDb();
+            layer.db=db;
+            layer.ownsDb=true;
+            return db;
+        }
+
+        return undefined;
+    }
+
+    private async initLayerAsync(layer:LayerInst):PromiseResultTypeVoid{
+        if(this.initializedDbs.has(layer.db)){
+            return {
+                success:true,
+            }
+        }
+
+        const r=await layer.db.initAsync();
+        if(!r.success){
+            return r;
+        }
+
+        this.initializedDbs.add(layer.db);
+
+        return {
+            success:true,
+        }
+    }
+
+    public getLayerByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst|undefined{
+        return this.getLayersByPath(support,path,1)[0];
+    }
+
+    public getLayersByPath(support:ConvoDbLayerSupport,path:string,limit?:number):LayerInst[]{
+
+        const layers:LayerInst[]=[];
+
+        const p=normalizeConvoNodePath(path,'end');
+        if(!p){
+            return [];
+        }
+        path=p;
+
+        const wildcard=path.endsWith('*');
+        
+        if(path.endsWith('*')){
+            path=path.substring(0,path.length-1);
+        }
+        if(!path.endsWith('/')){
+            path+='/'
+        }
+
+
+        for(let i=0;i<this.layers.length && (wildcard || !layers.length) && (limit===undefined?true:layers.length<limit);i++){
+            const layer=this.layers[i];
+            if( !layer ||
+                !hasSupport(layer,support) ||
+                !(path.startsWith(layer.mountPoint) || (wildcard?layer.mountPoint.startsWith(path):false))
+            ){
+                continue;
+            }
+
+            const db=this.getDbForLayer(layer);
+            if(db){
+                layers.push(layer as LayerInst);
+            }
+        }
+
+        return layers;
+    }
+
+    async selectForStepAsync(
+        groupPaths:string[],
+        step: ConvoNodeQueryStep,
+        currentNodePaths: string[] | null,
+        orderBy: ConvoNodeOrderBy[],
+        limit: number,
+        offset: number,
+        nextToken: string | undefined,
+        select:(
+            state:SelectToken,
+            group:ScopedPathGroup,
+            path:string,
+            step: ConvoNodeQueryStep,
+            currentNodePaths: string[] | null,
+            orderBy: ConvoNodeOrderBy[],
+            limit: number,
+            offset: number,
+            nextToken: string | undefined,
+        )=>PromiseResultType<ConvoDbDriverPathsResult>
+    ): PromiseResultType<ConvoDbDriverPathsResult>{
+        const groups=this.getPathGroups({supportsNodes:true},groupPaths);
+        const state=getSelectToken(nextToken);
+        if(offset<state.o){
+            return {
+                success:true,
+                result:{paths:[]}
+            }
+        }
+        for(;state.i<groups.length;state.i++){
+            const group=groups[state.i]!;
+            const initR=await this.initLayerAsync(group.layer);
+            if(!initR.success){
+                return initR;
+            }
+            const scopedCurrentPaths=this.filterCurrentPaths(currentNodePaths,group.layer.mountPoint);
+            if(scopedCurrentPaths && !scopedCurrentPaths.length){
+                continue;
+            }
+            for(;state.g<group.paths.length;state.g++){
+                const path=group.paths[state.g]!;
+                const r=await select(
+                    state,group,path,step,
+                    scopedCurrentPaths,
+                    orderBy,limit,getSelectLayerOffset(offset,state),state.t
+                );
+                if(!r.success){
+                    return r;
+                }
+                state.t=r.result.nextToken;
+                state.l+=r.result.paths.length;
+                const paths=this.filterPathsToMountPoint(r.result.paths,group.layer.mountPoint);
+                if(paths.length){
+                    return {
+                        success:true,
+                        result:{
+                            paths,
+                            nextToken:JSON.stringify(state)
+                        }
+                    }
+                }
+                state.o+=state.l;
+                state.l=0;
+                state.t=undefined;
+            }
+            state.g=0;
+
+        }
+        return {
+            success:true,
+            result:{
+                paths:[],
+            },
+        }
+    }
+
+    override readonly _driver:ConvoDbDriver={
+
+        openBlobAsync:async (path:string):PromiseResultType<ReadableStream>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.openBlobAsync(path);
+        },
+
+        writeBlobAsync:async (path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.writeBlobAsync(path,blob);
+
+        },
+
+        hasBlobAsync:async (path:string):PromiseResultType<boolean>=>
+        {
+            const layer=this.getLayerByPath({supportsBlobs:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:'Layer not found by path',
+                    statusCode:404,
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.hasBlobAsync(path);
+        },
+
+
+        selectEdgesByPathsAsync:async (keys: (keyof ConvoNodeEdge)[] | "*", fromPathsIn: string[], toPathsIn: string[], hasGrant: boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>=>{
+            const groups=this.getPathGroups({supportsEdges:true},fromPathsIn);
+            const edges:Partial<ConvoNodeEdge>[]=[];
+            for(const group of groups){
+                const initR=await this.initLayerAsync(group.layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await group.db._driver.selectEdgesByPathsAsync(keys,group.paths,toPathsIn,hasGrant);
+                if(!r.success){
+                    return r;
+                }
+                edges.push(...r.result);
+            }
+
+            return {
+                success:true,
+                result:edges,
+            }
+        },
+        selectNodesByPathsAsync:async (keys: (keyof ConvoNode)[] | "*", paths: string[], orderBy: ConvoNodeOrderBy[]): PromiseResultType<Partial<ConvoNode>[]> =>{
+            const groups=this.getPathGroups({supportsNodes:true},paths);
+            const nodes:Partial<ConvoNode>[]=[];
+            for(const group of groups){
+                const initR=await this.initLayerAsync(group.layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await group.db._driver.selectNodesByPathsAsync(keys,group.paths,orderBy);
+                if(!r.success){
+                    return r;
+                }
+                nodes.push(...r.result);
+            }
+
+            return {
+                success:true,
+                result:nodes,
+            }
+        },
+        selectNodePathsForPathAsync:async (step: Required<Pick<ConvoNodeQueryStep, "path">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                [step.path],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPathAsync(
+                        {path},currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForPermissionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForPermissionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectNodePathsForEmbeddingAsync:async (step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectNodePathsForEmbeddingAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        selectEdgeNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+            return await this.selectForStepAsync(
+                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                    return group.db._driver.selectEdgeNodePathsForConditionAsync(
+                        step as any,currentNodePaths,orderBy,limit,offset,nextToken
+                    )
+                }
+            );
+        },
+        insertNodeAsync:async (node: ConvoNode, options: Omit<InsertConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNode> =>{
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertNodeAsync(node,options);
+
+        },
+        updateNodeAsync:async (node: ConvoNodeUpdate, options: Omit<UpdateConvoNodeOptions, "permissionFrom" | "mergeData"> | undefined): PromiseResultTypeVoid =>{
+            const layer=this.getLayerByPath({supportsNodes:true},node.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${node.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.updateNodeAsync(node,options);
+        },
+        deleteNodeAsync:async (path: string, options: Omit<DeleteConvoNodeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const layer=this.getLayerByPath({supportsNodes:true},path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.deleteNodeAsync(path,options);
+        },
+        insertEdgeAsync:async (edge: Omit<ConvoNodeEdge, "id">, options: Omit<InsertConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEdge> =>{
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertEdgeAsync(edge,options);
+        },
+        updateEdgeAsync:async (update: ConvoNodeEdgeUpdate, options: Omit<UpdateConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const edgeR=await this._driver.queryEdgesAsync({id:update.id,limit:1});
+            if(!edgeR.success){
+                return edgeR;
+            }
+            const edge=edgeR.result.edges[0];
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.updateEdgeAsync(update,options);
+        },
+        deleteEdgeAsync:async (id: string, options: Omit<DeleteConvoNodeEdgeOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const edgeR=await this._driver.queryEdgesAsync({id,limit:1});
+            if(!edgeR.success){
+                return edgeR;
+            }
+            const edge=edgeR.result.edges[0];
+            if(!edge){
+                return {
+                    success:false,
+                    error:"No edge found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEdges:true},edge.from);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${edge.from}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.deleteEdgeAsync(id,options);
+        },
+        insertEmbeddingAsync:async (embedding: Omit<ConvoNodeEmbedding, "id">, options: Omit<InsertConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultType<ConvoNodeEmbedding> =>{
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return await layer.db._driver.insertEmbeddingAsync(embedding,options);
+        },
+        updateEmbeddingAsync:async (update: ConvoNodeEmbeddingUpdate, options: Omit<UpdateConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id:update.id,limit:1});
+            if(!embeddingR.success){
+                return embeddingR;
+            }
+            const embedding=embeddingR.result.embeddings[0];
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No embedding found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.updateEmbeddingAsync(update,options);
+        },
+        deleteEmbeddingAsync:async (id: string, options: Omit<DeleteConvoNodeEmbeddingOptions, "permissionFrom"> | undefined): PromiseResultTypeVoid =>{
+            const embeddingR=await this._driver.queryEmbeddingsAsync({id,limit:1});
+            if(!embeddingR.success){
+                return embeddingR;
+            }
+            const embedding=embeddingR.result.embeddings[0];
+            if(!embedding){
+                return {
+                    success:false,
+                    error:"No embedding found by id",
+                    statusCode:404,
+                }
+            }
+            const layer=this.getLayerByPath({supportsEmbeddings:true},embedding.path);
+            if(!layer){
+                return {
+                    success:false,
+                    error:`No layer mounted at ${embedding.path}`,
+                    statusCode:404
+                }
+            }
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            return layer.db._driver.deleteEmbeddingAsync(id,options);
+        },
+        queryEdgesAsync:async (query: ConvoNodeEdgeQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{edges:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const initR=await this.initLayerAsync(layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await layer.db._driver.queryEdgesAsync({
+                    ...query,
+                    offset:getLayerOffset(offset,state),
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.edges.length;
+                state.t=r.result.nextToken;
+
+                const edges=this.filterEdgesToMountPoint(r.result.edges,layer.mountPoint);
+
+                if(edges.length===0){
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEdgeTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:state.t===undefined && r.result.edges.length<(query.limit??50)?undefined:JSON.stringify(state),
+                        edges,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEdgeTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    edges:[],
+                    total,
+                }
+            }
+            
+        },
+        queryEmbeddingsAsync:async (query: ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken): PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>=>{
+            if(query.limit!==undefined && query.limit<1 && !query.includeTotal){
+                return {
+                    success:true,
+                    result:{embeddings:[]}
+                }
+            }
+            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+            const state=getQueryToken(query.nextToken);
+            const offset=query.offset??0;
+            for(;state.i<layers.length;state.i++){
+                const layer=layers[state.i];
+                if(!layer){
+                    return {
+                        success:false,
+                        error:'Layer not found at index',
+                        statusCode:500,
+                    }
+                }
+                const initR=await this.initLayerAsync(layer);
+                if(!initR.success){
+                    return initR;
+                }
+                const r=await layer.db._driver.queryEmbeddingsAsync({
+                    ...query,
+                    offset:getLayerOffset(offset,state),
+                    nextToken:state.t,
+                    includeTotal:false,
+                });
+
+                if(!r.success){
+                    return r;
+                }
+
+                state.l+=r.result.embeddings.length;
+                state.t=r.result.nextToken;
+
+                const embeddings=this.filterEmbeddingsToMountPoint(r.result.embeddings,layer.mountPoint);
+
+                if(embeddings.length===0){
+                    state.o+=state.l;
+                    state.l=0;
+                    state.t=undefined;
+                    continue;
+                }
+                let total:number|undefined;
+                if(query.includeTotal){
+                    const tr=await this.getEmbeddingTotalAsync(query);
+                    if(!tr.success){
+                        return tr;
+                    }
+                    total=tr.result;
+                }
+                return {
+                    success:true,
+                    result:{
+                        nextToken:state.t===undefined && r.result.embeddings.length<(query.limit??50)?undefined:JSON.stringify(state),
+                        embeddings,
+                        total,
+                    }
+                }
+            }
+
+            let total:number|undefined;
+            if(query.includeTotal){
+                const tr=await this.getEmbeddingTotalAsync(query);
+                if(!tr.success){
+                    return tr;
+                }
+                total=tr.result;
+            }
+            return {
+                success:true,
+                result:{
+                    embeddings:[],
+                    total,
+                }
+            }
+        },
+        
+    }
+
+    private async getEdgeTotalAsync(query:ConvoNodeEdgeQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+        for(const layer of layers){
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            const r=await layer.db._driver.queryEdgesAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            if(query.from===undefined){
+                const edges=this.filterEdgesToMountPoint(r.result.edges,layer.mountPoint);
+                total+=edges.length?r.result.total??0:0;
+            }else{
+                total+=(r.result.total??0);
+            }
+        }
+        return {
+            success:true,
+            result:total,
+        }
+    }
+
+    private async getEmbeddingTotalAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<number>
+    {
+        let total=0;
+        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+        for(const layer of layers){
+            const initR=await this.initLayerAsync(layer);
+            if(!initR.success){
+                return initR;
+            }
+            const r=await layer.db._driver.queryEmbeddingsAsync({
+                ...query,
+                nextToken:undefined,
+                offset:0,
+                limit:1,
+                includeTotal:true
+            });
+            if(!r.success){
+                return r;
+            }
+            if(query.path===undefined){
+                const embeddings=this.filterEmbeddingsToMountPoint(r.result.embeddings,layer.mountPoint);
+                total+=embeddings.length?r.result.total??0:0;
+            }else{
+                total+=(r.result.total??0);
+            }
+        }
+        return {
+            success:true,
+            result:total,
+        }
+    }
+    
+}
+
+const getLayerOffset=(offset:number,state:QueryToken):number=>{
+    return Math.max(0,offset-state.o)+(state.t===undefined?state.l:0);
+}
+
+const getSelectLayerOffset=(offset:number,state:QueryToken):number=>{
+    return Math.max(0,offset-state.o);
+}
+
+const getQueryToken=(token?:string):QueryToken=>{
+    if(!token){
+        return {
+            i:0,
+            o:0,
+            l:0,
+        }
+    }
+
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+
+}
+
+interface QueryToken
+{
+    /**
+     * Layer Index
+     */
+    i:number;
+
+    /**
+     * Layer offset. The total of all items returned by layers that have already been passed.
+     * Will offset the offset value passed to driver functions
+     */
+    o:number;
+
+    /**
+     * Current layer total
+     */
+    l:number;
+
+    /**
+     * Layer next token
+     */
+    t?:string;
+}
+
+interface SelectToken extends QueryToken 
+{
+
+    /**
+     * Group index
+     */
+    g:number;
+
+
+}
+
+const getSelectToken=(token:string|undefined):SelectToken=>{
+    if(!token){
+        return {i:0,g:0,o:0,l:0}
+    }
+    try{
+        return JSON.parse(token);
+    }catch{
+        throw new Error('Invalid layer db next token');
+    }
+}
+
+interface ScopedPathGroup
+{
+    paths:string[];
+    db:ConvoDb;
+    layer:LayerInst;
+}
+
+```
+</FILE_CONTENT>
+
+
+> user
