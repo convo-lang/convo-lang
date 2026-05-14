@@ -1,3 +1,40 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+
+> user
+Update the behavior of wildcard in query paths to behave like unix globs
+- Change the current wildcard `*` to be non-recursive
+- Add a recursive wildcard: `**`
+
+The change should only effect the path property of query steps
+
+@time 2026-05-14T17:33:58-04:00
+@tokenUsage 17315 / 2178 / $0.09746500000000001
+@model gpt-5.5-2026-04-23
+> assistant
+Can you provide the implementation file(s) that validate/match `ConvoNodeQueryStep.path` wildcards?
+
+The file you shared is type/interface documentation only. I can update its comments, but changing the actual behavior from:
+
+- `*` recursive suffix wildcard
+
+to:
+
+- `*` non-recursive segment wildcard
+- `**` recursive glob wildcard
+
+will require updating the query path matching / normalization logic, likely in the base `ConvoDb` implementation or a shared path-matching utility.
+
+
+> user
+Just update the documentation and add any required types. We will update the implementation after.
+
+@time 2026-05-14T17:39:18-04:00
+@tokenUsage 17445 / 18350 / $0.17897500000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db-types.ts" target-output-path="../../packages/convo-lang/src/lib/db/convo-db-types.ts" last-commit="101843fea3d4a4330a27dca61f775d6cb0247c4e">
+``` ts
 import type { CancelToken } from "@iyio/common";
 import type { ZodType } from "zod";
 import type { PromiseOrResultType, PromiseResultType, PromiseResultTypeVoid, StatusCode } from "../result-type.js";
@@ -504,25 +541,26 @@ export enum ConvoNodePermissionType
 
 export type ConvoNodeEdgeDirection='forward'|'reverse'|'bi';
 
-
-// A normalized absolute query-step node path or node path glob.
-// 
-// Glob rules only apply to `ConvoNodeQueryStep.path`. Stored node paths and all other path
-// fields are literal normalized paths and may not contain `*`.
-// 
-// Query path glob rules:
-// - glob matching is case-sensitive
-// - matching is against the full normalized node path
-// - `*` matches zero or more characters within a single path segment and does not match `/`
-// - `**` matches zero or more complete path segments and may span `/`
-// - `*` and `**` are the only supported wildcard tokens
-// - wildcard tokens can not be escaped
-// - `.` and `..` path segments are not allowed
-// - duplicate slashes are normalized to a single slash
-// - trailing slashes are removed during normalization except for `/`
-// - `/users/*` matches `/users/a` and `/users/b` but not `/users/a/b`
-// - `/users/**` matches `/users`, `/users/a`, and `/users/a/b`
-// - `/users/**/posts/*` matches `/users/posts/1`, `/users/a/posts/1`, and `/users/a/b/posts/1`
+/**
+ * A normalized absolute query-step node path or node path glob.
+ * 
+ * Glob rules only apply to `ConvoNodeQueryStep.path`. Stored node paths and all other path
+ * fields are literal normalized paths and may not contain `*`.
+ * 
+ * Query path glob rules:
+ * - glob matching is case-sensitive
+ * - matching is against the full normalized node path
+ * - `*` matches zero or more characters within a single path segment and does not match `/`
+ * - `**` matches zero or more complete path segments and may span `/`
+ * - `*` and `**` are the only supported wildcard tokens
+ * - wildcard tokens can not be escaped
+ * - `.` and `..` path segments are not allowed
+ * - duplicate slashes are normalized to a single slash
+ * - trailing slashes are removed during normalization except for `/`
+ * - `/users/*` matches `/users/a` and `/users/b` but not `/users/a/b`
+ * - `/users/**` matches `/users`, `/users/a`, and `/users/a/b`
+ * - `/users/**/posts/*` matches `/users/posts/1`, `/users/a/posts/1`, and `/users/a/b/posts/1`
+ */
 export type ConvoNodeQueryPath=string;
 
 export const allConvoStepStages=['path','condition','permissions','embedding','call','edge'] as const;
@@ -565,22 +603,23 @@ export interface ConvoNodeWatchCondition extends Pick<ConvoNodeQueryStep,'path'|
 export interface ConvoNodeQueryStep
 {
 
-    
-    // Full normalized path of node to select or a glob path that will select all nodes matching the glob.
-    // 
-    // Glob path rules:
-    // - glob matching is case-sensitive
-    // - matching is against the full normalized node path
-    // - `*` matches zero or more characters within a single path segment and does not match `/`
-    // - `**` matches zero or more complete path segments and may span `/`
-    // - `*` and `**` are the only supported wildcard tokens
-    // - wildcard tokens can not be escaped
-    // - the non-wildcard portions of the path follow the same normalization rules as stored node paths
-    // - `/users/*` matches `/users/a` and `/users/b` but not `/users/a/b`
-    // - `/users/**` matches `/users`, `/users/a`, and `/users/a/b`
-    // - `/users/**/posts/*` matches `/users/posts/1`, `/users/a/posts/1`, and `/users/a/b/posts/1`
-    // 
-    // @stepStage 1 - path
+    /**
+     * Full normalized path of node to select or a glob path that will select all nodes matching the glob.
+     * 
+     * Glob path rules:
+     * - glob matching is case-sensitive
+     * - matching is against the full normalized node path
+     * - `*` matches zero or more characters within a single path segment and does not match `/`
+     * - `**` matches zero or more complete path segments and may span `/`
+     * - `*` and `**` are the only supported wildcard tokens
+     * - wildcard tokens can not be escaped
+     * - the non-wildcard portions of the path follow the same normalization rules as stored node paths
+     * - `/users/*` matches `/users/a` and `/users/b` but not `/users/a/b`
+     * - `/users/**` matches `/users`, `/users/a`, and `/users/a/b`
+     * - `/users/**/posts/*` matches `/users/posts/1`, `/users/a/posts/1`, and `/users/a/b/posts/1`
+     * 
+     * @stepStage 1 - path
+     */
     path?:ConvoNodeQueryPath;
 
     /**
@@ -2367,3 +2406,227 @@ export type ConvoDbFactory=(name:string)=>ConvoDb;
  * Converts a connection string to a ConvoDbFactory
  */
 export type ConvoDbConnectionStringHandler=(type:string,args:string[])=>ConvoDbFactory|null|undefined|Promise<ConvoDbFactory|null|undefined>;
+```
+</FILE_CONTENT>
+
+
+> user
+Write an update guide for upgrading to the new wildcard behavior
+
+save to `./wildcard-update.md`
+
+@time 2026-05-14T17:44:06-04:00
+@tokenUsage 34609 / 1072 / $0.178405
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="wildcard-update.md" target-output-path="./wildcard-update.md">
+``` md
+# Wildcard Query Path Update Guide
+
+ConvoDb query step paths now use unix-glob-like wildcard behavior.
+
+This change only affects the `path` property of `ConvoNodeQueryStep` and helper methods that internally query by path, such as `getNodesByPathAsync`.
+
+Stored node paths and all other path fields remain literal normalized paths and must not contain wildcards.
+
+## What changed
+
+### Previous behavior
+
+Previously, `*` was recursive when used in query paths.
+
+``` txt
+/users/*
+```
+
+matched:
+
+``` txt
+/users/a
+/users/a/b
+/users/a/b/c
+```
+
+### New behavior
+
+`*` is now non-recursive and only matches within a single path segment.
+
+``` txt
+/users/*
+```
+
+matches:
+
+``` txt
+/users/a
+/users/b
+```
+
+but does not match:
+
+``` txt
+/users/a/b
+```
+
+A new recursive wildcard, `**`, has been added.
+
+``` txt
+/users/**
+```
+
+matches:
+
+``` txt
+/users
+/users/a
+/users/a/b
+/users/a/b/c
+```
+
+## Wildcard rules
+
+Query path globs follow these rules:
+
+- Matching is case-sensitive
+- Matching is against the full normalized node path
+- `*` matches zero or more characters within a single path segment
+- `*` does not match `/`
+- `**` matches zero or more complete path segments
+- `**` may span `/`
+- `*` and `**` are the only supported wildcard tokens
+- Wildcard tokens cannot be escaped
+- `.` and `..` path segments are not allowed
+- Duplicate slashes are normalized to a single slash
+- Trailing slashes are removed during normalization except for `/`
+
+## Migration table
+
+| Old query path | Old meaning | New equivalent |
+| --- | --- | --- |
+| `/users/*` | All descendants under `/users` | `/users/**` |
+| `/docs/*` | All descendants under `/docs` | `/docs/**` |
+| `/a/b/*` | All descendants under `/a/b` | `/a/b/**` |
+| `/users/*/posts` | Not previously supported as a segment glob | `/users/*/posts` |
+| `/users/*/posts/*` | Not previously supported as a segment glob | `/users/*/posts/*` |
+| `/users/**/posts/*` | Not previously supported | `/users/**/posts/*` |
+
+## Common updates
+
+### Recursive descendant queries
+
+If your existing query was intended to match all descendants recursively, replace the trailing `*` with `**`.
+
+Before:
+
+``` ts
+await db.queryNodesAsync({
+    steps:[
+        {path:'/users/*'}
+    ]
+});
+```
+
+After:
+
+``` ts
+await db.queryNodesAsync({
+    steps:[
+        {path:'/users/**'}
+    ]
+});
+```
+
+### Direct child queries
+
+If your query should only match direct children, keep using `*`.
+
+``` ts
+await db.queryNodesAsync({
+    steps:[
+        {path:'/users/*'}
+    ]
+});
+```
+
+This now matches direct children only:
+
+``` txt
+/users/alice
+/users/bob
+```
+
+It no longer matches nested descendants:
+
+``` txt
+/users/alice/profile
+/users/bob/settings/theme
+```
+
+### Matching a recursive subtree including the base node
+
+Use `**` when the base node should also match.
+
+``` ts
+await db.queryNodesAsync({
+    steps:[
+        {path:'/users/**'}
+    ]
+});
+```
+
+This matches:
+
+``` txt
+/users
+/users/alice
+/users/alice/profile
+```
+
+### Matching nested structures
+
+`**` can be used in the middle of a path.
+
+``` ts
+await db.queryNodesAsync({
+    steps:[
+        {path:'/users/**/posts/*'}
+    ]
+});
+```
+
+This matches:
+
+``` txt
+/users/posts/1
+/users/alice/posts/1
+/users/alice/archive/posts/1
+```
+
+## What to search for
+
+Review query step paths that use `*`, especially trailing wildcards.
+
+Look for patterns like:
+
+``` txt
+path:'/.../*'
+path:"/.../*"
+{path:`/.../*`}
+getNodesByPathAsync('/.../*')
+getNodeByPathAsync('/.../*')
+requireNodeByPathAsync('/.../*')
+```
+
+If the old query expected recursive results, change `*` to `**`.
+
+## Compatibility notes
+
+- This change only affects `ConvoNodeQueryStep.path`
+- Condition operators such as `like` and `ilike` are not changed
+- Edge paths, embedding paths, blob paths, permission paths, and stored node paths are not glob paths
+- Stored node paths still cannot contain `*`
+```
+</FILE_CONTENT>
+
+
+> user
