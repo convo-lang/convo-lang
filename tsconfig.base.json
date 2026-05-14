@@ -34,6 +34,9 @@
         "outDir": "./dist",
         "composite": true,
         "paths": {
+            "@convo-lang/agent/*": [
+                "packages/agent/src/*"
+            ],
             "@convo-lang/convo-crawler": [
                 "./packages/convo-crawler/src/index.ts"
             ],
@@ -76,9 +79,6 @@
             "@convo-lang/db": [
                 "./packages/db/src/index.ts"
             ],
-            "@convo-lang/db/*": [
-                "./packages/db/src/*"
-            ],
             "@convo-lang/db-bun": [
                 "./packages/db-bun/src/index.ts"
             ],
@@ -91,17 +91,20 @@
             "@convo-lang/db-node/*": [
                 "./packages/db-node/src/*"
             ],
-            "@convo-lang/hono/*": [
-                "./packages/hono/src/*"
-            ],
-            "@convo-lang/tui/*": [
-                "./packages/tui/src/*"
+            "@convo-lang/db/*": [
+                "./packages/db/src/*"
             ],
             "@convo-lang/highlighter/*": [
                 "./packages/highlighter/src/*"
             ],
+            "@convo-lang/hono/*": [
+                "./packages/hono/src/*"
+            ],
             "@convo-lang/studio/*": [
                 "./packages/studio/src/*"
+            ],
+            "@convo-lang/tui/*": [
+                "./packages/tui/src/*"
             ]
         }
     },
