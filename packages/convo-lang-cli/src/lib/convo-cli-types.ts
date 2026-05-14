@@ -395,6 +395,22 @@ export interface ConvoCliOptions
     loadDbFunctionDropExport?:boolean;
 
     /**
+     * Loads a file from disk into a db blob.
+     * Format = `{db-name}:{path-on-disk}:{path-in-db}`
+     * @example 
+     * --loadDbBlob default:profile-pic.png:/usr/frank/profile-image.png
+     */
+    loadDbBlob?:string[]
+
+    /**
+     * Deletes blobs from the database
+     * Format = `{db-name}:{path-in-db}`
+     * @example 
+     * --deleteDbBlob default:/usr/frank/profile-image.png
+     */
+    deleteDbBlob?:string[]
+
+    /**
      * A shell command to bundle db function. The `$dbFunctionSrcFilePath` variable will contain the 
      * path to the function file. bun build is used by default.
      * @default 'bun build "$dbFunctionSrcFilePath"'

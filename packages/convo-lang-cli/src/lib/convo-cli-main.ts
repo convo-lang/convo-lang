@@ -11,6 +11,7 @@ import { generateEmbeddingAsync } from "../lib/convo-cli-embeddings.js";
 import { defaultConvoCliApiPort, loadEnvFileAsync } from "../lib/convo-cli-lib.js";
 import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
+import { deleteCliDbBlobsAsync, loadCliDbBlobsAsync } from "./convo-cli-blob.js";
 import { convoCliHelpMessage } from "./convo-cli-help.js";
 import { runConvoTuiAsync } from "./tui/lib/convo-tui-app.js";
 
@@ -104,6 +105,8 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         disableApiDbAuth:args=>args.length?true:false,
         apiStaticRoot:args=>args[0],
         embeddedFileMap:args=>parseJson5(args[0]??'{}'),
+        loadDbBlob:args=>args,
+        deleteDbBlob:args=>args,
     }
 }).parsed;
 
@@ -213,18 +216,21 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
             
         }
     });
-    if(args.dbMap){
-        await initConvoCliAsync(args);
-    }
 
     if(args.loadDbFunction){
         await initConvoCliAsync(args);
-        if(!dbMap){
-            console.error('loadDbFunction requires a dbMap be defined');
-            process.exit(1);
-        }
         await loadCliDbFunctionsAsync(dbMap,args);
         disableREPL=true;
+    }
+
+    if(args.loadDbBlob || args.deleteDbBlob){
+        await initConvoCliAsync(args);
+        if(args.deleteDbBlob){
+            await deleteCliDbBlobsAsync(dbMap,args);
+        }
+        if(args.loadDbBlob){
+            await loadCliDbBlobsAsync(dbMap,args);
+        }
     }
 
     if(args.executeDbCommands){
