@@ -1,5 +1,6 @@
 import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+import { doesJsonQueryPathMatchStepPath, getJsonQueryPathLiteralPrefix, hasJsonQueryPathWildcard } from "./json-query.js";
 
 
 
@@ -151,12 +152,22 @@ export class LayeredConvoDb extends BaseConvoDb
     }
 
     private scopePathToMountPoint(path:string,mountPoint:string):string{
-        if(!path.endsWith('*') || path.length>mountPoint.length){
+        if(!hasJsonQueryPathWildcard(path)){
             return path;
-        }else{
-            return (mountPoint.endsWith('/')?mountPoint:mountPoint+'/')+'*';
         }
 
+        const mountRoot=getMountPointRoot(mountPoint);
+        const prefix=getJsonQueryPathLiteralPrefix(path);
+
+        if(path.endsWith('/**') && mountPoint.startsWith(prefix)){
+            return mountRoot==='/'?'/**':`${mountRoot}/**`;
+        }
+
+        if(doesJsonQueryPathMatchStepPath(mountRoot,path)){
+            return mountRoot;
+        }
+
+        return path;
     }
 
     private filterCurrentPaths(currentPaths:string[]|null,mountPoint:string):string[]|null{
@@ -250,27 +261,24 @@ export class LayeredConvoDb extends BaseConvoDb
 
         const layers:LayerInst[]=[];
 
-        const p=normalizeConvoNodePath(path,'end');
+        const p=normalizeConvoNodePath(path,'any');
         if(!p){
             return [];
         }
         path=p;
 
-        const wildcard=path.endsWith('*');
-        
-        if(path.endsWith('*')){
-            path=path.substring(0,path.length-1);
-        }
-        if(!path.endsWith('/')){
-            path+='/'
-        }
-
+        const wildcard=hasJsonQueryPathWildcard(path);
+        const lookupPath=wildcard?getJsonQueryPathLiteralPrefix(path):ensureTrailingSlash(path);
 
         for(let i=0;i<this.layers.length && (wildcard || !layers.length) && (limit===undefined?true:layers.length<limit);i++){
             const layer=this.layers[i];
             if( !layer ||
                 !hasSupport(layer,support) ||
-                !(path.startsWith(layer.mountPoint) || (wildcard?layer.mountPoint.startsWith(path):false))
+                !(wildcard?
+                    lookupPath.startsWith(layer.mountPoint) || layer.mountPoint.startsWith(lookupPath)
+                :
+                    lookupPath.startsWith(layer.mountPoint)
+                )
             ){
                 continue;
             }
@@ -466,7 +474,7 @@ export class LayeredConvoDb extends BaseConvoDb
         },
         selectNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
             return await this.selectForStepAsync(
-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
                     return group.db._driver.selectNodePathsForConditionAsync(
                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
@@ -476,7 +484,7 @@ export class LayeredConvoDb extends BaseConvoDb
         },
         selectNodePathsForPermissionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
             return await this.selectForStepAsync(
-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
                     return group.db._driver.selectNodePathsForPermissionAsync(
                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
@@ -486,7 +494,7 @@ export class LayeredConvoDb extends BaseConvoDb
         },
         selectNodePathsForEmbeddingAsync:async (step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
             return await this.selectForStepAsync(
-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
                     return group.db._driver.selectNodePathsForEmbeddingAsync(
                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
@@ -496,7 +504,7 @@ export class LayeredConvoDb extends BaseConvoDb
         },
         selectEdgeNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
             return await this.selectForStepAsync(
-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
                     return group.db._driver.selectEdgeNodePathsForConditionAsync(
                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
@@ -695,7 +703,7 @@ export class LayeredConvoDb extends BaseConvoDb
                     result:{edges:[]}
                 }
             }
-            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/**');
             const state=getQueryToken(query.nextToken);
             const offset=query.offset??0;
             for(;state.i<layers.length;state.i++){
@@ -775,7 +783,7 @@ export class LayeredConvoDb extends BaseConvoDb
                     result:{embeddings:[]}
                 }
             }
-            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/**');
             const state=getQueryToken(query.nextToken);
             const offset=query.offset??0;
             for(;state.i<layers.length;state.i++){
@@ -853,7 +861,7 @@ export class LayeredConvoDb extends BaseConvoDb
     private async getEdgeTotalAsync(query:ConvoNodeEdgeQuery):PromiseResultType<number>
     {
         let total=0;
-        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
+        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/**');
         for(const layer of layers){
             const initR=await this.initLayerAsync(layer);
             if(!initR.success){
@@ -885,7 +893,7 @@ export class LayeredConvoDb extends BaseConvoDb
     private async getEmbeddingTotalAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<number>
     {
         let total=0;
-        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
+        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/**');
         for(const layer of layers){
             const initR=await this.initLayerAsync(layer);
             if(!initR.success){
@@ -939,6 +947,14 @@ const getQueryToken=(token?:string):QueryToken=>{
         throw new Error('Invalid layer db next token');
     }
 
+}
+
+const ensureTrailingSlash=(path:string):string=>{
+    return path.endsWith('/')?path:`${path}/`;
+}
+
+const getMountPointRoot=(mountPoint:string):string=>{
+    return mountPoint==='/'?'/':mountPoint.substring(0,mountPoint.length-1);
 }
 
 interface QueryToken

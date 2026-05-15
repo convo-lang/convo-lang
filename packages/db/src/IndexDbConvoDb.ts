@@ -33,9 +33,9 @@ import { ConvoNodePermissionType } from '@convo-lang/convo-lang';
 import { uuid } from '@iyio/common';
 import { BaseConvoDb, BaseConvoDbOptions } from './BaseConvoDb.js';
 import {
+    createJsonQueryPathMatcher,
     doesJsonQueryEdgeMatchQuery,
     doesJsonQueryEmbeddingMatchQuery,
-    doesJsonQueryPathMatchStepPath,
     evaluateJsonQueryCondition,
     hasJsonQueryPermission,
     selectJsonQueryEdgeDestinationPaths,
@@ -331,7 +331,8 @@ export class IndexDbConvoDbDriver implements ConvoDbDriver
     ):PromiseResultType<ConvoDbDriverPathsResult>{
         try{
             const nodes=await this._selectCandidateNodesAsync(currentNodePaths);
-            const filtered=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
+            const matchPath=createJsonQueryPathMatcher(step.path);
+            const filtered=nodes.filter(node=>matchPath(node.path));
             return success(pathsResult(filtered,orderBy,limit,offset,nextToken));
         }catch(ex){
             return errorResult(ex);

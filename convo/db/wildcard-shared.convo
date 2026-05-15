@@ -1,0 +1,1707 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-lib.ts !file
+@import ../../packages/db/src/json-query.ts !file
+
+> user
+Move duplicated functionality in the following diff to either 
+`../../packages/convo-lang/src/lib/db/convo-db-lib.ts` or `../../packages/db/src/json-query.ts`
+
+<DIFF>
+diff --git a/packages/convo-lang/src/lib/db/convo-db-lib.ts b/packages/convo-lang/src/lib/db/convo-db-lib.ts
+index 7dfcbb6..f8189c5 100644
+--- a/packages/convo-lang/src/lib/db/convo-db-lib.ts
++++ b/packages/convo-lang/src/lib/db/convo-db-lib.ts
+@@ -14,8 +14,11 @@ import { ConvoDbCommand, ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunc
+  * 
+  * Wildcard rules:
+  * - `none` no `*` characters are allowed
+- * - `end` a wildcard is allowed only as a trailing `/*`
+- * - `any` wildcards may appear anywhere in the path
++ * - `end` validates query path globs and is retained for backwards compatibility
++ * - `any` validates query path globs
++ * - `*` matches zero or more characters within a single path segment
++ * - `**` matches zero or more complete path segments and must be its own path segment
++ * - `*` and `**` are the only supported wildcard tokens
+  * 
+  * Returns the normalized path or `undefined` if the path is invalid.
+  */
+@@ -53,17 +56,10 @@ export const normalizeConvoNodePath=(path:string|null|undefined,wildcard:'none'|
+             break;
+ 
+         case 'end':
+-            if(path.includes('*')){
+-                if(!path.endsWith('/*')){
+-                    return undefined;
+-                }
+-                if(path.indexOf('*')!==path.length-1){
+-                    return undefined;
+-                }
+-            }
+-            break;
+-
+         case 'any':
++            if(!isValidConvoNodePathGlob(parts)){
++                return undefined;
++            }
+             break;
+     }
+ 
+@@ -100,6 +96,25 @@ export const validateConvoNodeCondition=(condition:ConvoNodeCondition):string|un
+ 
+ const reservedPathSuffix='.@db-';
+ 
++const isValidConvoNodePathGlob=(parts:string[]):boolean=>{
++    for(let i=1;i<parts.length;i++){
++        const part=parts[i];
++        if(!part){
++            continue;
++        }
++        if(!part.includes('*')){
++            continue;
++        }
++        if(part==='**'){
++            continue;
++        }
++        if(part.includes('**')){
++            return false;
++        }
++    }
++    return true;
++}
++
+ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined=>{
+     if( query.permissionFrom!==undefined && (
+             normalizeConvoNodePath(query.permissionFrom,'none')!==query.permissionFrom ||
+@@ -114,7 +129,7 @@ export const validateConvoNodeQuery=(query:ConvoNodeQuery<any>):string|undefined
+             return `Undefined step at index ${i}`;
+         }
+         if( step.path!==undefined && (
+-                normalizeConvoNodePath(step.path,'end')!==step.path ||
++                normalizeConvoNodePath(step.path,'any')!==step.path ||
+                 step.path.includes(reservedPathSuffix)
+             )
+         ){
+diff --git a/packages/db-node/src/NodeFsConvoDb.ts b/packages/db-node/src/NodeFsConvoDb.ts
+index 5f9b2d7..6942624 100644
+--- a/packages/db-node/src/NodeFsConvoDb.ts
++++ b/packages/db-node/src/NodeFsConvoDb.ts
+@@ -1,6 +1,6 @@
+ import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoEmbeddingSearch, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
+ import { BaseConvoDb, BaseConvoDbOptions } from '@convo-lang/db/BaseConvoDb.js';
+-import { doesJsonQueryEdgeMatchCondition, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from '@convo-lang/db/json-query.js';
++import { doesJsonQueryEdgeMatchCondition, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from '@convo-lang/db/json-query.js';
+ import { pathExistsAsync } from "@iyio/node-common";
+ import { randomUUID } from 'node:crypto';
+ import { createReadStream, createWriteStream } from 'node:fs';
+@@ -225,7 +225,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
+     public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+         return await this._runAsync(async ()=>{
+             const paths=currentNodePaths??await this._readNodePathsAsync();
+-            const selected=paths.filter(nodePath=>doesJsonQueryPathMatchStepPath(nodePath,step.path));
++            const selected=paths.filter(nodePath=>this._doesPathMatchStepPath(nodePath,step.path));
+             return {
+                 paths:await this._pageOrderedPathsAsync(selected,orderBy,limit,offset),
+                 nextToken:undefined,
+@@ -448,6 +448,76 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
+         return !!ex && typeof ex==='object' && 'code' in ex && ex.code==='ENOENT';
+     }
+ 
++    private _doesPathMatchStepPath(nodePath:string,stepPath:string):boolean{
++        const normalizedNodePath=this._normalizeQueryPath(nodePath);
++        const normalizedStepPath=this._normalizeQueryPath(stepPath);
++        if(normalizedNodePath===undefined || normalizedStepPath===undefined){
++            return false;
++        }
++        return this._doPathSegmentsMatch(
++            this._getPathSegments(normalizedNodePath),
++            this._getPathSegments(normalizedStepPath),
++            0,
++            0
++        );
++    }
++
++    private _normalizeQueryPath(queryPath:string):string|undefined{
++        let normalized=queryPath.replace(/\/+/g,'/');
++        if(!normalized.startsWith('/')){
++            normalized=`/${normalized}`;
++        }
++        if(normalized.length>1 && normalized.endsWith('/')){
++            normalized=normalized.slice(0,-1);
++        }
++        const segments=this._getPathSegments(normalized);
++        if(segments.some(segment=>segment==='.' || segment==='..')){
++            return undefined;
++        }
++        return normalized;
++    }
++
++    private _getPathSegments(normalizedPath:string):string[]{
++        return normalizedPath==='/'?[]:normalizedPath.slice(1).split('/');
++    }
++
++    private _doPathSegmentsMatch(pathSegments:string[],stepSegments:string[],pathIndex:number,stepIndex:number):boolean{
++        if(stepIndex===stepSegments.length){
++            return pathIndex===pathSegments.length;
++        }
++
++        const stepSegment=stepSegments[stepIndex];
++        if(stepSegment==='**'){
++            if(stepIndex===stepSegments.length-1){
++                return true;
++            }
++            for(let i=pathIndex;i<=pathSegments.length;i++){
++                if(this._doPathSegmentsMatch(pathSegments,stepSegments,i,stepIndex+1)){
++                    return true;
++                }
++            }
++            return false;
++        }
++
++        return (
++            pathIndex<pathSegments.length &&
++            this._doesPathSegmentMatch(pathSegments[pathIndex],stepSegment) &&
++            this._doPathSegmentsMatch(pathSegments,stepSegments,pathIndex+1,stepIndex+1)
++        );
++    }
++
++    private _doesPathSegmentMatch(pathSegment:string,stepSegment:string):boolean{
++        if(!stepSegment.includes('*')){
++            return pathSegment===stepSegment;
++        }
++        const pattern=`^${stepSegment.split('*').map(segment=>this._escapeRegex(segment)).join('.*')}$`;
++        return new RegExp(pattern).test(pathSegment);
++    }
++
++    private _escapeRegex(value:string):string{
++        return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
++    }
++
+     private _getNodeFsPath(nodePath:string):string{
+         return path.join(this.root,nodePath.slice(1)+this.nodeSuffix);
+     }
+diff --git a/packages/db/src/BaseConvoDb.ts b/packages/db/src/BaseConvoDb.ts
+index 04e7458..320c711 100644
+--- a/packages/db/src/BaseConvoDb.ts
++++ b/packages/db/src/BaseConvoDb.ts
+@@ -612,6 +612,7 @@ export abstract class BaseConvoDb implements ConvoDb
+                                     condition:lastStep.condition,
+                                     baseNodePaths:query.steps.length>1?[...state.paths]:undefined,
+                                 },
++                                pathMatcher:lastStep.path?createConvoNodePathMatcher(lastStep.path):undefined,
+                                 itemMap:{},
+                                 loopCount:0,
+                                 lastSend:0,
+@@ -630,10 +631,6 @@ export abstract class BaseConvoDb implements ConvoDb
+                                     watcher?.next?.([{type:'error'}]);
+                                 })
+                             }
+-                            if(watcher.condition.path?.endsWith('*')){
+-                                watcher.condition.path=watcher.condition.path.substring(0,watcher.condition.path.length-1);
+-                                watcher.condition.wildcardPath=true;
+-                            }
+                             this.watchers.push(watcher);
+                         }
+                     }
+@@ -1038,8 +1035,8 @@ export abstract class BaseConvoDb implements ConvoDb
+                     continue;
+                 }
+                 if(c.path){
+-                    if(c.wildcardPath){
+-                        if(!nodePath.startsWith(c.path)){
++                    if(w.pathMatcher){
++                        if(!w.pathMatcher(nodePath)){
+                             continue;
+                         }
+                     }else if(c.path!==nodePath){
+@@ -1898,6 +1895,148 @@ const convoNodeKeySelectionToKeys=(sourceKeys:ConvoNodeKeySelection):(keyof Conv
+     return keys;
+ }
+ 
++/**
++ * Creates a matcher for ConvoDb query path glob patterns.
++ *
++ * Query path glob rules:
++ * - `*` matches zero or more characters within one path segment
++ * - `**` matches zero or more complete path segments
++ * - matching is case-sensitive and against the full normalized node path
++ *
++ * @param path Query path or literal node path.
++ */
++const createConvoNodePathMatcher=(path:string):(nodePath:string)=>boolean=>{
++    const p=normalizeConvoNodeQueryPath(path);
++    if(!p){
++        return ()=>false;
++    }
++    if(hasConvoNodePathWildcard(p)){
++        return nodePath=>isConvoNodePathGlobMatch(nodePath,p);
++    }
++    return nodePath=>nodePath===p;
++}
++
++/**
++ * Normalizes a query path. Literal paths use normal node path normalization. Glob paths allow
++ * `*` and `**` while still normalizing duplicate slashes and rejecting `.` / `..` segments.
++ *
++ * @param path Query path.
++ */
++const normalizeConvoNodeQueryPath=(path:string):string|undefined=>(
++    hasConvoNodePathWildcard(path)?
++        normalizeConvoNodePathGlob(path)
++    :
++        normalizeConvoNodePath(path,'none')
++);
++
++/**
++ * Normalizes a ConvoDb query path glob.
++ *
++ * @param path Query path glob.
++ */
++const normalizeConvoNodePathGlob=(path:string):string|undefined=>{
++    if(!path){
++        return undefined;
++    }
++    const parts=path.split('/').filter(p=>p.length);
++    for(const part of parts){
++        if(part==='.' || part==='..' || (part.includes('**') && part!=='**')){
++            return undefined;
++        }
++    }
++    return '/'+parts.join('/');
++}
++
++/**
++ * Returns true if the path contains a wildcard token.
++ *
++ * @param path Path to test.
++ */
++const hasConvoNodePathWildcard=(path:string):boolean=>path.includes('*');
++
++
++/**
++ * Returns true if a normalized node path matches a query path glob.
++ *
++ * @param path Normalized node path.
++ * @param glob Query path glob.
++ */
++const isConvoNodePathGlobMatch=(path:string,glob:string):boolean=>{
++    const p=normalizeConvoNodePath(path,'none');
++    const g=normalizeConvoNodeQueryPath(glob);
++    if(!p || !g){
++        return false;
++    }
++    if(!hasConvoNodePathWildcard(g)){
++        return p===g;
++    }
++
++    const pathSegments=getConvoNodePathSegments(p);
++    const globSegments=getConvoNodePathSegments(g);
++    const memo:Record<string,boolean>={};
++
++    const match=(pathIndex:number,globIndex:number):boolean=>{
++        const memoKey=`${pathIndex}:${globIndex}`;
++        if(memoKey in memo){
++            return memo[memoKey]??false;
++        }
++
++        const globSegment=globSegments[globIndex];
++        let result=false;
++
++        if(globSegment===undefined){
++            result=pathIndex===pathSegments.length;
++        }else if(globSegment==='**'){
++            for(let i=pathIndex;i<=pathSegments.length;i++){
++                if(match(i,globIndex+1)){
++                    result=true;
++                    break;
++                }
++            }
++        }else if(pathIndex<pathSegments.length && isConvoNodePathSegmentGlobMatch(pathSegments[pathIndex]??'',globSegment)){
++            result=match(pathIndex+1,globIndex+1);
++        }
++
++        memo[memoKey]=result;
++        return result;
++    }
++
++    return match(0,0);
++}
++
++/**
++ * Splits a normalized node path into path segments.
++ *
++ * @param path Normalized node path.
++ */
++const getConvoNodePathSegments=(path:string):string[]=>path==='/'?[]:path.substring(1).split('/');
++
++/**
++ * Returns true if a single path segment matches a segment glob.
++ *
++ * @param segment Path segment.
++ * @param glob Segment glob.
++ */
++const isConvoNodePathSegmentGlobMatch=(segment:string,glob:string):boolean=>{
++    if(glob.includes('**')){
++        return false;
++    }
++    let pattern='^';
++    for(let i=0;i<glob.length;i++){
++        const c=glob[i];
++        pattern+=c==='*'?'[^/]*':escapeRegex(c??'');
++    }
++    pattern+='$';
++    return new RegExp(pattern).test(segment);
++}
++
++/**
++ * Escapes regex metacharacters in a string.
++ *
++ * @param value Value to escape.
++ */
++const escapeRegex=(value:string):string=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
++
+ /**
+  * Parses a serialized query traversal token into traversal state.
+  *
+@@ -2014,6 +2153,7 @@ interface WatcherUpdate
+ interface Watcher
+ {
+     condition:ConvoNodeWatchCondition;
++    pathMatcher?:(path:string)=>boolean;
+     next?:(items:WatcherUpdate[]|'ping')=>void;
+     /**
+      * Stores stream items until next can be called.
+@@ -2025,4 +2165,4 @@ interface Watcher
+ 
+     loopCount:number;
+     lastSend:number;
+-}
+\ No newline at end of file
++}
+diff --git a/packages/db/src/BaseSqliteConvoDb.ts b/packages/db/src/BaseSqliteConvoDb.ts
+index 31a9c20..d9b0b89 100644
+--- a/packages/db/src/BaseSqliteConvoDb.ts
++++ b/packages/db/src/BaseSqliteConvoDb.ts
+@@ -1,4 +1,4 @@
+-import { ConvoDbDriverPathsResult, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
++import { ConvoDbDriverPathsResult, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid, ResultType } from "@convo-lang/convo-lang";
+ import { deepClone, getErrorMessage, uuid } from "@iyio/common";
+ import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+ 
+@@ -292,32 +292,48 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
+         },
+         
+         selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
++            const pathResult=normalizeConvoPathGlob(step.path);
++            if(!pathResult.success){
++                return pathResult;
++            }
++
++            const path=pathResult.result;
+             const bind:any[]=[];
+             const where:string[]=[];
+             appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
+ 
+-            if(step.path.endsWith('/*')){
+-                const prefix=step.path.substring(0,step.path.length-1);
+-                where.push(`path LIKE ?`);
+-                bind.push(`${prefix}%`);
+-                where.push(`path != ?`);
+-                bind.push(prefix.substring(0,prefix.length-1));
+-            }else{
++            if(!path.includes('*')){
+                 where.push(`path = ?`);
+-                bind.push(step.path);
++                bind.push(path);
++
++                const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
++                bind.push(limit,offset);
++
++                const r=await this.execSqlAsync(sql,bind);
++                if(!r.success){
++                    return r;
++                }
++
++                return {
++                    success:true,
++                    result:{paths:r.result.map(v=>String(v.path))}
++                };
+             }
+ 
+-            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
+-            bind.push(limit,offset);
++            appendPathGlobCandidateFilter(where,bind,path,'path');
+ 
++            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)}`;
+             const r=await this.execSqlAsync(sql,bind);
+             if(!r.success){
+                 return r;
+             }
+ 
++            const matches=createPathGlobMatcher(path);
++            const paths=r.result.map(v=>String(v.path)).filter(matches).slice(offset,offset+limit);
++
+             return {
+                 success:true,
+-                result:{paths:r.result.map(v=>String(v.path))}
++                result:{paths}
+             };
+         },
+ 
+@@ -1123,6 +1139,142 @@ const appendCurrentNodePathsFilter=(where:string[],bind:any[],currentNodePaths:s
+     }
+ }
+ 
++const normalizeConvoPathGlob=(path:string):ResultType<string>=>{
++    let normalized=path.replace(/\/+/g,'/');
++    if(normalized.length>1 && normalized.endsWith('/')){
++        normalized=normalized.substring(0,normalized.length-1);
++    }
++    if(!normalized){
++        normalized='/';
++    }
++
++    const parts=splitNormalizedPathSegments(normalized);
++    if(parts.some(p=>p==='.' || p==='..')){
++        return {
++            success:false,
++            error:`Invalid query path. "." and ".." path segments are not allowed - ${path}`,
++            statusCode:400,
++        };
++    }
++    if(parts.some(p=>p.includes('**') && p!=='**')){
++        return {
++            success:false,
++            error:`Invalid query path. "**" wildcard must be a complete path segment - ${path}`,
++            statusCode:400,
++        };
++    }
++
++    return {
++        success:true,
++        result:normalized,
++    };
++}
++
++const splitNormalizedPathSegments=(path:string):string[]=>{
++    if(path==='/' || !path){
++        return [];
++    }
++    return path.replace(/^\/+/,'').split('/').filter(Boolean);
++}
++
++const createPathGlobMatcher=(glob:string):(path:string)=>boolean=>{
++    const patternSegments=splitNormalizedPathSegments(glob);
++    const segmentMatchers=patternSegments.map(s=>s==='**'?null:createSegmentGlobMatcher(s));
++
++    return (path:string)=>{
++        const pathSegments=splitNormalizedPathSegments(path);
++        const memo=new Set<string>();
++
++        const match=(patternIndex:number,pathIndex:number):boolean=>{
++            const key=`${patternIndex}:${pathIndex}`;
++            if(memo.has(key)){
++                return false;
++            }
++
++            if(patternIndex>=patternSegments.length){
++                return pathIndex>=pathSegments.length;
++            }
++
++            const patternSegment=patternSegments[patternIndex];
++            if(patternSegment==='**'){
++                if(patternIndex===patternSegments.length-1){
++                    return true;
++                }
++                for(let i=pathIndex;i<=pathSegments.length;i++){
++                    if(match(patternIndex+1,i)){
++                        return true;
++                    }
++                }
++                memo.add(key);
++                return false;
++            }
++
++            if(pathIndex>=pathSegments.length){
++                memo.add(key);
++                return false;
++            }
++
++            const matcher=segmentMatchers[patternIndex];
++            if(!matcher?.test(pathSegments[pathIndex]!)){
++                memo.add(key);
++                return false;
++            }
++
++            const matched=match(patternIndex+1,pathIndex+1);
++            if(!matched){
++                memo.add(key);
++            }
++            return matched;
++        }
++
++        return match(0,0);
++    }
++}
++
++const createSegmentGlobMatcher=(glob:string):RegExp=>{
++    let pattern='^';
++    for(const ch of glob){
++        pattern+=ch==='*'?'[^/]*':escapeRegExp(ch);
++    }
++    pattern+='$';
++    return new RegExp(pattern);
++}
++
++const appendPathGlobCandidateFilter=(where:string[],bind:any[],glob:string,columnName:string)=>{
++    const firstWildcard=glob.indexOf('*');
++    if(firstWildcard<0){
++        where.push(`${columnName} = ?`);
++        bind.push(glob);
++        return;
++    }
++
++    const prefix=glob.substring(0,firstWildcard);
++    if(!prefix || prefix==='/'){
++        return;
++    }
++
++    if(prefix.endsWith('/')){
++        const base=prefix.substring(0,prefix.length-1) || '/';
++        if(base==='/'){
++            return;
++        }
++
++        where.push(`(${columnName} = ? OR ${columnName} LIKE ? ESCAPE '\\')`);
++        bind.push(base,`${escapeSqlLikeLiteral(prefix)}%`);
++    }else{
++        where.push(`${columnName} LIKE ? ESCAPE '\\'`);
++        bind.push(`${escapeSqlLikeLiteral(prefix)}%`);
++    }
++}
++
++const escapeRegExp=(value:string)=>{
++    return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
++}
++
++const escapeSqlLikeLiteral=(value:string)=>{
++    return value.replace(/\\/g,'\\\\').replace(/%/g,'\\%').replace(/_/g,'\\_');
++}
++
+ const buildNodeOrderByClause=(orderBy:ConvoNodeOrderBy[],alias='')=>{
+     if(!orderBy.length){
+         return '';
+diff --git a/packages/db/src/InMemoryConvoDb.ts b/packages/db/src/InMemoryConvoDb.ts
+index cafb0ff..e716ed1 100644
+--- a/packages/db/src/InMemoryConvoDb.ts
++++ b/packages/db/src/InMemoryConvoDb.ts
+@@ -1,7 +1,7 @@
+ import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
+ import { deepClone, uuid } from "@iyio/common";
+ import { BaseConvoDb } from "./BaseConvoDb.js";
+-import { doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues, compareJsonQueryValues } from "./json-query.js";
++import { compareJsonQueryValues, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
+ 
+ 
+ export class InMemoryConvoDb extends BaseConvoDb
+@@ -129,7 +129,7 @@ export class InMemoryConvoDb extends BaseConvoDb
+         selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
+             const nodes=this.getCandidateNodes(currentNodePaths);
+ 
+-            const matched=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
++            const matched=nodes.filter(node=>doesInMemoryConvoDbPathMatchStepPath(node.path,step.path));
+ 
+             sortJsonQueryValues(matched,orderBy);
+ 
+@@ -583,3 +583,77 @@ export class InMemoryConvoDb extends BaseConvoDb
+         return getJsonQueryPermissionValue(this.edges.values(),fromPath,toPath);
+     }
+ }
++
++const doesInMemoryConvoDbPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
++    const nodeSegments=normalizeInMemoryConvoDbPath(nodePath);
++    const stepSegments=normalizeInMemoryConvoDbPath(stepPath);
++
++    if(!nodeSegments || !stepSegments){
++        return false;
++    }
++
++    const cache=new Map<string,boolean>();
++
++    const match=(stepIndex:number,nodeIndex:number):boolean=>{
++        const cacheKey=`${stepIndex}:${nodeIndex}`;
++        const cached=cache.get(cacheKey);
++        if(cached!==undefined){
++            return cached;
++        }
++
++        const result=(
++            stepIndex===stepSegments.length?
++                nodeIndex===nodeSegments.length
++            :stepSegments[stepIndex]==='**'?
++                doesInMemoryConvoDbRecursiveWildcardMatch(stepIndex,nodeIndex,stepSegments,nodeSegments,match)
++            :nodeIndex<nodeSegments.length && doesInMemoryConvoDbSegmentMatch(nodeSegments[nodeIndex]??'',stepSegments[stepIndex]??'')?
++                match(stepIndex+1,nodeIndex+1)
++            :
++                false
++        );
++
++        cache.set(cacheKey,result);
++        return result;
++    }
++
++    return match(0,0);
++}
++
++const doesInMemoryConvoDbRecursiveWildcardMatch=(
++    stepIndex:number,
++    nodeIndex:number,
++    stepSegments:string[],
++    nodeSegments:string[],
++    match:(stepIndex:number,nodeIndex:number)=>boolean
++):boolean=>{
++    for(let i=nodeIndex;i<=nodeSegments.length;i++){
++        if(match(stepIndex+1,i)){
++            return true;
++        }
++    }
++    return false;
++}
++
++const normalizeInMemoryConvoDbPath=(path:string):string[]|null=>{
++    const segments=path.split('/').filter(segment=>segment.length>0);
++
++    for(const segment of segments){
++        if(segment==='.' || segment==='..'){
++            return null;
++        }
++    }
++
++    return segments;
++}
++
++const doesInMemoryConvoDbSegmentMatch=(segment:string,stepSegment:string):boolean=>{
++    if(stepSegment==='*'){
++        return true;
++    }
++
++    const pattern=stepSegment
++        .replace(/[.+?^${}()|[\]\\]/g,'\\$&')
++        .replace(/\*/g,'[^/]*');
++
++    return new RegExp(`^${pattern}$`).test(segment);
++}
+diff --git a/packages/db/src/IndexDbConvoDb.ts b/packages/db/src/IndexDbConvoDb.ts
+index b2dfc1e..74f4279 100644
+--- a/packages/db/src/IndexDbConvoDb.ts
++++ b/packages/db/src/IndexDbConvoDb.ts
+@@ -35,7 +35,6 @@ import { BaseConvoDb, BaseConvoDbOptions } from './BaseConvoDb.js';
+ import {
+     doesJsonQueryEdgeMatchQuery,
+     doesJsonQueryEmbeddingMatchQuery,
+-    doesJsonQueryPathMatchStepPath,
+     evaluateJsonQueryCondition,
+     hasJsonQueryPermission,
+     selectJsonQueryEdgeDestinationPaths,
+@@ -331,7 +330,7 @@ export class IndexDbConvoDbDriver implements ConvoDbDriver
+     ):PromiseResultType<ConvoDbDriverPathsResult>{
+         try{
+             const nodes=await this._selectCandidateNodesAsync(currentNodePaths);
+-            const filtered=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
++            const filtered=nodes.filter(node=>doesQueryPathMatchNodePath(node.path,step.path));
+             return success(pathsResult(filtered,orderBy,limit,offset,nextToken));
+         }catch(ex){
+             return errorResult(ex);
+@@ -747,6 +746,71 @@ const transactionComplete=(tx:IDBTransaction):Promise<void>=>
+         tx.onabort=()=>reject(tx.error??new Error('IndexedDB transaction aborted'));
+     });
+ 
++const doesQueryPathMatchNodePath=(nodePath:string,queryPath:string):boolean=>{
++    const nodeSegments=normalizeQueryPathToSegments(nodePath);
++    const querySegments=normalizeQueryPathToSegments(queryPath);
++    if(!nodeSegments || !querySegments){
++        return false;
++    }
++    return doPathSegmentsMatch(nodeSegments,querySegments,0,0);
++};
++
++const normalizeQueryPathToSegments=(path:string):string[]|null=>{
++    let normalized=path.replace(/\/+/g,'/');
++    if(!normalized.startsWith('/')){
++        normalized='/'+normalized;
++    }
++    while(normalized.length>1 && normalized.endsWith('/')){
++        normalized=normalized.slice(0,-1);
++    }
++
++    if(normalized==='/'){
++        return [];
++    }
++
++    const segments=normalized.slice(1).split('/');
++    return segments.some(segment=>segment==='.' || segment==='..')?null:segments;
++};
++
++const doPathSegmentsMatch=(
++    nodeSegments:string[],
++    querySegments:string[],
++    nodeIndex:number,
++    queryIndex:number
++):boolean=>{
++    if(queryIndex===querySegments.length){
++        return nodeIndex===nodeSegments.length;
++    }
++
++    const querySegment=querySegments[queryIndex]??'';
++    if(querySegment==='**'){
++        for(let i=nodeIndex;i<=nodeSegments.length;i++){
++            if(doPathSegmentsMatch(nodeSegments,querySegments,i,queryIndex+1)){
++                return true;
++            }
++        }
++        return false;
++    }
++
++    if(nodeIndex>=nodeSegments.length || querySegment.includes('**')){
++        return false;
++    }
++
++    return doesPathSegmentMatch(nodeSegments[nodeIndex]??'',querySegment) &&
++        doPathSegmentsMatch(nodeSegments,querySegments,nodeIndex+1,queryIndex+1);
++};
++
++const doesPathSegmentMatch=(nodeSegment:string,querySegment:string):boolean=>{
++    let regex='';
++    for(const ch of querySegment){
++        regex+=ch==='*'?'[^/]*':escapeRegexChar(ch);
++    }
++    return new RegExp(`^${regex}$`).test(nodeSegment);
++};
++
++const escapeRegexChar=(ch:string):string=>
++    /[\\^$.*+?()[\]{}|]/.test(ch)?`\\${ch}`:ch;
++
+ const pathsResult=(
+     nodes:ConvoNode[],
+     orderBy:ConvoNodeOrderBy[],
+diff --git a/packages/db/src/LayeredConvoDb.ts b/packages/db/src/LayeredConvoDb.ts
+index 1c062d8..9e60457 100644
+--- a/packages/db/src/LayeredConvoDb.ts
++++ b/packages/db/src/LayeredConvoDb.ts
+@@ -151,12 +151,22 @@ export class LayeredConvoDb extends BaseConvoDb
+     }
+ 
+     private scopePathToMountPoint(path:string,mountPoint:string):string{
+-        if(!path.endsWith('*') || path.length>mountPoint.length){
++        if(!hasConvoPathWildcard(path)){
+             return path;
+-        }else{
+-            return (mountPoint.endsWith('/')?mountPoint:mountPoint+'/')+'*';
+         }
+ 
++        const mountRoot=getMountPointRoot(mountPoint);
++        const prefix=getConvoPathLiteralPrefix(path);
++
++        if(path.endsWith('/**') && mountPoint.startsWith(prefix)){
++            return mountRoot==='/'?'/**':`${mountRoot}/**`;
++        }
++
++        if(pathMatchesConvoGlob(path,mountRoot)){
++            return mountRoot;
++        }
++
++        return path;
+     }
+ 
+     private filterCurrentPaths(currentPaths:string[]|null,mountPoint:string):string[]|null{
+@@ -256,21 +266,18 @@ export class LayeredConvoDb extends BaseConvoDb
+         }
+         path=p;
+ 
+-        const wildcard=path.endsWith('*');
+-        
+-        if(path.endsWith('*')){
+-            path=path.substring(0,path.length-1);
+-        }
+-        if(!path.endsWith('/')){
+-            path+='/'
+-        }
+-
++        const wildcard=hasConvoPathWildcard(path);
++        const lookupPath=wildcard?getConvoPathLiteralPrefix(path):ensureTrailingSlash(path);
+ 
+         for(let i=0;i<this.layers.length && (wildcard || !layers.length) && (limit===undefined?true:layers.length<limit);i++){
+             const layer=this.layers[i];
+             if( !layer ||
+                 !hasSupport(layer,support) ||
+-                !(path.startsWith(layer.mountPoint) || (wildcard?layer.mountPoint.startsWith(path):false))
++                !(wildcard?
++                    lookupPath.startsWith(layer.mountPoint) || layer.mountPoint.startsWith(lookupPath)
++                :
++                    lookupPath.startsWith(layer.mountPoint)
++                )
+             ){
+                 continue;
+             }
+@@ -466,7 +473,7 @@ export class LayeredConvoDb extends BaseConvoDb
+         },
+         selectNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "condition">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+             return await this.selectForStepAsync(
+-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
++                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                     return group.db._driver.selectNodePathsForConditionAsync(
+                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
+@@ -476,7 +483,7 @@ export class LayeredConvoDb extends BaseConvoDb
+         },
+         selectNodePathsForPermissionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "permissionFrom" | "permissionRequired">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+             return await this.selectForStepAsync(
+-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
++                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                     return group.db._driver.selectNodePathsForPermissionAsync(
+                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
+@@ -486,7 +493,7 @@ export class LayeredConvoDb extends BaseConvoDb
+         },
+         selectNodePathsForEmbeddingAsync:async (step: Required<Pick<ConvoNodeQueryStep, "embedding">>, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+             return await this.selectForStepAsync(
+-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
++                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                     return group.db._driver.selectNodePathsForEmbeddingAsync(
+                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
+@@ -496,7 +503,7 @@ export class LayeredConvoDb extends BaseConvoDb
+         },
+         selectEdgeNodePathsForConditionAsync:async (step: Required<Pick<ConvoNodeQueryStep, "edge" | "edgeDirection">> & Pick<ConvoNodeQueryStep, "edgeLimit">, currentNodePaths: string[] | null, orderBy: ConvoNodeOrderBy[], limit: number, offset: number, nextToken: string | undefined): PromiseResultType<ConvoDbDriverPathsResult>=>{
+             return await this.selectForStepAsync(
+-                currentNodePaths??['/*'],step,currentNodePaths,orderBy,limit,offset,nextToken,
++                currentNodePaths??['/**'],step,currentNodePaths,orderBy,limit,offset,nextToken,
+                 (state,group,path,step,currentNodePaths,orderBy,limit,offset,nextToken)=>{
+                     return group.db._driver.selectEdgeNodePathsForConditionAsync(
+                         step as any,currentNodePaths,orderBy,limit,offset,nextToken
+@@ -695,7 +702,7 @@ export class LayeredConvoDb extends BaseConvoDb
+                     result:{edges:[]}
+                 }
+             }
+-            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
++            const layers=this.getLayersByPath({supportsEdges:true},query.from??'/**');
+             const state=getQueryToken(query.nextToken);
+             const offset=query.offset??0;
+             for(;state.i<layers.length;state.i++){
+@@ -775,7 +782,7 @@ export class LayeredConvoDb extends BaseConvoDb
+                     result:{embeddings:[]}
+                 }
+             }
+-            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
++            const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/**');
+             const state=getQueryToken(query.nextToken);
+             const offset=query.offset??0;
+             for(;state.i<layers.length;state.i++){
+@@ -853,7 +860,7 @@ export class LayeredConvoDb extends BaseConvoDb
+     private async getEdgeTotalAsync(query:ConvoNodeEdgeQuery):PromiseResultType<number>
+     {
+         let total=0;
+-        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/*');
++        const layers=this.getLayersByPath({supportsEdges:true},query.from??'/**');
+         for(const layer of layers){
+             const initR=await this.initLayerAsync(layer);
+             if(!initR.success){
+@@ -885,7 +892,7 @@ export class LayeredConvoDb extends BaseConvoDb
+     private async getEmbeddingTotalAsync(query:ConvoNodeEmbeddingQuery):PromiseResultType<number>
+     {
+         let total=0;
+-        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/*');
++        const layers=this.getLayersByPath({supportsEmbeddings:true},query.path??'/**');
+         for(const layer of layers){
+             const initR=await this.initLayerAsync(layer);
+             if(!initR.success){
+@@ -941,6 +948,102 @@ const getQueryToken=(token?:string):QueryToken=>{
+ 
+ }
+ 
++const hasConvoPathWildcard=(path:string):boolean=>{
++    return path.includes('*');
++}
++
++const ensureTrailingSlash=(path:string):string=>{
++    return path.endsWith('/')?path:`${path}/`;
++}
++
++const getMountPointRoot=(mountPoint:string):string=>{
++    return mountPoint==='/'?'/':mountPoint.substring(0,mountPoint.length-1);
++}
++
++const getConvoPathLiteralPrefix=(path:string):string=>{
++    const i=path.indexOf('*');
++    if(i===-1){
++        return ensureTrailingSlash(path);
++    }
++
++    const slash=path.lastIndexOf('/',i);
++    if(slash<0){
++        return '/';
++    }
++
++    const prefix=path.substring(0,slash+1);
++    return prefix || '/';
++}
++
++const getConvoPathSegments=(path:string):string[]=>{
++    if(path==='/'){
++        return [];
++    }
++
++    const start=path.startsWith('/')?1:0;
++    const end=path.endsWith('/')?path.length-1:path.length;
++    const p=path.substring(start,end);
++
++    return p?p.split('/'):[];
++}
++
++const escapeRegex=(value:string):string=>{
++    return value.replace(/[|\\{}()[\]^$+?.]/g,'\\$&');
++}
++
++const pathSegmentMatchesConvoGlob=(pattern:string,segment:string):boolean=>{
++    if(pattern==='*'){
++        return true;
++    }
++
++    if(!pattern.includes('*')){
++        return pattern===segment;
++    }
++
++    const regex=new RegExp(`^${pattern.split('*').map(escapeRegex).join('[^/]*')}$`);
++    return regex.test(segment);
++}
++
++const pathMatchesConvoGlob=(pattern:string,path:string):boolean=>{
++    if(!hasConvoPathWildcard(pattern)){
++        return pattern===path;
++    }
++
++    const patternSegments=getConvoPathSegments(pattern);
++    const pathSegments=getConvoPathSegments(path);
++
++    const match=(patternIndex:number,pathIndex:number):boolean=>{
++        if(patternIndex===patternSegments.length){
++            return pathIndex===pathSegments.length;
++        }
++
++        const segment=patternSegments[patternIndex];
++        if(segment==='**'){
++            if(patternIndex===patternSegments.length-1){
++                return true;
++            }
++
++            for(let i=pathIndex;i<=pathSegments.length;i++){
++                if(match(patternIndex+1,i)){
++                    return true;
++                }
++            }
++            return false;
++        }
++
++        if(pathIndex>=pathSegments.length){
++            return false;
++        }
++
++        return pathSegmentMatchesConvoGlob(segment!,pathSegments[pathIndex]!)?
++            match(patternIndex+1,pathIndex+1)
++        :
++            false;
++    }
++
++    return match(0,0);
++}
++
+ interface QueryToken
+ {
+     /**
+diff --git a/packages/db/src/LocalStorageConvoDb.ts b/packages/db/src/LocalStorageConvoDb.ts
+index 8a81e2b..c5178e5 100644
+--- a/packages/db/src/LocalStorageConvoDb.ts
++++ b/packages/db/src/LocalStorageConvoDb.ts
+@@ -1,7 +1,7 @@
+ import { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
+ import { deepClone, uuid } from "@iyio/common";
+ import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+-import { compareJsonQueryValues, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
++import { compareJsonQueryValues, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
+ 
+ export interface LocalStorageConvoDbInf
+ {
+@@ -276,7 +276,7 @@ export class LocalStorageConvoDbDriver implements ConvoDbDriver
+ 
+     public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+         const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+-        const matched=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
++        const matched=nodes.filter(node=>doesConvoDbQueryPathMatchPath(node.path,step.path));
+ 
+         sortJsonQueryValues(matched,orderBy);
+ 
+@@ -853,3 +853,83 @@ const base64ToBytes=(base64:string):Uint8Array<ArrayBuffer>=>{
+     }
+     return bytes;
+ }
++
++const doesConvoDbQueryPathMatchPath=(path:string,queryPath:string):boolean=>{
++    const pathSegments=getNormalizedConvoDbPathSegments(path);
++    const querySegments=getNormalizedConvoDbPathSegments(queryPath);
++
++    if(!pathSegments || !querySegments){
++        return false;
++    }
++
++    const memo=new Map<string,boolean>();
++
++    const match=(pathIndex:number,queryIndex:number):boolean=>{
++        const key=`${pathIndex}:${queryIndex}`;
++        const memoValue=memo.get(key);
++        if(memoValue!==undefined){
++            return memoValue;
++        }
++
++        let value:boolean;
++
++        if(queryIndex>=querySegments.length){
++            value=pathIndex>=pathSegments.length;
++        }else{
++            const querySegment=querySegments[queryIndex];
++
++            if(querySegment==='**'){
++                if(queryIndex===querySegments.length-1){
++                    value=true;
++                }else{
++                    value=false;
++                    for(let i=pathIndex;i<=pathSegments.length;i++){
++                        if(match(i,queryIndex+1)){
++                            value=true;
++                            break;
++                        }
++                    }
++                }
++            }else{
++                value=pathIndex<pathSegments.length &&
++                    doesConvoDbQueryPathSegmentMatchPathSegment(pathSegments[pathIndex]??'',querySegment??'') &&
++                    match(pathIndex+1,queryIndex+1);
++            }
++        }
++
++        memo.set(key,value);
++        return value;
++    }
++
++    return match(0,0);
++}
++
++const getNormalizedConvoDbPathSegments=(path:string):string[]|null=>{
++    path=path.replace(/\/+/g,'/');
++
++    while(path.length>1 && path.endsWith('/')){
++        path=path.substring(0,path.length-1);
++    }
++
++    if(path===''){
++        path='/';
++    }
++
++    const segments=path==='/'?[]:path.split('/').filter(v=>v);
++
++    return segments.some(segment=>segment==='.' || segment==='..' || (segment.includes('**') && segment!=='**'))?
++        null:
++        segments;
++}
++
++const doesConvoDbQueryPathSegmentMatchPathSegment=(pathSegment:string,querySegment:string):boolean=>{
++    if(querySegment.indexOf('*')===-1){
++        return pathSegment===querySegment;
++    }
++
++    return new RegExp(`^${escapeConvoDbQueryPathRegex(querySegment).replace(/\*/g,'[^/]*')}$`).test(pathSegment);
++}
++
++const escapeConvoDbQueryPathRegex=(value:string):string=>{
++    return value.replace(/[.+?^${}()|[\]\\]/g,'\\$&');
++}
+diff --git a/packages/db/src/json-query.ts b/packages/db/src/json-query.ts
+index a82e866..64ad0f6 100644
+--- a/packages/db/src/json-query.ts
++++ b/packages/db/src/json-query.ts
+@@ -127,11 +127,67 @@ export const jsonQueryWildcardMatch=(value:string,pattern:string,ignoreCase=fals
+  * Matches a node path against a query step path.
+  */
+ export const doesJsonQueryPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
+-    if(!stepPath.includes('*')){
+-        return nodePath===stepPath;
++    const normalizedStepPath=normalizeJsonQueryStepPath(stepPath);
++    if(normalizedStepPath===null){
++        return false;
++    }
++    if(!normalizedStepPath.includes('*')){
++        return nodePath===normalizedStepPath;
++    }
++    if(nodePath.startsWith('/')!==normalizedStepPath.startsWith('/')){
++        return false;
++    }
++
++    const nodeSegments=getJsonQueryPathSegments(nodePath);
++    const stepSegments=getJsonQueryPathSegments(normalizedStepPath);
++
++    return doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,0,0);
++}
++
++const normalizeJsonQueryStepPath=(stepPath:string):string|null=>{
++    let normalized=stepPath.replace(/\/+/g,'/');
++    if(normalized.length>1 && normalized.endsWith('/')){
++        normalized=normalized.slice(0,-1);
++    }
++
++    const segments=getJsonQueryPathSegments(normalized);
++    return segments.some(segment=>segment==='.' || segment==='..')?null:normalized;
++}
++
++const getJsonQueryPathSegments=(path:string):string[]=>{
++    const start=path.startsWith('/')?1:0;
++    const end=path.length>1 && path.endsWith('/')?path.length-1:path.length;
++    return start>=end?[]:path.slice(start,end).split('/');
++}
++
++const doJsonQueryPathSegmentsMatch=(nodeSegments:string[],stepSegments:string[],nodeIndex:number,stepIndex:number):boolean=>{
++    if(stepIndex>=stepSegments.length){
++        return nodeIndex>=nodeSegments.length;
+     }
+-    const prefix=stepPath.slice(0,-1);
+-    return nodePath.startsWith(prefix) && nodePath.length>prefix.length;
++
++    const stepSegment=stepSegments[stepIndex];
++    if(stepSegment==='**'){
++        if(stepIndex===stepSegments.length-1){
++            return true;
++        }
++        for(let i=nodeIndex;i<=nodeSegments.length;i++){
++            if(doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,i,stepIndex+1)){
++                return true;
++            }
++        }
++        return false;
++    }
++
++    return (
++        nodeIndex<nodeSegments.length &&
++        doesJsonQueryPathSegmentMatch(nodeSegments[nodeIndex]??'',stepSegment??'') &&
++        doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,nodeIndex+1,stepIndex+1)
++    );
++}
++
++const doesJsonQueryPathSegmentMatch=(nodeSegment:string,stepSegment:string):boolean=>{
++    const escaped=stepSegment.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'[^/]*');
++    return new RegExp(`^${escaped}$`).test(nodeSegment);
+ }
+ 
+ /**
+
+</DIFF>
+
+@time 2026-05-14T18:36:10-04:00
+@tokenUsage 18956 / 5327 / $0.12141500000000001
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="json-query.ts" target-output-path="../../packages/db/src/json-query.ts" dirty file-hash="774451a5773a3a588743394129925920084da5ba" last-commit="8793c9cd74bd0e3722eff5e811192fed7f3dbc0e">
+``` ts
+import { ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition, normalizeConvoNodePath } from "@convo-lang/convo-lang";
+
+export interface JsonQuerySortOptions<T>
+{
+    pathOrder?:string[];
+    getPath?:(value:T)=>string;
+    nullsLast?:boolean;
+}
+
+/**
+ * Selects keys from a JSON object.
+ */
+export const selectJsonQueryKeys=<T extends Record<string,any>>(source:T,keys:(keyof T)[]|'*',cloneValue?:(value:any)=>any):Partial<T>=>{
+    if(keys==='*'){
+        return cloneValue?cloneValue(source):source;
+    }
+
+    const obj:Partial<T>={};
+    for(const key of keys){
+        obj[key]=cloneValue?cloneValue(source[key]):source[key];
+    }
+    return obj;
+}
+
+/**
+ * Gets a nested value from an object using dot notation.
+ */
+export const getJsonQueryValueByPath=(obj:any,path:string):any=>{
+    if(!path){
+        return undefined;
+    }
+
+    const parts=path.split('.');
+    let current=obj;
+
+    for(const part of parts){
+        if(current===undefined || current===null){
+            return undefined;
+        }
+        current=current[part];
+    }
+
+    return current;
+}
+
+/**
+ * Evaluates a ConvoNodeCondition against any JSON object.
+ */
+export const evaluateJsonQueryCondition=(target:any,condition:ConvoNodeCondition):boolean=>{
+    if(isConvoNodePropertyCondition(condition)){
+        const left=getJsonQueryValueByPath(target,condition.target);
+        const right=condition.value;
+
+        switch(condition.op){
+            case '=':
+                return areJsonQueryValuesEqual(left,right);
+            case '!=':
+                return !areJsonQueryValuesEqual(left,right);
+            case '>':
+                return left>right;
+            case '<':
+                return left<right;
+            case '>=':
+                return left>=right;
+            case '<=':
+                return left<=right;
+            case 'in':
+                return Array.isArray(right)?right.some(v=>areJsonQueryValuesEqual(v,left)):false;
+            case 'all-in':
+                return Array.isArray(left) && Array.isArray(right)?left.every(v=>right.some(rv=>areJsonQueryValuesEqual(rv,v))):false;
+            case 'any-in':
+                return Array.isArray(left) && Array.isArray(right)?left.some(v=>right.some(rv=>areJsonQueryValuesEqual(rv,v))):false;
+            case 'contains':
+                return Array.isArray(left)?left.some(v=>areJsonQueryValuesEqual(v,right)):false;
+            case 'contains-all':
+                return Array.isArray(left) && Array.isArray(right)?right.every(v=>left.some(lv=>areJsonQueryValuesEqual(lv,v))):false;
+            case 'contains-any':
+                return Array.isArray(left) && Array.isArray(right)?right.some(v=>left.some(lv=>areJsonQueryValuesEqual(lv,v))):false;
+            case 'like':
+                return jsonQueryWildcardMatch(String(left??''),String(right),false);
+            case 'ilike':
+                return jsonQueryWildcardMatch(String(left??''),String(right),true);
+            default:
+                return false;
+        }
+    }
+
+    if(isConvoNodeGroupCondition(condition)){
+        if(!condition.conditions.length){
+            return false;
+        }
+        switch(condition.groupOp){
+            case 'and':
+                return condition.conditions.every(c=>evaluateJsonQueryCondition(target,c));
+            case 'or':
+                return condition.conditions.some(c=>evaluateJsonQueryCondition(target,c));
+            default:
+                return false;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Compares JSON primitive values. Non-strict equality falls back to string comparison.
+ */
+export const areJsonQueryValuesEqual=(a:any,b:any):boolean=>{
+    if(a===b){
+        return true;
+    }
+    if(a===undefined || a===null || b===undefined || b===null){
+        return false;
+    }
+    return String(a)===String(b);
+}
+
+/**
+ * Matches a string against a `*` wildcard pattern.
+ */
+export const jsonQueryWildcardMatch=(value:string,pattern:string,ignoreCase=false):boolean=>{
+    const escaped=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*');
+    return new RegExp(`^${escaped}$`,ignoreCase?'i':undefined).test(value);
+}
+
+/**
+ * Matches a node path against a query step path.
+ */
+export const doesJsonQueryPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
+    return createJsonQueryPathMatcher(stepPath)(nodePath);
+}
+
+/**
+ * Creates a matcher for ConvoDb query step paths.
+ */
+export const createJsonQueryPathMatcher=(stepPath:string):(nodePath:string)=>boolean=>{
+    const normalizedStepPath=normalizeJsonQueryStepPath(stepPath);
+    if(normalizedStepPath===null){
+        return ()=>false;
+    }
+
+    if(!hasJsonQueryPathWildcard(normalizedStepPath)){
+        return nodePath=>normalizeConvoNodePath(nodePath,'none')===normalizedStepPath;
+    }
+
+    const stepSegments=getJsonQueryPathSegments(normalizedStepPath);
+
+    return nodePath=>{
+        const normalizedNodePath=normalizeConvoNodePath(nodePath,'none');
+        if(normalizedNodePath===undefined){
+            return false;
+        }
+
+        return doJsonQueryPathSegmentsMatch(getJsonQueryPathSegments(normalizedNodePath),stepSegments,0,0,new Map());
+    }
+}
+
+/**
+ * Normalizes a query step path.
+ */
+export const normalizeJsonQueryStepPath=(stepPath:string):string|null=>{
+    return normalizeConvoNodePath(stepPath,'any')??null;
+}
+
+/**
+ * Returns true if a query path contains a wildcard token.
+ */
+export const hasJsonQueryPathWildcard=(path:string):boolean=>{
+    return path.includes('*');
+}
+
+/**
+ * Returns the literal path prefix before the first wildcard segment.
+ */
+export const getJsonQueryPathLiteralPrefix=(path:string):string=>{
+    const normalized=normalizeJsonQueryStepPath(path)??path;
+    const firstWildcard=normalized.indexOf('*');
+    if(firstWildcard<0){
+        return ensureJsonQueryTrailingSlash(normalized);
+    }
+
+    const slash=normalized.lastIndexOf('/',firstWildcard);
+    if(slash<0){
+        return '/';
+    }
+
+    return normalized.substring(0,slash+1) || '/';
+}
+
+/**
+ * Appends a SQL filter that narrows candidates for a query path glob.
+ */
+export const appendJsonQueryPathGlobCandidateFilter=(where:string[],bind:any[],glob:string,columnName:string):void=>{
+    const firstWildcard=glob.indexOf('*');
+    if(firstWildcard<0){
+        where.push(`${columnName} = ?`);
+        bind.push(glob);
+        return;
+    }
+
+    const prefix=glob.substring(0,firstWildcard);
+    if(!prefix || prefix==='/'){
+        return;
+    }
+
+    if(prefix.endsWith('/')){
+        const base=prefix.substring(0,prefix.length-1) || '/';
+        if(base==='/'){
+            return;
+        }
+
+        where.push(`(${columnName} = ? OR ${columnName} LIKE ? ESCAPE '\\')`);
+        bind.push(base,`${escapeJsonQuerySqlLikeLiteral(prefix)}%`);
+    }else{
+        where.push(`${columnName} LIKE ? ESCAPE '\\'`);
+        bind.push(`${escapeJsonQuerySqlLikeLiteral(prefix)}%`);
+    }
+}
+
+const ensureJsonQueryTrailingSlash=(path:string):string=>{
+    return path.endsWith('/')?path:`${path}/`;
+}
+
+const getJsonQueryPathSegments=(path:string):string[]=>{
+    return path==='/'?[]:path.slice(1).split('/');
+}
+
+const doJsonQueryPathSegmentsMatch=(nodeSegments:string[],stepSegments:string[],nodeIndex:number,stepIndex:number,memo:Map<string,boolean>):boolean=>{
+    const memoKey=`${nodeIndex}:${stepIndex}`;
+    const memoValue=memo.get(memoKey);
+    if(memoValue!==undefined){
+        return memoValue;
+    }
+
+    let result:boolean;
+
+    if(stepIndex>=stepSegments.length){
+        result=nodeIndex>=nodeSegments.length;
+    }else{
+        const stepSegment=stepSegments[stepIndex];
+
+        if(stepSegment==='**'){
+            result=false;
+            for(let i=nodeIndex;i<=nodeSegments.length;i++){
+                if(doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,i,stepIndex+1,memo)){
+                    result=true;
+                    break;
+                }
+            }
+        }else{
+            result=(
+                nodeIndex<nodeSegments.length &&
+                doesJsonQueryPathSegmentMatch(nodeSegments[nodeIndex]??'',stepSegment??'') &&
+                doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,nodeIndex+1,stepIndex+1,memo)
+            );
+        }
+    }
+
+    memo.set(memoKey,result);
+    return result;
+}
+
+const doesJsonQueryPathSegmentMatch=(nodeSegment:string,stepSegment:string):boolean=>{
+    if(stepSegment.includes('**')){
+        return false;
+    }
+    const escaped=stepSegment.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'[^/]*');
+    return new RegExp(`^${escaped}$`).test(nodeSegment);
+}
+
+const escapeJsonQuerySqlLikeLiteral=(value:string):string=>{
+    return value.replace(/\\/g,'\\\\').replace(/%/g,'\\%').replace(/_/g,'\\_');
+}
+
+/**
+ * Sorts JSON values by ConvoNodeOrderBy rules.
+ */
+export const sortJsonQueryValues=<T>(values:T[],orderBy:ConvoNodeOrderBy[],options?:JsonQuerySortOptions<T>):void=>{
+    const pathIndex=options?.pathOrder && options.getPath?
+        new Map(options.pathOrder.map((path,index)=>[path,index])):
+        undefined;
+
+    values.sort((a,b)=>{
+        for(const order of orderBy){
+            const av=getJsonQueryValueByPath(a,order.prop);
+            const bv=getJsonQueryValueByPath(b,order.prop);
+            const cmp=compareJsonQueryValues(av,bv,options?.nullsLast);
+            if(cmp!==0){
+                return order.direction==='desc'?-cmp:cmp;
+            }
+        }
+        if(pathIndex && options?.getPath){
+            return (pathIndex.get(options.getPath(a))??0)-(pathIndex.get(options.getPath(b))??0);
+        }
+        return 0;
+    });
+}
+
+/**
+ * Compares JSON primitive values.
+ */
+export const compareJsonQueryValues=(a:any,b:any,nullsLast=false):number=>{
+    if(a===b){
+        return 0;
+    }
+    if(a===undefined || a===null){
+        return nullsLast?1:-1;
+    }
+    if(b===undefined || b===null){
+        return nullsLast?-1:1;
+    }
+    if(a>b){
+        return 1;
+    }
+    if(a<b){
+        return -1;
+    }
+    return String(a).localeCompare(String(b));
+}
+
+/**
+ * Returns the permission granted from a source path to a target path.
+ */
+export const getJsonQueryPermissionValue=(edges:Iterable<ConvoNodeEdge>,fromPath:string,toPath:string):ConvoNodePermissionType=>{
+    let grant=ConvoNodePermissionType.none;
+
+    for(const edge of edges){
+        if(edge.from===fromPath && edge.grant && isJsonQuerySameOrAncestorPath(edge.to,toPath)){
+            grant|=edge.grant;
+        }
+    }
+
+    return grant;
+}
+
+/**
+ * Checks if a permission grant exists.
+ */
+export const hasJsonQueryPermission=(edges:Iterable<ConvoNodeEdge>,fromPath:string,toPath:string,required:ConvoNodePermissionType):boolean=>{
+    if(required===ConvoNodePermissionType.none){
+        return true;
+    }
+    const grant=getJsonQueryPermissionValue(edges,fromPath,toPath);
+    return (grant&required)===required;
+}
+
+/**
+ * Returns true when `ancestor` is the same path as `nodePath` or an ancestor path.
+ */
+export const isJsonQuerySameOrAncestorPath=(ancestor:string,nodePath:string):boolean=>{
+    return ancestor==='/' || nodePath===ancestor || nodePath.startsWith(`${ancestor}/`);
+}
+
+/**
+ * Matches an edge against a query-step edge condition.
+ */
+export const doesJsonQueryEdgeMatchCondition=(edge:ConvoNodeEdge,condition:string|ConvoNodeCondition):boolean=>{
+    return typeof condition==='string'?
+        edge.type===condition:
+        evaluateJsonQueryCondition(edge,condition);
+}
+
+/**
+ * Selects destination node paths by traversing JSON edges.
+ */
+export const selectJsonQueryEdgeDestinationPaths=(edges:Iterable<ConvoNodeEdge>,step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,sourcePaths:string[]|null):string[]=>{
+    const sourceSet=sourcePaths?new Set(sourcePaths):undefined;
+    const selected:string[]=[];
+    const selectedSet=new Set<string>();
+
+    for(const edge of edges){
+        if(!doesJsonQueryEdgeMatchCondition(edge,step.edge)){
+            continue;
+        }
+
+        if((step.edgeDirection==='forward' || step.edgeDirection==='bi') && (!sourceSet || sourceSet.has(edge.from))){
+            addJsonQuerySelectedPath(edge.to,selected,selectedSet);
+        }
+
+        if((step.edgeDirection==='reverse' || step.edgeDirection==='bi') && (!sourceSet || sourceSet.has(edge.to))){
+            addJsonQuerySelectedPath(edge.from,selected,selectedSet);
+        }
+
+        if(step.edgeLimit!==undefined && selected.length>=step.edgeLimit){
+            break;
+        }
+    }
+
+    return step.edgeLimit===undefined?selected:selected.slice(0,Math.max(0,step.edgeLimit));
+}
+
+const addJsonQuerySelectedPath=(path:string,selected:string[],selectedSet:Set<string>):void=>{
+    if(!selectedSet.has(path)){
+        selectedSet.add(path);
+        selected.push(path);
+    }
+}
+
+/**
+ * Matches an edge against a raw edge query.
+ */
+export const doesJsonQueryEdgeMatchQuery=(edge:ConvoNodeEdge,query:ConvoNodeEdgeQuery):boolean=>{
+    return (
+        (query.id===undefined || edge.id===query.id) &&
+        (query.from===undefined || edge.from===query.from) &&
+        (query.to===undefined || edge.to===query.to) &&
+        (query.type===undefined || edge.type===query.type) &&
+        (query.name===undefined || edge.name===query.name)
+    );
+}
+
+/**
+ * Matches an embedding against a raw embedding query.
+ */
+export const doesJsonQueryEmbeddingMatchQuery=(embedding:ConvoNodeEmbedding,query:ConvoNodeEmbeddingQuery):boolean=>{
+    return (
+        (query.id===undefined || embedding.id===query.id) &&
+        (query.path===undefined || embedding.path===query.path) &&
+        (query.type===undefined || embedding.type===query.type) &&
+        (query.name===undefined || embedding.name===query.name) &&
+        (query.prop===undefined || embedding.prop===query.prop)
+    );
+}
+```
+</FILE_CONTENT>
+
+
+> user
+Is there any shared functionality to place in `../../packages/convo-lang/src/lib/db/convo-db-lib.ts`?
+
+@time 2026-05-14T19:13:58-04:00
+@tokenUsage 23252 / 899 / $0.12075500000000002
+@model gpt-5.5-2026-04-23
+> assistant
+Yes.
+
+The shared functionality that should live in `../../packages/convo-lang/src/lib/db/convo-db-lib.ts` is the Convo node path glob logic, because it is core ConvoDb path semantics and is useful across all drivers.
+
+I would move/export these there:
+
+- query path glob normalization
+    - already mostly covered by `normalizeConvoNodePath(path,'any')`
+- wildcard detection
+    - `hasConvoNodePathWildcard(path)`
+- literal prefix extraction
+    - useful for layered DB routing and SQL candidate filtering
+- path segment splitting
+- segment glob matching
+- full path glob matching
+- matcher factory
+    - `createConvoNodePathMatcher(path)`
+
+Suggested exported API:
+
+```ts
+export const hasConvoNodePathWildcard=(path:string):boolean=>path.includes('*');
+
+export const getConvoNodePathLiteralPrefix=(path:string):string|undefined=>{...};
+
+export const createConvoNodePathMatcher=(queryPath:string):(nodePath:string)=>boolean=>{...};
+
+export const doesConvoNodePathMatchQueryPath=(nodePath:string,queryPath:string):boolean=>{...};
+```
+
+Then `json-query.ts` should keep only JSON/query-specific helpers and delegate path matching:
+
+```ts
+export const doesJsonQueryPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
+    return doesConvoNodePathMatchQueryPath(nodePath,stepPath);
+}
+```
+
+Things I would **not** put in `convo-db-lib.ts`:
+
+- SQL `LIKE` candidate filtering
+    - `appendPathGlobCandidateFilter`
+    - SQL escaping
+- JSON object querying helpers
+    - `evaluateJsonQueryCondition`
+    - `sortJsonQueryValues`
+    - `getJsonQueryValueByPath`
+
+Those belong in `../../packages/db/src/json-query.ts` or SQLite-specific code.
+
+So the clean split is:
+
+### `convo-db-lib.ts`
+
+Core path/glob semantics shared by every DB implementation.
+
+### `json-query.ts`
+
+JSON condition evaluation, JSON sorting, edge/embedding matching, and thin wrappers around core path matching if needed for backwards-compatible imports.
+
+
+> user

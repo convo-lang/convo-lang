@@ -1,6 +1,7 @@
 import { allConvoStepStages, callConvoDbDriverCmdAsync, Conversation, ConversationOptions, ConvoDb, ConvoDbAuthManager, ConvoDbCommand, ConvoDbCommandResult, ConvoDbDriver, ConvoDbDriverPathsResult, ConvoDbFunction, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeKeySelection, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryResult, ConvoNodeStreamItem, ConvoNodeStreamItemType, ConvoNodeUpdate, ConvoNodeWatchCondition, ConvoStepStage, createConvoDbFunctionExecutionContextAsync, defaultConvoNodeQueryLimit, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, executeConvoDbFunction, getDefaultMockConvoEmbeddingsService, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, maxConvoNodeQueryLimit, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, ResultType, ResultTypeError, StatusCode, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, validateConvoNodeQuery } from "@convo-lang/convo-lang";
 import { aryRemoveItem, CancelToken, DisposeCallback, getErrorMessage, getValueByPath } from "@iyio/common";
 import z, { ZodType } from "zod";
+import { createJsonQueryPathMatcher, normalizeJsonQueryStepPath } from "./json-query.js";
 
 
 
@@ -182,7 +183,7 @@ export abstract class BaseConvoDb implements ConvoDb
         if(permissionFrom){
             const permission=await this.checkNodePermissionAsync(
                 permissionFrom,
-                path,
+                p,
                 ConvoNodePermissionType.read,
             );
             if(!permission.success){
@@ -190,7 +191,7 @@ export abstract class BaseConvoDb implements ConvoDb
             }
         }
 
-        return await this._driver.openBlobAsync(path);
+        return await this._driver.openBlobAsync(p);
     }
 
     /**
@@ -213,7 +214,7 @@ export abstract class BaseConvoDb implements ConvoDb
         if(permissionFrom){
             const permission=await this.checkNodePermissionAsync(
                 permissionFrom,
-                path,
+                p,
                 ConvoNodePermissionType.write,
             );
             if(!permission.success){
@@ -221,7 +222,7 @@ export abstract class BaseConvoDb implements ConvoDb
             }
         }
 
-        return await this._driver.writeBlobAsync(path,blob);
+        return await this._driver.writeBlobAsync(p,blob);
     }
 
     /**
@@ -244,7 +245,7 @@ export abstract class BaseConvoDb implements ConvoDb
         if(permissionFrom){
             const permission=await this.checkNodePermissionAsync(
                 permissionFrom,
-                path,
+                p,
                 ConvoNodePermissionType.read,
             );
             if(!permission.success){
@@ -252,7 +253,7 @@ export abstract class BaseConvoDb implements ConvoDb
             }
         }
 
-        return await this._driver.hasBlobAsync(path);
+        return await this._driver.hasBlobAsync(p);
     }
 
     public async callFunctionAsync<T extends Record<string,any>=Record<string,any>>(path:string,args:Record<string,any>,permissionFrom?:string):PromiseResultType<T|undefined>
@@ -612,6 +613,7 @@ export abstract class BaseConvoDb implements ConvoDb
                                     condition:lastStep.condition,
                                     baseNodePaths:query.steps.length>1?[...state.paths]:undefined,
                                 },
+                                pathMatcher:lastStep.path?createJsonQueryPathMatcher(lastStep.path):undefined,
                                 itemMap:{},
                                 loopCount:0,
                                 lastSend:0,
@@ -629,10 +631,6 @@ export abstract class BaseConvoDb implements ConvoDb
                                     }
                                     watcher?.next?.([{type:'error'}]);
                                 })
-                            }
-                            if(watcher.condition.path?.endsWith('*')){
-                                watcher.condition.path=watcher.condition.path.substring(0,watcher.condition.path.length-1);
-                                watcher.condition.wildcardPath=true;
                             }
                             this.watchers.push(watcher);
                         }
@@ -804,7 +802,16 @@ export abstract class BaseConvoDb implements ConvoDb
 
                     case 'path':
                         if(step.path){
-                            const p=step.path;
+                            const p=normalizeJsonQueryStepPath(step.path);
+                            if(!p){
+                                yield {
+                                    type:'error',
+                                    error:`Invalid path - ${step.path}`,
+                                    statusCode:400,
+                                }
+                                return;
+                            }
+
                             const r=await iteratePathsAsync((offset,nextToken)=>this._driver.selectNodePathsForPathAsync({
                                 path:p
                             },stagePaths,orderBy,batchSize,offset,nextToken));
@@ -1038,8 +1045,8 @@ export abstract class BaseConvoDb implements ConvoDb
                     continue;
                 }
                 if(c.path){
-                    if(c.wildcardPath){
-                        if(!nodePath.startsWith(c.path)){
+                    if(w.pathMatcher){
+                        if(!w.pathMatcher(nodePath)){
                             continue;
                         }
                     }else if(c.path!==nodePath){
@@ -2014,6 +2021,7 @@ interface WatcherUpdate
 interface Watcher
 {
     condition:ConvoNodeWatchCondition;
+    pathMatcher?:(path:string)=>boolean;
     next?:(items:WatcherUpdate[]|'ping')=>void;
     /**
      * Stores stream items until next can be called.

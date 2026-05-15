@@ -1,4 +1,29 @@
-import { ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition, normalizeConvoNodePath } from "@convo-lang/convo-lang";
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/db/src/json-query.ts !file
+
+> user
+Update the wildcard behavior of `json-query.ts` based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T18:07:07-04:00
+@tokenUsage 4731 / 558 / $0.026445000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+Do you want `doesJsonQueryPathMatchStepPath` to normalize the incoming `nodePath` too, or only normalize the query `stepPath` as described in the guide?
+
+
+> user
+Only `stepPath`
+
+@time 2026-05-14T18:09:09-04:00
+@tokenUsage 4783 / 4274 / $0.045285000000000006
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="json-query.ts" target-output-path="../../packages/db/src/json-query.ts" last-commit="8793c9cd74bd0e3722eff5e811192fed7f3dbc0e">
+```ts
+import { ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "@convo-lang/convo-lang";
 
 export interface JsonQuerySortOptions<T>
 {
@@ -127,149 +152,67 @@ export const jsonQueryWildcardMatch=(value:string,pattern:string,ignoreCase=fals
  * Matches a node path against a query step path.
  */
 export const doesJsonQueryPathMatchStepPath=(nodePath:string,stepPath:string):boolean=>{
-    return createJsonQueryPathMatcher(stepPath)(nodePath);
-}
-
-/**
- * Creates a matcher for ConvoDb query step paths.
- */
-export const createJsonQueryPathMatcher=(stepPath:string):(nodePath:string)=>boolean=>{
     const normalizedStepPath=normalizeJsonQueryStepPath(stepPath);
     if(normalizedStepPath===null){
-        return ()=>false;
+        return false;
+    }
+    if(!normalizedStepPath.includes('*')){
+        return nodePath===normalizedStepPath;
+    }
+    if(nodePath.startsWith('/')!==normalizedStepPath.startsWith('/')){
+        return false;
     }
 
-    if(!hasJsonQueryPathWildcard(normalizedStepPath)){
-        return nodePath=>normalizeConvoNodePath(nodePath,'none')===normalizedStepPath;
-    }
-
+    const nodeSegments=getJsonQueryPathSegments(nodePath);
     const stepSegments=getJsonQueryPathSegments(normalizedStepPath);
 
-    return nodePath=>{
-        const normalizedNodePath=normalizeConvoNodePath(nodePath,'none');
-        if(normalizedNodePath===undefined){
-            return false;
-        }
-
-        return doJsonQueryPathSegmentsMatch(getJsonQueryPathSegments(normalizedNodePath),stepSegments,0,0,new Map());
-    }
+    return doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,0,0);
 }
 
-/**
- * Normalizes a query step path.
- */
-export const normalizeJsonQueryStepPath=(stepPath:string):string|null=>{
-    return normalizeConvoNodePath(stepPath,'any')??null;
-}
-
-/**
- * Returns true if a query path contains a wildcard token.
- */
-export const hasJsonQueryPathWildcard=(path:string):boolean=>{
-    return path.includes('*');
-}
-
-/**
- * Returns the literal path prefix before the first wildcard segment.
- */
-export const getJsonQueryPathLiteralPrefix=(path:string):string=>{
-    const normalized=normalizeJsonQueryStepPath(path)??path;
-    const firstWildcard=normalized.indexOf('*');
-    if(firstWildcard<0){
-        return ensureJsonQueryTrailingSlash(normalized);
+const normalizeJsonQueryStepPath=(stepPath:string):string|null=>{
+    let normalized=stepPath.replace(/\/+/g,'/');
+    if(normalized.length>1 && normalized.endsWith('/')){
+        normalized=normalized.slice(0,-1);
     }
 
-    const slash=normalized.lastIndexOf('/',firstWildcard);
-    if(slash<0){
-        return '/';
-    }
-
-    return normalized.substring(0,slash+1) || '/';
-}
-
-/**
- * Appends a SQL filter that narrows candidates for a query path glob.
- */
-export const appendJsonQueryPathGlobCandidateFilter=(where:string[],bind:any[],glob:string,columnName:string):void=>{
-    const firstWildcard=glob.indexOf('*');
-    if(firstWildcard<0){
-        where.push(`${columnName} = ?`);
-        bind.push(glob);
-        return;
-    }
-
-    const prefix=glob.substring(0,firstWildcard);
-    if(!prefix || prefix==='/'){
-        return;
-    }
-
-    if(prefix.endsWith('/')){
-        const base=prefix.substring(0,prefix.length-1) || '/';
-        if(base==='/'){
-            return;
-        }
-
-        where.push(`(${columnName} = ? OR ${columnName} LIKE ? ESCAPE '\\')`);
-        bind.push(base,`${escapeJsonQuerySqlLikeLiteral(prefix)}%`);
-    }else{
-        where.push(`${columnName} LIKE ? ESCAPE '\\'`);
-        bind.push(`${escapeJsonQuerySqlLikeLiteral(prefix)}%`);
-    }
-}
-
-const ensureJsonQueryTrailingSlash=(path:string):string=>{
-    return path.endsWith('/')?path:`${path}/`;
+    const segments=getJsonQueryPathSegments(normalized);
+    return segments.some(segment=>segment==='.' || segment==='..')?null:normalized;
 }
 
 const getJsonQueryPathSegments=(path:string):string[]=>{
-    return path==='/'?[]:path.slice(1).split('/');
+    const start=path.startsWith('/')?1:0;
+    const end=path.length>1 && path.endsWith('/')?path.length-1:path.length;
+    return start>=end?[]:path.slice(start,end).split('/');
 }
 
-const doJsonQueryPathSegmentsMatch=(nodeSegments:string[],stepSegments:string[],nodeIndex:number,stepIndex:number,memo:Map<string,boolean>):boolean=>{
-    const memoKey=`${nodeIndex}:${stepIndex}`;
-    const memoValue=memo.get(memoKey);
-    if(memoValue!==undefined){
-        return memoValue;
-    }
-
-    let result:boolean;
-
+const doJsonQueryPathSegmentsMatch=(nodeSegments:string[],stepSegments:string[],nodeIndex:number,stepIndex:number):boolean=>{
     if(stepIndex>=stepSegments.length){
-        result=nodeIndex>=nodeSegments.length;
-    }else{
-        const stepSegment=stepSegments[stepIndex];
-
-        if(stepSegment==='**'){
-            result=false;
-            for(let i=nodeIndex;i<=nodeSegments.length;i++){
-                if(doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,i,stepIndex+1,memo)){
-                    result=true;
-                    break;
-                }
-            }
-        }else{
-            result=(
-                nodeIndex<nodeSegments.length &&
-                doesJsonQueryPathSegmentMatch(nodeSegments[nodeIndex]??'',stepSegment??'') &&
-                doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,nodeIndex+1,stepIndex+1,memo)
-            );
-        }
+        return nodeIndex>=nodeSegments.length;
     }
 
-    memo.set(memoKey,result);
-    return result;
+    const stepSegment=stepSegments[stepIndex];
+    if(stepSegment==='**'){
+        if(stepIndex===stepSegments.length-1){
+            return true;
+        }
+        for(let i=nodeIndex;i<=nodeSegments.length;i++){
+            if(doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,i,stepIndex+1)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return (
+        nodeIndex<nodeSegments.length &&
+        doesJsonQueryPathSegmentMatch(nodeSegments[nodeIndex],stepSegment) &&
+        doJsonQueryPathSegmentsMatch(nodeSegments,stepSegments,nodeIndex+1,stepIndex+1)
+    );
 }
 
 const doesJsonQueryPathSegmentMatch=(nodeSegment:string,stepSegment:string):boolean=>{
-    if(stepSegment.includes('**')){
-        return false;
-    }
     const escaped=stepSegment.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'[^/]*');
     return new RegExp(`^${escaped}$`).test(nodeSegment);
-}
-
-const escapeJsonQuerySqlLikeLiteral=(value:string):string=>{
-    return value.replace(/\\/g,'\\\\').replace(/%/g,'\\%').replace(/_/g,'\\_');
 }
 
 /**
@@ -421,3 +364,9 @@ export const doesJsonQueryEmbeddingMatchQuery=(embedding:ConvoNodeEmbedding,quer
         (query.prop===undefined || embedding.prop===query.prop)
     );
 }
+
+```
+</FILE_CONTENT>
+
+
+> user

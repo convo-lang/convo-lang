@@ -1,0 +1,7 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/tests/src/convo-db.test.ts !file
+
+> user
+Update the wildcard behavior of the test file based on the `wildcard-update.md` file
+

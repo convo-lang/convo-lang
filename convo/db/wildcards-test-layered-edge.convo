@@ -1,3 +1,18 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/tests/src/convo-db-layered-edge.test.ts !file
+
+> user
+Update the wildcard behavior of the test file based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T19:46:55-04:00
+@tokenUsage 4416 / 2524 / $0.0347
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db-layered-edge.test.ts" target-output-path="../../packages/tests/src/convo-db-layered-edge.test.ts" last-commit="3499090fb34046fb06560c486a55e26cfb585d9c">
+``` ts
 import { type ConvoNode, type ConvoNodeEdge } from "@convo-lang/convo-lang";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
 import { LayeredConvoDb } from "@convo-lang/db/LayeredConvoDb.js";
@@ -275,3 +290,9 @@ test("LayeredConvoDb driver paginates edge queries across layers and reports tot
     expect(names.sort()).toEqual(expectedNames);
     expect(nextToken).toBeUndefined();
 });
+
+```
+</FILE_CONTENT>
+
+
+> user

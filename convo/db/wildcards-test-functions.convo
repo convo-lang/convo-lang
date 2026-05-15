@@ -1,0 +1,19 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/tests/src/convo-db-functions.test.ts !file
+
+> user
+Update the wildcard behavior of the test file based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T19:46:32-04:00
+@tokenUsage 5585 / 326 / $0.029555
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t see any wildcard query paths (`*` / `**`) in `../../packages/tests/src/convo-db-functions.test.ts`; all queried paths are exact literal paths like `/example-functions/a`.
+
+Did you mean a different test file that contains wildcard path queries, or would you like me to add new tests for the updated wildcard behavior to this file?
+
+
+> user

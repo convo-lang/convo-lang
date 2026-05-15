@@ -1,3 +1,19 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/tests/src/convo-db-permission-boundary.test.ts !file
+
+> user
+Update the wildcard behavior of the test file based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T19:47:20-04:00
+@tokenUsage 4344 / 3500 / $0.039220000000000005
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any questions.
+<FILE_CONTENT name="convo-db-permission-boundary.test.ts" target-output-path="../../packages/tests/src/convo-db-permission-boundary.test.ts" last-commit="f92381322e7993d225112ae668eea7f553424618">
+```ts
 import { ConvoDb, ConvoDbCommandResult, ConvoDbPermissionBoundary, ConvoNode, ConvoNodePermissionType, ConvoNodeQueryResult, PromiseResultType, PromiseResultTypeVoid, ResultTypeVoid } from "@convo-lang/convo-lang";
 import { describe, expect, test } from "bun:test";
 import { createTestDb } from "./createTestDb.js";
@@ -300,3 +316,9 @@ describe('ConvoDbPermissionBoundary',()=>{
         }));
     });
 });
+
+```
+</FILE_CONTENT>
+
+
+> user

@@ -1,6 +1,7 @@
 import { ConvoDbDriverPathsResult, ConvoNode, ConvoNodeCondition, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodePropertyCondition, ConvoNodeQueryStep, ConvoNodeUpdate, isConvoNodeGroupCondition, PromiseResultType, PromiseResultTypeVoid } from "@convo-lang/convo-lang";
 import { deepClone, getErrorMessage, uuid } from "@iyio/common";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+import { appendJsonQueryPathGlobCandidateFilter, createJsonQueryPathMatcher, normalizeJsonQueryStepPath } from "./json-query.js";
 
 export interface BaseSqliteConvoDbOptions extends BaseConvoDbOptions
 {
@@ -292,32 +293,51 @@ export abstract class BaseSqliteConvoDb extends BaseConvoDb
         },
         
         selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
+            const path=normalizeJsonQueryStepPath(step.path);
+            if(path===null){
+                return {
+                    success:false,
+                    error:`Invalid query path - ${step.path}`,
+                    statusCode:400,
+                };
+            }
+
             const bind:any[]=[];
             const where:string[]=[];
             appendCurrentNodePathsFilter(where,bind,currentNodePaths,'path');
 
-            if(step.path.endsWith('/*')){
-                const prefix=step.path.substring(0,step.path.length-1);
-                where.push(`path LIKE ?`);
-                bind.push(`${prefix}%`);
-                where.push(`path != ?`);
-                bind.push(prefix.substring(0,prefix.length-1));
-            }else{
+            if(!path.includes('*')){
                 where.push(`path = ?`);
-                bind.push(step.path);
+                bind.push(path);
+
+                const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
+                bind.push(limit,offset);
+
+                const r=await this.execSqlAsync(sql,bind);
+                if(!r.success){
+                    return r;
+                }
+
+                return {
+                    success:true,
+                    result:{paths:r.result.map(v=>String(v.path))}
+                };
             }
 
-            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)} LIMIT ? OFFSET ?`;
-            bind.push(limit,offset);
+            appendJsonQueryPathGlobCandidateFilter(where,bind,path,'path');
 
+            const sql=`SELECT path FROM ${this.nodeTableName}${where.length?` WHERE ${where.join(' AND ')}`:''} ${buildNodeOrderByClause(orderBy)}`;
             const r=await this.execSqlAsync(sql,bind);
             if(!r.success){
                 return r;
             }
 
+            const matches=createJsonQueryPathMatcher(path);
+            const paths=r.result.map(v=>String(v.path)).filter(matches).slice(offset,offset+limit);
+
             return {
                 success:true,
-                result:{paths:r.result.map(v=>String(v.path))}
+                result:{paths}
             };
         },
 

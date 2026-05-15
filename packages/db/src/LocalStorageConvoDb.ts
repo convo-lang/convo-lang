@@ -1,7 +1,7 @@
 import { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
 import { deepClone, uuid } from "@iyio/common";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
-import { compareJsonQueryValues, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
+import { compareJsonQueryValues, createJsonQueryPathMatcher, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
 
 export interface LocalStorageConvoDbInf
 {
@@ -276,7 +276,8 @@ export class LocalStorageConvoDbDriver implements ConvoDbDriver
 
     public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
         const nodes=await this.getCandidateNodesAsync(currentNodePaths);
-        const matched=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
+        const matchPath=createJsonQueryPathMatcher(step.path);
+        const matched=nodes.filter(node=>matchPath(node.path));
 
         sortJsonQueryValues(matched,orderBy);
 

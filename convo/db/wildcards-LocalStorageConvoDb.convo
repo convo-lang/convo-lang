@@ -1,0 +1,1828 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/db/src/LocalStorageConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-lib.ts !file
+@import ../../packages/db/src/json-query.ts !file
+
+> user
+Update the wildcard behavior of `LocalStorageConvoDb.ts` based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T18:08:14-04:00
+@tokenUsage 8589 / 8012 / $0.08300500000000001
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any questions.
+<FILE_CONTENT name="LocalStorageConvoDb.ts" target-output-path="../../packages/db/src/LocalStorageConvoDb.ts" last-commit="f7a2f59805a2cd50161e36ed2bd0b8d7d1f4aece">
+``` ts
+import { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
+import { deepClone, uuid } from "@iyio/common";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+import { compareJsonQueryValues, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
+
+export interface LocalStorageConvoDbInf
+{
+    readonly length:number;
+
+    key(index:number):string|null;
+
+    getItem(key:string):string|null;
+
+    setItem(key:string,value:string):void;
+
+    removeItem(key:string):void;
+}
+
+export interface LocalStorageConvoDbOptions extends BaseConvoDbOptions
+{
+    /**
+     * A string prepended to the key of paths and ids used to store objects.
+     * @default "convo-db:"
+     */
+    keyPrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for node paths.
+     * Example node path key
+     * `/usr/tom/settings` -> `convo-db:node:/usr/tom/settings`
+     * @default "node:"
+     */
+    nodePrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for edge ids.
+     * Example edge id key
+     * `5a4eae7a-2d30-4a60-81d4-13e706b48d4c` -> `convo-db:edge:5a4eae7a-2d30-4a60-81d4-13e706b48d4c`
+     * @default "edge:"
+     */
+    edgePrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for embedding ids.
+     * Example embedding id key
+     * `8b18a539-77dc-421a-ae74-eacf4766a324` -> `convo-db:embedding:8b18a539-77dc-421a-ae74-eacf4766a324`
+     * @default "embedding:"
+     */
+    embeddingPrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for blob paths.
+     * Example blob path key
+     * `/usr/bob/report.docx` -> `convo-db:blob:/usr/bob/report.docx`
+     * @default "blob:"
+     */
+    blobPrefix?:string;
+
+    /**
+     * Local storage interface
+     * @default globalThis.localStorage
+     */
+    inf?:LocalStorageConvoDbInf;
+
+    /**
+     * An optional delay to add to all accesses to the LocalStorageConvoDbInf. This is used to
+     * simulate network latency or other performance bottlenecks.
+     * @default 0
+     */
+    simulatedDelayMs?:number;
+}
+
+export class LocalStorageConvoDb extends BaseConvoDb
+{
+    public readonly keyPrefix:string;
+
+    public readonly nodePrefix:string;
+
+    public readonly edgePrefix:string;
+
+    public readonly embeddingPrefix:string;
+
+    public readonly blobPrefix:string;
+
+    public readonly inf:LocalStorageConvoDbInf;
+
+    public readonly simulatedDelayMs:number;
+
+    override readonly _driver:ConvoDbDriver;
+
+    private readonly _driverT:LocalStorageConvoDbDriver;
+
+    public constructor({
+        keyPrefix='convo-db:',
+        nodePrefix='node:',
+        edgePrefix='edge:',
+        embeddingPrefix='embedding:',
+        blobPrefix='blob:',
+        inf=(globalThis as any).localStorage,
+        simulatedDelayMs=0,
+        ...baseOptions
+    }:LocalStorageConvoDbOptions){
+        super(baseOptions);
+
+        if(!inf){
+            throw new Error('LocalStorageConvoDb requires a localStorage interface');
+        }
+
+        this.keyPrefix=keyPrefix;
+        this.nodePrefix=nodePrefix;
+        this.edgePrefix=edgePrefix;
+        this.embeddingPrefix=embeddingPrefix;
+        this.blobPrefix=blobPrefix;
+        this.inf=inf;
+        this.simulatedDelayMs=simulatedDelayMs;
+
+        this._driver=this._driverT=new LocalStorageConvoDbDriver({
+            keyPrefix,
+            nodePrefix,
+            edgePrefix,
+            embeddingPrefix,
+            blobPrefix,
+            inf,
+            simulatedDelayMs,
+        });
+    }
+
+    protected override _dispose():void{
+        this._driverT.dispose();
+    }
+}
+
+export interface LocalStorageConvoDbDriverOptions
+{
+    keyPrefix:string;
+
+    nodePrefix:string;
+
+    edgePrefix:string;
+
+    embeddingPrefix:string;
+
+    blobPrefix:string;
+
+    inf:LocalStorageConvoDbInf;
+
+    simulatedDelayMs:number;
+}
+
+export class LocalStorageConvoDbDriver implements ConvoDbDriver
+{
+    public readonly keyPrefix:string;
+
+    public readonly nodePrefix:string;
+
+    public readonly edgePrefix:string;
+
+    public readonly embeddingPrefix:string;
+
+    public readonly blobPrefix:string;
+
+    public readonly inf:LocalStorageConvoDbInf;
+
+    public readonly simulatedDelayMs:number;
+
+    public constructor({
+        keyPrefix,
+        nodePrefix,
+        edgePrefix,
+        embeddingPrefix,
+        blobPrefix,
+        inf,
+        simulatedDelayMs,
+    }:LocalStorageConvoDbDriverOptions){
+        this.keyPrefix=keyPrefix;
+        this.nodePrefix=nodePrefix;
+        this.edgePrefix=edgePrefix;
+        this.embeddingPrefix=embeddingPrefix;
+        this.blobPrefix=blobPrefix;
+        this.inf=inf;
+        this.simulatedDelayMs=simulatedDelayMs;
+    }
+
+    public dispose():void{
+    }
+
+    public async openBlobAsync(path:string):PromiseResultType<ReadableStream>{
+        const value=await this.getItemAsync(this.getBlobKey(path));
+        if(value===null){
+            return {
+                success:false,
+                error:'Blob not found',
+                statusCode:404,
+            }
+        }
+
+        return {
+            success:true,
+            result:new Blob([base64ToBytes(value)]).stream(),
+        }
+    }
+
+    public async writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid{
+        const key=this.getBlobKey(path);
+
+        if(blob===null){
+            await this.removeItemAsync(key);
+            return {
+                success:true,
+            }
+        }
+
+        let bytes:Uint8Array;
+        if(typeof blob==='string'){
+            bytes=new TextEncoder().encode(blob);
+        }else if(typeof Blob!=='undefined' && blob instanceof Blob){
+            bytes=new Uint8Array(await blob.arrayBuffer());
+        }else{
+            const response=new Response(blob);
+            const responseBlob=await response.blob();
+            bytes=new Uint8Array(await responseBlob.arrayBuffer());
+        }
+
+        await this.setItemAsync(key,bytesToBase64(bytes));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async hasBlobAsync(path:string):PromiseResultType<boolean>{
+        return {
+            success:true,
+            result:(await this.getItemAsync(this.getBlobKey(path)))!==null,
+        }
+    }
+
+    public async selectEdgesByPathsAsync(keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>{
+        const fromSet=new Set(fromPathsIn);
+        const toSet=new Set(toPathsIn);
+        const edges:Partial<ConvoNodeEdge>[]=[];
+
+        for(const edge of await this.getAllEdgesAsync()){
+            if(!fromSet.has(edge.from) || !toSet.has(edge.to)){
+                continue;
+            }
+            if(hasGrant && (edge.grant===undefined || edge.grant===ConvoNodePermissionType.none)){
+                continue;
+            }
+            edges.push(selectJsonQueryKeys(edge,keys,deepClone));
+        }
+
+        return {
+            success:true,
+            result:edges,
+        }
+    }
+
+    public async selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>{
+        const nodes:ConvoNode[]=[];
+
+        for(const path of paths){
+            const node=await this.getNodeAsync(path);
+            if(node){
+                nodes.push(node);
+            }
+        }
+
+        sortJsonQueryValues(nodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:nodes.map(node=>selectJsonQueryKeys(node,keys,deepClone)),
+        }
+    }
+
+    public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const matched=nodes.filter(node=>doesConvoDbQueryPathMatchPath(node.path,step.path));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const matched=nodes.filter(node=>evaluateJsonQueryCondition(node,step.condition));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const edges=await this.getAllEdgesAsync();
+        const matched=nodes.filter(node=>hasJsonQueryPermission(edges,step.permissionFrom,node.path,step.permissionRequired));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const allowedPaths=currentNodePaths?new Set(currentNodePaths):undefined;
+        const matchedPathSet=new Set<string>();
+        const matchedPaths:string[]=[];
+
+        for(const embedding of await this.getAllEmbeddingsAsync()){
+            if(step.embedding.type!==undefined && embedding.type!==step.embedding.type){
+                continue;
+            }
+            if(allowedPaths && !allowedPaths.has(embedding.path)){
+                continue;
+            }
+            if(matchedPathSet.has(embedding.path)){
+                continue;
+            }
+
+            const node=await this.getNodeAsync(embedding.path);
+            if(!node){
+                continue;
+            }
+
+            const value=getJsonQueryValueByPath(node,embedding.prop);
+            const text=value===undefined || value===null?'':String(value);
+            if(text.toLowerCase().includes(step.embedding.text.toLowerCase())){
+                matchedPathSet.add(embedding.path);
+                matchedPaths.push(embedding.path);
+            }
+        }
+
+        const matchedNodes=(await Promise.all(matchedPaths.map(path=>this.getNodeAsync(path)))).filter(v=>v) as ConvoNode[];
+        sortJsonQueryValues(matchedNodes,orderBy,{pathOrder:matchedPaths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const paths=selectJsonQueryEdgeDestinationPaths(await this.getAllEdgesAsync(),step,currentNodePaths);
+        const matchedNodes=(await Promise.all(paths.map(path=>this.getNodeAsync(path)))).filter(v=>v) as ConvoNode[];
+
+        sortJsonQueryValues(matchedNodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async insertNodeAsync(node:ConvoNode,_options:Omit<InsertConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>{
+        if(await this.getNodeAsync(node.path)){
+            return {
+                success:false,
+                error:`Node already exists - ${node.path}`,
+                statusCode:409,
+            }
+        }
+
+        const clone=deepClone(node);
+        await this.setJsonAsync(this.getNodeKey(node.path),clone);
+
+        return {
+            success:true,
+            result:deepClone(clone),
+        }
+    }
+
+    public async updateNodeAsync(node:ConvoNodeUpdate,_options:Omit<UpdateConvoNodeOptions,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getNodeAsync(node.path);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(node.displayName!==undefined){
+            if(node.displayName===null){
+                delete updated.displayName;
+            }else{
+                updated.displayName=node.displayName;
+            }
+        }
+        if(node.modified!==undefined){
+            if(node.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=node.modified;
+            }
+        }
+        if(node.description!==undefined){
+            if(node.description===null){
+                delete updated.description;
+            }else{
+                updated.description=node.description;
+            }
+        }
+        if(node.instructions!==undefined){
+            if(node.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=node.instructions;
+            }
+        }
+        if(node.data!==undefined){
+            updated.data=deepClone(node.data??{});
+        }
+
+        await this.setJsonAsync(this.getNodeKey(updated.path),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async deleteNodeAsync(path:string,_options:Omit<DeleteConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getNodeAsync(path)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getNodeKey(path));
+
+        for(const edge of await this.getAllEdgesAsync()){
+            if(edge.from===path || edge.to===path){
+                await this.removeItemAsync(this.getEdgeKey(edge.id));
+            }
+        }
+
+        for(const embedding of await this.getAllEmbeddingsAsync()){
+            if(embedding.path===path){
+                await this.removeItemAsync(this.getEmbeddingKey(embedding.id));
+            }
+        }
+
+        return {
+            success:true,
+        }
+    }
+
+    public async insertEdgeAsync(edge:Omit<ConvoNodeEdge,'id'>,_options:Omit<InsertConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEdge>{
+        if(!await this.getNodeAsync(edge.from)){
+            return {
+                success:false,
+                error:`Node not found - ${edge.from}`,
+                statusCode:404,
+            }
+        }
+        if(!await this.getNodeAsync(edge.to)){
+            return {
+                success:false,
+                error:`Node not found - ${edge.to}`,
+                statusCode:404,
+            }
+        }
+
+        const inserted:ConvoNodeEdge={
+            ...deepClone(edge),
+            id:uuid(),
+        };
+
+        await this.setJsonAsync(this.getEdgeKey(inserted.id),inserted);
+
+        return {
+            success:true,
+            result:deepClone(inserted),
+        }
+    }
+
+    public async updateEdgeAsync(update:ConvoNodeEdgeUpdate,_options:Omit<UpdateConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getEdgeAsync(update.id);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(update.displayName!==undefined){
+            if(update.displayName===null){
+                delete updated.displayName;
+            }else{
+                updated.displayName=update.displayName;
+            }
+        }
+        if(update.modified!==undefined){
+            if(update.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=update.modified;
+            }
+        }
+        if(update.description!==undefined){
+            if(update.description===null){
+                delete updated.description;
+            }else{
+                updated.description=update.description;
+            }
+        }
+        if(update.instructions!==undefined){
+            if(update.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=update.instructions;
+            }
+        }
+        if(update.grant!==undefined){
+            if(update.grant===null){
+                delete updated.grant;
+            }else{
+                updated.grant=update.grant;
+            }
+        }
+
+        await this.setJsonAsync(this.getEdgeKey(updated.id),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async deleteEdgeAsync(id:string,_options:Omit<DeleteConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getEdgeAsync(id)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getEdgeKey(id));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,'id'>,_options:Omit<InsertConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEmbedding>{
+        if(!await this.getNodeAsync(embedding.path)){
+            return {
+                success:false,
+                error:`Node not found - ${embedding.path}`,
+                statusCode:404,
+            }
+        }
+
+        const inserted:ConvoNodeEmbedding={
+            ...deepClone(embedding),
+            id:uuid(),
+        };
+
+        await this.setJsonAsync(this.getEmbeddingKey(inserted.id),inserted);
+
+        return {
+            success:true,
+            result:deepClone(inserted),
+        }
+    }
+
+    public async deleteEmbeddingAsync(id:string,_options:Omit<DeleteConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getEmbeddingAsync(id)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getEmbeddingKey(id));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,_options:Omit<UpdateConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getEmbeddingAsync(update.id);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(update.modified!==undefined){
+            if(update.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=update.modified;
+            }
+        }
+        if(update.description!==undefined){
+            if(update.description===null){
+                delete updated.description;
+            }else{
+                updated.description=update.description;
+            }
+        }
+        if(update.instructions!==undefined){
+            if(update.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=update.instructions;
+            }
+        }
+
+        await this.setJsonAsync(this.getEmbeddingKey(updated.id),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async queryEdgesAsync(query:ConvoNodeEdgeQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>{
+        const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
+        const offset=Math.max(0,query.offset??0);
+        const allEdges=await this.getAllEdgesAsync();
+
+        let edges=allEdges.filter(edge=>doesJsonQueryEdgeMatchQuery(edge,query));
+
+        if(query.permissionFrom!==undefined){
+            edges=edges.filter(edge=>{
+                const fromPermission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,edge.from);
+                const toPermission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,edge.to);
+                return (fromPermission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read &&
+                    (toPermission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read;
+            });
+        }
+
+        edges.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
+
+        const total=query.includeTotal?edges.length:undefined;
+        const resultEdges=edges.slice(offset,offset+limit).map(edge=>deepClone(edge));
+
+        return {
+            success:true,
+            result:{
+                edges:resultEdges,
+                total,
+            },
+        }
+    }
+
+    public async queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>{
+        const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
+        const offset=Math.max(0,query.offset??0);
+        const allEdges=await this.getAllEdgesAsync();
+
+        let embeddings=(await this.getAllEmbeddingsAsync()).filter(embedding=>doesJsonQueryEmbeddingMatchQuery(embedding,query));
+
+        if(query.permissionFrom!==undefined){
+            embeddings=embeddings.filter(embedding=>{
+                const permission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,embedding.path);
+                return (permission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read;
+            });
+        }
+
+        embeddings.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
+
+        const total=query.includeTotal?embeddings.length:undefined;
+        const resultEmbeddings=embeddings
+            .slice(offset,offset+limit)
+            .map(embedding=>{
+                const clone=deepClone(embedding);
+                if(!query.includeVector){
+                    delete clone.vector;
+                }
+                return clone;
+            });
+
+        return {
+            success:true,
+            result:{
+                embeddings:resultEmbeddings,
+                total,
+            },
+        }
+    }
+
+    private getNodeKey(path:string):string{
+        return `${this.keyPrefix}${this.nodePrefix}${path}`;
+    }
+
+    private getEdgeKey(id:string):string{
+        return `${this.keyPrefix}${this.edgePrefix}${id}`;
+    }
+
+    private getEmbeddingKey(id:string):string{
+        return `${this.keyPrefix}${this.embeddingPrefix}${id}`;
+    }
+
+    private getBlobKey(path:string):string{
+        return `${this.keyPrefix}${this.blobPrefix}${path}`;
+    }
+
+    private async getNodeAsync(path:string):Promise<ConvoNode|undefined>{
+        return await this.getJsonAsync<ConvoNode>(this.getNodeKey(path));
+    }
+
+    private async getEdgeAsync(id:string):Promise<ConvoNodeEdge|undefined>{
+        return await this.getJsonAsync<ConvoNodeEdge>(this.getEdgeKey(id));
+    }
+
+    private async getEmbeddingAsync(id:string):Promise<ConvoNodeEmbedding|undefined>{
+        return await this.getJsonAsync<ConvoNodeEmbedding>(this.getEmbeddingKey(id));
+    }
+
+    private async getCandidateNodesAsync(currentNodePaths:string[]|null):Promise<ConvoNode[]>{
+        if(currentNodePaths===null){
+            return await this.getAllNodesAsync();
+        }
+
+        const nodes:ConvoNode[]=[];
+        for(const path of currentNodePaths){
+            const node=await this.getNodeAsync(path);
+            if(node){
+                nodes.push(node);
+            }
+        }
+        return nodes;
+    }
+
+    private async getAllNodesAsync():Promise<ConvoNode[]>{
+        return await this.getAllByPrefixAsync<ConvoNode>(`${this.keyPrefix}${this.nodePrefix}`);
+    }
+
+    private async getAllEdgesAsync():Promise<ConvoNodeEdge[]>{
+        return await this.getAllByPrefixAsync<ConvoNodeEdge>(`${this.keyPrefix}${this.edgePrefix}`);
+    }
+
+    private async getAllEmbeddingsAsync():Promise<ConvoNodeEmbedding[]>{
+        return await this.getAllByPrefixAsync<ConvoNodeEmbedding>(`${this.keyPrefix}${this.embeddingPrefix}`);
+    }
+
+    private async getAllByPrefixAsync<T>(prefix:string):Promise<T[]>{
+        const values:T[]=[];
+
+        for(const key of await this.getKeysByPrefixAsync(prefix)){
+            const value=await this.getJsonAsync<T>(key);
+            if(value!==undefined){
+                values.push(value);
+            }
+        }
+
+        return values;
+    }
+
+    private async getKeysByPrefixAsync(prefix:string):Promise<string[]>{
+        const keys:string[]=[];
+        const length=await this.getLengthAsync();
+
+        for(let i=0;i<length;i++){
+            const key=await this.keyAsync(i);
+            if(key?.startsWith(prefix)){
+                keys.push(key);
+            }
+        }
+
+        return keys;
+    }
+
+    private async getJsonAsync<T>(key:string):Promise<T|undefined>{
+        const value=await this.getItemAsync(key);
+        return value===null?undefined:deepClone(JSON.parse(value));
+    }
+
+    private async setJsonAsync(key:string,value:any):Promise<void>{
+        await this.setItemAsync(key,JSON.stringify(value));
+    }
+
+    private async delayAsync():Promise<void>{
+        if(this.simulatedDelayMs>0){
+            await new Promise<void>(resolve=>setTimeout(resolve,this.simulatedDelayMs));
+        }
+    }
+
+    private async getLengthAsync():Promise<number>{
+        await this.delayAsync();
+        return this.inf.length;
+    }
+
+    private async keyAsync(index:number):Promise<string|null>{
+        await this.delayAsync();
+        return this.inf.key(index);
+    }
+
+    private async getItemAsync(key:string):Promise<string|null>{
+        await this.delayAsync();
+        return this.inf.getItem(key);
+    }
+
+    private async setItemAsync(key:string,value:string):Promise<void>{
+        await this.delayAsync();
+        this.inf.setItem(key,value);
+    }
+
+    private async removeItemAsync(key:string):Promise<void>{
+        await this.delayAsync();
+        this.inf.removeItem(key);
+    }
+}
+
+const bytesToBase64=(bytes:Uint8Array):string=>{
+    const bufferCtor=(globalThis as any).Buffer;
+    if(bufferCtor){
+        return bufferCtor.from(bytes).toString('base64');
+    }
+
+    let binary='';
+    const chunkSize=0x8000;
+    for(let i=0;i<bytes.length;i+=chunkSize){
+        binary+=String.fromCharCode(...bytes.subarray(i,i+chunkSize));
+    }
+    return globalThis.btoa(binary);
+}
+
+const base64ToBytes=(base64:string):Uint8Array<ArrayBuffer>=>{
+    const bufferCtor=(globalThis as any).Buffer;
+    if(bufferCtor){
+        return new Uint8Array(bufferCtor.from(base64,'base64'));
+    }
+
+    const binary=globalThis.atob(base64);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++){
+        bytes[i]=binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+const doesConvoDbQueryPathMatchPath=(path:string,queryPath:string):boolean=>{
+    const pathSegments=getNormalizedConvoDbPathSegments(path);
+    const querySegments=getNormalizedConvoDbPathSegments(queryPath);
+
+    if(!pathSegments || !querySegments){
+        return false;
+    }
+
+    const memo=new Map<string,boolean>();
+
+    const match=(pathIndex:number,queryIndex:number):boolean=>{
+        const key=`${pathIndex}:${queryIndex}`;
+        const memoValue=memo.get(key);
+        if(memoValue!==undefined){
+            return memoValue;
+        }
+
+        let value:boolean;
+
+        if(queryIndex>=querySegments.length){
+            value=pathIndex>=pathSegments.length;
+        }else{
+            const querySegment=querySegments[queryIndex];
+
+            if(querySegment==='**'){
+                if(queryIndex===querySegments.length-1){
+                    value=true;
+                }else{
+                    value=false;
+                    for(let i=pathIndex;i<=pathSegments.length;i++){
+                        if(match(i,queryIndex+1)){
+                            value=true;
+                            break;
+                        }
+                    }
+                }
+            }else{
+                value=pathIndex<pathSegments.length &&
+                    doesConvoDbQueryPathSegmentMatchPathSegment(pathSegments[pathIndex],querySegment) &&
+                    match(pathIndex+1,queryIndex+1);
+            }
+        }
+
+        memo.set(key,value);
+        return value;
+    }
+
+    return match(0,0);
+}
+
+const getNormalizedConvoDbPathSegments=(path:string):string[]|null=>{
+    path=path.replace(/\/+/g,'/');
+
+    while(path.length>1 && path.endsWith('/')){
+        path=path.substring(0,path.length-1);
+    }
+
+    if(path===''){
+        path='/';
+    }
+
+    const segments=path==='/'?[]:path.split('/').filter(v=>v);
+
+    return segments.some(segment=>segment==='.' || segment==='..' || (segment.includes('**') && segment!=='**'))?
+        null:
+        segments;
+}
+
+const doesConvoDbQueryPathSegmentMatchPathSegment=(pathSegment:string,querySegment:string):boolean=>{
+    if(querySegment.indexOf('*')===-1){
+        return pathSegment===querySegment;
+    }
+
+    return new RegExp(`^${escapeConvoDbQueryPathRegex(querySegment).replace(/\*/g,'[^/]*')}$`).test(pathSegment);
+}
+
+const escapeConvoDbQueryPathRegex=(value:string):string=>{
+    return value.replace(/[.+?^${}()|[\]\\]/g,'\\$&');
+}
+```
+</FILE_CONTENT>
+
+
+> user
+Update LocalStorageConvoDb to use any of the shared functions of convo-db-lib.ts or json-query.ts
+
+@time 2026-05-14T19:28:00-04:00
+@tokenUsage 21677 / 6585 / $0.14131000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any questions.
+<FILE_CONTENT name="LocalStorageConvoDb.ts" target-output-path="../../packages/db/src/LocalStorageConvoDb.ts" dirty file-hash="9f866fe94626abc38418a01997a8374f34410b21" last-commit="f7a2f59805a2cd50161e36ed2bd0b8d7d1f4aece">
+``` ts
+import { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
+import { deepClone, uuid } from "@iyio/common";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
+import { compareJsonQueryValues, createJsonQueryPathMatcher, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
+
+export interface LocalStorageConvoDbInf
+{
+    readonly length:number;
+
+    key(index:number):string|null;
+
+    getItem(key:string):string|null;
+
+    setItem(key:string,value:string):void;
+
+    removeItem(key:string):void;
+}
+
+export interface LocalStorageConvoDbOptions extends BaseConvoDbOptions
+{
+    /**
+     * A string prepended to the key of paths and ids used to store objects.
+     * @default "convo-db:"
+     */
+    keyPrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for node paths.
+     * Example node path key
+     * `/usr/tom/settings` -> `convo-db:node:/usr/tom/settings`
+     * @default "node:"
+     */
+    nodePrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for edge ids.
+     * Example edge id key
+     * `5a4eae7a-2d30-4a60-81d4-13e706b48d4c` -> `convo-db:edge:5a4eae7a-2d30-4a60-81d4-13e706b48d4c`
+     * @default "edge:"
+     */
+    edgePrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for embedding ids.
+     * Example embedding id key
+     * `8b18a539-77dc-421a-ae74-eacf4766a324` -> `convo-db:embedding:8b18a539-77dc-421a-ae74-eacf4766a324`
+     * @default "embedding:"
+     */
+    embeddingPrefix?:string;
+
+    /**
+     * Prefixed added the key prefix for blob paths.
+     * Example blob path key
+     * `/usr/bob/report.docx` -> `convo-db:blob:/usr/bob/report.docx`
+     * @default "blob:"
+     */
+    blobPrefix?:string;
+
+    /**
+     * Local storage interface
+     * @default globalThis.localStorage
+     */
+    inf?:LocalStorageConvoDbInf;
+
+    /**
+     * An optional delay to add to all accesses to the LocalStorageConvoDbInf. This is used to
+     * simulate network latency or other performance bottlenecks.
+     * @default 0
+     */
+    simulatedDelayMs?:number;
+}
+
+export class LocalStorageConvoDb extends BaseConvoDb
+{
+    public readonly keyPrefix:string;
+
+    public readonly nodePrefix:string;
+
+    public readonly edgePrefix:string;
+
+    public readonly embeddingPrefix:string;
+
+    public readonly blobPrefix:string;
+
+    public readonly inf:LocalStorageConvoDbInf;
+
+    public readonly simulatedDelayMs:number;
+
+    override readonly _driver:ConvoDbDriver;
+
+    private readonly _driverT:LocalStorageConvoDbDriver;
+
+    public constructor({
+        keyPrefix='convo-db:',
+        nodePrefix='node:',
+        edgePrefix='edge:',
+        embeddingPrefix='embedding:',
+        blobPrefix='blob:',
+        inf=(globalThis as any).localStorage,
+        simulatedDelayMs=0,
+        ...baseOptions
+    }:LocalStorageConvoDbOptions){
+        super(baseOptions);
+
+        if(!inf){
+            throw new Error('LocalStorageConvoDb requires a localStorage interface');
+        }
+
+        this.keyPrefix=keyPrefix;
+        this.nodePrefix=nodePrefix;
+        this.edgePrefix=edgePrefix;
+        this.embeddingPrefix=embeddingPrefix;
+        this.blobPrefix=blobPrefix;
+        this.inf=inf;
+        this.simulatedDelayMs=simulatedDelayMs;
+
+        this._driver=this._driverT=new LocalStorageConvoDbDriver({
+            keyPrefix,
+            nodePrefix,
+            edgePrefix,
+            embeddingPrefix,
+            blobPrefix,
+            inf,
+            simulatedDelayMs,
+        });
+    }
+
+    protected override _dispose():void{
+        this._driverT.dispose();
+    }
+}
+
+export interface LocalStorageConvoDbDriverOptions
+{
+    keyPrefix:string;
+
+    nodePrefix:string;
+
+    edgePrefix:string;
+
+    embeddingPrefix:string;
+
+    blobPrefix:string;
+
+    inf:LocalStorageConvoDbInf;
+
+    simulatedDelayMs:number;
+}
+
+export class LocalStorageConvoDbDriver implements ConvoDbDriver
+{
+    public readonly keyPrefix:string;
+
+    public readonly nodePrefix:string;
+
+    public readonly edgePrefix:string;
+
+    public readonly embeddingPrefix:string;
+
+    public readonly blobPrefix:string;
+
+    public readonly inf:LocalStorageConvoDbInf;
+
+    public readonly simulatedDelayMs:number;
+
+    public constructor({
+        keyPrefix,
+        nodePrefix,
+        edgePrefix,
+        embeddingPrefix,
+        blobPrefix,
+        inf,
+        simulatedDelayMs,
+    }:LocalStorageConvoDbDriverOptions){
+        this.keyPrefix=keyPrefix;
+        this.nodePrefix=nodePrefix;
+        this.edgePrefix=edgePrefix;
+        this.embeddingPrefix=embeddingPrefix;
+        this.blobPrefix=blobPrefix;
+        this.inf=inf;
+        this.simulatedDelayMs=simulatedDelayMs;
+    }
+
+    public dispose():void{
+    }
+
+    public async openBlobAsync(path:string):PromiseResultType<ReadableStream>{
+        const value=await this.getItemAsync(this.getBlobKey(path));
+        if(value===null){
+            return {
+                success:false,
+                error:'Blob not found',
+                statusCode:404,
+            }
+        }
+
+        return {
+            success:true,
+            result:new Blob([base64ToBytes(value)]).stream(),
+        }
+    }
+
+    public async writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null):PromiseResultTypeVoid{
+        const key=this.getBlobKey(path);
+
+        if(blob===null){
+            await this.removeItemAsync(key);
+            return {
+                success:true,
+            }
+        }
+
+        let bytes:Uint8Array;
+        if(typeof blob==='string'){
+            bytes=new TextEncoder().encode(blob);
+        }else if(typeof Blob!=='undefined' && blob instanceof Blob){
+            bytes=new Uint8Array(await blob.arrayBuffer());
+        }else{
+            const response=new Response(blob);
+            const responseBlob=await response.blob();
+            bytes=new Uint8Array(await responseBlob.arrayBuffer());
+        }
+
+        await this.setItemAsync(key,bytesToBase64(bytes));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async hasBlobAsync(path:string):PromiseResultType<boolean>{
+        return {
+            success:true,
+            result:(await this.getItemAsync(this.getBlobKey(path)))!==null,
+        }
+    }
+
+    public async selectEdgesByPathsAsync(keys:(keyof ConvoNodeEdge)[]|'*',fromPathsIn:string[],toPathsIn:string[],hasGrant:boolean):PromiseResultType<Partial<ConvoNodeEdge>[]>{
+        const fromSet=new Set(fromPathsIn);
+        const toSet=new Set(toPathsIn);
+        const edges:Partial<ConvoNodeEdge>[]=[];
+
+        for(const edge of await this.getAllEdgesAsync()){
+            if(!fromSet.has(edge.from) || !toSet.has(edge.to)){
+                continue;
+            }
+            if(hasGrant && (edge.grant===undefined || edge.grant===ConvoNodePermissionType.none)){
+                continue;
+            }
+            edges.push(selectJsonQueryKeys(edge,keys,deepClone));
+        }
+
+        return {
+            success:true,
+            result:edges,
+        }
+    }
+
+    public async selectNodesByPathsAsync(keys:(keyof ConvoNode)[]|'*',paths:string[],orderBy:ConvoNodeOrderBy[]):PromiseResultType<Partial<ConvoNode>[]>{
+        const nodes:ConvoNode[]=[];
+
+        for(const path of paths){
+            const node=await this.getNodeAsync(path);
+            if(node){
+                nodes.push(node);
+            }
+        }
+
+        sortJsonQueryValues(nodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:nodes.map(node=>selectJsonQueryKeys(node,keys,deepClone)),
+        }
+    }
+
+    public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const matchPath=createJsonQueryPathMatcher(step.path);
+        const matched=nodes.filter(node=>matchPath(node.path));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'condition'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const matched=nodes.filter(node=>evaluateJsonQueryCondition(node,step.condition));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForPermissionAsync(step:Required<Pick<ConvoNodeQueryStep,'permissionFrom'|'permissionRequired'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const nodes=await this.getCandidateNodesAsync(currentNodePaths);
+        const edges=await this.getAllEdgesAsync();
+        const matched=nodes.filter(node=>hasJsonQueryPermission(edges,step.permissionFrom,node.path,step.permissionRequired));
+
+        sortJsonQueryValues(matched,orderBy);
+
+        return {
+            success:true,
+            result:{paths:matched.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectNodePathsForEmbeddingAsync(step:Required<Pick<ConvoNodeQueryStep,'embedding'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const allowedPaths=currentNodePaths?new Set(currentNodePaths):undefined;
+        const matchedPathSet=new Set<string>();
+        const matchedPaths:string[]=[];
+
+        for(const embedding of await this.getAllEmbeddingsAsync()){
+            if(step.embedding.type!==undefined && embedding.type!==step.embedding.type){
+                continue;
+            }
+            if(allowedPaths && !allowedPaths.has(embedding.path)){
+                continue;
+            }
+            if(matchedPathSet.has(embedding.path)){
+                continue;
+            }
+
+            const node=await this.getNodeAsync(embedding.path);
+            if(!node){
+                continue;
+            }
+
+            const value=getJsonQueryValueByPath(node,embedding.prop);
+            const text=value===undefined || value===null?'':String(value);
+            if(text.toLowerCase().includes(step.embedding.text.toLowerCase())){
+                matchedPathSet.add(embedding.path);
+                matchedPaths.push(embedding.path);
+            }
+        }
+
+        const matchedNodes=(await Promise.all(matchedPaths.map(path=>this.getNodeAsync(path)))).filter(v=>v) as ConvoNode[];
+        sortJsonQueryValues(matchedNodes,orderBy,{pathOrder:matchedPaths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async selectEdgeNodePathsForConditionAsync(step:Required<Pick<ConvoNodeQueryStep,'edge'|'edgeDirection'>>&Pick<ConvoNodeQueryStep,'edgeLimit'>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,_nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
+        const paths=selectJsonQueryEdgeDestinationPaths(await this.getAllEdgesAsync(),step,currentNodePaths);
+        const matchedNodes=(await Promise.all(paths.map(path=>this.getNodeAsync(path)))).filter(v=>v) as ConvoNode[];
+
+        sortJsonQueryValues(matchedNodes,orderBy,{pathOrder:paths,getPath:node=>node.path});
+
+        return {
+            success:true,
+            result:{paths:matchedNodes.slice(offset,offset+limit).map(node=>node.path)},
+        }
+    }
+
+    public async insertNodeAsync(node:ConvoNode,_options:Omit<InsertConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNode>{
+        if(await this.getNodeAsync(node.path)){
+            return {
+                success:false,
+                error:`Node already exists - ${node.path}`,
+                statusCode:409,
+            }
+        }
+
+        const clone=deepClone(node);
+        await this.setJsonAsync(this.getNodeKey(node.path),clone);
+
+        return {
+            success:true,
+            result:deepClone(clone),
+        }
+    }
+
+    public async updateNodeAsync(node:ConvoNodeUpdate,_options:Omit<UpdateConvoNodeOptions,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getNodeAsync(node.path);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(node.displayName!==undefined){
+            if(node.displayName===null){
+                delete updated.displayName;
+            }else{
+                updated.displayName=node.displayName;
+            }
+        }
+        if(node.modified!==undefined){
+            if(node.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=node.modified;
+            }
+        }
+        if(node.description!==undefined){
+            if(node.description===null){
+                delete updated.description;
+            }else{
+                updated.description=node.description;
+            }
+        }
+        if(node.instructions!==undefined){
+            if(node.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=node.instructions;
+            }
+        }
+        if(node.data!==undefined){
+            updated.data=deepClone(node.data??{});
+        }
+
+        await this.setJsonAsync(this.getNodeKey(updated.path),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async deleteNodeAsync(path:string,_options:Omit<DeleteConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getNodeAsync(path)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getNodeKey(path));
+
+        for(const edge of await this.getAllEdgesAsync()){
+            if(edge.from===path || edge.to===path){
+                await this.removeItemAsync(this.getEdgeKey(edge.id));
+            }
+        }
+
+        for(const embedding of await this.getAllEmbeddingsAsync()){
+            if(embedding.path===path){
+                await this.removeItemAsync(this.getEmbeddingKey(embedding.id));
+            }
+        }
+
+        return {
+            success:true,
+        }
+    }
+
+    public async insertEdgeAsync(edge:Omit<ConvoNodeEdge,'id'>,_options:Omit<InsertConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEdge>{
+        if(!await this.getNodeAsync(edge.from)){
+            return {
+                success:false,
+                error:`Node not found - ${edge.from}`,
+                statusCode:404,
+            }
+        }
+        if(!await this.getNodeAsync(edge.to)){
+            return {
+                success:false,
+                error:`Node not found - ${edge.to}`,
+                statusCode:404,
+            }
+        }
+
+        const inserted:ConvoNodeEdge={
+            ...deepClone(edge),
+            id:uuid(),
+        };
+
+        await this.setJsonAsync(this.getEdgeKey(inserted.id),inserted);
+
+        return {
+            success:true,
+            result:deepClone(inserted),
+        }
+    }
+
+    public async updateEdgeAsync(update:ConvoNodeEdgeUpdate,_options:Omit<UpdateConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getEdgeAsync(update.id);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(update.displayName!==undefined){
+            if(update.displayName===null){
+                delete updated.displayName;
+            }else{
+                updated.displayName=update.displayName;
+            }
+        }
+        if(update.modified!==undefined){
+            if(update.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=update.modified;
+            }
+        }
+        if(update.description!==undefined){
+            if(update.description===null){
+                delete updated.description;
+            }else{
+                updated.description=update.description;
+            }
+        }
+        if(update.instructions!==undefined){
+            if(update.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=update.instructions;
+            }
+        }
+        if(update.grant!==undefined){
+            if(update.grant===null){
+                delete updated.grant;
+            }else{
+                updated.grant=update.grant;
+            }
+        }
+
+        await this.setJsonAsync(this.getEdgeKey(updated.id),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async deleteEdgeAsync(id:string,_options:Omit<DeleteConvoNodeEdgeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getEdgeAsync(id)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getEdgeKey(id));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async insertEmbeddingAsync(embedding:Omit<ConvoNodeEmbedding,'id'>,_options:Omit<InsertConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultType<ConvoNodeEmbedding>{
+        if(!await this.getNodeAsync(embedding.path)){
+            return {
+                success:false,
+                error:`Node not found - ${embedding.path}`,
+                statusCode:404,
+            }
+        }
+
+        const inserted:ConvoNodeEmbedding={
+            ...deepClone(embedding),
+            id:uuid(),
+        };
+
+        await this.setJsonAsync(this.getEmbeddingKey(inserted.id),inserted);
+
+        return {
+            success:true,
+            result:deepClone(inserted),
+        }
+    }
+
+    public async deleteEmbeddingAsync(id:string,_options:Omit<DeleteConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        if(!await this.getEmbeddingAsync(id)){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        await this.removeItemAsync(this.getEmbeddingKey(id));
+
+        return {
+            success:true,
+        }
+    }
+
+    public async updateEmbeddingAsync(update:ConvoNodeEmbeddingUpdate,_options:Omit<UpdateConvoNodeEmbeddingOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
+        const current=await this.getEmbeddingAsync(update.id);
+        if(!current){
+            return {
+                success:false,
+                error:'not found',
+                statusCode:404,
+            }
+        }
+
+        const updated=deepClone(current);
+
+        if(update.modified!==undefined){
+            if(update.modified===null){
+                delete updated.modified;
+            }else{
+                updated.modified=update.modified;
+            }
+        }
+        if(update.description!==undefined){
+            if(update.description===null){
+                delete updated.description;
+            }else{
+                updated.description=update.description;
+            }
+        }
+        if(update.instructions!==undefined){
+            if(update.instructions===null){
+                delete updated.instructions;
+            }else{
+                updated.instructions=update.instructions;
+            }
+        }
+
+        await this.setJsonAsync(this.getEmbeddingKey(updated.id),updated);
+
+        return {
+            success:true,
+        }
+    }
+
+    public async queryEdgesAsync(query:ConvoNodeEdgeQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEdgeQueryResult&ConvoDbDriverNextToken>{
+        const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
+        const offset=Math.max(0,query.offset??0);
+        const allEdges=await this.getAllEdgesAsync();
+
+        let edges=allEdges.filter(edge=>doesJsonQueryEdgeMatchQuery(edge,query));
+
+        if(query.permissionFrom!==undefined){
+            edges=edges.filter(edge=>{
+                const fromPermission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,edge.from);
+                const toPermission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,edge.to);
+                return (fromPermission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read &&
+                    (toPermission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read;
+            });
+        }
+
+        edges.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
+
+        const total=query.includeTotal?edges.length:undefined;
+        const resultEdges=edges.slice(offset,offset+limit).map(edge=>deepClone(edge));
+
+        return {
+            success:true,
+            result:{
+                edges:resultEdges,
+                total,
+            },
+        }
+    }
+
+    public async queryEmbeddingsAsync(query:ConvoNodeEmbeddingQuery&ConvoDbDriverNextToken):PromiseResultType<ConvoNodeEmbeddingQueryResult&ConvoDbDriverNextToken>{
+        const limit=Math.max(0,query.limit??defaultConvoNodeQueryLimit);
+        const offset=Math.max(0,query.offset??0);
+        const allEdges=await this.getAllEdgesAsync();
+
+        let embeddings=(await this.getAllEmbeddingsAsync()).filter(embedding=>doesJsonQueryEmbeddingMatchQuery(embedding,query));
+
+        if(query.permissionFrom!==undefined){
+            embeddings=embeddings.filter(embedding=>{
+                const permission=getJsonQueryPermissionValue(allEdges,query.permissionFrom!,embedding.path);
+                return (permission&ConvoNodePermissionType.read)===ConvoNodePermissionType.read;
+            });
+        }
+
+        embeddings.sort((a,b)=>compareJsonQueryValues(a.id,b.id));
+
+        const total=query.includeTotal?embeddings.length:undefined;
+        const resultEmbeddings=embeddings
+            .slice(offset,offset+limit)
+            .map(embedding=>{
+                const clone=deepClone(embedding);
+                if(!query.includeVector){
+                    delete clone.vector;
+                }
+                return clone;
+            });
+
+        return {
+            success:true,
+            result:{
+                embeddings:resultEmbeddings,
+                total,
+            },
+        }
+    }
+
+    private getNodeKey(path:string):string{
+        return `${this.keyPrefix}${this.nodePrefix}${path}`;
+    }
+
+    private getEdgeKey(id:string):string{
+        return `${this.keyPrefix}${this.edgePrefix}${id}`;
+    }
+
+    private getEmbeddingKey(id:string):string{
+        return `${this.keyPrefix}${this.embeddingPrefix}${id}`;
+    }
+
+    private getBlobKey(path:string):string{
+        return `${this.keyPrefix}${this.blobPrefix}${path}`;
+    }
+
+    private async getNodeAsync(path:string):Promise<ConvoNode|undefined>{
+        return await this.getJsonAsync<ConvoNode>(this.getNodeKey(path));
+    }
+
+    private async getEdgeAsync(id:string):Promise<ConvoNodeEdge|undefined>{
+        return await this.getJsonAsync<ConvoNodeEdge>(this.getEdgeKey(id));
+    }
+
+    private async getEmbeddingAsync(id:string):Promise<ConvoNodeEmbedding|undefined>{
+        return await this.getJsonAsync<ConvoNodeEmbedding>(this.getEmbeddingKey(id));
+    }
+
+    private async getCandidateNodesAsync(currentNodePaths:string[]|null):Promise<ConvoNode[]>{
+        if(currentNodePaths===null){
+            return await this.getAllNodesAsync();
+        }
+
+        const nodes:ConvoNode[]=[];
+        for(const path of currentNodePaths){
+            const node=await this.getNodeAsync(path);
+            if(node){
+                nodes.push(node);
+            }
+        }
+        return nodes;
+    }
+
+    private async getAllNodesAsync():Promise<ConvoNode[]>{
+        return await this.getAllByPrefixAsync<ConvoNode>(`${this.keyPrefix}${this.nodePrefix}`);
+    }
+
+    private async getAllEdgesAsync():Promise<ConvoNodeEdge[]>{
+        return await this.getAllByPrefixAsync<ConvoNodeEdge>(`${this.keyPrefix}${this.edgePrefix}`);
+    }
+
+    private async getAllEmbeddingsAsync():Promise<ConvoNodeEmbedding[]>{
+        return await this.getAllByPrefixAsync<ConvoNodeEmbedding>(`${this.keyPrefix}${this.embeddingPrefix}`);
+    }
+
+    private async getAllByPrefixAsync<T>(prefix:string):Promise<T[]>{
+        const values:T[]=[];
+
+        for(const key of await this.getKeysByPrefixAsync(prefix)){
+            const value=await this.getJsonAsync<T>(key);
+            if(value!==undefined){
+                values.push(value);
+            }
+        }
+
+        return values;
+    }
+
+    private async getKeysByPrefixAsync(prefix:string):Promise<string[]>{
+        const keys:string[]=[];
+        const length=await this.getLengthAsync();
+
+        for(let i=0;i<length;i++){
+            const key=await this.keyAsync(i);
+            if(key?.startsWith(prefix)){
+                keys.push(key);
+            }
+        }
+
+        return keys;
+    }
+
+    private async getJsonAsync<T>(key:string):Promise<T|undefined>{
+        const value=await this.getItemAsync(key);
+        return value===null?undefined:deepClone(JSON.parse(value));
+    }
+
+    private async setJsonAsync(key:string,value:any):Promise<void>{
+        await this.setItemAsync(key,JSON.stringify(value));
+    }
+
+    private async delayAsync():Promise<void>{
+        if(this.simulatedDelayMs>0){
+            await new Promise<void>(resolve=>setTimeout(resolve,this.simulatedDelayMs));
+        }
+    }
+
+    private async getLengthAsync():Promise<number>{
+        await this.delayAsync();
+        return this.inf.length;
+    }
+
+    private async keyAsync(index:number):Promise<string|null>{
+        await this.delayAsync();
+        return this.inf.key(index);
+    }
+
+    private async getItemAsync(key:string):Promise<string|null>{
+        await this.delayAsync();
+        return this.inf.getItem(key);
+    }
+
+    private async setItemAsync(key:string,value:string):Promise<void>{
+        await this.delayAsync();
+        this.inf.setItem(key,value);
+    }
+
+    private async removeItemAsync(key:string):Promise<void>{
+        await this.delayAsync();
+        this.inf.removeItem(key);
+    }
+}
+
+const bytesToBase64=(bytes:Uint8Array):string=>{
+    const bufferCtor=(globalThis as any).Buffer;
+    if(bufferCtor){
+        return bufferCtor.from(bytes).toString('base64');
+    }
+
+    let binary='';
+    const chunkSize=0x8000;
+    for(let i=0;i<bytes.length;i+=chunkSize){
+        binary+=String.fromCharCode(...bytes.subarray(i,i+chunkSize));
+    }
+    return globalThis.btoa(binary);
+}
+
+const base64ToBytes=(base64:string):Uint8Array<ArrayBuffer>=>{
+    const bufferCtor=(globalThis as any).Buffer;
+    if(bufferCtor){
+        return new Uint8Array(bufferCtor.from(base64,'base64'));
+    }
+
+    const binary=globalThis.atob(base64);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++){
+        bytes[i]=binary.charCodeAt(i);
+    }
+    return bytes;
+}
+```
+</FILE_CONTENT>
+
+
+> user

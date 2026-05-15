@@ -1,3 +1,18 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-lib.ts !file !file
+
+> user
+Update the wildcard behavior of `convo-db-lib.ts` based on the `wildcard-update.md` file
+
+
+@time 2026-05-14T18:10:47-04:00
+@tokenUsage 4939 / 4470 / $0.047045000000000003
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t have any questions; I’ll apply the documented wildcard validation changes to `convo-db-lib.ts`.
+<FILE_CONTENT name="convo-db-lib.ts" target-output-path="../../packages/convo-lang/src/lib/db/convo-db-lib.ts" last-commit="6f03324367c581bed3df4f2569256ea524962a26">
+``` ts
 import { ResultTypeError, ResultTypeVoid } from "../result-type.js";
 import { ConvoDbCommand, ConvoDbDriver, ConvoDbDriverFunction, convoDbDriverFunctions, ConvoNodeCondition, ConvoNodePermissionType, ConvoNodeQuery, ConvoNodeQueryStep, isConvoNodeGroupCondition, isConvoNodePropertyCondition } from "./convo-db-types.js";
 
@@ -99,9 +114,6 @@ const reservedPathSuffix='.@db-';
 const isValidConvoNodePathGlob=(parts:string[]):boolean=>{
     for(let i=1;i<parts.length;i++){
         const part=parts[i];
-        if(!part){
-            continue;
-        }
         if(!part.includes('*')){
             continue;
         }
@@ -382,3 +394,8 @@ export const applyIdentityToConvoDbCommand=(identityPath:string,cmd:ConvoDbComma
     }
     return {success:true}
 }
+```
+</FILE_CONTENT>
+
+
+> user

@@ -1,0 +1,21 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/tests/src/convo-db-blob.test.ts !file
+
+> user
+Update the wildcard behavior of the test file based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T19:46:34-04:00
+@tokenUsage 2471 / 607 / $0.015390000000000001
+@model gpt-5.5-2026-04-23
+> assistant
+I don’t see any wildcard query paths in `convo-db-blob.test.ts`; the existing paths are literal blob paths like `/blob-test/${crypto.randomUUID()}.txt`.
+
+Do you want me to:
+1. Leave the file unchanged because blob paths are not glob paths, or
+2. Add a test asserting blob paths with `*`/`**` are treated as invalid or non-glob literal paths?
+
+
+> user

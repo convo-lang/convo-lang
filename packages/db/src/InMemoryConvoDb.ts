@@ -1,7 +1,7 @@
 import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
 import { deepClone, uuid } from "@iyio/common";
 import { BaseConvoDb } from "./BaseConvoDb.js";
-import { doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, doesJsonQueryPathMatchStepPath, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues, compareJsonQueryValues } from "./json-query.js";
+import { compareJsonQueryValues, createJsonQueryPathMatcher, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
 
 
 export class InMemoryConvoDb extends BaseConvoDb
@@ -64,7 +64,7 @@ export class InMemoryConvoDb extends BaseConvoDb
             
             if(typeof blob === 'string'){
                 blob=new Blob([blob]);
-            }else if(!(blob instanceof Blob)){
+            }else if(blob && !(blob instanceof Blob)){
                 const response=new Response(blob);
                 blob=await response.blob();
             }else if(blob){
@@ -128,8 +128,9 @@ export class InMemoryConvoDb extends BaseConvoDb
         
         selectNodePathsForPathAsync:async (step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number):PromiseResultType<ConvoDbDriverPathsResult>=>{
             const nodes=this.getCandidateNodes(currentNodePaths);
+            const matchesPath=createJsonQueryPathMatcher(step.path);
 
-            const matched=nodes.filter(node=>doesJsonQueryPathMatchStepPath(node.path,step.path));
+            const matched=nodes.filter(node=>matchesPath(node.path));
 
             sortJsonQueryValues(matched,orderBy);
 
