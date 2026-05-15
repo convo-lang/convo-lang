@@ -275,3 +275,82 @@ test("LayeredConvoDb driver paginates edge queries across layers and reports tot
     expect(names.sort()).toEqual(expectedNames);
     expect(nextToken).toBeUndefined();
 });
+
+test("layered edge queryNodesAsync supports non-recursive and recursive wildcard query paths",async ()=>{
+    const base=createLayer('/');
+    const posts=createLayer('/wild/posts');
+    const archive=createLayer('/wild/a/archive');
+    const store=new LayeredConvoDb({
+        name:'layered',
+        layers:[
+            {
+                mountPoint:'/',
+                db:base,
+            },
+            {
+                mountPoint:'/wild/a/archive',
+                db:archive,
+            },
+            {
+                mountPoint:'/wild/posts',
+                db:posts,
+            },
+        ],
+    });
+
+    const paths=[
+        '/wild',
+        '/wild/a',
+        '/wild/ab',
+        '/wild/a/b',
+        '/wild/posts',
+        '/wild/posts/1',
+        '/wild/a/posts',
+        '/wild/a/posts/1',
+        '/wild/a/posts/1/comment',
+        '/wild/a/archive',
+        '/wild/a/archive/posts',
+        '/wild/a/archive/posts/1',
+    ];
+
+    for(const path of paths){
+        await store.insertNodeAsync(createNode(path));
+    }
+
+    const queryPathsAsync=async (path:string):Promise<string[]>=>{
+        const result=await store.queryNodesAsync({
+            steps:[
+                {path},
+            ],
+            orderBy:{prop:'path',direction:'asc'},
+        });
+        expect(result.success).toBe(true);
+        if(!result.success){
+            throw new Error('expected success');
+        }
+        return result.result.nodes.map(n=>n.path);
+    };
+
+    expect(await queryPathsAsync('/wild/*')).toEqual([
+        '/wild/a',
+        '/wild/ab',
+        '/wild/posts',
+    ]);
+
+    expect(await queryPathsAsync('/wild/a*')).toEqual([
+        '/wild/a',
+        '/wild/ab',
+    ]);
+
+    expect((await queryPathsAsync('/wild/**')).sort()).toEqual([...paths].sort());
+
+    expect(await queryPathsAsync('/wild/*/posts/*')).toEqual([
+        '/wild/a/posts/1',
+    ]);
+
+    expect(await queryPathsAsync('/wild/**/posts/*')).toEqual([
+        '/wild/a/archive/posts/1',
+        '/wild/a/posts/1',
+        '/wild/posts/1',
+    ]);
+});
