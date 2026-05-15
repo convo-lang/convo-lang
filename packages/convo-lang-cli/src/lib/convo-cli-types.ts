@@ -177,6 +177,22 @@ export interface ConvoCliOptions
     exeCwd?:string;
 
     /**
+     * Path to tsconfig of a TypeScript project that will be synchronized by scanning for tagged
+     * interfaces, types and components
+     */
+    syncTsConfig?:string[];
+
+    /**
+     * If TypeScript projects being scanned with be updated in real time as changes are made.
+     */
+    syncWatch?:boolean;
+
+    /**
+     * The directory where generated synchronization output files are written
+     */
+    syncOut?:string;
+
+    /**
      * A command line that can be ran in parallel with actions such as sync watching
      */
     spawn?:string;

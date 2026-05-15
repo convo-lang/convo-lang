@@ -13,6 +13,7 @@ import { ConvoCliOptions } from "../lib/convo-cli-types.js";
 import { createNextAppAsync } from "../lib/create-next-app.js";
 import { deleteCliDbBlobsAsync, loadCliDbBlobsAsync } from "./convo-cli-blob.js";
 import { convoCliHelpMessage } from "./convo-cli-help.js";
+import { convertConvoInterfacesAsync } from "./convo-interface-converter.js";
 import { runConvoTuiAsync } from "./tui/lib/convo-tui-app.js";
 
 export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>parseCliArgsT<ConvoCliOptions>({
@@ -55,6 +56,9 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         allowExec:args=>args[0] as any,
         prepend:args=>args[0],
         exeCwd:args=>args[0],
+        syncTsConfig:args=>args,
+        syncWatch:args=>args.length?true:false,
+        syncOut:args=>args[0],
         spawn:args=>args.join(' '),
         spawnDir:args=>args[0],
         printState:args=>args.length?true:false,
@@ -166,6 +170,10 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
             cwd:args.spawnDir,
             cancel,
         }));
+    }
+
+    if(args.syncTsConfig?.length){
+        toolPromises.push(convertConvoInterfacesAsync(args,cancel));
     }
 
     if(args.generateEmbedding){
