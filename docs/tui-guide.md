@@ -1,0 +1,1262 @@
+# TUI Developer Guide
+
+This guide covers the recommended way to build terminal user interfaces with `@convo-lang/tui`.
+
+The TUI library uses a declarative sprite tree. A `ConvoTuiCtrl` owns the terminal, screens, input handling, rendering, focus, links, lifecycle, and runtime updates.
+
+## Guiding principles
+
+- Prefer declarative `SpriteDef` objects.
+- Prefer sprite `ctrl` functions for local state, lifecycle hooks, intervals, subscriptions, and event wiring.
+- Do not add `id` values unless they are needed.
+- Use `id` when a sprite must be focused, linked to, updated externally, or updated by a parent controller.
+- Keep screen-level state for screen concerns.
+- Keep sprite-level state close to the sprite that owns it.
+- Use `children` composition instead of imperative rendering where possible.
+
+## Basic app
+
+```ts
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import type { ScreenDef, TuiConsole, TuiTheme } from '@convo-lang/tui/tui-types';
+
+const theme:TuiTheme={
+    foreground:'#d7d7d7',
+    background:'#111111',
+    panel:'#1f2937',
+    muted:'#6b7280',
+    accent:'#60a5fa',
+    success:'#22c55e',
+    danger:'#ef4444',
+};
+
+const screens:ScreenDef[]=[
+    {
+        id:'home',
+        root:{
+            layout:'column',
+            padding:1,
+            gap:1,
+            children:[
+                {
+                    text:'Convo TUI',
+                    color:'accent',
+                    align:'center',
+                },
+                {
+                    text:'Press Tab to focus the button. Press Enter to activate it.',
+                    flex:1,
+                    align:'center',
+                    justify:'center',
+                },
+                {
+                    text:' Quit ',
+                    border:'danger',
+                    activeColor:'background',
+                    activeBg:'danger',
+                    onClick:evt=>evt.ctrl.dispose(),
+                },
+            ],
+        },
+    },
+];
+
+const tuiConsole:TuiConsole={
+    stdout:process.stdout,
+    stdin:process.stdin,
+};
+
+const ctrl=new ConvoTuiCtrl({
+    console:tuiConsole,
+    theme,
+    defaultScreen:'home',
+    screens,
+});
+
+process.on('exit',()=>ctrl.dispose());
+process.on('SIGTERM',()=>{
+    ctrl.dispose();
+    process.exit(0);
+});
+
+ctrl.init();
+```
+
+## Screens
+
+A screen represents one full terminal view.
+
+```ts
+import type { ScreenDef } from '@convo-lang/tui/tui-types';
+
+export const homeScreen:ScreenDef={
+    id:'home',
+    root:{
+        layout:'column',
+        children:[
+            {
+                text:'Home',
+                color:'accent',
+            },
+            {
+                text:' Settings ',
+                link:'settings',
+                border:'accent',
+            },
+        ],
+    },
+};
+```
+
+Use screen ids for navigation targets. Sprite ids are not needed for simple links to screens.
+
+```ts
+export const settingsScreen:ScreenDef={
+    id:'settings',
+    root:{
+        layout:'column',
+        children:[
+            {
+                text:'Settings',
+                color:'accent',
+            },
+            {
+                text:' Back ',
+                link:'home',
+                border:'accent',
+            },
+        ],
+    },
+};
+```
+
+## Sprite basics
+
+A sprite can display text, rich text, images, child sprites, or custom inline renderer output.
+
+```ts
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
+
+const card:SpriteDef={
+    layout:'column',
+    border:'accent',
+    padding:1,
+    gap:1,
+    children:[
+        {
+            text:'Ada Lovelace',
+            color:'accent',
+        },
+        {
+            text:'Mathematician and programmer',
+            color:'muted',
+        },
+    ],
+};
+```
+
+Only add an `id` when something must reference the sprite.
+
+```ts
+const status:SpriteDef={
+    id:'status',
+    text:'Ready',
+    color:'success',
+};
+```
+
+## Prefer `ctrl` for sprite behavior
+
+Use a sprite `ctrl` function to attach behavior when a sprite is loaded. This keeps state and lifecycle code near the sprite that owns it.
+
+A `ctrl` function receives:
+
+- `sprite`: the loaded sprite.
+- `ctrl`: the root `ConvoTuiCtrl`.
+- `update`: a scoped update function.
+
+When `update` is called without an `id`, it updates the controller sprite. When an `id` is supplied, it updates a descendant sprite.
+
+```ts
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
+
+const counterButton:SpriteDef={
+    text:' Count: 0 ',
+    border:'accent',
+    activeColor:'background',
+    activeBg:'accent',
+    ctrl:({sprite,update})=>{
+        let count=0;
+
+        sprite.onClick=()=>{
+            count++;
+            update({text:` Count: ${count} `});
+        };
+    },
+};
+```
+
+Use the cleanup return value for intervals, subscriptions, and resources.
+
+```ts
+const clock:SpriteDef={
+    text:'--:--:--',
+    color:'accent',
+    ctrl:({update})=>{
+        const render=()=>{
+            update({text:new Date().toLocaleTimeString()});
+        };
+
+        render();
+
+        const iv=setInterval(render,1000);
+
+        return ()=>{
+            clearInterval(iv);
+        };
+    },
+};
+```
+
+## Updating descendants from `ctrl`
+
+Use child ids only when a controller needs to update a specific descendant.
+
+```ts
+const searchPanel:SpriteDef={
+    layout:'column',
+    gap:1,
+    ctrl:({sprite,update})=>{
+        update({children:[
+            {
+                isInput:true,
+                border:'accent',
+                placeholder:'Search',
+                onInput:evt=>{
+                    update({
+                        id:'summary',
+                        text:`Search length: ${evt.value.length}`,
+                    });
+                },
+            },
+            {
+                id:'summary',
+                text:'Search length: 0',
+                color:'muted',
+            },
+        ]);
+    },
+};
+```
+
+For static children, define them directly and wire behavior in `ctrl`.
+
+```ts
+const form:SpriteDef={
+    layout:'column',
+    gap:1,
+    children:[
+        {
+            id:'preview',
+            text:'Hello, stranger',
+            color:'muted',
+        },
+        {
+            id:'input',
+            isInput:true,
+            border:'accent',
+            placeholder:'Name',
+        },
+    ],
+    ctrl:({find,update})=>{
+        const input=find('input');
+
+        if(input){
+            input.onInput=evt=>{
+                update({
+                    id:'preview',
+                    text:`Hello, ${evt.value || 'stranger'}`,
+                    color:evt.value?'accent':'muted',
+                });
+            };
+        }
+    },
+};
+```
+
+## Layout
+
+The primary layout values are:
+
+- `inline`: render text, rich text, image, or inline renderer.
+- `row`: place children horizontally.
+- `column`: place children vertically.
+- `grid`: place children into grid columns and rows.
+
+### Inline
+
+```ts
+const label:SpriteDef={
+    text:'Inline text',
+    color:'accent',
+};
+```
+
+### Row
+
+```ts
+const toolbar:SpriteDef={
+    layout:'row',
+    gap:1,
+    children:[
+        {
+            text:' New ',
+            border:'accent',
+        },
+        {
+            text:' Save ',
+            border:'success',
+        },
+        {
+            text:' Delete ',
+            border:'danger',
+        },
+    ],
+};
+```
+
+### Column
+
+```ts
+const panel:SpriteDef={
+    layout:'column',
+    border:'accent',
+    padding:1,
+    gap:1,
+    children:[
+        {
+            text:'Header',
+            color:'accent',
+            align:'center',
+        },
+        {
+            text:'Body',
+            flex:1,
+        },
+        {
+            text:'Footer',
+            color:'muted',
+        },
+    ],
+};
+```
+
+### Grid
+
+Grid columns use `cr` for character width and `fr` for fractional remaining width.
+
+```ts
+const detailsGrid:SpriteDef={
+    layout:'grid',
+    gridCols:['14cr','1fr'],
+    gap:{
+        x:1,
+        y:0,
+    },
+    children:[
+        {
+            text:'Name',
+            color:'accent',
+        },
+        {
+            text:'Convo TUI',
+        },
+        {
+            text:'Status',
+            color:'accent',
+        },
+        {
+            text:'Ready',
+            color:'success',
+        },
+    ],
+};
+```
+
+## Sizing and spacing
+
+Use `width` and `height` for fixed sizing.
+
+```ts
+const box:SpriteDef={
+    text:'Fixed size',
+    width:24,
+    height:5,
+    border:'accent',
+    align:'center',
+    justify:'center',
+};
+```
+
+Use `flex` to consume remaining space in row and column layouts.
+
+```ts
+const splitView:SpriteDef={
+    layout:'row',
+    children:[
+        {
+            text:'Sidebar',
+            width:24,
+            border:'muted',
+        },
+        {
+            text:'Main content',
+            flex:1,
+            border:'accent',
+        },
+    ],
+};
+```
+
+Use `margin`, `padding`, and `gap` for spacing.
+
+```ts
+const spaced:SpriteDef={
+    layout:'column',
+    padding:{
+        top:1,
+        bottom:1,
+        left:2,
+        right:2,
+    },
+    gap:1,
+    children:[
+        {
+            text:'First',
+            border:'muted',
+        },
+        {
+            text:'Second',
+            border:'muted',
+        },
+    ],
+};
+```
+
+## Alignment
+
+Use `align` and `justify`.
+
+For inline sprites:
+
+- `align` controls horizontal alignment.
+- `justify` controls vertical alignment.
+
+For column layouts:
+
+- `align` controls child horizontal alignment.
+- `justify` controls child vertical placement.
+
+For row layouts:
+
+- `align` controls child vertical alignment.
+- `justify` controls child horizontal placement.
+
+```ts
+const centered:SpriteDef={
+    text:'Centered',
+    width:40,
+    height:7,
+    border:'accent',
+    align:'center',
+    justify:'center',
+};
+```
+
+Use `selfAlign` on a child to override inherited alignment.
+
+```ts
+const actions:SpriteDef={
+    layout:'column',
+    align:'stretch',
+    children:[
+        {
+            text:'Full width',
+            border:'muted',
+        },
+        {
+            text:' Centered ',
+            selfAlign:'center',
+            border:'accent',
+        },
+    ],
+};
+```
+
+## Text
+
+Text wraps by default. Configure wrapping with `textWrap`.
+
+```ts
+const wrapping:SpriteDef={
+    layout:'column',
+    gap:1,
+    children:[
+        {
+            text:'This text wraps at whitespace when possible.',
+            textWrap:'wrap',
+            border:'muted',
+        },
+        {
+            text:'Thistexthardwrapsattheavailablewidth.',
+            textWrap:'wrap-hard',
+            border:'muted',
+        },
+        {
+            text:'This text clips when too long.',
+            textWrap:'clip',
+            textClipStyle:'ellipses',
+            border:'muted',
+        },
+    ],
+};
+```
+
+Use `richText` for per-span colors.
+
+```ts
+const rich:SpriteDef={
+    richText:[
+        {
+            text:'Build ',
+        },
+        {
+            text:'colorful',
+            color:'accent',
+        },
+        {
+            text:' terminal apps',
+        },
+    ],
+};
+```
+
+## Colors and themes
+
+Colors can be direct hex colors or theme variable names.
+
+```ts
+const theme:TuiTheme={
+    foreground:'#d7d7d7',
+    background:'#111111',
+    panel:'#1f2937',
+    muted:'#6b7280',
+    accent:'#60a5fa',
+    success:'#22c55e',
+    danger:'#ef4444',
+};
+```
+
+```ts
+const button:SpriteDef={
+    text:' Save ',
+    color:'accent',
+    bg:'panel',
+    border:'accent',
+    activeColor:'background',
+    activeBg:'success',
+    activeBorder:'success',
+};
+```
+
+## Borders
+
+Use a string border for all sides.
+
+```ts
+const bordered:SpriteDef={
+    text:'Bordered',
+    border:'accent',
+    borderStyle:'rounded',
+};
+```
+
+Use an object for per-side borders.
+
+```ts
+const sideBorders:SpriteDef={
+    text:'Selected sides',
+    border:{
+        top:'accent',
+        bottom:'accent',
+        left:'muted',
+    },
+};
+```
+
+Supported border styles:
+
+- `normal`
+- `thick`
+- `rounded`
+- `double`
+- `classic`
+
+## Buttons
+
+A sprite with `onClick` automatically behaves like a button. You can also set `isButton:true`.
+
+```ts
+const saveButton:SpriteDef={
+    text:' Save ',
+    border:'success',
+    activeColor:'background',
+    activeBg:'success',
+    onClick:evt=>{
+        evt.ctrl.log('saved');
+    },
+};
+```
+
+Prefer `ctrl` when the button owns state.
+
+```ts
+const toggleButton:SpriteDef={
+    text:' Off ',
+    border:'muted',
+    ctrl:({sprite,update})=>{
+        let enabled=false;
+
+        sprite.onClick=()=>{
+            enabled=!enabled;
+            update({
+                text:enabled?' On ':' Off ',
+                border:enabled?'success':'muted',
+                activeBg:enabled?'success':'muted',
+            });
+        };
+    },
+};
+```
+
+## Inputs
+
+A sprite with `isInput:true` behaves like a text input.
+
+```ts
+const nameInput:SpriteDef={
+    isInput:true,
+    border:'accent',
+    placeholder:'Name',
+    activeBorder:'success',
+};
+```
+
+Use `onInput` for live updates and `onSubmit` for submission.
+
+```ts
+const inputForm:SpriteDef={
+    layout:'column',
+    gap:1,
+    children:[
+        {
+            isInput:true,
+            border:'accent',
+            placeholder:'Type a message',
+        },
+        {
+            id:'result',
+            text:'No message submitted',
+            color:'muted',
+        },
+    ],
+    ctrl:({sprite,update})=>{
+        const input=sprite.children?.[0];
+
+        if(input){
+            input.onSubmit=evt=>{
+                update({
+                    id:'result',
+                    text:`Submitted: ${evt.value}`,
+                    color:'success',
+                });
+            };
+        }
+    },
+};
+```
+
+Use `multiLineInput:true` for multiline input. Enter inserts new lines. Ctrl+Enter submits when the terminal emits a distinct Ctrl+Enter sequence.
+
+```ts
+const editor:SpriteDef={
+    isInput:true,
+    multiLineInput:true,
+    textWrap:'wrap',
+    height:8,
+    border:'accent',
+    placeholder:'Write notes...',
+};
+```
+
+Use `inputFilter` to transform input.
+
+```ts
+const slugInput:SpriteDef={
+    isInput:true,
+    border:'accent',
+    placeholder:'slug',
+    inputFilter:value=>value.toLowerCase().replace(/\s+/g,'-'),
+};
+```
+
+## Form data
+
+Use `getFormData` to collect non-empty input values from a sprite subtree. The returned object is keyed by input sprite id.
+
+From app-level code, call `ctrl.getFormData(spriteOrId)`. From a sprite `ctrl`, call the scoped `getFormData()` helper to collect data under the controller sprite, or pass a descendant id to collect only that descendant subtree.
+
+```ts
+const profileForm:SpriteDef={
+    layout:'column',
+    gap:1,
+    children:[
+        {
+            id:'name',
+            isInput:true,
+            border:'accent',
+            placeholder:'Name',
+        },
+        {
+            id:'email',
+            isInput:true,
+            border:'accent',
+            placeholder:'Email',
+        },
+        {
+            text:' Submit ',
+            border:'success',
+        },
+        {
+            id:'status',
+            text:'Enter profile details',
+            color:'muted',
+        },
+    ],
+    ctrl:({sprite,getFormData,update})=>{
+        const submit=sprite.children?.[2];
+
+        if(submit){
+            submit.onClick=()=>{
+                const data=getFormData();
+
+                update({
+                    id:'status',
+                    text:`Submitting ${data.name ?? 'unknown'} <${data.email ?? 'no email'}>`,
+                    color:'success',
+                });
+            };
+        }
+    },
+};
+```
+
+Only inputs with an id and a non-empty trimmed value are included.
+
+## Focus
+
+Interactive sprites are focusable when they are inputs, buttons, or links.
+
+Common keyboard behavior:
+
+- `Tab`: focus next.
+- `Shift+Tab`: focus previous.
+- `Enter`: activate button or submit input.
+- `Space`: activate button or link, or insert a space into input.
+- Arrow keys: move input caret or scroll active scrollable sprite.
+- `Ctrl+C`: dispose the controller.
+
+Use `defaultSprite` when a screen should focus a specific sprite when first shown. This requires an id.
+
+```ts
+const screen:ScreenDef={
+    id:'home',
+    defaultSprite:'primary-action',
+    root:{
+        layout:'column',
+        children:[
+            {
+                id:'primary-action',
+                text:' Continue ',
+                border:'accent',
+                link:'next',
+            },
+        ],
+    },
+};
+```
+
+Use `autoActivate:true` when a sprite should activate itself on mount.
+
+```ts
+const autoFocusedInput:SpriteDef={
+    isInput:true,
+    autoActivate:true,
+    border:'accent',
+    placeholder:'Start typing',
+};
+```
+
+## Links
+
+Use `link` to navigate to a screen or focus another sprite.
+
+```ts
+const nav:SpriteDef={
+    layout:'row',
+    gap:1,
+    children:[
+        {
+            text:' Home ',
+            link:'home',
+            border:'accent',
+        },
+        {
+            text:' Settings ',
+            link:'settings',
+            border:'accent',
+        },
+    ],
+};
+```
+
+Link resolution checks:
+
+1. Sprites in the current screen.
+2. Screens.
+3. Sprites in all screens.
+
+## Scrolling
+
+Set `scrollable:true` when content can exceed the sprite viewport.
+
+```ts
+const list:SpriteDef={
+    layout:'column',
+    flex:1,
+    scrollable:true,
+    isButton:true,
+    border:'accent',
+    children:Array.from({length:40},(_,i)=>({
+        text:`Row ${String(i+1).padStart(2,'0')}`,
+    })),
+};
+```
+
+Scrollable sprites can be scrolled with arrow keys when active or with the mouse wheel when under the mouse.
+
+## Mouse events
+
+Sprites can handle mouse release, drag, and wheel events.
+
+```ts
+import type { SpriteDef, SpriteMouseEvtBase } from '@convo-lang/tui/tui-types';
+
+const formatMouse=(evt:SpriteMouseEvtBase)=>{
+    const modifiers=[
+        evt.modifiers.shift?'shift':undefined,
+        evt.modifiers.alt?'alt':undefined,
+        evt.modifiers.ctrl?'ctrl':undefined,
+    ].filter(Boolean).join('+') || 'none';
+
+    return `${evt.x},${evt.y} modifiers=${modifiers}`;
+};
+
+const mousePanel:SpriteDef={
+    layout:'column',
+    flex:1,
+    border:'accent',
+    isButton:true,
+    children:[
+        {
+            id:'mouse-status',
+            text:'Move the mouse over this panel.',
+            color:'muted',
+        },
+    ],
+    ctrl:({sprite,update})=>{
+        sprite.onMouseRelease=evt=>{
+            update({
+                id:'mouse-status',
+                text:`release ${evt.button} at ${formatMouse(evt)}`,
+                color:'accent',
+            });
+        };
+
+        sprite.onMouseDrag=evt=>{
+            update({
+                id:'mouse-status',
+                text:`drag ${evt.button} at ${formatMouse(evt)}`,
+                color:'success',
+            });
+        };
+
+        sprite.onMouseWheel=evt=>{
+            update({
+                id:'mouse-status',
+                text:`wheel ${evt.direction} at ${formatMouse(evt)}`,
+                color:'muted',
+            });
+        };
+    },
+};
+```
+
+## Custom inline renderers
+
+Use `inlineRenderer` for custom inline drawing.
+
+```ts
+const meter:SpriteDef={
+    text:'[          ]',
+    inlineRenderer:{
+        overlayContent:true,
+        render:ctx=>{
+            const width=Math.max(3, ctx.width);
+            const innerWidth=width-2;
+            const value=ctx.ivCount%(innerWidth+1);
+
+            ctx.setChar(0,0,'['+' '.repeat(innerWidth)+']','muted');
+            ctx.setChar(1,0,'='.repeat(value),'success');
+
+            if(value<innerWidth){
+                ctx.setChar(value+1,0,'>','accent');
+            }
+        },
+        intervalMs:120,
+    },
+};
+```
+
+The renderer can only draw inside its bounded layout area. Return `false` from an interval render to skip flushing output for that tick.
+
+## Images
+
+Use the `image` property with encoded TUI image data.
+
+```ts
+import type { SpriteDef } from '@convo-lang/tui/tui-types';
+import { logoSrc } from './logo.js';
+
+const logo:SpriteDef={
+    image:logoSrc,
+    align:'center',
+    justify:'center',
+    imageOptions:{
+        width:80,
+        cleanEdges:true,
+    },
+};
+```
+
+## Runtime updates
+
+Use `updateSprite` for app-level updates.
+
+```ts
+ctrl.updateSprite({
+    id:'status',
+    text:'Updated',
+    color:'success',
+});
+```
+
+Use a callback for in-place updates.
+
+```ts
+ctrl.updateSprite('status',sprite=>{
+    sprite.text='Updated';
+    sprite.color='success';
+});
+```
+
+For local sprite behavior, prefer the scoped `update` function inside `ctrl`.
+
+```ts
+const statusButton:SpriteDef={
+    layout:'column',
+    children:[
+        {
+            text:' Refresh ',
+            border:'accent',
+        },
+        {
+            id:'status',
+            text:'Ready',
+            color:'muted',
+        },
+    ],
+    ctrl:({sprite,update})=>{
+        const button=sprite.children?.[0];
+
+        if(button){
+            button.onClick=()=>{
+                update({
+                    id:'status',
+                    text:'Refreshed',
+                    color:'success',
+                });
+            };
+        }
+    },
+};
+```
+
+## Screen lifecycle
+
+Screens support activation and deactivation callbacks.
+
+```ts
+const dashboardScreen:ScreenDef={
+    id:'dashboard',
+    root:{
+        text:'Dashboard',
+    },
+    onActivate:evt=>{
+        evt.ctrl.log('dashboard active');
+    },
+    onDeactivate:evt=>{
+        evt.ctrl.log('dashboard inactive');
+    },
+};
+```
+
+Use `transient:true` to reset screen state each time the screen is deactivated.
+
+```ts
+const modalScreen:ScreenDef={
+    id:'modal',
+    transient:true,
+    root:{
+        border:'accent',
+        text:'Temporary modal',
+    },
+};
+```
+
+## Sprite lifecycle
+
+Prefer `ctrl` for most lifecycle use cases.
+
+Use `onMount` and `onUnmount` when an external API expects explicit mount callbacks.
+
+```ts
+const mountedSprite:SpriteDef={
+    text:'Mounted',
+    onMount:evt=>{
+        evt.ctrl.log('mounted', evt.sprite.id);
+    },
+    onUnmount:evt=>{
+        evt.ctrl.log('unmounted', evt.sprite.id);
+    },
+};
+```
+
+For cleanup, prefer returning a cleanup function from `ctrl`.
+
+```ts
+const subscriptionSprite:SpriteDef={
+    text:'Listening',
+    ctrl:({update})=>{
+        const unsubscribe=subscribeToValue(value=>{
+            update({text:value});
+        });
+
+        return ()=>{
+            unsubscribe();
+        };
+    },
+};
+```
+
+## State
+
+Sprites and screens have mutable state objects.
+
+Sprite state includes:
+
+- `active`
+- `inputValue`
+- `inputCaret`
+- `scrollX`
+- `scrollY`
+
+Use sprite state for renderer and input state. Use closure state inside `ctrl` for private component state.
+
+```ts
+const privateStateButton:SpriteDef={
+    text:' Count: 0 ',
+    border:'accent',
+    ctrl:({sprite,update})=>{
+        let count=0;
+
+        sprite.onClick=()=>{
+            count++;
+            update({text:` Count: ${count} `});
+        };
+    },
+};
+```
+
+Use explicit sprite state when the state should participate in TUI behavior.
+
+```ts
+const prefilledInput:SpriteDef={
+    isInput:true,
+    border:'accent',
+    state:{
+        inputValue:'Initial value',
+    },
+};
+```
+
+## Absolute positioning
+
+Absolute sprites are removed from normal parent layout and positioned relative to the terminal.
+
+```ts
+const root:SpriteDef={
+    layout:'column',
+    children:[
+        {
+            text:'Main content',
+            flex:1,
+        },
+        {
+            absolutePosition:{
+                left:4,
+                top:3,
+                right:4,
+                height:8,
+            },
+            layout:'column',
+            border:'accent',
+            bg:'panel',
+            padding:1,
+            children:[
+                {
+                    text:'Floating panel',
+                    color:'accent',
+                    align:'center',
+                },
+                {
+                    text:'This overlays the main layout.',
+                    flex:1,
+                    align:'center',
+                    justify:'center',
+                },
+            ],
+        },
+    ],
+};
+```
+
+## Recommended project structure
+
+For larger apps, define screens in modules and compose them in one controller.
+
+```ts
+// screens/homeScreen.ts
+import type { ScreenDef } from '@convo-lang/tui/tui-types';
+
+export const homeScreen:ScreenDef={
+    id:'home',
+    root:{
+        layout:'column',
+        padding:1,
+        gap:1,
+        children:[
+            {
+                text:'Home',
+                color:'accent',
+            },
+            {
+                text:' Settings ',
+                link:'settings',
+                border:'accent',
+            },
+        ],
+    },
+};
+```
+
+```ts
+// screens/settingsScreen.ts
+import type { ScreenDef } from '@convo-lang/tui/tui-types';
+
+export const settingsScreen:ScreenDef={
+    id:'settings',
+    root:{
+        layout:'column',
+        padding:1,
+        gap:1,
+        children:[
+            {
+                text:'Settings',
+                color:'accent',
+            },
+            {
+                text:' Back ',
+                link:'home',
+                border:'accent',
+            },
+        ],
+    },
+};
+```
+
+```ts
+// app.ts
+import { ConvoTuiCtrl } from '@convo-lang/tui/ConvoTuiCtrl';
+import { homeScreen } from './screens/homeScreen.js';
+import { settingsScreen } from './screens/settingsScreen.js';
+
+const ctrl=new ConvoTuiCtrl({
+    console:{
+        stdout:process.stdout,
+        stdin:process.stdin,
+    },
+    theme:{
+        foreground:'#d7d7d7',
+        background:'#111111',
+        accent:'#60a5fa',
+    },
+    defaultScreen:'home',
+    screens:[
+        homeScreen,
+        settingsScreen,
+    ],
+});
+
+ctrl.init();
+```
+
+## Checklist
+
+Before adding an id to a sprite, ask:
+
+- Does another sprite need to update it?
+- Does a screen need to focus it by default?
+- Does a link target it?
+- Does app-level code need to update it?
+- Do tests or debug tools need a stable identifier?
+
+If the answer is no, leave the id out.
+
+Before using app-level `updateSprite`, ask:
+
+- Can this state live inside a sprite `ctrl` closure?
+- Can the scoped `update` function update the target?
+- Would a parent sprite controller be a better owner?
+
+Prefer local ownership unless the state is truly app-level.

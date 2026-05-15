@@ -1,3 +1,18 @@
+@import ./_tui.convo
+@import ../../packages/tui/README.md !file
+
+> user
+Update the README to include information about `Sprite.ctrl`. Include an example where the ctrl
+updates the sprite and assigns a onClick callback function
+
+
+
+@time 2026-05-14T21:55:13-04:00
+@tokenUsage 13571 / 6615 / $0.10092999999999999
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="README.md" target-output-path="../../packages/tui/README.md" last-commit="bb6b2176100093f6d1e821910c907b9754899887">
+```md
 # @convo-lang/tui
 
 A resource efficient, zero dependency terminal user interface library for building feature rich TUI interfaces in TypeScript.
@@ -1017,25 +1032,29 @@ A controller can also return a cleanup function that runs when the sprite is unm
 import type { SpriteDef } from '@convo-lang/tui/tui-types';
 
 const counterButton:SpriteDef={
+    id:'counter-button',
     text:' Count: 0 ',
     border:'accent',
     activeColor:'background',
     activeBg:'accent',
-    ctrl:({sprite,update})=>{
+    ctrl:ctx=>{
         let count=0;
 
-        sprite.onClick=()=>{
-            update({text:` Count: ${++count} `});
-        }
-
-        const iv=setInterval(()=>{
-            update({text:` Count: ${++count} `});
-        },2000);
+        ctx.update({
+            text:` Count: ${count} `,
+            onClick:()=>{
+                count++;
+                ctx.update({
+                    text:` Count: ${count} `,
+                    border:count%2?'success':'accent',
+                });
+            },
+        });
 
         return ()=>{
-            clearInterval(iv);
+            ctx.ctrl.log?.('counter unmounted');
         };
-    }
+    },
 };
 ```
 
@@ -1192,3 +1211,18 @@ Common keyboard behavior:
 - `Backspace`: edit active input
 - Arrow keys: scroll the active scrollable sprite
 - `Ctrl+C`: dispose the controller
+
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="tui-notes.md" target-output-path="./tui-notes.md">
+```md
+# TUI notes
+
+- Updated `packages/tui/README.md` to document `Sprite.ctrl`.
+- Added an example where a sprite controller updates its own sprite text and assigns an `onClick` callback with `ctx.update`.
+```
+</FILE_CONTENT>
+
+
+> user

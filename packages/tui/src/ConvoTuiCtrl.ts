@@ -1,6 +1,6 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
 import { detectColorMode } from "./tui-lib.js";
-import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteDef, SpriteGridColWidth, SpriteGridRowHeight, SpriteGridUnit, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
+import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteCtx, SpriteCtxUpdate, SpriteDef, SpriteGridColWidth, SpriteGridRowHeight, SpriteGridUnit, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
 export interface ConvoTuiCtrlOptions
@@ -320,6 +320,7 @@ export class ConvoTuiCtrl
         const m=screen.state.mountedSprites;
         let mounted:Sprite[]|undefined;
         let unmounted:Sprite[]|undefined;
+        let cleanUps:(()=>void)[]|undefined;
         let activate:Sprite|undefined;
 
         const visit=(sprite:Sprite)=>{
@@ -350,10 +351,12 @@ export class ConvoTuiCtrl
                 continue;
             }
             if(sprite.onUnmount){
-                if(!unmounted){
-                    unmounted=[];
-                }
+                unmounted??=[];
                 unmounted.push(sprite);
+            }
+            if(sprite.state.ctrlCleanup){
+                cleanUps??=[];
+                cleanUps.push(sprite.state.ctrlCleanup);
             }
             this.stopAnimationFor(sprite);
             sprite.state.mounted=false;
@@ -364,6 +367,12 @@ export class ConvoTuiCtrl
         if(unmounted){
             for(const sprite of unmounted){
                 sprite.onUnmount?.({type:'unmount',sprite,ctrl:this,screen});
+            }
+        }
+
+        if(cleanUps){
+            for(const c of cleanUps){
+                c();
             }
         }
 
@@ -381,8 +390,15 @@ export class ConvoTuiCtrl
     private syncActiveSpriteStates(screen:Screen)
     {
         const activeId=screen.state?.activeSpriteId;
+        let init:Sprite[]|undefined;
 
         const visit=(sprite:Sprite)=>{
+
+            if(sprite.ctrl && !sprite.state.ctrlCtx){
+                init??=[];
+                init.push(sprite);
+            }
+
             const active=!!activeId && sprite.id===activeId;
 
             sprite.state.active=active;
@@ -393,6 +409,69 @@ export class ConvoTuiCtrl
         };
 
         visit(screen.root);
+
+        if(init){
+            for(let i=0;i<init.length;i++){
+                const sprite=init[i]!;
+                if(sprite.ctrl){
+                    const ctx=this.createSpriteCtx(sprite);
+                    sprite.state.ctrlCtx=ctx;
+                    const sc=sprite.children;
+                    sprite.state.ctrlCleanup=sprite.ctrl(ctx);
+                    if(sprite.onClick){
+                        sprite.isButton=true;
+                    }
+                    if(sprite.onInput){
+                        sprite.isInput=true;
+                    }
+                    if(sc!==sprite.children && sprite.children){
+                        for(const c of sprite.children){
+                            visit(c);
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    private createSpriteCtx(sprite:Sprite):SpriteCtx{
+        const ctx:SpriteCtx={
+            sprite,
+            ctrl:this,
+            update:(update,reRender=this.renderState!=='init' && !update.children)=>{
+                return this.updateCtxSprite(sprite,update,reRender);
+            },
+            find:id=>this.findSpriteInTree(sprite,id),
+            getFormData:id=>this.getFormData(id??sprite),
+        }
+        return ctx;
+    }
+
+    public getFormData(sprite:string|Sprite):Record<string,string>{
+        if(typeof sprite === 'string'){
+            const s=this.findSpriteById(sprite);
+            if(!s){
+                return {};
+            }
+            sprite=s;
+        }
+        const data:Record<string,string>={};
+        this._getFormData(sprite,data);
+        return data;
+        
+    }
+
+    private _getFormData(sprite:Sprite,data:Record<string,string>){
+        if(sprite.id && sprite.isInput && sprite.state.inputValue?.trim()){
+            data[sprite.id]=sprite.state.inputValue?.trim();
+        }
+        if(sprite.children){
+            for(const c of sprite.children){
+                this._getFormData(c,data);
+            }
+        }
+        
     }
 
     public findScreen(id:string):Screen|undefined
@@ -622,49 +701,66 @@ export class ConvoTuiCtrl
         };
     }
 
+    private renderState:null|'init'|'render'=null;
+    private renderRequested=false;
     public render()
     {
         if(this._isDisposed){
             return;
         }
 
-        this.inputCursor=undefined;
-        this.resizeBuffers();
-        this.clearBuffer(this.bufferState.back);
-        this.spriteContentRects.clear();
-
-        const screen=this._activeScreen;
-        if(screen){
-            screen.state.renderIndex++;
-            this.syncActiveSpriteStates(screen);
-
-            const rect:TuiRect={
-                x:0,
-                y:0,
-                width:this.bufferState.width,
-                height:this.bufferState.height,
-            };
-            this.drawSprite(screen.root, rect, {
-                f:this.resolveColor(this.theme.foreground),
-                b:this.resolveColor(this.theme.background),
-            });
-            this.drawAbsoluteSprites(screen.root);
-            this.syncSpriteMounts(screen);
+        if(this.renderState){
+            this.renderRequested=true;
+            return;
         }
 
-        const output=(
-            this.forceFullRender?
-                this.renderBufferAnsi(this.bufferState.back)
-            :
-                this.renderBufferDiffAnsi(this.bufferState.front, this.bufferState.back,{x:0,y:0,width:this.bufferState.width,height:this.bufferState.height})
-        );
+        this.renderState='init';
+        try{
+            this.inputCursor=undefined;
+            this.resizeBuffers();
+            this.clearBuffer(this.bufferState.back);
+            this.spriteContentRects.clear();
 
-        this.copyBackBufferToFront();
-        this.forceFullRender=false;
+            const screen=this._activeScreen;
+            if(screen){
+                screen.state.renderIndex++;
+                this.syncActiveSpriteStates(screen);
+                this.renderState='render';
 
-        const cursorOutput=this.getCursorAnsi();
-        if(output || cursorOutput){
-            this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
+                const rect:TuiRect={
+                    x:0,
+                    y:0,
+                    width:this.bufferState.width,
+                    height:this.bufferState.height,
+                };
+                this.drawSprite(screen.root, rect, {
+                    f:this.resolveColor(this.theme.foreground),
+                    b:this.resolveColor(this.theme.background),
+                });
+                this.drawAbsoluteSprites(screen.root);
+                this.syncSpriteMounts(screen);
+            }
+
+            const output=(
+                this.forceFullRender?
+                    this.renderBufferAnsi(this.bufferState.back)
+                :
+                    this.renderBufferDiffAnsi(this.bufferState.front, this.bufferState.back,{x:0,y:0,width:this.bufferState.width,height:this.bufferState.height})
+            );
+
+            this.copyBackBufferToFront();
+            this.forceFullRender=false;
+
+            const cursorOutput=this.getCursorAnsi();
+            if(output || cursorOutput){
+                this.writeAnsi(`\x1b[?25l${output}${cursorOutput}`);
+            }
+        }finally{
+            this.renderState=null;
+            if(this.renderRequested){
+                this.renderRequested=false;
+                this.render();
+            }
         }
     }
 
@@ -2895,6 +2991,31 @@ export class ConvoTuiCtrl
         }
 
         return true;
+    }
+
+    public updateCtxSprite(sprite:Sprite,update:SpriteCtxUpdate,render=true):Sprite|undefined{
+        if(update.id!==undefined){
+            const s=this.findSpriteInTree(sprite,update.id);
+            if(!s){
+                return undefined;
+            }
+            sprite=s;
+        }
+        for(const e in update){
+            if(e==='children'){
+                const defs=update.children;
+                if(defs){
+                    sprite.children=defs.map(d=>this.loadSprite(d));
+                }
+            }else if(e!=='id'){
+                (sprite as any)[e]=(update as any)[e];
+            }
+        }
+
+        if(render){
+            this.render();
+        }
+        return sprite;
     }
 
     private parseSgrMouseEvent(code:number, x:number, y:number, suffix:'m'|'M'):TuiSgrMouseEvt

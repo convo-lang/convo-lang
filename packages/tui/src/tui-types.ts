@@ -80,6 +80,15 @@ export interface Sprite{
     id:string;
 
     /**
+     * A controller function that can be used to hook into the lifecycle of the sprite. `ctrl` will be
+     * called before the sprites first render before the onMount callback is called. The controller
+     * can return a clean up function that will be called just before the controller is unmounted.
+     * Controller functions can also be used to set other callbacks onClick and any other
+     * property of a sprite.
+     */
+    ctrl?:SpriteCtrl;
+
+    /**
      * Controls how the sprite is displayed. The default layout type is `inline` and will draw
      * the text of the sprite on a single line. All other layout types will cause the text of the
      * sprite to be ignored and render the children of the sprite.
@@ -474,6 +483,10 @@ export interface SpriteState
     mounted?:boolean;
 
     renderIndex:number;
+
+    ctrlCtx?:SpriteCtx;
+
+    ctrlCleanup?:()=>void;
 }
 
 /**
@@ -707,6 +720,35 @@ export type SpriteGridColWidth=`${number}${SpriteGridUnit}`;
  * Format = "{number}{cr|fr}"|"auto"
  */
 export type SpriteGridRowHeight=`${number}${SpriteGridUnit}`|'auto';
+
+export interface SpriteCtx
+{
+    sprite:Sprite;
+    ctrl:ConvoTuiCtrl;
+    /**
+     * Updates the sprite of the context of a descendant of the sprite if the update object defines an id.
+     * @returns The sprite that is updated or undefined if not descendant sprite is found by id
+     */
+    update:(update:SpriteCtxUpdate,reRender?:boolean)=>Sprite|undefined;
+
+    /**
+     * Finds a descendant sprite by id
+     */
+    find:(id:string)=>Sprite|undefined;
+
+    /**
+     * Returns an object containing all the input data. Keys are the ids of inputs.
+     * @param spriteId If provided only form data within the descendant specified by the id will be gathered.
+     */
+    getFormData:(spriteId?:string)=>Record<string,string>;
+}
+
+export type SpriteCtxUpdate=Omit<SpriteUpdate,'id'>&{id?:string};
+
+/**
+ * A controller function that can hook into the lifecycle of a sprite
+ */
+export type SpriteCtrl=(ctx:SpriteCtx)=>undefined|(()=>undefined);
 
 
 ///// Custom sprite rendering /////

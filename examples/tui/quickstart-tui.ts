@@ -24,10 +24,35 @@ const root:SpriteDef={
         },
         {
             id:'body',
-            text:'Press Tab to focus the button, then Enter to quit.',
             flex:1,
             align:'center',
             justify:'center',
+            layout:'column',
+            gap:1,
+            children:[
+                'Press Tab to focus the button, then Enter to quit.',
+                {
+                    text:' Count: 0 ',
+                    border:'accent',
+                    activeColor:'background',
+                    activeBg:'accent',
+                    ctrl:({sprite,update})=>{
+                        let count=0;
+
+                        sprite.onClick=()=>{
+                            update({text:` Count: ${++count} `});
+                        }
+
+                        const iv=setInterval(()=>{
+                            update({text:` Count: ${++count} `});
+                        },2000);
+
+                        return ()=>{
+                            clearInterval(iv);
+                        };
+                    }
+                }
+            ]
         },
         {
             id:'quit',
