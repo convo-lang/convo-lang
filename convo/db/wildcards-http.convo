@@ -1,3 +1,30 @@
+@import ../base.convo
+@import ./wildcard-update.md !file
+@import ../../packages/convo-lang/src/lib/HttpConvoCompletionService.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-lib.ts !file
+@import ../../packages/db/src/json-query.ts !file
+
+> user
+Update the wildcard behavior of `HttpConvoCompletionService.ts` based on the `wildcard-update.md` file
+
+
+
+@time 2026-05-14T20:05:47-04:00
+@tokenUsage 16051 / 530 / $0.082905
+@model gpt-5.5-2026-04-23
+> assistant
+No questions. Proceeding with the update.
+
+
+> user
+
+
+@time 2026-05-14T20:07:31-04:00
+@tokenUsage 16066 / 8740 / $0.12403000000000002
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="HttpConvoCompletionService.ts" target-output-path="../../packages/convo-lang/src/lib/HttpConvoCompletionService.ts" last-commit="101843fea3d4a4330a27dca61f775d6cb0247c4e">
+``` ts
 import { CancelToken, HttpClientRequestOptions, HttpMethod, NotFoundError, Scope, ScopeRegistration, aryRandomize, defineStringParam, deleteUndefined, getErrorMessage, getObjKeyCount, getSortedObjectHash, httpClient, joinPaths, objectToQueryParams } from "@iyio/common";
 import type { ZodType } from "zod";
 import { getSerializableFlatConvoConversation, passthroughConvoInputType, passthroughConvoOutputType } from "./convo-lib.js";
@@ -601,7 +628,7 @@ export class HttpConvoCompletionService implements
             "*" extends U ? keyof ConvoNode :
             Exclude<U, "*"|null|undefined>&keyof ConvoNode :
         keyof ConvoNode
-    >>
+    \>>
     {
         const options=await this.getRequestOptions?.();
         
@@ -656,7 +683,7 @@ export class HttpConvoCompletionService implements
             "*" extends U ? keyof ConvoNode :
             Exclude<U, "*"|null|undefined>&keyof ConvoNode :
         keyof ConvoNode
-    >>
+    \>>
     {
         const r=await this.executeCommandAsync<TKeys>({queryNodes:{query}});
         return r.success?{success:true,result:r.result.queryNodes!}:r;
@@ -840,8 +867,7 @@ export class HttpConvoCompletionService implements
 
     public async getNodesByPathAsync(path:string,permissionFrom?:string):PromiseResultType<ConvoNodeQueryResult<keyof ConvoNode>>
     {
-        const r=await this.executeCommandAsync({getNodesByPath:{path,permissionFrom}});
-        return r.success?{success:true,result:r.result.getNodesByPath!}:r;
+        return await this.queryNodesAsync({steps:[{path}],permissionFrom});
     }
 
     public async getNodePermissionAsync(fromPath:string,toPath:string):PromiseResultType<ConvoNodePermissionType>
@@ -1016,3 +1042,9 @@ export class HttpConvoCompletionService implements
         }
     }
 }
+
+```
+</FILE_CONTENT>
+
+
+> user

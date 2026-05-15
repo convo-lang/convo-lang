@@ -10,7 +10,7 @@ import { uuid } from "@iyio/common";
 import { indexedDB as fakeIndexedDB } from "fake-indexeddb";
 
 export type DbType='bun-sqlite'|'node-sqlite'|'mem'|'http'|'fs'|'local-storage'|'index-db';
-export const defaultTestDbType='fs' satisfies DbType;
+export const defaultTestDbType='mem' satisfies DbType;
 
 
 export const createTestDb=(type=defaultTestDbType)=>{
