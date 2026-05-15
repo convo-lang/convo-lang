@@ -1,3 +1,24 @@
+@import ../base.convo
+@import ../../packages/convo-lang/src/lib/db/convo-db-types.ts !file
+@import ../../packages/db/src/BaseConvoDb.ts !file
+@import ../../packages/convo-lang/src/lib/db/convo-db-function-executor.ts !file
+@import ../../packages/tests/src/createTestDb.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../docs/convo-db.md !file
+@import ./wildcard-update.md !file
+
+> user
+Update the `convo-db.md` document based on the `wildcard-update.md` file
+
+Do not use language like "now supports" or "previous worked like". The update should not
+read like a version update.
+
+@time 2026-05-14T20:17:16-04:00
+@tokenUsage 54058 / 18061 / $0.36059500000000005
+@model gpt-5.5-2026-04-23
+> assistant
+<FILE_CONTENT name="convo-db.md" target-output-path="../../docs/convo-db.md" last-commit="f0ba8951179005960f3a0c92cde3450956627b24">
+``` md
 # ConvoDb
 
 ConvoDb is a graph-capable, path-based database interface for building AI agents, tools, memory systems, knowledge stores, workflow engines, authentication flows, and other agentic systems.
@@ -3488,3 +3509,8 @@ import {
     NodeFsConvoDb,
 } from '@convo-lang/db-node';
 ```
+```
+</FILE_CONTENT>
+
+
+> user
