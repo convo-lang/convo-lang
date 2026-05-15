@@ -1,8 +1,11 @@
 @import ../base.convo
 @import ../../packages/tui/src/tui-types.ts !file
+@import ../../docs/tui-guide.md !file
 
 > system
 We are building a TUI for Convo-Lang. 
+
+The TUI will run in Node v20 LTS or later.
 
 ## Screens
 

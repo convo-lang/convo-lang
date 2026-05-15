@@ -1,7 +1,7 @@
+import { ConvoDbFsItem } from "@convo-lang/convo-lang";
 import { SpriteDef } from "@convo-lang/tui/tui-types";
 import { getDirectoryName, joinPaths } from "@iyio/common";
 import { FSWatcher, watch } from "fs";
-import { readdir } from "fs/promises";
 import { cIcon } from "../lib/character-icons";
 import { ConvoCliTuiCtx } from "../lib/convo-cli-tui-types";
 
@@ -11,6 +11,13 @@ export const fileBrowser=(ctx:ConvoCliTuiCtx):SpriteDef=>{
 
     let dir=studio.cwd;
     const setDir=(d:string)=>{
+        let w=studio.workspacePath;
+        if(!w.endsWith('/')){
+            w+='/';
+        }
+        if(d.startsWith('/') && d.startsWith(w)){
+            d='./'+d.substring(w.length);
+        }
         dir=d;
         ctx.studio.cwd=d;
     }
@@ -33,7 +40,7 @@ export const fileBrowser=(ctx:ConvoCliTuiCtx):SpriteDef=>{
         }
         cleanUpWatcher();
         currentWatchDir=dir;
-        watcher=watch(dir,{recursive:false,persistent:false},(evt,name)=>{
+        watcher=watch(joinPaths(studio.workspacePath,dir),{recursive:false,persistent:false},(evt,name)=>{
             if(name==='log'){
                 return;
             }
@@ -45,23 +52,38 @@ export const fileBrowser=(ctx:ConvoCliTuiCtx):SpriteDef=>{
     const updateFilesAsync=async ()=>{
         try{
             const id=++updateId;
-            const items=await readdir(joinPaths(studio.workspacePath,dir),{withFileTypes:true});
+            let path=dir;
+            if(path.endsWith('/.')){
+                path=path.substring(0,path.length-2)
+            }
+            if(path.startsWith('./')){
+                path=path.substring(2);
+            }
+            if(!path || path==='.'){
+                path='/'
+            }
+            const r=await studio.db.getNodeByPathAsync(path);
+            if(!r.success){
+                throw new Error(r.error);
+            }
+            const items=Object.values(r.result?.data??{}) as Partial<ConvoDbFsItem>[];
             if(id!==updateId){
                 return;
             }
-            items.sort((a,b)=>`${a.isDirectory()?'1':'2'}${a.name}`.localeCompare(`${b.isDirectory()?'1':'2'}${b.name}`));
+            items.sort((a,b)=>`${a.isDir?'1':'2'}${a.name}`.localeCompare(`${b.isDir?'1':'2'}${b.name}`));
+
 
             fileSprites=items.map(item=>{
                 return {
-                    text:`${item.isDirectory()?'⏵':' '} ${item.name}`,
+                    text:`${item.isDir?'⏵':' '} ${item.name}`,
                     textWrap:'clip',
                     isButton:true,
                     activeColor:'foreground',
                     onClick:()=>{
-                        if(item.isFile()){
-                            studio.openDocAsync(joinPaths(item.parentPath,item.name),true)
-                        }else{
-                            setDir(joinPaths(dir,item.name));
+                        if(item.isFile && item.path){
+                            studio.openDocAsync(item.path,true)
+                        }else if(item.path){
+                            setDir(item.path);
                             updateFilesAsync();
                         }
                     }
@@ -75,7 +97,7 @@ export const fileBrowser=(ctx:ConvoCliTuiCtx):SpriteDef=>{
                 })
             }else{
                 fileSprites.unshift({
-                    text:`${cIcon.dotDot} ${dir.substring(1)}`,
+                    text:`${cIcon.dotDot} ${dir}`,
                     margin:{bottom:1},
                     textWrap:'clip',  
                     onClick:()=>{

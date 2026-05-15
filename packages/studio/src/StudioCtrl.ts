@@ -1,9 +1,10 @@
 import { ObjectBinding } from "@convo-lang/convo-lang";
+import { LayeredConvoDb, LayeredConvoDbOptions } from "@convo-lang/db/LayeredConvoDb.js";
 import { getContentType, ObjWatchEvt, ReadonlySubject, uuid, wSetProp } from "@iyio/common";
 import { BehaviorSubject } from "rxjs";
 import { CellCtrl } from "./CellCtrl.js";
 import { areStudioUrisEqual, defaultStudioDocTask, parseStudioUri } from "./convo-studio-lib.js";
-import { Studio, StudioCell, StudioDoc, StudioDocTask, StudioUri, StudioWindow, TmpStudioIo } from "./convo-studio-types.js";
+import { Studio, StudioCell, StudioDoc, StudioDocTask, StudioUri, StudioWindow } from "./convo-studio-types.js";
 import { DocCtrl } from "./DocCtrl.js";
 import { WindowCtrl } from "./WindowCtrl.js";
 
@@ -11,7 +12,7 @@ export interface StudioCtrlOptions
 {
     workspacePath:string;
     studio?:Studio;
-    tmpIo:TmpStudioIo;
+    dbOptions:LayeredConvoDbOptions;
 }
 
 /**
@@ -41,16 +42,16 @@ export class StudioCtrl extends ObjectBinding<Studio>
 
     public readonly workspacePath:string;
 
-    private readonly tmpIo:TmpStudioIo;
+    public readonly db:LayeredConvoDb;
 
     public constructor({
         workspacePath,
         studio={windows:[]},
-        tmpIo,
+        dbOptions,
     }:StudioCtrlOptions){
         super({obj:studio});
         this.workspacePath=workspacePath;
-        this.tmpIo=tmpIo;
+        this.db=new LayeredConvoDb(dbOptions);
     }
 
     public override sync(evt:ObjWatchEvt<Studio>):void{
@@ -118,8 +119,16 @@ export class StudioCtrl extends ObjectBinding<Studio>
 
         let content:string|undefined;
 
+        console.log('hio 👋 👋 👋 open',uri);
+
         if(uri.protocol==='file'){
-            content=await this.tmpIo.readFileAsync(uri.path);
+            const r=await this.db.readBlobStringAsync(uri.path);
+            if(!r.success){
+                console.error('Failed to load doc content',r);
+            }else{
+                content=r.result;
+            }
+
         }
         const doc:StudioDoc={
             name:uri.basename,

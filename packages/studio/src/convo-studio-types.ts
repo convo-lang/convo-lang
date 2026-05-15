@@ -84,13 +84,3 @@ export interface StudioDoc
 
     content?:string;
 }
-
-/**
- * This interface will be replace with a ConvoDb Filesystem mount
- */
-export interface TmpStudioIo
-{
-    readFileAsync(path:string):Promise<string|undefined>;
-
-    writeFileAsync(path:string,content:string):Promise<boolean>;
-}

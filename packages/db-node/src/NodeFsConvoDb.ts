@@ -1,7 +1,9 @@
-import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoEmbeddingSearch, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
+import type { ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoDbFsItem, ConvoEmbeddingSearch, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from '@convo-lang/convo-lang';
 import { BaseConvoDb, BaseConvoDbOptions } from '@convo-lang/db/BaseConvoDb.js';
 import { createJsonQueryPathMatcher, doesJsonQueryEdgeMatchCondition, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from '@convo-lang/db/json-query.js';
+import { getContentType } from '@iyio/common';
 import { pathExistsAsync } from "@iyio/node-common";
+import { glob } from 'glob';
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -47,6 +49,13 @@ export interface NodeFsConvoDbOptions extends BaseConvoDbOptions
      * An optional suffix to append to the end of paths to blobs. By default blobs are stored with out a suffix
      */
     blobSuffix?:string;
+
+    /**
+     * File extensions that should be loaded as json nodes when `nodeSuffix` is empty and the database
+     * is operating in metadata mode.
+     * @default ['.json']
+     */
+    jsonExtensions?:string[];
 }
 
 export class NodeFsConvoDb extends BaseConvoDb
@@ -61,6 +70,8 @@ export class NodeFsConvoDb extends BaseConvoDb
 
     public readonly blobSuffix:string;
 
+    public readonly jsonExtensions:string[];
+
     override readonly _driver:ConvoDbDriver;
 
     private readonly _driverT:NodeFsConvoDbDriver;
@@ -71,6 +82,7 @@ export class NodeFsConvoDb extends BaseConvoDb
         embeddingsDirectory=path.join(root,'.@db-metadata/embeddings'),
         nodeSuffix='.@db-n.json',
         blobSuffix='',
+        jsonExtensions=['.json'],
         ...baseOptions
     }:NodeFsConvoDbOptions){
         super(baseOptions);
@@ -79,12 +91,14 @@ export class NodeFsConvoDb extends BaseConvoDb
         this.embeddingsDirectory=path.resolve(embeddingsDirectory);
         this.nodeSuffix=nodeSuffix;
         this.blobSuffix=blobSuffix;
+        this.jsonExtensions=jsonExtensions;
         this._driver=this._driverT=new NodeFsConvoDbDriver({
             root:this.root,
             edgeDirectory:this.edgeDirectory,
             embeddingsDirectory:this.embeddingsDirectory,
             nodeSuffix:this.nodeSuffix,
             blobSuffix:this.blobSuffix,
+            jsonExtensions:this.jsonExtensions,
         });
     }
 
@@ -104,6 +118,7 @@ export interface NodeFsConvoDbDriverOptions
     embeddingsDirectory:string;
     nodeSuffix:string;
     blobSuffix:string;
+    jsonExtensions:string[];
 }
 
 export class NodeFsConvoDbDriver implements ConvoDbDriver
@@ -118,18 +133,22 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     public readonly blobSuffix:string;
 
+    public readonly jsonExtensions:string[];
+
     public constructor({
         root,
         edgeDirectory,
         embeddingsDirectory,
         nodeSuffix,
         blobSuffix,
+        jsonExtensions,
     }:NodeFsConvoDbDriverOptions){
         this.root=root;
         this.edgeDirectory=edgeDirectory;
         this.embeddingsDirectory=embeddingsDirectory;
         this.nodeSuffix=nodeSuffix;
         this.blobSuffix=blobSuffix;
+        this.jsonExtensions=jsonExtensions;
     }
 
     public async initAsync():PromiseResultTypeVoid{
@@ -224,9 +243,9 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     public async selectNodePathsForPathAsync(step:Required<Pick<ConvoNodeQueryStep,'path'>>,currentNodePaths:string[]|null,orderBy:ConvoNodeOrderBy[],limit:number,offset:number,nextToken:string|undefined):PromiseResultType<ConvoDbDriverPathsResult>{
         return await this._runAsync(async ()=>{
-            const paths=currentNodePaths??await this._readNodePathsAsync();
             const matches=createJsonQueryPathMatcher(step.path);
-            const selected=paths.filter(matches);
+            const paths=currentNodePaths??await this._readNodePathsForPathAsync(step.path);
+            const selected=currentNodePaths?paths.filter(matches):paths;
             return {
                 paths:await this._pageOrderedPathsAsync(selected,orderBy,limit,offset),
                 nextToken:undefined,
@@ -319,6 +338,9 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     public async deleteNodeAsync(nodePath:string,options:Omit<DeleteConvoNodeOptions,'permissionFrom'>|undefined):PromiseResultTypeVoid{
         return await this._runVoidAsync(async ()=>{
+            if(this._isMetadataMode() && !this._hasJsonNodeExtension(this._getNodeFsPath(nodePath))){
+                throw new Error('Metadata nodes are read only');
+            }
             await rm(this._getNodeFsPath(nodePath),{force:true});
             const edges=await this._readEdgesAsync();
             await Promise.all(edges
@@ -467,11 +489,18 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     private async _writeNodeAsync(node:ConvoNode):Promise<void>{
         const fsPath=this._getNodeFsPath(node.path);
+        if(this._isMetadataMode() && !this._hasJsonNodeExtension(fsPath)){
+            throw new Error('Metadata nodes are read only');
+        }
         await mkdir(path.dirname(fsPath),{recursive:true});
         await writeFile(fsPath,JSON.stringify(node,null,4));
     }
 
     private async _readNodeAsync(nodePath:string):Promise<ConvoNode|undefined>{
+        if(this._isMetadataMode()){
+            return await this._readMetadataNodeAsync(nodePath);
+        }
+
         try{
             return JSON.parse(await readFile(this._getNodeFsPath(nodePath),'utf8'));
         }catch(ex){
@@ -491,15 +520,45 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
     }
 
     private async _readNodePathsAsync():Promise<string[]>{
-        const files=await this._walkFilesAsync(this.root);
-        const paths:string[]=[];
-        for(const file of files){
-            const nodePath=this._fsPathToNodePath(file);
-            if(nodePath!==undefined){
-                paths.push(nodePath);
+        if(this._isMetadataMode()){
+            return await this._readMetadataNodePathsForPathAsync('/**');
+        }
+
+        return await this._readNodePathsForPathAsync('/**');
+    }
+
+    private async _readNodePathsForPathAsync(nodePath:string):Promise<string[]>{
+        if(this._isMetadataMode()){
+            return await this._readMetadataNodePathsForPathAsync(nodePath);
+        }
+
+        if(!this._hasPathGlob(nodePath)){
+            try{
+                const fsPath=this._getNodeFsPath(nodePath);
+                const s=await stat(fsPath);
+                return s.isFile()?[nodePath]:[];
+            }catch(ex){
+                if(this._isNotFound(ex)){
+                    return [];
+                }
+                throw ex;
             }
         }
-        return paths.sort();
+
+        const matches=createJsonQueryPathMatcher(nodePath);
+        const fsPaths=await this._globFsPathsAsync(this._createNodeGlobPatterns(nodePath));
+        const paths:string[]=[];
+        for(const fsPath of fsPaths){
+            const s=await stat(fsPath);
+            if(!s.isFile()){
+                continue;
+            }
+            const selectedPath=this._fsPathToNodePath(fsPath);
+            if(selectedPath!==undefined && matches(selectedPath)){
+                paths.push(selectedPath);
+            }
+        }
+        return [...new Set(paths)].sort();
     }
 
     private _fsPathToNodePath(fsPath:string):string|undefined{
@@ -558,27 +617,13 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return values;
     }
 
-    private async _walkFilesAsync(dir:string):Promise<string[]>{
-        let entries;
-        try{
-            entries=await readdir(dir,{withFileTypes:true});
-        }catch(ex){
-            if(this._isNotFound(ex)){
-                return [];
-            }
-            throw ex;
+    private async _globFsPathsAsync(patterns:string|string[]):Promise<string[]>{
+        const values:string[]=[];
+        const results=await glob(patterns,{cwd:this.root,dot:true});
+        for await(const result of results as AsyncIterable<string>|string[]){
+            values.push(path.resolve(this.root,result));
         }
-
-        const files:string[]=[];
-        for(const entry of entries){
-            const fullPath=path.join(dir,entry.name);
-            if(entry.isDirectory()){
-                files.push(...await this._walkFilesAsync(fullPath));
-            }else if(entry.isFile()){
-                files.push(fullPath);
-            }
-        }
-        return files;
+        return values;
     }
 
     private _assignNullable<T extends Record<string,any>,U extends Record<string,any>,K extends keyof T&keyof U>(target:T,source:U,key:K):void{
@@ -643,5 +688,188 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
     private _omitVector(embedding:ConvoNodeEmbedding):ConvoNodeEmbedding{
         const {vector,...rest}=embedding;
         return rest;
+    }
+
+    private _isMetadataMode():boolean{
+        return this.nodeSuffix==='';
+    }
+
+    private async _readMetadataNodeAsync(nodePath:string):Promise<ConvoNode|undefined>{
+        const fsPath=this._getNodeFsPath(nodePath);
+        if(this._isReservedFsPath(fsPath)){
+            return undefined;
+        }
+
+        let s;
+        try{
+            s=await stat(fsPath);
+        }catch(ex){
+            if(this._isNotFound(ex)){
+                return undefined;
+            }
+            throw ex;
+        }
+
+        if(s.isDirectory()){
+            return {
+                path:nodePath,
+                name:this._getNodeName(nodePath),
+                type:'db-metadata-dir',
+                data:await this._readMetadataDirectoryItemsAsync(fsPath,nodePath) as any,
+            };
+        }
+
+        if(this._hasJsonNodeExtension(fsPath)){
+            return JSON.parse(await readFile(fsPath,'utf8'));
+        }
+
+        return {
+            path:nodePath,
+            name:this._getNodeName(nodePath),
+            type:'db-metadata-file',
+            data:this._createFsItem(this._getNodeName(nodePath),nodePath,s) as any,
+        };
+    }
+
+    private async _readMetadataDirectoryItemsAsync(dir:string,nodePath:string):Promise<ConvoDbFsItem[]>{
+        let entries;
+        try{
+            entries=await readdir(dir,{withFileTypes:true});
+        }catch(ex){
+            if(this._isNotFound(ex)){
+                return [];
+            }
+            throw ex;
+        }
+
+        const items:ConvoDbFsItem[]=[];
+        for(const entry of entries){
+            const fsPath=path.join(dir,entry.name);
+            if(this._isReservedFsPath(fsPath)){
+                continue;
+            }
+            const itemPath=nodePath==='/'?`/${entry.name}`:`${nodePath}/${entry.name}`;
+            items.push(this._createFsItem(entry.name,itemPath,await stat(fsPath)));
+        }
+        return items.sort((a,b)=>a.name.localeCompare(b.name));
+    }
+
+    private async _readMetadataNodePathsForPathAsync(nodePath:string):Promise<string[]>{
+        const matches=createJsonQueryPathMatcher(nodePath);
+
+        if(!this._hasPathGlob(nodePath)){
+            const fsPath=this._getNodeFsPath(nodePath);
+            if(this._isReservedFsPath(fsPath)){
+                return [];
+            }
+            try{
+                await stat(fsPath);
+                return [nodePath];
+            }catch(ex){
+                if(this._isNotFound(ex)){
+                    return [];
+                }
+                throw ex;
+            }
+        }
+
+        const paths:string[]=[];
+        if(matches('/')){
+            paths.push('/');
+        }
+
+        const fsPaths=await this._globFsPathsAsync(this._createMetadataGlobPatterns(nodePath));
+        for(const fsPath of fsPaths){
+            if(this._isReservedFsPath(fsPath)){
+                continue;
+            }
+            const s=await stat(fsPath);
+            if(!s.isDirectory() && !s.isFile() && !s.isFIFO()){
+                continue;
+            }
+            const selectedPath=this._fsPathToNodePath(fsPath);
+            if(selectedPath!==undefined && matches(selectedPath)){
+                paths.push(selectedPath);
+            }
+        }
+        return [...new Set(paths)].sort();
+    }
+
+    private _createFsItem(name:string,itemPath:string,s:Awaited<ReturnType<typeof stat>>):ConvoDbFsItem{
+        const contentType=s.isFile()?getContentType(name)??undefined:undefined;
+        return {
+            name,
+            path:itemPath,
+            size:s.size,
+            contentType,
+            isDir:s.isDirectory()||undefined,
+            isFile:s.isFile()||undefined,
+            isFifo:s.isFIFO()||undefined,
+        };
+    }
+
+    private _createNodeGlobPatterns(nodePath:string):string[]{
+        const prefix=this._getGlobStaticPrefix(nodePath);
+        const patterns=[
+            `${prefix}**/*${this.nodeSuffix}`,
+        ];
+        if(prefix){
+            patterns.push(`${prefix.slice(0,-1)}${this.nodeSuffix}`);
+        }else{
+            patterns.push(`*${this.nodeSuffix}`);
+        }
+        return patterns;
+    }
+
+    private _createMetadataGlobPatterns(nodePath:string):string[]{
+        const prefix=this._getGlobStaticPrefix(nodePath);
+        const patterns=[
+            `${prefix}**/*`,
+        ];
+        if(prefix){
+            patterns.push(prefix.slice(0,-1));
+        }else{
+            patterns.push('*');
+        }
+        return patterns;
+    }
+
+    private _getGlobStaticPrefix(nodePath:string):string{
+        const rel=nodePath==='/'?'':nodePath.slice(1);
+        const wildcardIndex=rel.search(/[*]/);
+        if(wildcardIndex===-1){
+            return rel.endsWith('/')?rel:path.dirname(rel)==='.'?'':`${path.dirname(rel).split(path.sep).join('/')}/`;
+        }
+        const slashIndex=rel.slice(0,wildcardIndex).lastIndexOf('/');
+        return slashIndex===-1?'':rel.slice(0,slashIndex+1);
+    }
+
+    private _hasJsonNodeExtension(fsPath:string):boolean{
+        const ext=path.extname(fsPath);
+        return this.jsonExtensions.includes(ext);
+    }
+
+    private _hasPathGlob(nodePath:string):boolean{
+        return nodePath.includes('*');
+    }
+
+    private _getNodeName(nodePath:string):string{
+        return nodePath==='/'?'':path.basename(nodePath);
+    }
+
+    private _isReservedFsPath(fsPath:string):boolean{
+        const rel=path.relative(this.root,fsPath);
+        if(rel && !rel.startsWith('..') && !path.isAbsolute(rel)){
+            const parts=rel.split(path.sep);
+            if(parts.some(part=>part.startsWith('.@db-'))){
+                return true;
+            }
+        }
+        return this._isFsPathInDirectory(fsPath,this.edgeDirectory) || this._isFsPathInDirectory(fsPath,this.embeddingsDirectory);
+    }
+
+    private _isFsPathInDirectory(fsPath:string,dir:string):boolean{
+        const rel=path.relative(dir,fsPath);
+        return rel==='' || (!!rel && !rel.startsWith('..') && !path.isAbsolute(rel));
     }
 }

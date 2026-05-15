@@ -162,7 +162,34 @@ export abstract class BaseConvoDb implements ConvoDb
     }
 
     
+    public async readBlobStringAsync(path:string,permissionFrom?:string):PromiseResultType<string|undefined>
+    {
+        const r=await this.openBlobAsync(path,permissionFrom);
+        if(!r.success){
+            if(r.statusCode===404){
+                return {
+                    success:true,
+                    result:undefined,
+                }
+            }else{
+                return r;
+            }
+        }
 
+        try{
+            const response=new Response(r.result);
+            return {
+                success:true,
+                result:await response.text(),
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500,
+            }
+        }
+    }
     /**
      * Opens a read stream to the given node path. If no blob exists at the path a 404 is returned.
      */
@@ -437,8 +464,17 @@ export abstract class BaseConvoDb implements ConvoDb
     {
         const init=await this.initAsync();
         if(!init.success){return init}
+
+        const p=normalizeConvoNodePath(path,'end');
+        if(!p){
+            return {
+                success:false,
+                error:`Invalid node path: ${path}`,
+                statusCode:400,
+            }
+        }
         
-        const r=await this.queryNodesAsync({steps:[{path}],limit:1,permissionFrom});
+        const r=await this.queryNodesAsync({steps:[{path:p}],limit:1,permissionFrom});
         if(!r.success){
             return r;
         }

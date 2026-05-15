@@ -1,9 +1,9 @@
-import { Studio, TmpStudioIo } from "@convo-lang/studio/convo-studio-types.js"
+import { NodeFsConvoDb } from "@convo-lang/db-node/NodeFsConvoDb.js"
+import { Studio } from "@convo-lang/studio/convo-studio-types.js"
 import { StudioCtrl } from "@convo-lang/studio/StudioCtrl"
 import { ConvoTuiCtrl } from "@convo-lang/tui/ConvoTuiCtrl"
 import type { TuiConsole } from "@convo-lang/tui/tui-types.js"
 import { CancelToken, getErrorMessage } from "@iyio/common"
-import { readFile, writeFile } from "fs/promises"
 import { convoTuiTheme } from "../lib/convo-tui-theme.js"
 import { apiScreen } from "../screens/api-screen.js"
 import { dbScreen } from "../screens/db-screen.js"
@@ -22,26 +22,6 @@ export const getConvoTuiScreens=(ctx:ConvoCliTuiCtx)=>{
     ]
 }
 
-const tmpIo:TmpStudioIo={
-    async readFileAsync(path:string){
-        try{
-            return (await readFile(path)).toString();
-        }catch(ex){
-            console.error(`Failed to read file: ${path}`,ex);
-            return undefined;
-        }
-    },
-    async writeFileAsync(path:string,content:string){
-        try{
-            await writeFile(path,content);
-            return true;
-        }catch(ex){
-            console.error(`Failed to write file: ${path}`,ex);
-            return false;
-        }
-    },
-}
-
 export interface RunConvoTuiOptions
 {
     studio?:Studio;
@@ -57,8 +37,16 @@ export const runConvoTuiAsync=async (options:RunConvoTuiOptions,cancel:CancelTok
 
     const studio=new StudioCtrl({
         workspacePath:process.cwd(),
-        tmpIo,
         studio:options.studio,
+        dbOptions:{
+            name:'default',
+            layers:[
+                {
+                    mountPoint:'/',
+                    createDb:()=>new NodeFsConvoDb({name:'fs',root:process.cwd(),nodeSuffix:''})
+                }
+            ],
+        }
     });
 
     const ctrl=new ConvoTuiCtrl({
@@ -94,6 +82,7 @@ const interceptConsole=(ctrl:ConvoTuiCtrl)=>{
                         output.push(v+' ');
                     }else if(v instanceof Error){
                         output.push(getErrorMessage(v));
+                        output.push(v.stack??'');
                     }else{
                         output.push(JSON.stringify(v,null,4)+' ');
                     }

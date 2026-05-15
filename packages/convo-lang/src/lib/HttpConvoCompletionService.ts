@@ -754,6 +754,35 @@ export class HttpConvoCompletionService implements
             }
         }
     }
+
+    public async readBlobStringAsync(path:string,permissionFrom?:string):PromiseResultType<string|undefined>
+    {
+        const r=await this.openBlobAsync(path,permissionFrom);
+        if(!r.success){
+            if(r.statusCode===404){
+                return {
+                    success:true,
+                    result:undefined,
+                }
+            }else{
+                return r;
+            }
+        }
+
+        try{
+            const response=new Response(r.result);
+            return {
+                success:true,
+                result:await response.text(),
+            }
+        }catch(ex){
+            return {
+                success:false,
+                error:getErrorMessage(ex),
+                statusCode:500,
+            }
+        }
+    }
     
     private async _writeBlobAsync(path:string,blob:string|Blob|ReadableStream|null,permissionFrom?:string):PromiseResultTypeVoid{
         try{

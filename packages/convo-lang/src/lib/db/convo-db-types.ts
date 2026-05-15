@@ -1286,6 +1286,11 @@ export interface ConvoDb
     hasBlobAsync(path:string,permissionFrom?:string):PromiseResultType<boolean>;
 
     /**
+     * Reads a blob as a string. If the blob does not exists undefined will be returned instead of an error.
+     */
+    readBlobStringAsync(path:string,permissionFrom?:string):PromiseResultType<string|undefined>;
+
+    /**
      * Convenience function for calling `queryNodesAsync({steps:[{path,call:{args}}],limit:1,permissionFrom})`.
      * Returns the data of the first node returned by the called function or undefined if the function
      * returns no nodes. If you need to call a node that return multiple nodes use `queryNodesAsync`.
@@ -2367,3 +2372,17 @@ export type ConvoDbFactory=(name:string)=>ConvoDb;
  * Converts a connection string to a ConvoDbFactory
  */
 export type ConvoDbConnectionStringHandler=(type:string,args:string[])=>ConvoDbFactory|null|undefined|Promise<ConvoDbFactory|null|undefined>;
+
+/**
+ * Used to represent a file or file like object
+ */
+export interface ConvoDbFsItem
+{
+    name:string;
+    path:string;
+    size?:number;
+    contentType?:string;
+    isDir?:boolean;
+    isFile?:boolean;
+    isFifo?:boolean;
+}
