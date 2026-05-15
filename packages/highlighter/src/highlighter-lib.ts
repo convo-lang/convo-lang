@@ -56,6 +56,8 @@ export const getHighlighterLang=(path:string):string|undefined=>{
         case 'md':
             return 'markdown';
 
+        default:
+            return undefined;
 
     }
 }

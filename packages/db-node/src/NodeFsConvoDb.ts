@@ -800,7 +800,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return {
             name,
             path:itemPath,
-            size:s.size,
+            size:Number(s.size),
             contentType,
             isDir:s.isDirectory()||undefined,
             isFile:s.isFile()||undefined,

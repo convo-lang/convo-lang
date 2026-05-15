@@ -56,6 +56,10 @@ export class ConvoDbPermissionBoundary implements ConvoDb
         // do nothing
     }
 
+    public readBlobStringAsync(path: string, permissionFrom?: string): PromiseResultType<string | undefined> {
+        return this.proxiedDb.readBlobStringAsync(path,this.identityPath);
+    }
+
     
     public openBlobAsync(path:string):PromiseResultType<ReadableStream>{
         return this.proxiedDb.openBlobAsync(path,this.identityPath);
