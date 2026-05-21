@@ -1,0 +1,20 @@
+@import ./iterate-config/package.json !file
+@import ./iterate-config/README.md !file
+
+> system
+
+Git Status:
+<GIT_STATUS>
+{{exec('cd ./iterate-config && git status')}}
+</GIT_STATUS>
+
+Iterate Config Files:
+<CONFIG_FILES>
+{{exec('ls -l ./iterate-config')}}
+</CONFIG_FILES>
+
+> user
+Make something cool based on `README.md` only using
+the packages in `package.json`
+
+

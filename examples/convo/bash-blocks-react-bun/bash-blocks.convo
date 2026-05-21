@@ -1,0 +1,197 @@
+@import std://bash-blocks.convo
+
+> define
+__model='gpt-5.5'
+
+> system
+You are a pragmatic coding assistant that prefers clean minimalist code.
+
+> user
+Setup a basic React app with tailwind v4 support using the Bun cli.
+
+Setup the project at `./react-bun-example`
+
+
+
+> assistant
+Run this script from the directory where you want `./react-bun-example` created:
+
+<RUNNABLE_SCRIPT script-name="setup-react-bun-tailwind-v4" target-shell-type="bash">
+```bash
+set -euo pipefail
+
+# Ensure Bun is available
+command -v bun >/dev/null 2>&1 || {
+  echo "Bun is not installed or not in PATH."
+  echo "Install it from: https://bun.sh"
+  exit 1
+}
+
+# Avoid accidentally overwriting existing work
+if [ -e "./react-bun-example" ]; then
+  echo "./react-bun-example already exists. Remove it or choose another directory."
+  exit 1
+fi
+
+# Create a basic React app using Vite through the Bun CLI
+bun create vite ./react-bun-example --template react
+
+cd ./react-bun-example
+
+# Install dependencies
+bun install
+
+# Add Tailwind CSS v4 and the official Vite plugin
+bun add -d tailwindcss @tailwindcss/vite
+
+# Configure Vite to use React and Tailwind v4
+cat > vite.config.js <<'EOF'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+EOF
+
+# Replace the default CSS with Tailwind v4 import
+cat > src/index.css <<'EOF'
+@import "tailwindcss";
+EOF
+
+# Create a minimal Tailwind-styled React app
+cat > src/App.jsx <<'EOF'
+function App() {
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
+      <section className="max-w-xl text-center space-y-6">
+        <div className="inline-flex rounded-full bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 ring-1 ring-cyan-500/20">
+          React + Bun + Tailwind CSS v4
+        </div>
+
+        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
+          Hello from Bun
+        </h1>
+
+        <p className="text-zinc-400 text-lg">
+          A minimal React app powered by Vite, Bun, and Tailwind CSS v4.
+        </p>
+
+        <a
+          href="https://tailwindcss.com"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex rounded-lg bg-white px-5 py-3 font-medium text-zinc-950 hover:bg-zinc-200 transition"
+        \>
+          Tailwind Docs
+        </a>
+      </section>
+    </main>
+  )
+}
+
+export default App
+EOF
+
+echo ""
+echo "Done."
+echo "Next steps:"
+echo "  cd react-bun-example"
+echo "  bun dev"
+```
+</RUNNABLE_SCRIPT>
+
+Then start the app:
+
+```bash
+cd react-bun-example
+bun dev
+```
+
+
+> user
+
+
+<SCRIPT_OUTPUT script-name="setup-react-bun-tailwind-v4">
+``` output
+Resolving dependencies
+Resolved, downloaded and extracted [4]
+Saved lockfile
+│
+◇  Scaffolding project in /Users/scott/docs/convo-lang/examples/convo/bash-blocks-react-bun/react-bun-example...
+│
+└  Done. Now run:
+
+  cd react-bun-example
+  bun install
+  bun dev
+
+bun install v1.3.13 (bf2e2cec)
+Resolving dependencies
+Resolved, downloaded and extracted [167]
+Saved lockfile
+
++ @eslint/js@10.0.1
++ @types/react@19.2.15
++ @types/react-dom@19.2.3
++ @vitejs/plugin-react@6.0.2
++ eslint@10.4.0
++ eslint-plugin-react-hooks@7.1.1
++ eslint-plugin-react-refresh@0.5.2
++ globals@17.6.0
++ vite@8.0.14
++ react@19.2.6
++ react-dom@19.2.6
+
+136 packages installed [615.00ms]
+bun add v1.3.13 (bf2e2cec)
+Resolving dependencies
+Resolved, downloaded and extracted [50]
+Saved lockfile
+
+installed tailwindcss@4.3.0
+installed @tailwindcss/vite@4.3.0
+
+10 packages installed [615.00ms]
+
+Done.
+Next steps:
+  cd react-bun-example
+  bun dev
+
+```
+</SCRIPT_OUTPUT>
+
+
+> assistant
+Done — the React app was created at:
+
+```bash
+./react-bun-example
+```
+
+It includes:
+
+- React 19
+- Vite
+- Bun lockfile / Bun-managed dependencies
+- Tailwind CSS v4
+- `@tailwindcss/vite` plugin
+- Minimal Tailwind-styled `App.jsx`
+
+Start it with:
+
+```bash
+cd react-bun-example
+bun dev
+```
+
+Then open the local URL Vite prints, usually:
+
+```text
+http://localhost:5173
+```
+
+
+> user

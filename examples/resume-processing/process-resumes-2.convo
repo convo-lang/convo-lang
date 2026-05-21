@@ -1,0 +1,87 @@
+@import ./base.convo
+@import ./tools.convo
+@import ./hr-policies.md !file
+@import ./open-positions.md !file
+@import ./submissions/*.md !file
+
+> system
+You are processing submitted resumes. Candidates must have 2 or more
+years of bio-tech experience or experience in a similar field.
+
+If any profiles match positions in the `open-positions.md` document
+call the `notifyCandidateMatch` function.
+
+If any profiles violate the policies in the `hr-policies.md` document
+call the `flagProfile` function
+
+> define
+ProfileData = struct(
+
+    # Name of person submitting resume
+    name: string
+
+    # Email of 
+    email: string
+
+    # Must have 1 or more years of experience
+    yearsExperience: number
+
+    # List of skill relating to bio-tech.
+    # Must have at least one related skill
+    skills: array(string)
+)
+
+
+> notifyCandidateMatch(profile:ProfileData) -> (
+    httpPost('https://example.io/recuriting/canidate' profile)
+    return('Notification sent to recurring department')
+)
+
+> extern flagProfile(profile:ProfileData)
+
+
+@json array(ProfileData)
+> user
+Extract the profiles from the resumes that meet
+the minimal requirements
+
+
+@format json
+> assistant
+``` json
+[
+    {
+        "name": "Jessica Hunt",
+        "yearsExperience": 20,
+        "skills": [
+            "Biotechnology research leadership",
+            "Bio-engineering strategy",
+            "Scientific program development",
+            "Experimental design",
+            "Research and development",
+        ]
+    },
+    {
+        "name": "Paul McGavin",
+        "yearsExperience": 4,
+        "skills": [
+            "Biotechnology lab operations",
+            "Quality control",
+            "Error detection and prevention",
+            "SOP compliance",
+        ]
+    },
+    {
+        "name": "Freddy",
+        "yearsExperience": 1,
+        "skills": [
+            "Bio-engineering fundamentals",
+            "Biotechnology basics",
+            "Laboratory safety",
+            "Sample preparation",
+        ]
+    }
+]
+```
+
+> user

@@ -1,0 +1,67 @@
+@import std://file-blocks.convo
+@import https://raw.githubusercontent.com/multica-ai/andrej-karpathy-skills/refs/heads/main/CLAUDE.md
+
+> user
+Write a React count down timer.
+
+Save to `./Timer.tsx`
+
+> assistant
+<FILE_CONTENT name="Timer.tsx" target-output-path="./Timer.tsx">
+```tsx
+import React, { useState, useEffect, useRef } from 'react';
+
+interface TimerProps {
+  initialSeconds: number;
+  onComplete?: () => void;
+}
+
+const Timer: React.FC<TimerProps> = ({ initialSeconds, onComplete }) => {
+  const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setSecondsLeft(initialSeconds); // Reset timer if initialSeconds prop changes
+  }, [initialSeconds]);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      onComplete?.();
+      return;
+    }
+
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [secondsLeft, onComplete]);
+
+  // Format seconds as MM:SS
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = secondsLeft % 60;
+  const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(
+    2,
+    '0'
+  )}`;
+
+  return (
+    <div>
+      <span>{formatted}</span>
+    </div>
+  );
+};
+
+export default Timer;
+```
+</FILE_CONTENT>
+
+
+> user
