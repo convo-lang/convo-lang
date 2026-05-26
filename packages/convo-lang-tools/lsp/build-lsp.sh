@@ -24,9 +24,6 @@ npx esbuild \
     --external:'bun' \
     --external:'bun:sqlite' \
     --external:'path' \
-    --external:'vscode-languageserver-textdocument' \
-    --external:'vscode-languageserver' \
-    --external:'vscode-languageserver' \
     --external:'fsevents' \
     --external:'typescript' \
     --outfile=server/out/server.js
@@ -42,8 +39,6 @@ npx esbuild \
     --external:'bun' \
     --external:'bun:sqlite' \
     --external:'path' \
-    --external:'vscode-languageserver-textdocument' \
-    --external:'vscode-languageserver' \
     --external:'fsevents' \
     --metafile=meta.json \
     --external:'typescript' \
