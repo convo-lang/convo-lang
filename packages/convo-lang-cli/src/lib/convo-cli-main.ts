@@ -1,4 +1,5 @@
-import { ConvoDbConnectionStringHandler, ConvoDbInstanceMap } from "@convo-lang/convo-lang";
+import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
+import { BunEmbeddedFileConvoDb } from "@convo-lang/db-bun/BunEmbeddedFileConvoDb.js";
 import { CancelToken, getObjKeyCount, normalizePath, parseCliArgsT, safeParseNumber, safeParseNumberOrUndefined } from "@iyio/common";
 import { parseJson5 } from "@iyio/json5";
 import { spawnAsync, stopReadingStdIn } from "@iyio/node-common";
@@ -89,6 +90,7 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         apiCorsOrigins:args=>args,
         apiLogging:args=>args.length?true:false,
         apiRequireSignIn:args=>args.length?true:false,
+        apiDbRoot:args=>args[0],
         apiRouteBase:args=>args[0],
         env:args=>args,
         generateEmbedding:args=>args[0],
@@ -97,10 +99,11 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         embeddingProvider:args=>args[0],
         embeddingDimensions:args=>safeParseNumberOrUndefined(args[0]),
         dbMap:args=>args,
+        dbMapLayer:args=>args,
         loadDbFunction:args=>args,
         loadDbFunctionDropExport:args=>args.length?true:false,
         dbFunctionBundleCommand:args=>args[0],
-        dbFactory:args=>args,
+        dbFactory:()=>[],
         callDbFunction:args=>args[0],
         callDbFunctionArgs:args=>parseJson5(args[0]??'{}'),
         queryDb:args=>parseQuery(args[0]??'{}'),
@@ -182,48 +185,35 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
     }
 
     const dbMap=new ConvoDbInstanceMap({
+        enabledDynamicImports:true,
+        importMap:{
+            'mem':'@convo-lang/db/InMemoryConvoDb',
+            'layered':'@convo-lang/db/LayeredConvoDb',
+            'sqlite':(globalThis as any).Bun?'@convo-lang/db-bun/BunSqliteConvoDb':'@convo-lang/db-node/NodeSqliteConvoDb',
+            'fs':'@convo-lang/db-node/NodeFsConvoDb',
+        },
         lazyInit:async (inst)=>{
             if(args.dbFactory){
                 for(const f of args.dbFactory){
-                    let factory:ConvoDbConnectionStringHandler|undefined;
-                    if(typeof f === 'string'){
-                        const [modName,fnName]=f.split(':');
-                        if(!modName || !fnName){
-                            console.error('Invalid dbFactor. {moduleName}:{handlerName} expected');
-                            process.exit(1);
-                        }
-                        try{
-                            const mod=await import(modName);
-                            const handler=mod[fnName];
-                            if(typeof handler !== 'function'){
-                                console.error(`${modName} does not export ${fnName} as a function`);
-                            }
-                            factory=handler;
-                        }catch(ex){
-                            console.error('Failed to load dbFactory',ex);
-                            process.exit(1);
-                        }
-
-                    }else{
-                        factory=f;
-                    }
-                    if(factory){
-                        dbMap.registerStringConnector(factory);
-                    }
+                    inst.registerStringConnector(f);
                 }
             }
             if(args.dbMap){
                 for(const s of args.dbMap){
-                    const r=await dbMap.addFactoryUsingConnectionStringAsync(s);
+                    const r=await inst.addFactoryUsingConnectionStringAsync(s);
                     if(!r.success){
                         console.error(r.error);
                         process.exit(1);
                     }
                 }
             }
-            
         }
     });
+
+    if(args.embeddedFileMap && (globalThis as any).Bun){
+        const embeddedMap=args.embeddedFileMap;
+        dbMap.registerStringConnector('embedded',()=>new BunEmbeddedFileConvoDb({name:'default',embeddedMap}))
+    }
 
     if(args.loadDbFunction){
         await initConvoCliAsync(args);

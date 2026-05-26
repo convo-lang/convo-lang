@@ -1,7 +1,9 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
 import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "@convo-lang/db/BaseSqliteConvoDb.js";
-import { getErrorMessage } from "@iyio/common";
+import { getDirectoryName, getErrorMessage } from "@iyio/common";
+import { pathExistsAsync } from "@iyio/node-common";
 import type { Database } from "bun:sqlite";
+import { mkdir } from "fs/promises";
 
 export interface BunSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
 {
@@ -29,6 +31,10 @@ export class BunSqliteConvoDb extends BaseSqliteConvoDb
     
     protected override async _initAsync()
     {
+        const dir=getDirectoryName(this.dbPath);
+        if(!await pathExistsAsync(dir)){
+            await mkdir(dir,{recursive:true});
+        }
         const sqliteMod=await import('bun:sqlite');
         this.db=new sqliteMod.Database(this.dbPath||'');
         return await super._initAsync();

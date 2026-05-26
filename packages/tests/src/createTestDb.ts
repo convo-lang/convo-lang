@@ -1,7 +1,7 @@
 import { HttpConvoCompletionService } from "@convo-lang/convo-lang";
 import { BunSqliteConvoDb } from "@convo-lang/db-bun/BunSqliteConvoDb.js";
 import { NodeFsConvoDb } from "@convo-lang/db-node/NodeFsConvoDb.js";
-import { NodeSQLiteConvoDb } from "@convo-lang/db-node/NodeSQLiteConvoDb.js";
+import { NodeSqliteConvoDb } from "@convo-lang/db-node/NodeSQLiteConvoDb.js";
 import { IndexDbConvoDb } from "@convo-lang/db/IndexDbConvoDb.js";
 import { InMemoryConvoDb } from "@convo-lang/db/InMemoryConvoDb.js";
 import { LocalStorageConvoDb } from "@convo-lang/db/LocalStorageConvoDb.js";
@@ -19,7 +19,7 @@ export const createTestDb=(type=defaultTestDbType)=>{
     :type==='bun-sqlite'?
         new BunSqliteConvoDb({name:'default'})
     :type==='node-sqlite'?
-        new NodeSQLiteConvoDb({name:'default'})
+        new NodeSqliteConvoDb({name:'default'})
     :type==='fs'?
         new NodeFsConvoDb({name:'default',root:`./data/fs-dbs/${uuid()}`})
     :type==='local-storage'?

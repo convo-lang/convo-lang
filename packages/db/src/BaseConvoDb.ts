@@ -616,7 +616,7 @@ export abstract class BaseConvoDb implements ConvoDb
                     paths.push(np);
                 }
                 offset+=r.result.paths.length;
-                if(r.result.paths.length<batchSize){
+                if(r.result.paths.length<batchSize && !r.result.nextToken){
                     break;
                 }
             }

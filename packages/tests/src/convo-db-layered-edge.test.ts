@@ -322,13 +322,12 @@ test("layered edge queryNodesAsync supports non-recursive and recursive wildcard
             steps:[
                 {path},
             ],
-            orderBy:{prop:'path',direction:'asc'},
         });
         expect(result.success).toBe(true);
         if(!result.success){
             throw new Error('expected success');
         }
-        return result.result.nodes.map(n=>n.path);
+        return result.result.nodes.map(n=>n.path).sort();
     };
 
     expect(await queryPathsAsync('/wild/*')).toEqual([

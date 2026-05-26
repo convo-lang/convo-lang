@@ -338,6 +338,12 @@ export interface ConvoCliOptions
     apiStaticRoot?:string;
 
     /**
+     * Path to a directory in ConvoDb to act as the http root. The path should start with the name
+     * of the database to use followed by the path in the database to use.
+     */
+    apiDbRoot?:string;
+
+    /**
      * If true all API endpoints will require a JWT to access
      */
     apiRequireSignIn?:boolean;
@@ -384,16 +390,26 @@ export interface ConvoCliOptions
      * - `dev:mem` - Maps the `dev` db to an in-memory database, not SQLite in-memory
      * - `stg:sqlite` - Maps the `stg` db to an SQLite in-memory db
      * - `prd:sqlite:./prd.db` Maps the `prd` db to an SQLite database with a db file saved to ./prd.db
+     * - `default:layered` - Maps the default db to a layered db. Use `dbMapLayer` to define layers
      * @default 'default:sqlite'
      */
     dbMap?:string[];
+
+    /**
+     * Maps layers of a layered convo db.
+     * Examples:
+     * - `default:/:sqlite:./data.db` - Maps the root of the db to an sqlite db
+     * - `default:/app:fs:./src/app` - Maps the db `/app` directory to the `./src/app` directory on disk 
+     * - `default:/cache:mem` - Maps the db `/cache` directory to an in memory db
+     */
+    dbMapLayer?:string[];
 
     /**
      * Array of connection string handlers (ConvoDbConnectionStringHandler) that produce db factories.
      * Provided string will be used to dynamically import modules containing factories.
      * String format = {importPackageName}:{factoryFunctionName}
      */
-    dbFactory?:(string|ConvoDbConnectionStringHandler)[];
+    dbFactory?:ConvoDbConnectionStringHandler[];
 
     /**
      * List of function file to load into the ConvoDb. Each item in the list is a colon separated

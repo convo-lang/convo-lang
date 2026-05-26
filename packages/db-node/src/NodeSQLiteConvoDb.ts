@@ -1,9 +1,11 @@
 import { PromiseResultType } from "@convo-lang/convo-lang";
 import { BaseSqliteConvoDb, BaseSqliteConvoDbOptions } from "@convo-lang/db/BaseSqliteConvoDb.js";
-import { getErrorMessage, getFileName } from "@iyio/common";
+import { getDirectoryName, getErrorMessage, getFileName } from "@iyio/common";
+import { pathExistsAsync } from "@iyio/node-common";
+import { mkdir } from "fs/promises";
 import type { DatabaseSync } from "node:sqlite";
 
-export interface NodeSQLiteConvoDbOptions extends BaseSqliteConvoDbOptions
+export interface NodeSqliteConvoDbOptions extends BaseSqliteConvoDbOptions
 {
     /**
      * Path to database on disk. If not defined in memory db will be used
@@ -11,11 +13,11 @@ export interface NodeSQLiteConvoDbOptions extends BaseSqliteConvoDbOptions
     dbPath?:string;
 }
 
-export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
+export class NodeSqliteConvoDb extends BaseSqliteConvoDb
 {
 
     public static fromConnectionString(connectionString?:string){
-        return new NodeSQLiteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
+        return new NodeSqliteConvoDb({dbPath:connectionString,name:connectionString?getFileName(connectionString):'default'})
     }
 
     private readonly dbPath?:string;
@@ -24,7 +26,7 @@ export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
     public constructor({
         dbPath,
         ...baseProps
-    }:NodeSQLiteConvoDbOptions){
+    }:NodeSqliteConvoDbOptions){
         super(baseProps);
         this.dbPath=dbPath;
     }
@@ -33,6 +35,10 @@ export class NodeSQLiteConvoDb extends BaseSqliteConvoDb
     
     protected override async _initAsync()
     {
+        const dir=getDirectoryName(this.dbPath);
+        if(!await pathExistsAsync(dir)){
+            await mkdir(dir,{recursive:true});
+        }
         const Db=(await import('node:sqlite')).default.DatabaseSync;
         this.db=new Db(this.dbPath||"test.db");
         return await super._initAsync();

@@ -8,4 +8,4 @@ bun run --watch packages/convo-lang-cli/src/lib/convo-entry.ts \
     --api-cors \
     --api-logging \
     --disable-api-db-auth \
-    --db-map '*:mem'
+    --db-map '*:@convo-lang/db/InMemoryConvoDb'

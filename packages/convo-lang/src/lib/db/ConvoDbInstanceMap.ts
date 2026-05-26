@@ -1,7 +1,9 @@
 import { getErrorMessage, Scope } from "@iyio/common";
+import { JSON5 } from "@iyio/json5";
 import { convoDbProvider, convoDbService } from "../convo.deps.js";
-import { PromiseResultTypeVoid } from "../result-type.js";
-import { ConvoDb, ConvoDbConnectionStringHandler, ConvoDbMap } from "./convo-db-types.js";
+import { PromiseResultType, PromiseResultTypeVoid } from "../result-type.js";
+import { loadDynamicConvoDbFactoryAsync } from "./convo-db-factory-loader.js";
+import { ConvoDb, ConvoDbConnectionStringHandler, ConvoDbFactory, ConvoDbMap } from "./convo-db-types.js";
 
 export interface ConvoDbInstanceMapOptions
 {
@@ -12,12 +14,18 @@ export interface ConvoDbInstanceMapOptions
     lazyInit?:(inst:ConvoDbInstanceMap)=>void|Promise<void>;
 
     scope?:Scope;
+
+    importMap?:Record<string,string>;
+
+    enabledDynamicImports?:boolean;
 }
 
 export class ConvoDbInstanceMap
 {
 
     public readonly dbMap:ConvoDbMap;
+
+    private readonly cache:Record<string,ConvoDb>={}
 
     /**
      * Used to lazy initialize a db instance map. Will be called the first time getDbAsync is called
@@ -29,12 +37,20 @@ export class ConvoDbInstanceMap
 
     private connectionStringHandlers:ConvoDbConnectionStringHandler[]=[];
 
+    public readonly importMap:Record<string,string>;
+
+    public enabledDynamicImports:boolean;
+
     public constructor({
         dbMap={},
+        importMap={},
+        enabledDynamicImports=false,
         lazyInit,
     }:ConvoDbInstanceMapOptions={})
     {
         this.dbMap=dbMap;
+        this.importMap=importMap;
+        this.enabledDynamicImports=enabledDynamicImports;
         this.lazyInit=lazyInit;
     }
 
@@ -56,25 +72,46 @@ export class ConvoDbInstanceMap
     public async getDbAsync(name:string):Promise<ConvoDb|undefined>{
 
         await this.initAsync();
+
+        const cached=this.cache[name];
+        if(cached){
+            return cached;
+        }
         
         const named=this.dbMap[name];
         if(named){
-            return named(name);
+            return this.cache[name]=named(name);
         }
+
         const fallback=this.dbMap['*'];
         if(fallback){
             let db=fallback(name);
             this.dbMap[name]=()=>db;
+            this.cache[name]=db;
             return db;
         }
         if(name==='default'){
-            return convoDbService.get();
+            const db=convoDbService.get();
+            if(db){
+                this.cache[name]=db;
+                return db;
+            }
         }
         return undefined;
     }
 
-    public registerStringConnector(handler:ConvoDbConnectionStringHandler){
-        this.connectionStringHandlers.push(handler);
+    public registerStringConnector(type:string,factory:ConvoDbFactory):void;
+    public registerStringConnector(handler:ConvoDbConnectionStringHandler):void;
+    registerStringConnector(handler:ConvoDbConnectionStringHandler|string,factory?:ConvoDbFactory):void{
+        if(typeof handler === 'string'){
+            if(factory){
+                this.connectionStringHandlers.push(()=>{
+                    return factory;
+                })
+            }
+        }else{
+            this.connectionStringHandlers.push(handler);
+        }
     }
 
     public async addFactoryUsingConnectionStringAsync(connectionString:string):PromiseResultTypeVoid{
@@ -121,6 +158,17 @@ export class ConvoDbInstanceMap
                 }
             }
 
+            if(this.enabledDynamicImports){
+                const factory=await this.getDynamicAsync(type,args);
+                if(!factory.success){
+                    return factory;
+                }
+                this.dbMap[name]=factory.result;
+                return {
+                    success:true
+                }
+            }
+
             return {
                 success:false,
                 error:'No string connection handler registered with support for provided connection string',
@@ -135,4 +183,33 @@ export class ConvoDbInstanceMap
             }
         }
     }
+
+    private async getDynamicAsync(type:string,args:string[]):PromiseResultType<ConvoDbFactory>{
+
+        let options:any;
+        try{
+            options=JSON5.parse(args.join(':'));
+        }catch(ex){
+            return {
+                success:false,
+                error:`Unable to parse options for: ${type}: ${getErrorMessage(ex)}`,
+                statusCode:400,
+            }
+        }
+
+        if(options.dbMap===undefined){
+            options.dbMap=this;
+        }
+
+        if(!type.startsWith('@')){
+            const mapped=this.importMap[type];
+            if(mapped){
+                type=mapped;
+            }
+        }
+
+
+        return await loadDynamicConvoDbFactoryAsync(type,options);
+    }
+
 }

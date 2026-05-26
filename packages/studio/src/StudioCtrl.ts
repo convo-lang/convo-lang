@@ -119,8 +119,6 @@ export class StudioCtrl extends ObjectBinding<Studio>
 
         let content:string|undefined;
 
-        console.log('hio 👋 👋 👋 open',uri);
-
         if(uri.protocol==='file'){
             const r=await this.db.readBlobStringAsync(uri.path);
             if(!r.success){

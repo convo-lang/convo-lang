@@ -2,21 +2,13 @@ import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
 import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
 import { getStaticHonoRoutesAsync } from "@convo-lang/hono/hono-static-routes.js";
 import { serve } from '@hono/node-server';
-import { CancelToken, DisposeCallback } from "@iyio/common";
+import { CancelToken, DisposeCallback, joinPaths } from "@iyio/common";
 import { Hono } from "hono";
 import { cors as _cors } from 'hono/cors';
 import { defaultConvoCliApiPort } from "./convo-cli-lib.js";
 import { ConvoCliOptions } from "./convo-cli-types.js";
 
 
-// port:args.apiPort,
-// reusePort:args.apiReusePort,
-// cors:args.apiCorsOrigins?.length?args.apiCorsOrigins:args.apiCors,
-// enableLogging:args.apiLogging,
-// dbMap,
-// disableApiDbAuth:args.disableApiDbAuth,
-// staticRoot:args.apiStaticRoot,
-// embeddedFileMap:args.embeddedFileMap
 
 export const runConvoCliApiAsync=async ({
     apiPort:port=defaultConvoCliApiPort,
@@ -24,6 +16,7 @@ export const runConvoCliApiAsync=async ({
     apiRouteBase:baseRoute='/api/convo-lang',
     apiCors:cors,
     apiLogging:enableLogging,
+    apiDbRoot,
     dbMap,
     disableApiDbAuth,
     apiStaticRoot:staticRoot,
@@ -31,7 +24,18 @@ export const runConvoCliApiAsync=async ({
     apiRequireSignIn
 }:Omit<ConvoCliOptions,'dbMap'>&{dbMap?:ConvoDbInstanceMap},cancel?:CancelToken)=>{
 
-    const app=new Hono();
+    const app=new Hono({
+        getPath:!apiDbRoot?undefined:req=>{
+
+            const path=new URL(req.url).pathname;
+
+            if(path.startsWith(baseRoute)){
+                return path;
+            }
+
+            return joinPaths(baseRoute,'db',apiDbRoot,path==='/'?'/index.html':path);
+        }
+    });
 
     const routes=getConvoHonoRoutes({enableLogging,dbMap,disableDbAuth:disableApiDbAuth,requireSignIn:apiRequireSignIn});
 

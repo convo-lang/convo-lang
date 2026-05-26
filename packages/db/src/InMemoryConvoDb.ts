@@ -1,16 +1,47 @@
 import { ConvoDbDriverPathsResult, ConvoDbExport, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodePermissionType, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions, defaultConvoNodeQueryLimit } from "@convo-lang/convo-lang";
 import { deepClone, uuid } from "@iyio/common";
-import { BaseConvoDb } from "./BaseConvoDb.js";
+import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 import { compareJsonQueryValues, createJsonQueryPathMatcher, doesJsonQueryEdgeMatchQuery, doesJsonQueryEmbeddingMatchQuery, evaluateJsonQueryCondition, getJsonQueryPermissionValue, getJsonQueryValueByPath, hasJsonQueryPermission, selectJsonQueryEdgeDestinationPaths, selectJsonQueryKeys, sortJsonQueryValues } from "./json-query.js";
 
+export interface InMemoryConvoDbOptions extends BaseConvoDbOptions
+{
+    nodes?:Record<string,ConvoNode>;
+    edges?:Record<string,ConvoNodeEdge>;
+    embeddings?:Record<string,ConvoNodeEmbedding>;
+    blobs?:Record<string,Blob>;
+    getBlobFallback?:(path:string)=>Blob|undefined|null|Promise<Blob|undefined|null>;
+}
 
 export class InMemoryConvoDb extends BaseConvoDb
 {
 
-    private readonly nodes=new Map<string,ConvoNode>();
-    private readonly edges=new Map<string,ConvoNodeEdge>();
-    private readonly embeddings=new Map<string,ConvoNodeEmbedding>();
-    private readonly blobs=new Map<string,Blob>();
+    private readonly nodes:Map<string,ConvoNode>;
+    private readonly edges:Map<string,ConvoNodeEdge>;
+    private readonly embeddings:Map<string,ConvoNodeEmbedding>;
+    private readonly blobs:Map<string,Blob>;
+    private readonly _getBlobFallback?:(path:string)=>Blob|undefined|null|Promise<Blob|undefined|null>;
+
+    public constructor({
+        nodes,
+        edges,
+        embeddings,
+        blobs,
+        getBlobFallback,
+        ...options
+    }:InMemoryConvoDbOptions){
+        super(options);
+        this.nodes=nodes?new Map(Object.entries(nodes)):new Map();
+        this.edges=edges?new Map(Object.entries(edges)):new Map();
+        this.embeddings=embeddings?new Map(Object.entries(embeddings)):new Map();
+        this.blobs=blobs?new Map(Object.entries(blobs)):new Map();
+        this._getBlobFallback=getBlobFallback;
+    }
+
+    protected getBlobFallback(path:string):Blob|undefined|null|Promise<Blob|undefined|null>
+    {
+        return this._getBlobFallback?.(path);
+    }
+
 
     public exportData():ConvoDbExport{
         return {
@@ -45,12 +76,17 @@ export class InMemoryConvoDb extends BaseConvoDb
 
         
         openBlobAsync:async (path:string):PromiseResultType<ReadableStream>=>{
-            const blob=this.blobs.get(path);
+            let blob=this.blobs.get(path);
             if(!blob){
-                return {
-                    success:false,
-                    error:'Blob not found',
-                    statusCode:404,
+                blob=(await this.getBlobFallback(path))??undefined;
+                if(blob){
+                    this.blobs.set(path,blob);
+                }else{
+                    return {
+                        success:false,
+                        error:'Blob not found',
+                        statusCode:404,
+                    }
                 }
             }
 

@@ -1,4 +1,4 @@
-import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
+import { ConvoDb, ConvoDbDriver, ConvoDbDriverNextToken, ConvoDbDriverPathsResult, ConvoDbInstanceMap, convoDbService, ConvoNode, ConvoNodeEdge, ConvoNodeEdgeQuery, ConvoNodeEdgeQueryResult, ConvoNodeEdgeUpdate, ConvoNodeEmbedding, ConvoNodeEmbeddingQuery, ConvoNodeEmbeddingQueryResult, ConvoNodeEmbeddingUpdate, ConvoNodeOrderBy, ConvoNodeQueryStep, ConvoNodeUpdate, DeleteConvoNodeEdgeOptions, DeleteConvoNodeEmbeddingOptions, DeleteConvoNodeOptions, InsertConvoNodeEdgeOptions, InsertConvoNodeEmbeddingOptions, InsertConvoNodeOptions, normalizeConvoNodePath, PromiseResultType, PromiseResultTypeVoid, UpdateConvoNodeEdgeOptions, UpdateConvoNodeEmbeddingOptions, UpdateConvoNodeOptions } from "@convo-lang/convo-lang";
 import { BaseConvoDb, BaseConvoDbOptions } from "./BaseConvoDb.js";
 import { doesJsonQueryPathMatchStepPath, getJsonQueryPathLiteralPrefix, hasJsonQueryPathWildcard } from "./json-query.js";
 
@@ -78,12 +78,13 @@ export interface ConvoDbLayerConfig extends ConvoDbLayerSupport
      * Pre-created ConvoDb instance
      */
     db?:ConvoDb;
+}
 
-    
+export type NamedConvoDbLayerConfig=Partial<ConvoDbLayerConfig>&{
+    name:string;
 }
 
 type Layer=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
-    db?:ConvoDb;
     ownsDb?:boolean;
 }
 
@@ -94,8 +95,9 @@ type LayerInst=ConvoDbLayerConfig&Required<ConvoDbLayerSupport>&{
 
 export interface LayeredConvoDbOptions extends BaseConvoDbOptions
 {
-    layers:ConvoDbLayerConfig[];
+    layers:ConvoDbLayerConfig[]|Record<string,string|NamedConvoDbLayerConfig>;
     dbId?:string;
+    dbMap?:ConvoDbInstanceMap;
 }
 
 /**
@@ -107,20 +109,80 @@ export class LayeredConvoDb extends BaseConvoDb
 
     private readonly layers:Layer[]=[];
 
+    private readonly layersOption:ConvoDbLayerConfig[]|Record<string,string|NamedConvoDbLayerConfig>;
+
     private readonly initializedDbs=new WeakSet<ConvoDb>();
 
     public readonly dbId:string|undefined;
 
+    public readonly dbMap:ConvoDbInstanceMap;
+
     public constructor({
         layers,
         dbId,
+        dbMap=new ConvoDbInstanceMap(),
         ...options
     }:LayeredConvoDbOptions){
         super(options);
 
         this.dbId=dbId;
 
-        this.layers=layers.map<Layer>(l=>{
+        this.dbMap=dbMap;
+        
+        this.layersOption=layers;
+    }
+
+    protected override _dispose(): void {
+        const disposed=new Set<ConvoDb>();
+        for(const layer of this.layers){
+            if(!layer.ownsDb || !layer.db || disposed.has(layer.db)){
+                continue;
+            }
+            disposed.add(layer.db);
+            layer.db.dispose();
+        }
+    }
+
+    protected override async _initAsync(): PromiseResultTypeVoid {
+
+        let layers=this.layersOption;
+
+        if(!Array.isArray(layers)){
+
+            const mapped:ConvoDbLayerConfig[]=[];
+
+            for(const mountPoint in layers){
+                let options=layers[mountPoint];
+                if(!options){
+                    continue;
+                }
+                if(typeof options === 'string'){
+                    options={
+                        name: options
+                    }
+                }
+                const db=await this.dbMap.getDbAsync(options.name);
+                if(!db){
+                    return {
+                        success:false,
+                        error:`Unable to get db for layer:${options.name}`,
+                        statusCode:500,
+                    }
+                }
+                mapped.push({
+                    ...options,
+                    mountPoint,
+                    db,
+                })
+            }
+
+            layers=mapped;
+        }
+
+        layers=[...layers];
+        layers.sort((a,b)=>b.mountPoint.length-a.mountPoint.length);
+
+        for(const l of layers){
             const layer:Layer={
                 supportsNodes:true,
                 supportsEdges:true,
@@ -136,18 +198,12 @@ export class LayeredConvoDb extends BaseConvoDb
             if(!layer.mountPoint.endsWith('/')){
                 layer.mountPoint+='/';
             }
-            return layer;
-        });
-    }
+            this.layers.push(layer);
+        };
+        
 
-    protected override _dispose(): void {
-        const disposed=new Set<ConvoDb>();
-        for(const layer of this.layers){
-            if(!layer.ownsDb || !layer.db || disposed.has(layer.db)){
-                continue;
-            }
-            disposed.add(layer.db);
-            layer.db.dispose();
+        return {
+            success:true,
         }
     }
 

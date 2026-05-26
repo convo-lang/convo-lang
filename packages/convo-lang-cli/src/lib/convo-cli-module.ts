@@ -1,5 +1,6 @@
 import { ConvoHttpImportService, ConvoProjectConfig, ConvoVfsImportService, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
+import type { ConvoDbLayerConfig } from '@convo-lang/db/LayeredConvoDb.js';
 import { EnvParams, ScopeRegistration, deleteUndefined } from "@iyio/common";
 import { nodeCommonModule } from "@iyio/node-common";
 import { VfsCtrl, vfs } from '@iyio/vfs';
@@ -70,12 +71,42 @@ export const convoCliDbModule=(
 
     scope.implement(convoDbProvider,()=>{
         return async (type,args)=>{
+            const layered=await import('@convo-lang/db/LayeredConvoDb.js');
+
+            const layers:((name:string)=>ConvoDbLayerConfig)[]=[];
+            const layerConns=args.join(':').split('//');
+            for(const layerConn of layerConns){
+                const [mountPoint,type,...args]=layerConn.split(':');
+                if(mountPoint && type){
+                    const provider=scope.scope.to(convoDbProvider).get(type);
+                    if(provider){
+                        const factory=await provider(type,args);
+                        if(factory){
+                            layers.push((name:string)=>{
+                                return {
+                                    createDb:()=>factory(name),
+                                    mountPoint,
+                                }
+                            });
+                        }
+
+                    }
+                }
+            }
+
+            return (name:string)=>{
+                return new layered.LayeredConvoDb({name,layers:layers.map(l=>l(name))});
+            };
+        }
+    },['layered']);
+
+    scope.implement(convoDbProvider,()=>{
+        return async (type,args)=>{
             return (await import('@convo-lang/db-node')).sqlite(type,args)
         }
     },['sql','sqlite','node-sqlite']);
 
     if(globalThis.Bun){
-
         scope.implement(convoDbProvider,()=>{
             return async (type,args)=>{
                 return (await import('@convo-lang/db-bun')).sqlite(type,args)
@@ -83,4 +114,10 @@ export const convoCliDbModule=(
         },['sql','sqlite','bun-sqlite']);
 
     }
+
+    scope.implement(convoDbProvider,()=>{
+        return async (type,args)=>{
+            return (await import('@convo-lang/db-node')).sqlite(type,args)
+        }
+    },['fs','node-fs']);
 }

@@ -191,7 +191,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
                 await writeFile(fsPath,new Uint8Array(await blob.arrayBuffer()));
             }else{
                 await pipeline(
-                    blob,
+                    Readable.fromWeb(blob as any),
                     createWriteStream(fsPath)
                 );
             }

@@ -1,15 +1,43 @@
 import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
+import { joinPaths } from "@iyio/common";
+import { pathExistsAsync } from "@iyio/node-common";
 import { createReadStream } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { ConvoCliOptions } from "./convo-cli-types";
 
 export const loadCliDbBlobsAsync=async (dbMap:ConvoDbInstanceMap,options:ConvoCliOptions)=>{
-    const pairs=options.loadDbBlob;
-    if(!pairs?.length){
+    if(!options.loadDbBlob?.length){
         return;
     }
-    for(const p of pairs){
+    const pairs=options.loadDbBlob;
+    for(let i=0;i<pairs.length;i++){
+        const p=pairs[i];
+        if(!p){
+            continue;
+        }
+        
         const [dbName,localPath,...pathAry]=p.split(':');
+
+        if(localPath?.endsWith('/*')){
+
+            const dir=localPath.substring(0,localPath.length-2);
+            if(!pathExistsAsync(dir)){
+                continue;
+            }
+            pairs.splice(i,1);
+            const items=await readdir(dir,{withFileTypes:true});
+            for(let x=0;x<items.length;x++){
+                const item=items[x];
+                if(!item){
+                    break;
+                }
+                const path=joinPaths(item.parentPath,item.name);
+                pairs.splice(i+x,0,`${dbName}:${path}:${joinPaths(pathAry.join(':'),item.name)}`);
+            }
+            i--;
+            continue;
+        }
 
         if(!dbName){
             console.error('Expected a dbName');
