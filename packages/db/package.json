@@ -6,5 +6,15 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/convo-lang/convo-lang.git"
+    },
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "import": "./src/index.js"
+        },
+        "./*": {
+            "types": "./src/*.d.ts",
+            "import": "./src/*.js"
+        }
     }
 }
