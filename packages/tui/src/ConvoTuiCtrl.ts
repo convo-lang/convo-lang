@@ -1,5 +1,5 @@
 import { convertB64TuiImage } from "./tui-image-lib.js";
-import { detectColorMode } from "./tui-lib.js";
+import { detectColorMode, isWideChar } from "./tui-lib.js";
 import { Char, Screen, ScreenBuffer, ScreenBufferState, ScreenDef, Sprite, SpriteAlignment, SpriteBorderStyle, SpriteCtx, SpriteCtxUpdate, SpriteDef, SpriteGridColWidth, SpriteGridRowHeight, SpriteGridUnit, SpriteInlineRenderCtx, SpriteJustification, SpriteMouseButton, SpriteMouseModifiers, SpriteMouseWheelDirection, SpriteSides, SpriteState, SpriteTextClipStyle, SpriteTextWrap, SpriteUpdate, TuiColorMode, TuiConsole, TuiRect, TuiSize, TuiTheme } from "./tui-types.js";
 
 
@@ -842,72 +842,87 @@ export class ConvoTuiCtrl
         }
     }
 
+    private readonly tmpBuffer:string[]=[];
+    private clearTmpBuffer(){
+        if(this.tmpBuffer.length){
+            this.tmpBuffer.splice(0,this.tmpBuffer.length);
+        }
+    }
     private renderBufferAnsi(buffer:ScreenBuffer):string
     {
-        let output='\x1b[0m\x1b[H';
-        let activeF:string|undefined;
-        let activeB:string|undefined;
+        try{
+            const output=this.tmpBuffer;
+            output.push('\x1b[0m\x1b[H');
+            let activeF:string|undefined;
+            let activeB:string|undefined;
 
-        for(let y=0;y<buffer.length;y++){
-            const row=buffer[y]!;
-            for(let x=0;x<row.length;x++){
-                const char=row[x]!;
-                if(char.f!==activeF){
-                    output+=this.getFgAnsi(char.f);
-                    activeF=char.f;
+            for(let y=0;y<buffer.length;y++){
+                const row=buffer[y]!;
+                for(let x=0;x<row.length;x++){
+                    const char=row[x]!;
+                    if(char.f!==activeF){
+                        output.push(this.getFgAnsi(char.f));
+                        activeF=char.f;
+                    }
+                    if(char.b!==activeB){
+                        output.push(this.getBgAnsi(char.b));
+                        activeB=char.b;
+                    }
+                    output.push(char.c);
                 }
-                if(char.b!==activeB){
-                    output+=this.getBgAnsi(char.b);
-                    activeB=char.b;
+                if(y<buffer.length-1){
+                    output.push('\r\n');
                 }
-                output+=char.c;
             }
-            if(y<buffer.length-1){
-                output+='\r\n';
-            }
+
+            return `${output.join('')}\x1b[0m`;
+        }finally{
+            this.clearTmpBuffer();
         }
-
-        return `${output}\x1b[0m`;
     }
 
     private renderBufferDiffAnsi(front:ScreenBuffer, back:ScreenBuffer, bounds:TuiRect):string
     {
-        let output='';
-        let activeF:string|undefined;
-        let activeB:string|undefined;
+        try{
+            const output=this.tmpBuffer;
+            let activeF:string|undefined;
+            let activeB:string|undefined;
 
-        const yl=Math.min(bounds.y+bounds.height,back.length);
-        for(let y=bounds.y;y<yl;y++){
-            const backRow=back[y]!;
-            const frontRow=front[y]??[];
-            const xl=Math.min(bounds.x+bounds.width,backRow.length);
+            const yl=Math.min(bounds.y+bounds.height,back.length);
+            for(let y=bounds.y;y<yl;y++){
+                const backRow=back[y]!;
+                const frontRow=front[y]??[];
+                const xl=Math.min(bounds.x+bounds.width,backRow.length);
 
-            let x=bounds.x;
-            while(x<xl){
-                if(this.isSameRenderChar(frontRow[x], backRow[x])){
-                    x++;
-                    continue;
-                }
-
-                output+=this.getCursorPositionAnsi(x, y);
-
-                while(x<backRow.length && !this.isSameRenderChar(frontRow[x], backRow[x])){
-                    const char=backRow[x]!;
-                    if(char.f!==activeF){
-                        output+=this.getFgAnsi(char.f);
-                        activeF=char.f;
+                let x=bounds.x;
+                while(x<xl){
+                    if(this.isSameRenderChar(frontRow[x], backRow[x])){
+                        x++;
+                        continue;
                     }
-                    if(char.b!==activeB){
-                        output+=this.getBgAnsi(char.b);
-                        activeB=char.b;
+
+                    output.push(this.getCursorPositionAnsi(x, y));
+
+                    while(x<backRow.length && !this.isSameRenderChar(frontRow[x], backRow[x])){
+                        const char=backRow[x]!;
+                        if(char.f!==activeF){
+                            output.push(this.getFgAnsi(char.f));
+                            activeF=char.f;
+                        }
+                        if(char.b!==activeB){
+                            output.push(this.getBgAnsi(char.b));
+                            activeB=char.b;
+                        }
+                        output.push(char.c);
+                        x++;
                     }
-                    output+=char.c;
-                    x++;
                 }
             }
-        }
 
-        return output?`\x1b[0m${output}\x1b[0m`:'';
+            return output?`\x1b[0m${output}\x1b[0m`:'';
+        }finally{
+            this.clearTmpBuffer();
+        }
     }
 
     private isSameRenderChar(a:Char|undefined, b:Char|undefined):boolean
@@ -1657,7 +1672,6 @@ export class ConvoTuiCtrl
         const padding=this.getSpriteSides(sprite.padding);
         const gap=this.getSpriteGap(sprite.gap);
         const marginWidth=margin.left+margin.right;
-        const marginHeight=margin.top+margin.bottom;
         const paddingWidth=padding.left+padding.right;
         const paddingHeight=padding.top+padding.bottom;
         const border=this.getBorderColors(sprite);
@@ -2035,11 +2049,29 @@ export class ConvoTuiCtrl
 
     private createInlineChars(text:string, style:TuiStyle):TuiInlineChar[]
     {
-        return Array.from(text).map(c=>({
-            c,
-            f:style.f,
-            b:style.b,
-        }));
+        const ary:TuiInlineChar[]=[];
+        for(let i=0;i<text.length;i++){
+            const c=text[i]!;
+            if(isWideChar(c)){
+                ary.push({
+                    c,
+                    f:style.f,
+                    b:style.b,
+                })
+                ary.push({
+                    c:text[i+1]??' ',
+                    f:style.f,
+                    b:style.b,
+                })
+            }else{
+                ary.push({
+                    c,
+                    f:style.f,
+                    b:style.b,
+                })
+            }
+        }
+        return ary;
     }
 
     private getTextLines(text:string):string[]
