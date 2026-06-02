@@ -40,7 +40,6 @@ npx esbuild \
     --external:'bun:sqlite' \
     --external:'path' \
     --external:'fsevents' \
-    --metafile=meta.json \
     --external:'typescript' \
     --outfile=client/out/extension.js
 
