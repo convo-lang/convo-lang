@@ -304,6 +304,20 @@ export interface ConvoCodeBlock
      * Index of the code block with a list of all other code blocks in the current conversation
      */
     index:number;
+
+    /**
+     * Find and replace content instead of replacing the full content. Defaults to finding and 
+     * replacing the first instance of the string to find. Can be used as a boolean attribute or
+     * the attribute can be a number or the value "all".
+     * @default 1
+     */
+    findReplace?:number|'all';
+
+    /**
+     * Used to define a custom separator between content to find and the content to replace it with.
+     * @default "//// replace-with ////"
+     */
+    findReplaceSeparator?:string;
 }
 
 /**

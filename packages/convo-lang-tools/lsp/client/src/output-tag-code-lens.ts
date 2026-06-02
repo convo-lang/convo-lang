@@ -1,8 +1,7 @@
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt';
-import { executeShellOutputTagAsync, getActiveOutputTag, getFileBlockArgs, getOutputTags, HasArgs, outputPreviewContent, OutputTagCodeLensArgs, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
+import { executeShellOutputTagAsync, getFileBlockArgs, getOutputTags, HasArgs, outputPreviewContent, OutputTagCodeLensArgs, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
 
 
 export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
@@ -25,34 +24,16 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
     context.subscriptions.push(commands.registerCommand('convo.output-tag-write',writeOutputTagAsync));
     
     context.subscriptions.push(commands.registerCommand('convo.output-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
-        const targetPath=args?.targetPath;
-        if(!targetPath){
+        if(!args){
             return;
         }
-
-        const tag=getActiveOutputTag(targetPath,args.index);
-        if(!tag){
-            void window.showErrorMessage('Unable to find output tag content for the selected target.');
-            return;
-        }
-
-        await showOutputDiffAsync(targetPath,tag.content);
+        await showOutputDiffAsync(args);
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.output-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
-        const targetPath=args?.targetPath;
-        if(!targetPath){
-            return;
+        if(args){
+            await setClipboardUsingOutputTagAsync(args);
         }
-
-        const tag=getActiveOutputTag(targetPath,args.index);
-        if(!tag){
-            void window.showErrorMessage('Unable to find output tag content for the selected target.');
-            return;
-        }
-
-        await vscode.env.clipboard.writeText(tag.content);
-        void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell',async (args:OutputTagCodeLensArgs|HasArgs)=>{
@@ -83,22 +64,22 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                         new vscode.CodeLens(tag.range,{
                             title:'Open Output',
                             command:'convo.output-tag-open',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Write Output',
                             command:'convo.output-tag-write',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Open Diff',
                             command:'convo.output-tag-diff',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                         new vscode.CodeLens(tag.range,{
                             title:'Copy Output',
                             command:'convo.output-tag-copy',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     break;
@@ -108,14 +89,14 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                         new vscode.CodeLens(tag.range,{
                             title:'Run Script',
                             command:'convo.output-tag-execute-shell',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     lenses.push(
                         new vscode.CodeLens(tag.range,{
                             title:'Run Script and complete',
                             command:'convo.output-tag-execute-shell-complete',
-                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,complete:true} satisfies OutputTagCodeLensArgs],
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,complete:true,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
                         }),
                     );
                     break;

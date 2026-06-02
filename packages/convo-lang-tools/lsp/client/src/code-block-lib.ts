@@ -1,4 +1,6 @@
-import { ConvoCodeBlock, ConvoMessage, escapeConvo, parseConvoCode } from '@convo-lang/convo-lang';
+import { ConvoCodeBlock, ConvoMessage, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import { readFileAsStringAsync } from '@iyio/node-common';
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -7,24 +9,29 @@ import * as vscode from 'vscode';
 import { commands, ExtensionContext, Range, Uri, window, workspace } from "vscode";
 import { revealDocumentEndAsync } from './util';
 
-export interface OutputTagCodeLensArgs
+export interface OutputTagBase
 {
+
     targetPath:string;
+    /**
+     * URI of document the code block is defined in
+     */
     documentUri:Uri;
     index:number;
     cwd?:string;
+    codeBlock:ConvoCodeBlock;
+    autoConfirm?:boolean;
+}
+
+export interface OutputTagCodeLensArgs extends OutputTagBase
+{
     complete?:boolean;
 }
 
-export interface OutputTagInfo
+export interface OutputTagInfo extends OutputTagBase
 {
-    targetPath:string;
-    content:string;
     range:Range;
     type:'file'|'shell'|'other';
-    cwd?:string;
-    index:number;
-    codeBlock:ConvoCodeBlock;
 }
 
 export interface ParsedOutputTagInfo extends OutputTagInfo
@@ -80,16 +87,16 @@ export const getOutputTagsFromSource=(source:string,document:vscode.TextDocument
             tags.push({
                 codeBlock:b,
                 targetPath:(baseDir && type==='file')?
-                        path.resolve(baseDir,targetPath)
-                    :type==='shell'?
-                        (b.attributes['script-name']??'script')
-                    :
-                        targetPath,
-                    content:b.content,
-                    type,
-                    range:new vscode.Range(start,end),
-                    index:b.index,
-                    cwd:ac?path.join(baseDir,ac):baseDir
+                    path.resolve(baseDir,targetPath)
+                :type==='shell'?
+                    (b.attributes['script-name']??'script')
+                :
+                    targetPath,
+                type,
+                range:new vscode.Range(start,end),
+                index:b.index,
+                cwd:ac?path.join(baseDir,ac):baseDir,
+                documentUri:document.uri,
             });
         }
     }
@@ -145,11 +152,11 @@ export const getParsedOutputTagGroups=(document:vscode.TextDocument):MessageTagG
                         (b.attributes['script-name']??'script')
                     :
                         targetPath,
-                content:b.content,
                 type,
                 range:new vscode.Range(start,end),
                 index:b.index,
                 cwd:b.attributes['cwd'],
+                documentUri:document.uri,
             });
         }
 
@@ -189,9 +196,13 @@ const createOutputPreviewUri=(targetPath:string):Uri=>{
 }
 export const outputPreviewContent=new Map<string,string>();
 export const showOutputDiffAsync=async (
-    targetPath:string,
-    content:string,
+    tag:OutputTagBase,
 ):Promise<boolean>=>{
+    const targetPath=tag.targetPath;
+    const content=await getCodeBlockOutputAsync(tag);
+    if(content===undefined){
+        return false;
+    }
     const previewUri=createOutputPreviewUri(targetPath);
     outputPreviewContent.set(previewUri.toString(),content);
 
@@ -217,9 +228,14 @@ export const showOutputDiffAsync=async (
     return true;
 }
 
-const _writeOutputTagAsync=async (targetPath:string,content:string):Promise<void>=>{
+const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
+    const targetPath=tag.targetPath;
     await fs.mkdir(path.dirname(targetPath),{recursive:true});
-    await fs.writeFile(targetPath,content,'utf8');
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+    await fs.writeFile(targetPath,outputContent,'utf8');
 
     const openEditors=workspace.textDocuments.filter(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===path.normalize(targetPath));
     for(const doc of openEditors){
@@ -227,6 +243,35 @@ const _writeOutputTagAsync=async (targetPath:string,content:string):Promise<void
     }
 
     void window.showInformationMessage(`Wrote output to ${targetPath}`);
+}
+
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|undefined>=>{
+    const targetPath=tag.targetPath;
+    if(!tag.codeBlock.findReplace){
+        return tag.codeBlock.content;
+    }
+    try{
+        const doc=await workspace.openTextDocument(tag.documentUri);
+        if(!doc){
+            const msg=`Failed to find document for Convo-Lang file-replace block: ${tag.documentUri}`;
+            console.error(msg);
+            await window.showErrorMessage(msg);
+            return;
+        }
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace);
+        outputs.sort((a,b)=>a.index-b.index);
+        let content=await readFileAsStringAsync(targetPath);
+        for(const r of outputs){
+            content=replaceConvoBlockContent(content,r.codeBlock);
+        }
+        return content;
+    }catch(ex){
+        const msg=`Failed to read content of targetPath for Convo-Lang file-replace block: ${targetPath}. Error:${getErrorMessage(ex)}`;
+        console.error(msg,ex);
+        await window.showErrorMessage(msg);
+        return undefined;
+    }
+    
 }
 
 export const writeOutputTagAsync=async (args:OutputTagCodeLensArgs|HasArgs)=>{
@@ -242,23 +287,38 @@ export const writeOutputTagAsync=async (args:OutputTagCodeLensArgs|HasArgs)=>{
         return;
     }
 
-    const action=await window.showWarningMessage(
-        `Write output to ${path.basename(targetPath)}?`,
-        { modal:true },
-        'Write File',
-        'View Diff',
-    );
+    if(!args.autoConfirm){
+        const action=await window.showWarningMessage(
+            `Write output to ${path.basename(targetPath)}?`,
+            { modal:true },
+            'Write File',
+            'View Diff',
+        );
 
-    if(action==='View Diff'){
-        await showOutputDiffAsync(targetPath,tag.content);
-        return;
+        if(action==='View Diff'){
+            await showOutputDiffAsync(tag);
+            return;
+        }
+
+        if(action!=='Write File'){
+            return;
+        }
     }
 
-    if(action!=='Write File'){
+    await _writeOutputTagAsync(tag);
+}
+
+export const setClipboardUsingOutputTagAsync=async (tag:OutputTagBase)=>{
+    const targetPath=tag?.targetPath;
+    if(!targetPath){
         return;
     }
-
-    await _writeOutputTagAsync(targetPath,tag.content);
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+    await vscode.env.clipboard.writeText(outputContent);
+    void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
 }
 
 
@@ -279,9 +339,11 @@ export const executeShellOutputTagAsync=async (
         return;
     }
 
-    const allowed=await confirmShellRunAsync(context,tag);
-    if(!allowed){
-        return;
+    if(!args.autoConfirm){
+        const allowed=await confirmShellRunAsync(context,tag);
+        if(!allowed){
+            return;
+        }
     }
 
     const editor=window.activeTextEditor;
@@ -311,25 +373,25 @@ export const executeShellOutputTagAsync=async (
         case 'bash':
             command='bash';
             commandArgs=[];
-            stdIn=tag.content;
+            stdIn=tag.codeBlock.content;
             break;
 
         case 'node':
             command='node';
             commandArgs=['--input-type=module'];
-            stdIn=tag.content;
+            stdIn=tag.codeBlock.content;
             break;
 
         case 'bun':
             command='bun';
             commandArgs=['run','-'];
-            stdIn=tag.content;
+            stdIn=tag.codeBlock.content;
             break;
 
         case 'python':
             command='python3';
             commandArgs=['-'];
-            stdIn=tag.content;
+            stdIn=tag.codeBlock.content;
             break;
 
         default:

@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
-import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
 import { timeSince, timeSinceNext } from './util.js';
 
 const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
@@ -267,7 +267,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         if(action==='View First Diff'){
             const first=tags[0];
             if(first){
-                await showOutputDiffAsync(first.targetPath,first.content);
+                await showOutputDiffAsync(first);
             }
             return;
         }
@@ -276,17 +276,25 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             return;
         }
 
+        const replaceBlocks:Record<string,boolean>={}
         for(const tag of tags){
             const args:OutputTagCodeLensArgs={
                 targetPath:tag.targetPath,
                 index:tag.index,
                 cwd:tag.cwd,
+                codeBlock:tag.codeBlock,
                 documentUri:target.group.messageUri,
             }
+            if(tag.codeBlock.findReplace){
+                if(replaceBlocks[tag.targetPath]){
+                    continue;
+                }
+                replaceBlocks[tag.targetPath]=true;
+            }
             if(tag.type==='file'){
-                await writeOutputTagAsync(args);
+                await writeOutputTagAsync({...args,autoConfirm:true});
             }else if(tag.type==='shell'){
-                await commands.executeCommand('convo.output-tag-execute-shell',args);
+                await commands.executeCommand('convo.output-tag-execute-shell',{...args,autoConfirm:true});
             }
         }
     }
@@ -432,6 +440,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             targetPath:tag.targetPath,
             index:tag.index,
             cwd:tag.cwd,
+            codeBlock:tag.codeBlock,
             documentUri:args?.documentUri,
         }
         if(tag.type==='file'){
@@ -451,21 +460,14 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             return;
         }
 
-        await showOutputDiffAsync(tag.targetPath,tag.content);
+        await showOutputDiffAsync(tag);
     }
 
     public async copyOutputTagAsync(args?:OutputTagCodeLensArgs):Promise<void>
     {
-        if(!args){
-            return;
+        if(args){
+            await setClipboardUsingOutputTagAsync(args);
         }
-        const tag=await getTagFromArgsAsync(args);
-        if(!tag){
-            return;
-        }
-
-        await vscode.env.clipboard.writeText(tag.content);
-        void window.showInformationMessage(`Copied ${getItemLabel(tag)}`);
     }
 
     private async cleanupStateAsync():Promise<void>
@@ -803,7 +805,7 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
         this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
         
 
-        this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:group.messageUri};
+        this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:group.messageUri,codeBlock:tag.codeBlock};
 
         this.command={
             title:'Open Block',
@@ -892,7 +894,10 @@ const getDocDescription=(fsPath:string,isPinned:boolean,isSelected:boolean,isAct
     return parts.join(' • ');
 }
 
-
+/**
+ * Use `getTagFromArgsAsync` to get the most up to date version of the given args. This function 
+ * prevents use old content that has not been updated as the user makes edits.
+ */
 const getTagFromArgsAsync=async (args:OutputTagCodeLensArgs):Promise<ParsedOutputTagInfo|undefined>=>
 {
     const targetPath=args.targetPath;

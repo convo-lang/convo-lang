@@ -21,8 +21,7 @@ export const getStdConvoImportAsync=async (name:string):Promise<ConvoModule|unde
 > system
 ## XML File Blocks
 When given files in an XML block and asked to modify the file or create a new file respond with
-a similar XML block but replace the path attribute name with ${t}target-output-path${t}. Respond
-with the full content of the file, never partial sections or ranges.
+a similar XML block but replace the path attribute name with ${t}target-output-path${t}.
 
 If creating a new file and not given a path use a path relative to the parent
 directory of the referenced file.
@@ -40,11 +39,16 @@ XML File Block Attributes:
 - file-hash: The hash of the file, usually only set when the file is dirty
 - last-commit: The hash of the last commit the file was part of
 - showing-ranges: If present only a limited range of the file will be displayed. Ranges are displayed in FILE_CONTENT_RANGE xml tags
+- find-replace: Find and replace content instead of replacing the full content. Defaults to finding and replacing the first instance of the string to find. Can be used as a boolean attribute or the attribute can be a number or the value "all".
+- find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
+
+When replacing content using find and replace make sure the file-replace-separator is not in the text of the content to find, if it is use a custom file-replace-separator.
+It is common practice to use a file-replace-separator that considered a comment in the language the content is being replaced in, but not required.
 
 You must always wrap the inner contents of the XML block with a markdown code fence to improve 
 syntax highlighting for the user.
 
-Example:
+Example of full file replacement:
 <FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts">
 ${t3} ts
 export interface Example
@@ -52,7 +56,59 @@ export interface Example
     name:string;
 }
 ${t3}
-</FILE_CONTENT>`.trim()};
+</FILE_CONTENT>
+
+
+Example of find and replace:
+
+(note - you do not need to supply the INPUT or OUTPUT, they are for example purposes only)
+
+Input:
+<INPUT>
+export interface Example
+{
+    name:string;
+}
+</INPUT>
+
+File block:
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" find-replace>
+${t3} ts
+    name:string;
+//// replace-with ////
+    first_name:string;
+${t3}
+</FILE_CONTENT>
+
+output:
+<OUTPUT>
+export interface Example
+{
+    first_name:string;
+}
+</OUTPUT>
+
+Example of replacing all instances of string:
+<FILE_CONTENT name="example-story.ts" target-output-path="./path/to/example-story.ts" find-replace="all">
+${t3} ts
+John
+//// replace-with ////
+Johnny Boy
+${t3}
+</FILE_CONTENT>
+
+
+Example of custom find-replace-separator. Use custom separators when the default separator appears in the content to replace.
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" find-replace find-replace-separator="+++ CUSTOM_SEP +++">
+${t3} ts
+    name:string;
++++ CUSTOM_SEP +++
+    first_name:string;
+${t3}
+</FILE_CONTENT>
+
+
+`.trim()};
 
         case 'bash-blocks.convo':return {
             name,
