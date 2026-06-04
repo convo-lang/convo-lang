@@ -114,6 +114,7 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         embeddedFileMap:args=>parseJson5(args[0]??'{}'),
         loadDbBlob:args=>args,
         deleteDbBlob:args=>args,
+        apiModule:args=>args,
     }
 }).parsed;
 

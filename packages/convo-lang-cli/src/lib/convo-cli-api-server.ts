@@ -1,4 +1,3 @@
-import { ConvoDbInstanceMap } from "@convo-lang/convo-lang";
 import { getConvoHonoRoutes } from "@convo-lang/hono/convo-lang-hono.js";
 import { getStaticHonoRoutesAsync } from "@convo-lang/hono/hono-static-routes.js";
 import { serve } from '@hono/node-server';
@@ -6,23 +5,26 @@ import { CancelToken, DisposeCallback, joinPaths } from "@iyio/common";
 import { Hono } from "hono";
 import { cors as _cors } from 'hono/cors';
 import { defaultConvoCliApiPort } from "./convo-cli-lib.js";
-import { ConvoCliOptions } from "./convo-cli-types.js";
+import { ConvoCliApiRouteProvider, ConvoCliOptionsDbMapped } from "./convo-cli-types.js";
 
 
 
-export const runConvoCliApiAsync=async ({
-    apiPort:port=defaultConvoCliApiPort,
-    apiReusePort:reusePort=false,
-    apiRouteBase:baseRoute='/api/convo-lang',
-    apiCors:cors,
-    apiLogging:enableLogging,
-    apiDbRoot,
-    dbMap,
-    disableApiDbAuth,
-    apiStaticRoot:staticRoot,
-    embeddedFileMap,
-    apiRequireSignIn
-}:Omit<ConvoCliOptions,'dbMap'>&{dbMap?:ConvoDbInstanceMap},cancel?:CancelToken)=>{
+export const runConvoCliApiAsync=async (options:ConvoCliOptionsDbMapped,cancel?:CancelToken)=>{
+
+    const {
+        apiPort:port=defaultConvoCliApiPort,
+        apiReusePort:reusePort=false,
+        apiRouteBase:baseRoute='/api/convo-lang',
+        apiCors:cors,
+        apiLogging:enableLogging,
+        apiDbRoot,
+        dbMap,
+        disableApiDbAuth,
+        apiStaticRoot:staticRoot,
+        embeddedFileMap,
+        apiRequireSignIn,
+        apiModule,
+    }=options;
 
     const app=new Hono({
         getPath:!apiDbRoot?undefined:req=>{
@@ -50,6 +52,32 @@ export const runConvoCliApiAsync=async ({
     }
 
     app.route(baseRoute,routes);
+
+    if(apiModule){
+        for(const mod of apiModule){
+            let cb:ConvoCliApiRouteProvider|undefined;
+            if(typeof mod === 'string'){
+                const [importName,...modName]=mod.split(':');
+                const importedMod=await import(modName.join(':'));
+                const routesCb=importedMod[importName??''];
+                if(typeof routesCb === 'function'){
+                    cb=routesCb;
+                }
+            }else{
+                cb=mod;
+            }
+
+            if(cb){
+                console.log(`Loading API module: ${mod}`);
+                const routes=await cb(options);
+                if(routes){
+                   app.route(baseRoute,routes);
+                }else{
+                    console.error(`API module export undefined: ${mod}`);
+                }
+            }
+        }
+    }
 
     let dispose:DisposeCallback|undefined;
     if(globalThis.Bun){

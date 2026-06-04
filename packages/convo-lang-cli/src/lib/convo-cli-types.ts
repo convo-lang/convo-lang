@@ -1,6 +1,7 @@
-import { ConvoDbCommand, ConvoDbConnectionStringHandler, ConvoNodeQuery } from "@convo-lang/convo-lang";
+import { ConvoDbCommand, ConvoDbConnectionStringHandler, ConvoDbInstanceMap, ConvoNodeQuery } from "@convo-lang/convo-lang";
+import type { Hono } from "hono";
 
-export type ConvoExecAllowMode='disable'|'ask'|'allow'
+export type ConvoExecAllowMode='disable'|'ask'|'allow';
 
 export interface ConvoCliConfig
 {
@@ -355,6 +356,12 @@ export interface ConvoCliOptions
     apiRouteBase?:string;
 
     /**
+     * Array of hono app callbacks to register routes. Strings will be loaded as dynamic modules
+     * using an async import. String values are formatted as "routesCallback:moduleName" -> `import { routesCallback } from "moduleName"`
+     */
+    apiModule?:(string|ConvoCliApiRouteProvider)[];
+
+    /**
      * Used to map file embedded during bun build
      */
     embeddedFileMap?:Record<string,string>;
@@ -482,3 +489,7 @@ export interface ConvoCliOptions
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;
+
+export type ConvoCliOptionsDbMapped=Omit<ConvoCliOptions,'dbMap'>&{dbMap?:ConvoDbInstanceMap};
+
+export type ConvoCliApiRouteProvider=(options:ConvoCliOptionsDbMapped)=>null|undefined|Hono|Promise<null|undefined|Hono>;
