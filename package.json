@@ -64,6 +64,7 @@
         "@iyio/syn-taxi": "^0.9.6",
         "@iyio/vfs": "^0.9.6",
         "@iyio/vfs-node": "^0.9.6",
+        "@llamaindex/liteparse": "^2.0.5",
         "@modelcontextprotocol/sdk": "^1.24.3",
         "@pinecone-database/pinecone": "^6.1.1",
         "@tailwindcss/postcss": "^4.2.2",

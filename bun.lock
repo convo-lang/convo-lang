@@ -29,6 +29,7 @@
         "@iyio/syn-taxi": "^0.9.6",
         "@iyio/vfs": "^0.9.6",
         "@iyio/vfs-node": "^0.9.6",
+        "@llamaindex/liteparse": "^2.0.5",
         "@modelcontextprotocol/sdk": "^1.24.3",
         "@pinecone-database/pinecone": "^6.1.1",
         "@tailwindcss/postcss": "^4.2.2",
@@ -508,6 +509,22 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
+
+    "@llamaindex/liteparse": ["@llamaindex/liteparse@2.0.5", "", { "dependencies": { "commander": "^12.0.0" }, "optionalDependencies": { "@llamaindex/liteparse-darwin-arm64": "2.0.5", "@llamaindex/liteparse-darwin-x64": "2.0.5", "@llamaindex/liteparse-linux-arm64-gnu": "2.0.5", "@llamaindex/liteparse-linux-x64-gnu": "2.0.5", "@llamaindex/liteparse-linux-x64-musl": "2.0.5", "@llamaindex/liteparse-win32-arm64-msvc": "2.0.5", "@llamaindex/liteparse-win32-x64-msvc": "2.0.5" }, "bin": { "lit": "dist/cli.js", "liteparse": "dist/cli.js" } }, "sha512-EQN2hYKRSDqhl5SAr8kqJZFn3pzh6DXAhhtng2zRlqvg/rslaroaBAbvzKep+ElljrmfYNZYjJqavgDK1IM1TQ=="],
+
+    "@llamaindex/liteparse-darwin-arm64": ["@llamaindex/liteparse-darwin-arm64@2.0.5", "", { "os": "darwin", "cpu": "arm64" }, "sha512-Z6gO+2Anwx7baBDXNUMHl8QYWuaDmLQZCZ4NKBgMXGlBaESL6OWsShigFMtPWRlNw5EsP/r+tn7uJmPxy2z2tg=="],
+
+    "@llamaindex/liteparse-darwin-x64": ["@llamaindex/liteparse-darwin-x64@2.0.5", "", { "os": "darwin", "cpu": "x64" }, "sha512-vK+BWVPrMId90sTCg5D/5I7ei2DLuy9Zt0mmByphKAGhiEb906X/hQJELKf4a6pBm1QhS0rb8sPDoHhQTY9aEA=="],
+
+    "@llamaindex/liteparse-linux-arm64-gnu": ["@llamaindex/liteparse-linux-arm64-gnu@2.0.5", "", { "os": "linux", "cpu": "arm64" }, "sha512-CKClEmHFf1iEwMp7SHqfcpa12D1Esr+JkxxE3pWS0fTXoTEkDOrjRQP1AEbXczGqb+pVVhCxWYcp5DsiXwC5aQ=="],
+
+    "@llamaindex/liteparse-linux-x64-gnu": ["@llamaindex/liteparse-linux-x64-gnu@2.0.5", "", { "os": "linux", "cpu": "x64" }, "sha512-3FBSjROuqleSLOhXFPEoG6Rq0mFGVxGuN45d1x3fxqUfDig753rTdAqisJnyLYLDiEUjK9llPP3rmuuFBVBFBg=="],
+
+    "@llamaindex/liteparse-linux-x64-musl": ["@llamaindex/liteparse-linux-x64-musl@2.0.5", "", { "os": "linux", "cpu": "x64" }, "sha512-arucwQ/pqetqtno+wngn3ho+oof7zJwCaNkJ63YaTk9xyxxWUQ9h8Dl4IdI1tCprgPx0U9DOWtKfJzcASXteUA=="],
+
+    "@llamaindex/liteparse-win32-arm64-msvc": ["@llamaindex/liteparse-win32-arm64-msvc@2.0.5", "", { "os": "win32", "cpu": "arm64" }, "sha512-0yT8qm7tkvZv/LW/zS8WuWA7ixLmkuFI9DjSO1dcIZpq/RgyvP/jyZsNSZEqR3IfR1GsViFmplTp9MjW7KV+1Q=="],
+
+    "@llamaindex/liteparse-win32-x64-msvc": ["@llamaindex/liteparse-win32-x64-msvc@2.0.5", "", { "os": "win32", "cpu": "x64" }, "sha512-htxyLATNuWJdTVHCM73jkDBNJZrvzz7gptUpGsVjhYOc7WvTBNCPsoSeOo07NonBH4mwEZfOU3XjuEwwjYGDWQ=="],
 
     "@mapbox/node-pre-gyp": ["@mapbox/node-pre-gyp@1.0.11", "", { "dependencies": { "detect-libc": "^2.0.0", "https-proxy-agent": "^5.0.0", "make-dir": "^3.1.0", "node-fetch": "^2.6.7", "nopt": "^5.0.0", "npmlog": "^5.0.1", "rimraf": "^3.0.2", "semver": "^7.3.5", "tar": "^6.1.11" }, "bin": { "node-pre-gyp": "bin/node-pre-gyp" } }, "sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ=="],
 

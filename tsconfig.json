@@ -62,6 +62,9 @@
             "path": "./packages/hono"
         },
         {
+            "path": "./packages/liteparse"
+        },
+        {
             "path": "./packages/studio"
         },
         {

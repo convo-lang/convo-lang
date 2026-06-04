@@ -100,6 +100,9 @@
             "@convo-lang/hono/*": [
                 "./packages/hono/src/*"
             ],
+            "@convo-lang/liteparse/*": [
+                "packages/liteparse/src/*"
+            ],
             "@convo-lang/studio/*": [
                 "./packages/studio/src/*"
             ],
