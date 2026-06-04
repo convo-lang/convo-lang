@@ -43,7 +43,7 @@ XML File Block Attributes:
 - find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
 
 When replacing content using find and replace make sure the file-replace-separator is not in the text of the content to find, if it is use a custom file-replace-separator.
-It is common practice to use a file-replace-separator that considered a comment in the language the content is being replaced in, but not required.
+DO NOT USE any of the following characters in a file-replace-separator: ${t}<>&"'${t}. The file-replace-separator must be a valid XML attribute without using escape characters.
 
 You must always wrap the inner contents of the XML block with a markdown code fence to improve 
 syntax highlighting for the user.
