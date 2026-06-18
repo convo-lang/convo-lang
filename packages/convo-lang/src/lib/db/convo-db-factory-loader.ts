@@ -2,7 +2,7 @@ import { getErrorMessage } from "@iyio/common";
 import { PromiseResultType } from "../result-type.js";
 import { ConvoDb, ConvoDbFactory } from "./convo-db-types.js";
 
-export const loadDynamicConvoDbFactoryAsync=async (imp:string,options:any):PromiseResultType<ConvoDbFactory>=>{
+export const loadDynamicConvoDbFactoryAsync=async (imp:string,options:any,module?:any):PromiseResultType<ConvoDbFactory>=>{
 
     const e=imp.indexOf('!');
     let className:string|undefined;
@@ -20,7 +20,7 @@ export const loadDynamicConvoDbFactoryAsync=async (imp:string,options:any):Promi
 
     if(className){
         try{
-            const mod=await import(imp);
+            const mod=module??await import(imp);
             dbClass=mod[className];
             if(typeof dbClass !== 'function'){
                 throw new Error(`db class not exported by name`);

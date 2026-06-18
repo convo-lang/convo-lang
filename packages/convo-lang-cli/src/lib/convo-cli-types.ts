@@ -73,6 +73,11 @@ export interface ConvoCliOptions
     help?:boolean;
 
     /**
+     * If true the arguments passed to the CLI will be printed to the console
+     */
+    echoArgs?:boolean;
+
+    /**
      * Path to env files to load environment variables from
      */
     env?:string|string[];
@@ -400,7 +405,7 @@ export interface ConvoCliOptions
      * - `default:layered` - Maps the default db to a layered db. Use `dbMapLayer` to define layers
      * @default 'default:sqlite'
      */
-    dbMap?:string[];
+    dbMap?:(string|ConvoCliDbModule)[];
 
     /**
      * Maps layers of a layered convo db.
@@ -486,6 +491,12 @@ export interface ConvoCliOptions
      * @default 4
      */
     jsonFormat?:number;
+}
+
+export interface ConvoCliDbModule
+{
+    connectionString:string;
+    module:any;
 }
 
 export type ConvoExecConfirmCallback=(command:string,commandIndex:number)=>Promise<boolean>|boolean;

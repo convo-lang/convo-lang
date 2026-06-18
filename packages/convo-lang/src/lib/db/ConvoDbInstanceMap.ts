@@ -105,8 +105,8 @@ export class ConvoDbInstanceMap
     registerStringConnector(handler:ConvoDbConnectionStringHandler|string,factory?:ConvoDbFactory):void{
         if(typeof handler === 'string'){
             if(factory){
-                this.connectionStringHandlers.push(()=>{
-                    return factory;
+                this.connectionStringHandlers.push(type=>{
+                    return type===handler?factory:undefined;
                 })
             }
         }else{
@@ -114,9 +114,8 @@ export class ConvoDbInstanceMap
         }
     }
 
-    public async addFactoryUsingConnectionStringAsync(connectionString:string):PromiseResultTypeVoid{
+    public async addFactoryUsingConnectionStringAsync(connectionString:string,module?:any):PromiseResultTypeVoid{
         try{
-
             const [name,type,...args]=connectionString.split(':');
             if(!name || !type){
                 return {
@@ -125,7 +124,6 @@ export class ConvoDbInstanceMap
                     statusCode:400,
                 }
             }
-
             for(const h of this.connectionStringHandlers){
                 let factory=h(type,args);
                 if(factory){
@@ -159,7 +157,7 @@ export class ConvoDbInstanceMap
             }
 
             if(this.enabledDynamicImports){
-                const factory=await this.getDynamicAsync(type,args);
+                const factory=await this.getDynamicAsync(type,args,module);
                 if(!factory.success){
                     return factory;
                 }
@@ -184,7 +182,7 @@ export class ConvoDbInstanceMap
         }
     }
 
-    private async getDynamicAsync(type:string,args:string[]):PromiseResultType<ConvoDbFactory>{
+    private async getDynamicAsync(type:string,args:string[],module?:any):PromiseResultType<ConvoDbFactory>{
 
         let options:any;
         try{
@@ -209,7 +207,7 @@ export class ConvoDbInstanceMap
         }
 
 
-        return await loadDynamicConvoDbFactoryAsync(type,options);
+        return await loadDynamicConvoDbFactoryAsync(type,options,module);
     }
 
 }

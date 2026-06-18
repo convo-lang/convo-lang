@@ -115,12 +115,16 @@ export const getConvoCliArgs=(argv=globalThis.process?.argv??[],startIndex=2)=>p
         loadDbBlob:args=>args,
         deleteDbBlob:args=>args,
         apiModule:args=>args,
+        echoArgs:args=>args.length?true:false,
     }
 }).parsed;
 
 export const convoCliMain=async(args=getConvoCliArgs())=>{
     if(!getObjKeyCount(args)){
         args.repl=true;
+    }
+    if(args.echoArgs){
+        console.log('Convo CLI Args:',args);
     }
     const cancel=new CancelToken();
     let done=false;
@@ -201,7 +205,10 @@ export const convoCliMain=async(args=getConvoCliArgs())=>{
             }
             if(args.dbMap){
                 for(const s of args.dbMap){
-                    const r=await inst.addFactoryUsingConnectionStringAsync(s);
+                    const r=await ((typeof s === 'string')?
+                        inst.addFactoryUsingConnectionStringAsync(s):
+                        inst.addFactoryUsingConnectionStringAsync(s.connectionString,s.module)
+                    );
                     if(!r.success){
                         console.error(r.error);
                         process.exit(1);

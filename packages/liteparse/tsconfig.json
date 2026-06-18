@@ -14,9 +14,5 @@
     "compilerOptions": {
         "composite": true
     },
-    "references": [
-        {
-            "path": "../../packages/convo-lang-cli"
-        }
-    ]
+    "references": []
 }
