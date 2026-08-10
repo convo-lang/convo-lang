@@ -32,6 +32,7 @@ export const createOpenRouterConvoConverterFromScope=(scope:Scope):BaseOpenAiCon
         visionModel:scope.to(openRouterVisionModelParam).get()??scope.to(openAiVisionModelParam).get(),
         supportedInputTypes:[convoOpenRouterInputType],
         supportedOutputTypes:[convoOpenRouterOutputType],
+        getModelsAsync:getOpenRouterModelsAsync,
         transformInput:input=>{
             if(input.model===openRouterAutoSelectModel || input.model===openRouterModel){
                 input.model='openrouter/auto'

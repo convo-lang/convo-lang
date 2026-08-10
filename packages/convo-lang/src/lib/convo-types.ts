@@ -306,6 +306,11 @@ export interface ConvoCodeBlock
     index:number;
 
     /**
+     * Index of the message the block is defined in
+     */
+    messageIndex:number;
+
+    /**
      * Find and replace content instead of replacing the full content. Defaults to finding and 
      * replacing the first instance of the string to find. Can be used as a boolean attribute or
      * the attribute can be a number or the value "all".
@@ -1328,15 +1333,15 @@ export interface ConvoConversationConverter<TInput,TOutput>
 
     supportedOutputTypes:string[];
 
-    convertConvoToInput(flat:FlatConvoConversationBase,inputType:string):TInput;
+    convertConvoToInputAsync(flat:FlatConvoConversationBase,inputType:string):Promise<TInput>;
 
-    convertOutputToConvo(
+    convertOutputToConvoAsync(
         output:TOutput,
         outputType:string,
         input:TInput,
         inputType:string,
         flat:FlatConvoConversationBase
-    ):ConvoCompletionMessage[];
+    ):Promise<ConvoCompletionMessage[]>;
 }
 
 export interface ConvoConversion<T>
@@ -1389,11 +1394,16 @@ export type ConvoTranscriptionResultProviderBase={
 }
 
 export type ConvoTranscriptionResultBase=ConvoTranscriptionResultProviderBase & {
+    timestamp?:number;
     file?:File;
     startTime:number;
     endTime:number;
     requestTime:number;
     index:number;
+    audioFileDbPath?:string;
+    audioFileDbFileName?:string;
+    transcriptionDbPath?:string;
+    transcriptionDbFileName?:string;
 }
 
 export type ConvoTranscriptionResult=

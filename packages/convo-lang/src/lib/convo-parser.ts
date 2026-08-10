@@ -1119,7 +1119,7 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
         }
 
         if(enableBlocks && msg.content){
-            const blocks=parseConvoCodeBlocks(msg.content,msg,blockIndex);
+            const blocks=parseConvoCodeBlocks(msg.content,i,msg,blockIndex);
             if(blocks){
                 blockIndex+=blocks.length;
                 msg.codeBlocks=blocks;

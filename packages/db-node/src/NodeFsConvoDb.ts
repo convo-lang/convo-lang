@@ -231,7 +231,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return await this._runAsync(async ()=>{
             const nodes:ConvoNode[]=[];
             for(const nodePath of paths){
-                const node=await this._readNodeAsync(nodePath);
+                const node=await this._readNodeAsync(nodePath,paths.length===1 && (keys==='*' || keys.includes('data')));
                 if(node){
                     nodes.push(node);
                 }
@@ -258,7 +258,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
             const paths=currentNodePaths??await this._readNodePathsAsync();
             const selected:string[]=[];
             for(const nodePath of paths){
-                const node=await this._readNodeAsync(nodePath);
+                const node=await this._readNodeAsync(nodePath,false);
                 if(node && evaluateJsonQueryCondition(node,step.condition)){
                     selected.push(node.path);
                 }
@@ -324,7 +324,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
     public async updateNodeAsync(update:ConvoNodeUpdate,options:Omit<UpdateConvoNodeOptions,'permissionFrom'|'mergeData'>|undefined):PromiseResultTypeVoid{
         return await this._runVoidAsync(async ()=>{
-            const node=await this._readNodeRequiredAsync(update.path);
+            const node=await this._readNodeRequiredAsync(update.path,false);
             this._assignNullable(node,update,'displayName');
             this._assignNullable(node,update,'modified');
             this._assignNullable(node,update,'description');
@@ -496,9 +496,9 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         await writeFile(fsPath,JSON.stringify(node,null,4));
     }
 
-    private async _readNodeAsync(nodePath:string):Promise<ConvoNode|undefined>{
+    private async _readNodeAsync(nodePath:string,loadData:boolean):Promise<ConvoNode|undefined>{
         if(this._isMetadataMode()){
-            return await this._readMetadataNodeAsync(nodePath);
+            return await this._readMetadataNodeAsync(nodePath,loadData);
         }
 
         try{
@@ -511,8 +511,8 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         }
     }
 
-    private async _readNodeRequiredAsync(nodePath:string):Promise<ConvoNode>{
-        const node=await this._readNodeAsync(nodePath);
+    private async _readNodeRequiredAsync(nodePath:string,loadData:boolean):Promise<ConvoNode>{
+        const node=await this._readNodeAsync(nodePath,loadData);
         if(!node){
             throw new Error(`Node not found: ${nodePath}`);
         }
@@ -644,7 +644,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
 
         const nodes:ConvoNode[]=[];
         for(const nodePath of paths){
-            const node=await this._readNodeAsync(nodePath);
+            const node=await this._readNodeAsync(nodePath,false);
             if(node){
                 nodes.push(node);
             }
@@ -681,7 +681,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
             return true;
         }
 
-        const node=await this._readNodeAsync(embedding.path);
+        const node=await this._readNodeAsync(embedding.path,false);
         return node?JSON.stringify(node).toLowerCase().includes(text):false;
     }
 
@@ -694,7 +694,7 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
         return this.nodeSuffix==='';
     }
 
-    private async _readMetadataNodeAsync(nodePath:string):Promise<ConvoNode|undefined>{
+    private async _readMetadataNodeAsync(nodePath:string,loadData:boolean):Promise<ConvoNode|undefined>{
         const fsPath=this._getNodeFsPath(nodePath);
         if(this._isReservedFsPath(fsPath)){
             return undefined;
@@ -715,12 +715,12 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
                 path:nodePath,
                 name:this._getNodeName(nodePath),
                 type:'db-metadata-dir',
-                data:await this._readMetadataDirectoryItemsAsync(fsPath,nodePath) as any,
+                data:loadData?{items:await this._readMetadataDirectoryItemsAsync(fsPath,nodePath) as any}:{},
             };
         }
 
         if(this._hasJsonNodeExtension(fsPath)){
-            return JSON.parse(await readFile(fsPath,'utf8'));
+            return this.parseAsNode(await readFile(fsPath,'utf8'),nodePath);
         }
 
         return {
@@ -729,6 +729,25 @@ export class NodeFsConvoDbDriver implements ConvoDbDriver
             type:'db-metadata-file',
             data:this._createFsItem(this._getNodeName(nodePath),nodePath,s) as any,
         };
+    }
+
+    private parseAsNode(json:string,nodePath:string){
+        const value=JSON.parse(json);
+        if( value &&
+            (typeof value === 'object') &&
+            (typeof value['type']==='string') &&
+            (typeof value['path']==='string') &&
+            value['data'] &&
+            (typeof value['data'] === 'object')
+        ){
+            return value;
+        }else{
+            return {
+                type:'json',
+                path:nodePath,
+                data:{value}
+            }
+        }
     }
 
     private async _readMetadataDirectoryItemsAsync(dir:string,nodePath:string):Promise<ConvoDbFsItem[]>{

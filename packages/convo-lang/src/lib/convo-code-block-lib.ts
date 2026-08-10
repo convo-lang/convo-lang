@@ -8,7 +8,7 @@ export const defaultConvoFindReplaceSeparator='//// replace-with ////';
 const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```[ \t\r\n]*<\/\k<tagName>>/g;
 const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
 
-export const parseConvoCodeBlocks=(text:string,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
+export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
     let indexOffset:number;
     if(typeof indexOffsetOrParentMessage === 'number'){
         indexOffset=indexOffsetOrParentMessage;
@@ -53,6 +53,7 @@ export const parseConvoCodeBlocks=(text:string,indexOffsetOrParentMessage?:Convo
             index:blockIndexOffset+blocks.length,
             startIndex:indexOffset+(match.index??0)+start.length,
             endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
             findReplace:parseConvoBlockFindReplace(findReplace),
             findReplaceSeparator,
         })
@@ -96,19 +97,24 @@ const trimBlockEnd=(content:string):string=>{
     return content;
 }
 
-export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):string=>{
+export interface ReplaceConvoBlockResult{
+    content:string;
+    replaceCount:number;
+}
+export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
     const sep=block.findReplaceSeparator??defaultConvoFindReplaceSeparator;
     const i=block.content.indexOf(sep);
     const find=trimBlockEnd(i===-1?block.content:block.content.substring(0,i));
     const replace=trimBlockEnd(trimBlockStart(i===-1?'':block.content.substring(i+sep.length)));
 
+    let replaceCount=0;
+
     const parts=content.split(find);
     if(parts.length===1){
-        return parts[0]!;
+        return {content:parts[0]!,replaceCount}
     }
     for(let
         i=0,
-        replaceCount=0,
         limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
         i<parts.length-1;
         i+=2
@@ -117,7 +123,7 @@ export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):stri
         replaceCount++;
     }
 
-    return parts.join('');
+    return {content:parts.join(''),replaceCount}
 }
 
 export const normalizeConvoCodeBlockContent=(tag:string,content:string,attrs?:Record<string,string>):string=>{

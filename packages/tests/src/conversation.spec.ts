@@ -31,6 +31,7 @@ describe('conversation',()=>{
         const flat=_flat as FlatConvoConversation|null;
 
         expect(flat).not.toBeNull();
+        expect(flat).not.toBeUndefined();
         expect(flat?.messages.length).toBe(2);
 
         expect(flat?.messages[1]?.content).toBe('What do I do after going fast?')

@@ -39,6 +39,8 @@ export interface BaseOpenAiConvoConverterOptions
 
     transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
     transformOutput?:(output:ChatCompletion)=>ChatCompletion;
+
+    getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
 }
 
 /**
@@ -57,13 +59,13 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public readonly functionRoles:string[];
     public readonly chatModel?:string;
     public readonly visionModel?:string;
-    public readonly models?:ConvoModelInfo[];
+    public models?:ConvoModelInfo[];
     public readonly includeModalities?:boolean;
     public readonly hasVision?:(modelName:string)=>boolean;
 
     public readonly transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
     public readonly transformOutput?:(output:ChatCompletion)=>ChatCompletion;
-    public readonly getModelsAsync?:()=>Promise<ConvoModelInfo[]>
+    private readonly _getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
 
 
     public constructor({
@@ -80,6 +82,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         transformInput,
         transformOutput,
         includeModalities,
+        getModelsAsync,
     }:BaseOpenAiConvoConverterOptions){
         this.chatModel=chatModel;
         this.visionModel=visionModel;
@@ -96,21 +99,34 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         this.functionRoles=functionRoles?[...functionRoles]:['function'];
         Object.freeze(this.functionRoles);
         this.models=models?[...models]:undefined;
-        Object.freeze(this.models);
         this.hasVision=hasVision;
         this.transformInput=transformInput;
         this.transformOutput=transformOutput;
         this.includeModalities=includeModalities;
+        this._getModelsAsync=getModelsAsync;
 
 
     }
 
-    public convertOutputToConvo(
+    public async getModelsAsync(){
+        if(this.models){
+            return [...this.models];
+        }
+        if(this._getModelsAsync){
+            const m=await this._getModelsAsync();
+            this.models=m;
+            return m;
+
+        }
+        return [];
+    }
+
+    public async convertOutputToConvoAsync(
         output:ChatCompletion,
         outputType:string,
         input:ChatCompletionRequest,
         inputType:string,
-        flat:FlatConvoConversation):ConvoCompletionMessage[]
+        flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
     {
         if(this.transformOutput){
             output=this.transformOutput(output);
@@ -137,14 +153,20 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
             }
         }
 
+        let outputModel=output.model;
+        const models=await this.getModelsAsync();
+        if(!models.some(m=>m.name===outputModel) && flat.model && models.some(m=>m.name===flat.model?.name)){
+            outputModel=flat.model.name;
+        }
+
         if(fnName){
             if(callError){
                 return [createTextConvoCompletionMessage({
                     flat,
                     role:msg.message.role,
                     content:callError,
-                    model:output.model,
-                    models:this.models,
+                    model:outputModel,
+                    models,
                     inputTokens:output.usage?.prompt_tokens,
                     outputTokens:output.usage?.completion_tokens,
                 })];
@@ -154,8 +176,8 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 callFn:fnName,
                 callParams:params,
                 toolId,
-                model:output.model,
-                models:this.models,
+                model:outputModel,
+                models,
                 inputTokens:output.usage?.prompt_tokens,
                 outputTokens:output.usage?.completion_tokens,
                 streamingId:flat.enableStreaming?output.id:undefined,
@@ -174,8 +196,8 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 flat,
                 role:msg.message.role,
                 content,
-                model:output.model,
-                models:this.models,
+                model:outputModel,
+                models,
                 inputTokens:output.usage?.prompt_tokens,
                 outputTokens:output.usage?.completion_tokens,
                 tags:vision?{[convoTags.vision]:''}:undefined,
@@ -184,7 +206,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         }
     }
 
-    public convertConvoToInput(flat:FlatConvoConversation,inputType:string):ChatCompletionRequest{
+    public async convertConvoToInputAsync(flat:FlatConvoConversation,inputType:string):Promise<ChatCompletionRequest>{
 
         const messages=getNormalizedFlatMessageList(flat);
 
@@ -196,7 +218,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
             throw new Error('Chat AI model not defined');
         }
 
-        const info=this.models?.find(m=>m.name===model);
+        const info=(await this.getModelsAsync())?.find(m=>m.name===model);
         if(info && info.inputCapabilities?.includes('image') || this.hasVision?.(model)){
             visionCapable=true;
         }

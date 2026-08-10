@@ -1,0 +1,16 @@
+{
+    "name": "@convo-lang/media",
+    "version": "0.0.0",
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "import": "./src/index.js"
+        },
+        "./*": {
+            "types": "./src/*.d.ts",
+            "import": "./src/*.js"
+        }
+    }
+}

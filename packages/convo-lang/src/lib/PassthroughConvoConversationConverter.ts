@@ -7,11 +7,11 @@ export class PassthroughConvoConversationConverter implements ConvoConversationC
 
     public readonly supportedOutputTypes=[passthroughConvoOutputType];
 
-    public convertConvoToInput(flat:FlatConvoConversation,inputType:string):FlatConvoConversationBase{
-        return flatConvoConversationToBase(flat);
+    public convertConvoToInputAsync(flat:FlatConvoConversation,inputType:string):Promise<FlatConvoConversationBase>{
+        return Promise.resolve(flatConvoConversationToBase(flat));
     }
 
-    public convertOutputToConvo(target:ConvoCompletionMessage[],outputType:string):ConvoCompletionMessage[]{
-        return target;
+    public convertOutputToConvoAsync(target:ConvoCompletionMessage[],outputType:string):Promise<ConvoCompletionMessage[]>{
+        return Promise.resolve(target);
     }
 }

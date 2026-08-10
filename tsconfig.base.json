@@ -97,11 +97,20 @@
             "@convo-lang/highlighter/*": [
                 "./packages/highlighter/src/*"
             ],
+            "@convo-lang/hono": [
+                "./packages/hono/src/index.ts"
+            ],
             "@convo-lang/hono/*": [
                 "./packages/hono/src/*"
             ],
             "@convo-lang/liteparse/*": [
                 "packages/liteparse/src/*"
+            ],
+            "@convo-lang/media": [
+                "packages/media/src/index.ts"
+            ],
+            "@convo-lang/media/*": [
+                "packages/media/src/*"
             ],
             "@convo-lang/studio/*": [
                 "./packages/studio/src/*"

@@ -802,6 +802,7 @@ export class HttpConvoCompletionService implements
                 stream,
                 {
                     ...options,
+                    halfDuplex:true,
                     returnFetchResponse:true,
                     rawBody:true,
                     headers:{

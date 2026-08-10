@@ -42,7 +42,7 @@ test('parse-code-block',()=>{
     expect(b.startIndex).toBe(src.indexOf('<'));
     expect(b.endIndex).toBe(src.lastIndexOf('>')+1);
 
-    const blocks=parseConvoCodeBlocks(src);
+    const blocks=parseConvoCodeBlocks(src,0);
     expect(blocks?.[0]?.startIndex).toBe(b.startIndex);
     expect(blocks?.[0]?.endIndex).toBe(b.endIndex);
 

@@ -8,7 +8,7 @@ import { ConvoRoom } from "./ConvoRoom.js";
 import { HttpConvoCompletionService } from "./HttpConvoCompletionService.js";
 import { requireParseConvoCached } from "./convo-cached-parsing.js";
 import { parseConvoCodeBlocks } from "./convo-code-block-lib.js";
-import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInput, getConvoCompletionServiceAsync, requireConvertConvoOutput } from "./convo-completion-lib.js";
+import { applyConvoModelConfigurationToInputAsync, applyConvoModelConfigurationToOutput, completeConvoUsingCompletionServiceAsync, convertConvoInputAsync, getConvoCompletionServiceAsync, requireConvertConvoOutputAsync } from "./convo-completion-lib.js";
 import { getConvoMessageComponent } from "./convo-component-lib.js";
 import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComponentDef, ConvoComponentMessageState, ConvoComponentMessagesCallback, ConvoComponentSubmissionWithIndex } from "./convo-component-types.js";
 import { evalConvoMessageAsCodeAsync } from "./convo-eval.js";
@@ -1961,7 +1961,7 @@ export class Conversation
         }
         try{
             if(modelInputOutput!==undefined){
-                messages=requireConvertConvoOutput(
+                messages=await requireConvertConvoOutputAsync(
                     modelInputOutput.output,
                     serviceAndModel.service.outputType,
                     modelInputOutput.input,
@@ -4903,7 +4903,7 @@ export class Conversation
                 if(this.defaultOptions.enableDynamicMessageCodeBlocks && msg.content && (msg.isUser || msg.isAssistant)){
                     const src=msg[convoFlatMessageSourceMessageKey];
                     if(src?.statement){
-                        const blocks=parseConvoCodeBlocks(msg.content,src);
+                        const blocks=parseConvoCodeBlocks(msg.content,i,src);
                         if(blocks){
                             msg.codeBlocks=blocks;
                         }
@@ -5680,7 +5680,7 @@ export class Conversation
         if(service.service.relayConvertConvoToInputAsync){
             return await service.service.relayConvertConvoToInputAsync(flat);
         }else{
-            const conversion=convertConvoInput(flat,service.service.inputType,this.converters);
+            const conversion=await convertConvoInputAsync(flat,service.service.inputType,this.converters);
             return conversion.result;
         }
     }

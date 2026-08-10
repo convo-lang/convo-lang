@@ -65,6 +65,9 @@
             "path": "./packages/liteparse"
         },
         {
+            "path": "./packages/media"
+        },
+        {
             "path": "./packages/studio"
         },
         {

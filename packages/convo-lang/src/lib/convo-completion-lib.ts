@@ -6,17 +6,17 @@ import { appendFlatConvoMessageSuffix, convoAnyModelName, convoTags, createFunct
 import { ConvoCompletionCtx, ConvoCompletionMessage, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoConversationConverter, ConvoConversion, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, SimulatedConvoFunctionCall } from "./convo-types.js"
 import { convoTypeToJsonScheme } from "./convo-zod.js"
 
-export const convertConvoInput=(
+export const convertConvoInputAsync=async (
     flat:FlatConvoConversationBase,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[]
-):ConvoConversion<any>=>{
+):Promise<ConvoConversion<any>>=>{
     for(const converter of converters){
         if(converter.supportedInputTypes.includes(inputType)){
             return {
                 success:true,
                 converter,
-                result:converter.convertConvoToInput(flat,inputType),
+                result:await converter.convertConvoToInputAsync(flat,inputType),
             }
         }
     }
@@ -25,20 +25,20 @@ export const convertConvoInput=(
     }
 }
 
-export const convertConvoOutput=(
+export const convertConvoOutputAsync=async (
     output:any,
     outputType:string,
     input:any,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[],
     flat:FlatConvoConversationBase
-):ConvoConversion<any>=>{
+):Promise<ConvoConversion<any>>=>{
     for(const converter of converters){
         if(converter.supportedOutputTypes.includes(outputType)){
             return {
                 success:true,
                 converter,
-                result:converter.convertOutputToConvo(output,outputType,input,inputType,flat),
+                result:await converter.convertOutputToConvoAsync(output,outputType,input,inputType,flat),
             }
         }
     }
@@ -47,27 +47,27 @@ export const convertConvoOutput=(
     }
 }
 
-export const requireConvertConvoInput=(
+export const requireConvertConvoInputAsync=async (
     flat:FlatConvoConversationBase,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[]
-):any=>{
-    const r=convertConvoInput(flat,inputType,converters);
+):Promise<any>=>{
+    const r=await convertConvoInputAsync(flat,inputType,converters);
     if(!r.success){
         throw new Error(`No convo converter found for input type - ${inputType}`);
     }
     return r.result;
 }
 
-export const requireConvertConvoOutput=(
+export const requireConvertConvoOutputAsync=async (
     output:any,
     outputType:string,
     input:any,
     inputType:string,
     converters:ConvoConversationConverter<any,any>[],
     flat:FlatConvoConversationBase
-):ConvoCompletionMessage[]=>{
-    const r=convertConvoOutput(output,outputType,input,inputType,converters,flat);
+):Promise<ConvoCompletionMessage[]>=>{
+    const r=await convertConvoOutputAsync(output,outputType,input,inputType,converters,flat);
     if(!r.success){
         throw new Error(`No convo converter found for output type - ${outputType}`);
     }
@@ -83,10 +83,10 @@ export const completeConvoUsingCompletionServiceAsync=async (
     if(!service){
         return [];
     }
-    const input=requireConvertConvoInput(flat,service.inputType,converters);
+    const input=await requireConvertConvoInputAsync(flat,service.inputType,converters);
     const r=await service.completeConvoAsync(input,flat,ctx);
     await ctx.afterComplete?.(service,r,input,flat);
-    return requireConvertConvoOutput(r,service.outputType,input,service.inputType,converters,flat);
+    return await requireConvertConvoOutputAsync(r,service.outputType,input,service.inputType,converters,flat);
 
 }
 

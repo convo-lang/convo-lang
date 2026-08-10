@@ -372,8 +372,9 @@ export class BaseOpenAiConvoCompletionService implements
             form.append('model',model);
             form.append('chunking_strategy','auto');
             form.append('file',audio);
+            //form.append('file',new Blob([audio],{type:'audio/wav'}));
             form.append('response_format',includeSegments?'diarized_json':'json');
-            if(labelSpeakers && speakerRefs){
+            if(labelSpeakers && speakerRefs?.length){
                 speakerRefs.sort((a,b)=>(b.priority??0)-(a.priority??0));
                 for(let i=0,l=Math.min(this.maxSpeakerRefs,speakerRefs.length);i<l;i++){
                     const s=speakerRefs[i];

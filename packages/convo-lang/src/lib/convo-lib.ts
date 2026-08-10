@@ -2595,7 +2595,7 @@ export const calculateConvoTokenUsage=(
             outputTokens,
             tokenPrice:(
                 inputTokens*(info.inputTokenPriceUsd??unknownConvoTokenPrice)+
-                outputTokens*(info.inputTokenPriceUsd??unknownConvoTokenPrice)
+                outputTokens*(info.outputTokenPriceUsd??unknownConvoTokenPrice)
             )
         }
     }

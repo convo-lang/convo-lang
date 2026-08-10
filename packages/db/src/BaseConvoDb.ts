@@ -609,7 +609,7 @@ export abstract class BaseConvoDb implements ConvoDb
                     if(!np){
                         return {
                             success:false,
-                            error:'Invalid node path returned from backing store',
+                            error:`Invalid node path returned from backing store - ${p}`,
                             statusCode:500,
                         }
                     }

@@ -1,4 +1,4 @@
-import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInput, convoAnthropicModule, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoOpenAiModule, convoOpenRouterModule, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
+import { Conversation, ConvoCompletionServiceAndModel, ConvoHttpToInputRequest, ConvoModelInfo, ConvoRagSearch, FlatConvoConversation, completeConvoUsingCompletionServiceAsync, convertConvoInputAsync, convoAnthropicModule, convoAnyModelName, convoCompletionService, convoConversationConverterProvider, convoOpenAiModule, convoOpenRouterModule, convoRagService, defaultConvoHttpEndpointPrefix, defaultConvoRagSearchLimit, defaultConvoRagTol, defaultMaxConvoRagSearchLimit, getConvoCompletionServiceAsync, getConvoCompletionServiceModelsAsync, getConvoCompletionServicesForModelAsync } from '@convo-lang/convo-lang';
 import { BadRequestError, EnvParams, InternalOptions, NotFoundError, dupDeleteUndefined, escapeRegex, getErrorMessage, initRootScope, rootScope, safeParseNumber } from "@iyio/common";
 import { HttpRoute } from "@iyio/node-common";
 import { ConvoLangRouteOptions, ConvoLangRouteOptionsBase, ConvoTokenQuota, ImageGenRouteOptions, defaultConvoLangFsRoot } from './convo-lang-api-routes-lib.js';
@@ -184,7 +184,7 @@ export const createConvoLangApiRoutes=({
                     inputType=modelService.service.inputType;
                 }
 
-                const result=convertConvoInput(request.flat,inputType,convoConversationConverterProvider.all()).result
+                const result=(await convertConvoInputAsync(request.flat,inputType,convoConversationConverterProvider.all())).result
                 if(!result){
                     throw new NotFoundError('No conversion found');
                 }

@@ -1,4 +1,4 @@
-import { ConvoCodeBlock, ConvoMessage, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { ConvoCodeBlock, ConvoMessage, defaultConvoFindReplaceSeparator, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
 import { getErrorMessage } from '@iyio/common';
 import { readFileAsStringAsync } from '@iyio/node-common';
 import { spawn } from 'child_process';
@@ -258,11 +258,20 @@ export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|un
             await window.showErrorMessage(msg);
             return;
         }
-        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace);
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
         outputs.sort((a,b)=>a.index-b.index);
         let content=await readFileAsStringAsync(targetPath);
+        let notFound:string[]=[];
         for(const r of outputs){
-            content=replaceConvoBlockContent(content,r.codeBlock);
+            const replacement=replaceConvoBlockContent(content,r.codeBlock);
+            if(!replacement.replaceCount){
+                notFound.push(`find-replace target not found. path:${tag.documentUri}, index:${r.codeBlock.index}, separator:${r.codeBlock.findReplaceSeparator??defaultConvoFindReplaceSeparator}`)
+            }else{
+                content=replacement.content;
+            }
+        }
+        if(notFound.length){
+            window.showErrorMessage(notFound.join('\n'));
         }
         return content;
     }catch(ex){

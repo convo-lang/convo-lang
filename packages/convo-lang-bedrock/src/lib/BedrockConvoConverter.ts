@@ -45,12 +45,12 @@ export class BedrockConvoConverter implements ConvoConversationConverter<Convers
         Object.freeze(this.supportedOutputTypes);
     }
 
-    public convertOutputToConvo(
+    public async convertOutputToConvoAsync(
         output:ConverseCommandOutput,
         outputType:string,
         input:ConverseCommandInput,
         inputType:string,
-        flat:FlatConvoConversation):ConvoCompletionMessage[]
+        flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
     {
 
         flat.debug?.('Bedrock response',output);
@@ -143,7 +143,7 @@ export class BedrockConvoConverter implements ConvoConversationConverter<Convers
         }
     }
 
-    public convertConvoToInput(flat:FlatConvoConversationBase,inputType:string):ConverseCommandInput{
+    public async convertConvoToInputAsync(flat:FlatConvoConversationBase,inputType:string):Promise<ConverseCommandInput>{
 
         const messages=getNormalizedFlatMessageList(flat,{
             mergeSystemMessages:true,

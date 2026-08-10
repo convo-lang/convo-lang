@@ -11,6 +11,8 @@
         "test-simple-shad":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../simple-shad",
         "test-public":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../convo-lang-public",
         "test-echo":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../echo",
+        "test-one-page":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../one-page",
+        "test-interviewer":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../interviewer",
         "test-self":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../..",
         "publish-ext":"./publish.sh",
         "publish-ext-open":"./publish-ovsx.sh"

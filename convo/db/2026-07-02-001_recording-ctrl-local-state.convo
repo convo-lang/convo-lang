@@ -1,0 +1,228 @@
+@import ../base.convo
+@import ../../packages/media/src/RecordingCtrl.ts !file
+
+> define
+__model=claudeModel
+
+> user
+Implement the save and delete functionality of the `saveLocalStateAsync` function and the functionality of the `getPendingRecordingTranscriptionsAsync` function.
+
+The state object should and recording should be stored as separate records using the uuid of the state object.
+
+state object key: `{state.uuid}.json`
+recording key: `{state.uuid}.blob`
+
+@time 2026-07-02T08:08:11-04:00
+@tokenUsage 9282 / 556
+@model open-router/anthropic/claude-4.8-opus-20260528
+> assistant
+A few questions before I implement this:
+
+1. **IndexedDB store setup** — Do you want me to create a simple wrapper that opens a single database (e.g. `convo-recording-transcriptions`) with one object store (e.g. `records`), keyed by the string key (`{uuid}.json` / `{uuid}.blob`)? Or is there an existing IndexedDB helper in `@iyio/common` or elsewhere in the mono-repo you'd prefer I use?
+
+2. **Deletion on complete/cancelled** — When state is `complete` or `cancelled`, should I delete *both* the `{uuid}.json` and `{uuid}.blob` records? And for `failed` states — should those be kept (so they can be retried/inspected later) or also deleted?
+
+3. **`getPendingRecordingTranscriptionsAsync` filtering** — You mention returning saved states that don't have a matching entry in `activeTranscriptions`. Should the match be by `uuid`? And should it only return states whose `state` is not `complete`/`cancelled` (i.e. actual pending ones), or literally everything stored that isn't currently active?
+
+4. **Recording blob retrieval** — `getPendingRecordingTranscriptionsAsync` returns `RecordingTranscriptionState[]`, which doesn't include the recording `File`/`Blob`. Do you want the pending recordings to also load their associated `.blob` record (and if so, where should it be attached — a new field on the state?), or is the JSON state alone sufficient for now?
+
+5. **Serialization of the recording** — The `.blob` record: store the raw `File`/`Blob` directly (IndexedDB supports Blob storage), correct?
+
+
+> user
+1. Create a simple wrapper
+2. Delete both records when completed or cancelled and keep records for all other states
+3. Yes match by uuid. Do not filter by state
+4. Return the state alone JSON and add a function called `getRecordingTranscriptionBlobAsync(uuid:string):Promise<Blob|undefined>` to return recording blobs
+5. Yes store as a blob
+
+@time 2026-07-02T08:14:00-04:00
+@tokenUsage 9967 / 2327
+@model open-router/anthropic/claude-4.8-opus-20260528
+> assistant
+Here's the implementation:
+
+<FILE_CONTENT name="RecordingCtrl.ts" target-output-path="../../packages/media/src/RecordingCtrl.ts" find-replace find-replace-separator="//// REPLACE ////">
+``` ts
+    private async saveLocalStateAsync(state:RecordingTranscriptionState,recording?:File){
+        if(!globalThis.indexedDB){
+            return;
+        }
+        if(state.state==='complete' || state.state==='cancelled'){
+            const db=await openTranscriptionDbAsync();
+            await Promise.all([
+                idbDeleteAsync(db,`${state.uuid}.json`),
+                idbDeleteAsync(db,`${state.uuid}.blob`),
+            ]);
+        }else{
+            const db=await openTranscriptionDbAsync();
+            await idbPutAsync(db,`${state.uuid}.json`,{...state});
+            if(recording){
+                await idbPutAsync(db,`${state.uuid}.blob`,recording);
+            }
+        }
+    }
+//// REPLACE ////
+    private async saveLocalStateAsync(state:RecordingTranscriptionState,recording?:File){
+        if(!globalThis.indexedDB){
+            return;
+        }
+        if(state.state==='complete' || state.state==='cancelled'){
+            const db=await openTranscriptionDbAsync();
+            await Promise.all([
+                idbDeleteAsync(db,`${state.uuid}.json`),
+                idbDeleteAsync(db,`${state.uuid}.blob`),
+            ]);
+        }else{
+            const db=await openTranscriptionDbAsync();
+            await idbPutAsync(db,`${state.uuid}.json`,{...state});
+            if(recording){
+                await idbPutAsync(db,`${state.uuid}.blob`,recording);
+            }
+        }
+    }
+```
+</FILE_CONTENT>
+
+Now the `getPendingRecordingTranscriptionsAsync` function and IndexedDB wrapper:
+
+<FILE_CONTENT name="RecordingCtrl.ts" target-output-path="../../packages/media/src/RecordingCtrl.ts" find-replace find-replace-separator="//// REPLACE ////">
+``` ts
+const activeTranscriptions:RecordingTranscriptionState[]=[];
+export const getPendingRecordingTranscriptionsAsync=async ():Promise<RecordingTranscriptionState[]>=>{
+    // todo - return all transcription states saved in IndexedDb that do not have a matching state in the activeTranscriptions array
+}
+//// REPLACE ////
+const activeTranscriptions:RecordingTranscriptionState[]=[];
+export const getPendingRecordingTranscriptionsAsync=async ():Promise<RecordingTranscriptionState[]>=>{
+    if(!globalThis.indexedDB){
+        return [];
+    }
+    const db=await openTranscriptionDbAsync();
+    const all=await idbGetAllAsync<RecordingTranscriptionState>(db,jsonKeyReg);
+    return all.filter(s=>!activeTranscriptions.some(a=>a.uuid===s.uuid));
+}
+
+export const getRecordingTranscriptionBlobAsync=async (uuid:string):Promise<Blob|undefined>=>{
+    if(!globalThis.indexedDB){
+        return undefined;
+    }
+    const db=await openTranscriptionDbAsync();
+    const blob=await idbGetAsync<Blob>(db,`${uuid}.blob`);
+    return blob??undefined;
+}
+
+const transcriptionDbName='convo-recording-transcriptions';
+const transcriptionStoreName='records';
+const jsonKeyReg=/\.json$/;
+
+let transcriptionDbPromise:Promise<IDBDatabase>|undefined;
+const openTranscriptionDbAsync=():Promise<IDBDatabase>=>{
+    return transcriptionDbPromise??(transcriptionDbPromise=new Promise<IDBDatabase>((resolve,reject)=>{
+        const req=globalThis.indexedDB.open(transcriptionDbName,1);
+        req.onupgradeneeded=()=>{
+            const db=req.result;
+            if(!db.objectStoreNames.contains(transcriptionStoreName)){
+                db.createObjectStore(transcriptionStoreName);
+            }
+        }
+        req.onsuccess=()=>resolve(req.result);
+        req.onerror=()=>reject(req.error);
+    }));
+}
+
+const idbPutAsync=(db:IDBDatabase,key:string,value:any):Promise<void>=>{
+    return new Promise<void>((resolve,reject)=>{
+        const tx=db.transaction(transcriptionStoreName,'readwrite');
+        tx.objectStore(transcriptionStoreName).put(value,key);
+        tx.oncomplete=()=>resolve();
+        tx.onerror=()=>reject(tx.error);
+    });
+}
+
+const idbDeleteAsync=(db:IDBDatabase,key:string):Promise<void>=>{
+    return new Promise<void>((resolve,reject)=>{
+        const tx=db.transaction(transcriptionStoreName,'readwrite');
+        tx.objectStore(transcriptionStoreName).delete(key);
+        tx.oncomplete=()=>resolve();
+        tx.onerror=()=>reject(tx.error);
+    });
+}
+
+const idbGetAsync=<T>(db:IDBDatabase,key:string):Promise<T|undefined>=>{
+    return new Promise<T|undefined>((resolve,reject)=>{
+        const tx=db.transaction(transcriptionStoreName,'readonly');
+        const req=tx.objectStore(transcriptionStoreName).get(key);
+        req.onsuccess=()=>resolve(req.result as T|undefined);
+        req.onerror=()=>reject(req.error);
+    });
+}
+
+const idbGetAllAsync=<T>(db:IDBDatabase,keyReg:RegExp):Promise<T[]>=>{
+    return new Promise<T[]>((resolve,reject)=>{
+        const tx=db.transaction(transcriptionStoreName,'readonly');
+        const store=tx.objectStore(transcriptionStoreName);
+        const results:T[]=[];
+        const cursorReq=store.openCursor();
+        cursorReq.onsuccess=()=>{
+            const cursor=cursorReq.result;
+            if(cursor){
+                if(typeof cursor.key==='string' && keyReg.test(cursor.key)){
+                    results.push(cursor.value as T);
+                }
+                cursor.continue();
+            }else{
+                resolve(results);
+            }
+        }
+        cursorReq.onerror=()=>reject(cursorReq.error);
+    });
+}
+```
+</FILE_CONTENT>
+
+
+> user
+No implement the `saveLocalStateAsync` function
+
+@time 2026-07-02T08:20:00-04:00
+@tokenUsage 13627 / 519
+@model open-router/anthropic/claude-4.8-opus-20260528
+> assistant
+The file already contains the implemented version of `saveLocalStateAsync` with the `// todo` comments. Here it is with the todos replaced:
+
+<FILE_CONTENT name="RecordingCtrl.ts" target-output-path="../../packages/media/src/RecordingCtrl.ts" find-replace find-replace-separator="//// REPLACE ////">
+``` ts
+    private async saveLocalStateAsync(state:RecordingTranscriptionState,recording?:File){
+        if(!globalThis.indexedDB){
+            return;
+        }
+        if(state.state==='complete' || state.state==='cancelled'){
+            // todo - delete from IndexedDB
+        }else{
+            // todo - save to IndexedDB
+        }
+    }
+//// REPLACE ////
+    private async saveLocalStateAsync(state:RecordingTranscriptionState,recording?:File){
+        if(!globalThis.indexedDB){
+            return;
+        }
+        const db=await openTranscriptionDbAsync();
+        if(state.state==='complete' || state.state==='cancelled'){
+            await Promise.all([
+                idbDeleteAsync(db,`${state.uuid}.json`),
+                idbDeleteAsync(db,`${state.uuid}.blob`),
+            ]);
+        }else{
+            await idbPutAsync(db,`${state.uuid}.json`,{...state});
+            if(recording){
+                await idbPutAsync(db,`${state.uuid}.blob`,recording);
+            }
+        }
+    }
+```
+</FILE_CONTENT>
+
+
+> user
