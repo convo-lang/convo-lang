@@ -3432,9 +3432,9 @@ export class Conversation
                 if(result){
                     if(Array.isArray(result)){
 
-                        if(tag){
+                        if(tag){// If tagged source convo should be treated as string content
                             for(const r of result){
-                                if(r.convo){
+                                if(r.convo && r.sourceContent===undefined){
                                     r.content=r.content?escapeConvo(r.convo)+'\n\n'+r.content:escapeConvo(r.convo);
                                     delete r.convo;
                                 }
@@ -3463,7 +3463,7 @@ export class Conversation
                                 }
                                 if(importBase.tag){
                                     content=applyConvoImportTag(
-                                        r.content??'',
+                                        r.sourceContent??r.content??'',
                                         importBase,
                                         r.relativeName,
                                         r.filePath?status?.find(s=>s?.filePath===r.filePath)?.status:undefined
@@ -3477,7 +3477,7 @@ export class Conversation
                             imports.push(...result);
                         }
                     }else{
-                        if(tag && result.convo){
+                        if(tag && result.convo && result.sourceContent===undefined){
                             result.content=result.content?escapeConvo(result.convo)+'\n\n'+result.content:escapeConvo(result.convo);
                             delete result.convo;
                         }
@@ -3562,7 +3562,7 @@ export class Conversation
             }
         }
 
-        const contentSrc=module.content??'';
+        const contentSrc=module.sourceContent??module.content??'';
         let content=escapeConvo(contentSrc);
         const hasRanges=importStatement.modifiers.some(m=>m.startsWith('range:'));
         if(hasRanges){

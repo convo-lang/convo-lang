@@ -2141,6 +2141,11 @@ export interface ConvoModule
     content?:string;
 
     /**
+     * The source content of the module before being parsed
+     */
+    sourceContent?:string;
+
+    /**
      * A type or set of types that will be converted to a convo type and imported
      */
     type?:ConvoTypeDef|ConvoTypeDef[];

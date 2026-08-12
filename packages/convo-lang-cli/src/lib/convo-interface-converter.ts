@@ -85,9 +85,12 @@ interface ProjectCtx{
     log:(...msgs:any[])=>void;
     reloadPaths:string[];
     includeGitIgnored?:boolean;
+    targetSourceFiles?:string[];
+    noOut?:boolean;
+    allExports?:boolean;
 }
 
-export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:CancelToken)=>{
+export const convertConvoInterfacesAsync=async (options:ConvoCliOptions&Partial<ProjectCtx>,cancel:CancelToken)=>{
     const {
         syncTsConfig,
         syncWatch,
@@ -107,6 +110,7 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
 
     const outFullPath=await realpath(syncOut);
     const projects=await Promise.all(syncTsConfig.map<Promise<ProjectCtx>>(async p=>({
+        ...options,
         path:p,
         fullPath:await realpath(getDirectoryName(p),{encoding:'utf-8'}),
         project:new Project({
@@ -136,6 +140,8 @@ export const convertConvoInterfacesAsync=async (options:ConvoCliOptions,cancel:C
     if(syncWatch){
         await Promise.all(projects.map(p=>watchProjectAsync(p)))
     }
+
+    return projects;
 }
 
 const modSortKey=(mod:Mod)=>`${mod.uri??''}::${mod.name}`;
@@ -188,9 +194,10 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
     }
 
     try{
-        for(const file of project.project.getSourceFiles()){
+        const files=project.targetSourceFiles?project.targetSourceFiles.map(f=>project.project.getSourceFileOrThrow(f)):project.project.getSourceFiles()
+        for(const file of files){
             const path=file.getFilePath();
-            if(path.startsWith(project.fullPath) && path!==project.outFullPath && !path.startsWith(project.outFullPath)){
+            if((path.startsWith(project.fullPath) && path!==project.outFullPath && !path.startsWith(project.outFullPath)) || project.targetSourceFiles){
                 await scanFileAsync(file,project);
             }
         }
@@ -214,20 +221,22 @@ const scanProjectAsync=async (project:ProjectCtx,catchErrors:boolean)=>{
         }
         if(convoHash!==project.convoHash){
             project.convoHash=convoHash;
-            const prefix='@/';
-            const info=(
-                `export const convoPackagePaths=${JSON.stringify(project.mods.map(m=>prefix+m.name),null,4)} as const;${
-                '\n'}export type ConvoPackagePath=(typeof convoPackagePaths[number])|(string & {});`
-            )
-            const infoPath=joinPaths(project.out,'convoPackage.ts');
-            const tsPath=joinPaths(project.out,'convoPackageModules.ts');
-            const tsxPath=joinPaths(project.out,'convoPackageComponentModules.tsx');
-            await Promise.all([
-                writeFile(infoPath,info),
-                writeFile(tsPath,modsToString(project.mods.filter(m=>!m.components),'convoPackageModules','@/')),
-                writeFile(tsxPath,modsToString(project.mods.filter(m=>m.components),'convoPackageComponentModules','@/')),
-            ]);
-            project.log(`convo> sync complete - ${project.path}`);
+            if(!project.noOut){
+                const prefix='@/';
+                const info=(
+                    `export const convoPackagePaths=${JSON.stringify(project.mods.map(m=>prefix+m.name),null,4)} as const;${
+                    '\n'}export type ConvoPackagePath=(typeof convoPackagePaths[number])|(string & {});`
+                )
+                const infoPath=joinPaths(project.out,'convoPackage.ts');
+                const tsPath=joinPaths(project.out,'convoPackageModules.ts');
+                const tsxPath=joinPaths(project.out,'convoPackageComponentModules.tsx');
+                await Promise.all([
+                    writeFile(infoPath,info),
+                    writeFile(tsPath,modsToString(project.mods.filter(m=>!m.components),'convoPackageModules','@/')),
+                    writeFile(tsxPath,modsToString(project.mods.filter(m=>m.components),'convoPackageComponentModules','@/')),
+                ]);
+                project.log(`convo> sync complete - ${project.path}`);
+            }
         }
 
 
@@ -445,6 +454,7 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
     const exportMap=file.getExportedDeclarations();
     Array.from(exportMap.values()).forEach((c)=>{c.forEach((c)=>{
         const tags=parseTags(c.getSymbol()?.getJsDocTags());
+        const at=project.allExports?c.getType():undefined;
         if(convoJsDocTags.convoComponent in tags){
             const fn=file.getFunction(c.getSymbol()?.getName()??'');
             if(fn){
@@ -469,8 +479,8 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
                 })
             }
         }
-        if(convoJsDocTags.convoType in tags){
-            const type=c.getType();
+        if((convoJsDocTags.convoType in tags) || (project.allExports && at?.isInterface())){
+            const type=at??c.getType();
             const typeScheme=convertType(type,file,project,false,true);
             const name=type.getSymbol()?.getName();
             if(name && typeScheme){
@@ -478,8 +488,8 @@ const scanFileAsync=async (file:SourceFile,project:ProjectCtx)=>{
             }
 
         }
-        if(convoJsDocTags.convoFn in tags){
-            convertFunction(c.getType(),file,project,tags);
+        if((convoJsDocTags.convoFn in tags) || at?.getCallSignatures()){
+            convertFunction(at??c.getType(),file,project,tags);
         }
     })});
 
@@ -640,11 +650,11 @@ const convertTypeToStrings=(type:Type,locationNode:Node,project:ProjectCtx,noWra
     const convoI=project.convoOut.length;
     const zodI=project.zodOut.length;
 
-    _convertType(type,locationNode,project,true,0,0,false)
+    _convertType(type,locationNode,project,false,0,0,false)
 
-    const ts=project.tsOut.splice(tsI,project.tsOut.length-tsI).join();
-    const convo=project.convoOut.splice(convoI,project.convoOut.length-convoI).join();
-    const zod=project.zodOut.splice(zodI,project.zodOut.length-zodI).join();
+    const ts=project.tsOut.splice(tsI,project.tsOut.length-tsI).join('');
+    const convo=project.convoOut.splice(convoI,project.convoOut.length-convoI).join('');
+    const zod=project.zodOut.splice(zodI,project.zodOut.length-zodI).join('');
 
     return {ts,convo,zod}
 }
@@ -937,7 +947,8 @@ const getDescription=(sym:Symbol|undefined|null,ignoreTags?:string[]):string|und
             descriptionLines[i]=match[2]??''
         }
     }
-    return descriptionLines.join('\n').trim()||undefined;
+    const desc=descriptionLines.join('\n').trim()||undefined;
+    return desc?.endsWith('*/')?desc.substring(0,desc.length-2).trimEnd():desc;
 }
 
 const writeTsConvoDescription=(
