@@ -49,6 +49,10 @@ export interface ConvoHonoRoutesOptions
     disableDbAuth?:boolean;
 
     requireSignIn?:boolean;
+
+    dbParamPrefix?:string;
+
+    dbParamPrefixSep?:string;
 }
 
 export const getConvoHonoRoutes=({
@@ -62,6 +66,8 @@ export const getConvoHonoRoutes=({
     getUsage,
     disableDbAuth=false,
     requireSignIn,
+    dbParamPrefix,
+    dbParamPrefixSep='-'
 }:ConvoHonoRoutesOptions={})=>{
     const convoModelServiceMap:Record<string,ConvoCompletionServiceAndModel[]>={};
 
@@ -466,7 +472,7 @@ export const getConvoHonoRoutes=({
     });
 
     const getDbAsync=async (c:Context):Promise<ConvoDb|undefined>=>{
-        const name=c.req.param('dbName');
+        const name=(dbParamPrefix?c.req.param(dbParamPrefix)+dbParamPrefixSep:'')+c.req.param('dbName');
         if(!name){
             return undefined;
         }

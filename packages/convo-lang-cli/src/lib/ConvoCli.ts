@@ -13,7 +13,6 @@ import { defaultConvoCliConfigFile } from './convo-cli-lib.js';
 import { convoCliModule } from './convo-cli-module.js';
 import { ConvoCliConfig, ConvoCliOptions, ConvoExecAllowMode, ConvoExecConfirmCallback } from "./convo-cli-types.js";
 import { createConvoExec } from './convo-exec.js';
-import { ConvoTsToolImportService } from './ConvoTsToolImportService.js';
 
 let configPromise:Promise<ConvoCliConfig>|null=null;
 export const getConvoCliConfigAsync=(options:ConvoCliOptions):Promise<ConvoCliConfig>=>
@@ -217,9 +216,7 @@ export class ConvoCli
     public constructor(options:ConvoCliOptions){
         this.allowExec=options.allowExec;
         this.options=options;
-        this.convo=createConversationFromScope(rootScope,{importServices:[
-            new ConvoTsToolImportService(),
-        ]});
+        this.convo=createConversationFromScope(rootScope);
         if(options.cmdMode){
             this.convo.dynamicFunctionCallback=this.dynamicFunctionCallback;
             startReadingStdIn();

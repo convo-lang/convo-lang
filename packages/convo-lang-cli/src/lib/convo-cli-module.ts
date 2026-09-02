@@ -6,6 +6,7 @@ import { nodeCommonModule } from "@iyio/node-common";
 import { VfsCtrl, vfs } from '@iyio/vfs';
 import { ConvoCliConfig, ConvoCliOptions } from "./convo-cli-types.js";
 import { ConvoCliGitService } from './ConvoCliGitService.js';
+import { ConvoTsToolImportService } from './ConvoTsToolImportService.js';
 
 export const convoCliModule=(
     scope:ScopeRegistration,
@@ -52,6 +53,7 @@ export const convoCliModule=(
 
     scope.implementService(convoImportService,()=>new ConvoVfsImportService());
     scope.implementService(convoImportService,()=>new ConvoHttpImportService());
+    scope.implementService(convoImportService,()=>new ConvoTsToolImportService());
 
     scope.implementService(vfs,()=>vfsCtrl);
     if(projectConfig){

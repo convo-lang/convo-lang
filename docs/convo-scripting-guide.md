@@ -573,14 +573,14 @@ List the four largest planets.
 You can also use anonymous JSON types:
 
 ``` convo
-@json = struct(
-    title:string
-    summary:string
-)
+@json = struct( title:string summary:string)
 > user
 Summarize Convo-Lang in one paragraph.
 <__send/>
 ```
+
+anonymous JSON must be defined on a single line and are only recommended for very simple types with
+self explanatory property name since comments can't be used.
 
 ## RAG
 

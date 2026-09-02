@@ -12,6 +12,10 @@
             "types": "./src/index.d.ts",
             "import": "./src/index.js"
         },
+        "./*.js": {
+            "types": "./src/*.d.ts",
+            "import": "./src/*.js"
+        },
         "./*": {
             "types": "./src/*.d.ts",
             "import": "./src/*.js"

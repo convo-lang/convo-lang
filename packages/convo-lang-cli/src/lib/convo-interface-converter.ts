@@ -90,7 +90,7 @@ interface ProjectCtx{
     allExports?:boolean;
 }
 
-export const convertConvoInterfacesAsync=async (options:ConvoCliOptions&Partial<ProjectCtx>,cancel:CancelToken)=>{
+export const convertConvoInterfacesAsync=async (options:ConvoCliOptions&Partial<Omit<ProjectCtx,'out'>>,cancel:CancelToken)=>{
     const {
         syncTsConfig,
         syncWatch,
