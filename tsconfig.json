@@ -68,6 +68,9 @@
             "path": "./packages/media"
         },
         {
+            "path": "./packages/script-tag"
+        },
+        {
             "path": "./packages/studio"
         },
         {

@@ -77,6 +77,13 @@ export interface ConvoUiMessageAppendEvt
     message:string;
 }
 
+export interface ConvoBeforeUiMessageAppendEvt
+{
+    raw?:string;
+    message?:string;
+    replaceWithConvo?:string|Promise<string>;
+}
+
 export interface ConvoUiAppendTrigger
 {
     /**

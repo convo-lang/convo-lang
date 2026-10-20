@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Conversation, ConversationOptions } from "./Conversation.js";
 import { ConvoComponentRenderer } from "./convo-component-types.js";
 import { getConvoPromptMediaUrl } from "./convo-lang-ui-lib.js";
-import { ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
+import { ConvoBeforeUiMessageAppendEvt, ConvoDataStore, ConvoEditorMode, ConvoMessageRenderResult, ConvoMessageRenderer, ConvoPromptMedia, ConvoUiMessageAppendEvt } from "./convo-lang-ui-types.js";
 import { convoRoles, convoTags, convoVars, removeDanglingConvoUserMessage } from "./convo-lib.js";
 import { BeforeCreateConversationExeCtx, ConvoAppend, ConvoCompletionChunk, ConvoCompletionOptions, ConvoEmbeddingsService, ConvoMessage, ConvoStartOfConversationCallback, ConvoTranscriptionService, ConvoTtsService, FlatConvoConversation, FlatConvoMessage } from "./convo-types.js";
 import { ConvoViewTheme } from "./convo-view-theme.js";
@@ -259,6 +259,9 @@ export class ConversationUiCtrl
 
     private readonly _onAppendUiMessage=new Subject<ConvoUiMessageAppendEvt>();
     public get onAppendUiMessage():Observable<ConvoUiMessageAppendEvt>{return this._onAppendUiMessage}
+
+    private readonly _beforeAppendUiMessage=new Subject<ConvoBeforeUiMessageAppendEvt>();
+    public get beforeAppendUiMessage():Observable<ConvoBeforeUiMessageAppendEvt>{return this._beforeAppendUiMessage}
 
     private readonly _expandOnUiMessage:BehaviorSubject<boolean>=new BehaviorSubject<boolean>(false);
     public get expandOnUiMessageSubject():ReadonlySubject<boolean>{return this._expandOnUiMessage}
@@ -859,8 +862,19 @@ export class ConversationUiCtrl
             this._mediaQueue.next([]);
         }
 
-        if(message.trim()){
+        if(this._beforeAppendUiMessage.observed){
+            const evt:ConvoBeforeUiMessageAppendEvt={
+                message,
+                raw
+            }
+            this._beforeAppendUiMessage.next(evt);
+            if(evt.replaceWithConvo){
+                message='';
+                raw=await evt.replaceWithConvo;
+            }
+        }
 
+        if(message.trim()){
             convo.appendUserMessage(message);
             this.triggerAppendUiMessageEvt(message);
         }

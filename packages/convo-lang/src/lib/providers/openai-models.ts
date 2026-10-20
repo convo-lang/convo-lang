@@ -9,7 +9,18 @@ let _embedding:ConvoModelInfo;
 
 const m=(num:number)=>num/1000000;
 
-export const openAiModels:ConvoModelInfo[]=[
+const openAiModelsBase:ConvoModelInfo[]=[
+    {
+        name:'gpt-6-astra',
+        matchNameStart:true,
+        supportsFunctionCalling:true,
+        supportsChat:true,
+        contextWindowSize:1050000,
+        inputCapabilities:['text','image'],
+        outputCapabilities:['text'],
+        inputTokenPriceUsd:m(10),
+        outputTokenPriceUsd:m(50),
+    },
     {
         name:'gpt-5.6-sol',
         matchNameStart:true,
@@ -1263,6 +1274,11 @@ export const openAiModels:ConvoModelInfo[]=[
         outputCapabilities:['text'],
     },
 ];
+
+export const openAiModels=[
+    ...openAiModelsBase,
+    ...openAiModelsBase.map(m=>({...m,name:'openai.'+m.name}))
+]
 
 Object.freeze(openAiModels);
 export const defaultOpenAiChatModel=_chat;

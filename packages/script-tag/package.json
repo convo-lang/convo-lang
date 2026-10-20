@@ -1,0 +1,16 @@
+{
+    "name": "@convo-lang/script-tag",
+    "version": "0.0.0",
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "import": "./src/index.js"
+        },
+        "./*": {
+            "types": "./src/*.d.ts",
+            "import": "./src/*.js"
+        }
+    }
+}

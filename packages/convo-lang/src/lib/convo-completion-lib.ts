@@ -109,6 +109,8 @@ export const getConvoCompletionServiceAsync=async (
     return undefined;
 }
 
+const modelMatchReg=/(.+)\[\[(=)([^\]]+)\]\]/
+
 export const getConvoCompletionServicesForModelAsync=async (
     model:string,
     services:ConvoCompletionService<any,any>[],
@@ -120,6 +122,15 @@ export const getConvoCompletionServicesForModelAsync=async (
         return cached;
     }
 
+    let modelName=model;
+    let matchName=model;
+
+    const match=modelMatchReg.exec(model);
+    if(match){
+        modelName=match[1]??'';
+        matchName=match[3]??'';
+    }
+
     const matches:{priority:number,service:ConvoCompletionServiceAndModel}[]=[];
     for(const s of services){
         const models=await getConvoCompletionServiceModelsAsync(s);
@@ -128,14 +139,20 @@ export const getConvoCompletionServicesForModelAsync=async (
             continue;
         }
         let hasMatch=false;
-        for(const m of models){
-            if(m.name===model){
+        for(let m of models){
+            if(m.name===matchName){
+                if(match){
+                    m={...m,name:modelName};
+                }
                 matches.push({priority:m.priority??0,service:{service:s,model:m}});
                 hasMatch=true;
             }
             if(m.aliases){
                 for(const a of m.aliases){
-                    if(isConvoModelAliasMatch(model,a)){
+                    if(isConvoModelAliasMatch(matchName,a)){
+                        if(match){
+                            m={...m,name:modelName};
+                        }
                         matches.push({priority:a.priority??0,service:{service:s,model:m}});
                         hasMatch=true;
                     }

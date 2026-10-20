@@ -1,0 +1,1 @@
+bunx esbuild ./src/convo-lang-standalone-sdk.ts --bundle --minify --target=chrome100,safari15,firefox100 --outfile=./dist/bundle.js

@@ -76,6 +76,9 @@
             "@convo-lang/convo-lang-react": [
                 "./packages/convo-lang-react/src/index.ts"
             ],
+            "@convo-lang/convo-lang-react/*": [
+                "./packages/convo-lang-react/src/lib/*"
+            ],
             "@convo-lang/db": [
                 "./packages/db/src/index.ts"
             ],
@@ -111,6 +114,9 @@
             ],
             "@convo-lang/media/*": [
                 "packages/media/src/*"
+            ],
+            "@convo-lang/script-tag": [
+                "packages/script-tag/src/index.ts"
             ],
             "@convo-lang/studio/*": [
                 "./packages/studio/src/*"
