@@ -1,6 +1,6 @@
 {
     "name": "@convo-lang/media",
-    "version": "0.0.0",
+    "version": "0.9.12",
     "type": "module",
     "sideEffects": false,
     "exports": {
