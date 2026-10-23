@@ -1713,6 +1713,16 @@ export interface FlatConvoConversationBase
      * If defined the debug function should be written to with debug info.
      */
     debug?:(...args:any[])=>void;
+
+    /**
+     * If true network requests should be logged
+     */
+    logNetworkRequests?:boolean;
+
+    /**
+     * If true an empty result should be returned from the provider
+     */
+    returnEmpty?:boolean;
 }
 
 export const allConvoReasoningEffort=['min','minimal','low','md','medium','high'] as const;

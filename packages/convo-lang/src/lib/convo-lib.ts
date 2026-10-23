@@ -3840,3 +3840,29 @@ export const convoTranscriptionRequestToSupportRequest=(request:ConvoTranscripti
         speakerRefsCount:request.speakerRefs?.length,
     }
 }
+
+
+export const logConvoMessages=(messages:ConvoMessage[],maxContentLength=500)=>{
+    for(const msg of messages){
+        console.log(convoMessageToStringSafe(msg)?.substring(0,maxContentLength)??`> ${msg.role}\n[[Unable to get message content]]`);
+    }
+}
+export const logFlatConvoMessages=(messages:(FlatConvoMessage|ConvoMessage|null|undefined)[],maxContentLength=500)=>{
+    for(const msg of messages){
+        if(!msg){
+            console.log(msg===null?'null':'undefined')
+            continue;
+        }
+        let tags='';
+        if(msg.tags){
+            if(Array.isArray(msg.tags)){
+                tags=msg.tags.map(t=>`@${t.name} ${t.value??''}`).join('\n');
+            }else{
+                for(const e in msg.tags){
+                    tags+=`${tags?'\n':''}@${e} ${msg.tags[e]??''}`
+                }
+            }
+        }
+        console.log(`${tags?tags+'\n':''}> ${msg.role}\n${msg.content?.substring(0,maxContentLength)??'[[No message content]]'}`);
+    }
+}

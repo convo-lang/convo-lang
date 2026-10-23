@@ -1,4 +1,5 @@
 import { NotFoundError, SecretManager, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
+import { logFlatConvoMessages } from "./convo-lib.js";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
 import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionResultProviderBase, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
 import { ChatCompletion, ChatCompletionChunk, ChatCompletionMessageToolCall } from './open-ai/resources/chat/index.js';
@@ -164,8 +165,21 @@ export class BaseOpenAiConvoCompletionService implements
 
         let completion:ChatCompletion|undefined;
 
+        if(flat.logNetworkRequests){
+            console.log('## Flat Messages before network');
+            logFlatConvoMessages(flat.messages);
+        }
+
         if(this.completeAsync){
             completion=await this.completeAsync(input,flat,client.apiKey,client.url);
+        }else if(flat.returnEmpty){
+            completion={
+                id:uuid(),
+                choices: [],
+                created: Date.now(),
+                model: 'empty',
+                object: 'chat.completion',
+            }
         }else{
 
             if(!input.stream){
@@ -175,7 +189,7 @@ export class BaseOpenAiConvoCompletionService implements
                     {
                         headers,
                         readErrors:true,
-                        log:this.logRequests,
+                        log:this.logRequests||flat.logNetworkRequests,
                     }
                 );
             }else{
@@ -203,7 +217,7 @@ export class BaseOpenAiConvoCompletionService implements
                     endDataFlag:'[DONE]',
                     logStreamErrors:true,
                     readErrors:true,
-                    log:this.logRequests,
+                    log:this.logRequests||flat.logNetworkRequests,
                 })){
                     if(!evt.data){
                         continue;
