@@ -5,7 +5,7 @@ import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey } from './
 
 export const defaultConvoFindReplaceSeparator='//// replace-with ////';
 
-const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```[ \t\r\n]*<\/\k<tagName>>/g;
+const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```+[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```+[ \t\r\n]*<\/\k<tagName>>/g;
 const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
 
 export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
