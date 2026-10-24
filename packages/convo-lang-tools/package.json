@@ -600,6 +600,12 @@
                     "default": "",
                     "description": "OpenRouter API key for authentication",
                     "order": 8
+                },
+                "convo.notifyOnCompletion": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display a notification when a completion finishes for a document that is not in the active editor",
+                    "order": 9
                 }
             }
         },

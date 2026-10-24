@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt';
-import { executeShellOutputTagAsync, getFileBlockArgs, getOutputTags, HasArgs, outputPreviewContent, OutputTagCodeLensArgs, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
+import { executeShellOutputTagAsync, getFileBlockArgs, getOutputTagFromArgsAsync, getOutputTags, HasArgs, outputPreviewChangeEmitter, outputPreviewContent, OutputTagCodeLensArgs, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
 
 
 export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
+    context.subscriptions.push(outputPreviewChangeEmitter);
+
     context.subscriptions.push(workspace.registerTextDocumentContentProvider('convo-output',{
+        onDidChange:outputPreviewChangeEmitter.event,
         provideTextDocumentContent(uri:Uri):string{
             return outputPreviewContent.get(uri.toString()) ?? '';
         },
@@ -27,7 +30,12 @@ export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
         if(!args){
             return;
         }
-        await showOutputDiffAsync(args);
+        const tag=await getOutputTagFromArgsAsync(args);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+        await showOutputDiffAsync(tag);
     }));
 
     context.subscriptions.push(commands.registerCommand('convo.output-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
@@ -106,4 +114,3 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
         return lenses;
     }
 }
-

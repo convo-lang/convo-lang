@@ -8,6 +8,7 @@ import { realpath } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { extensionPublisher } from './build-const.js';
+import { notifyCompletionAsync } from './completion-notification.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
@@ -609,8 +610,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                         new Range(document.positionAt(0),document.positionAt(document.getText().length));
 
                     if(isFinal){
-                        await applyFinalEditAsync(document,code,getRange());
-                        return;
+                        return await applyFinalEditAsync(document,code,getRange());
                     }
 
                     try{
@@ -674,7 +674,10 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                     return;
                 }
                 const lastMsg=cli.convo.messages[cli.convo.messages.length-1];
-                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+                const applied=await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+                if(applied){
+                    void notifyCompletionAsync(document);
+                }
 
                 if(nextCommand){
                     commands.executeCommand(nextCommand);
@@ -882,7 +885,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
         if(showingConfigChange){
             return;
         }
-        if(e.affectsConfiguration('convo')){
+        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion')){
             clearTimeout(configChangeIv);
             configChangeIv=setTimeout(()=>{
                 showingConfigChange=true;
@@ -909,9 +912,10 @@ const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
 /**
  * Applies the final completion edit in the background without focusing the document. The
  * document is saved after the edit and visible editors of the document are scrolled to the end.
- * If the edit fails the response is opened in a new untitled convo document.
+ * If the edit fails the response is opened in a new untitled convo document. Returns true if the
+ * edit was applied to the document.
  */
-const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<void>=>{
+const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<boolean>=>{
     const edit=new WorkspaceEdit();
     edit.replace(document.uri,range,code);
 
@@ -932,7 +936,7 @@ const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):
             preserveFocus:true,
             viewColumn:ViewColumn.Beside,
         });
-        return;
+        return false;
     }
 
     const doc=await workspace.openTextDocument(document.uri);
@@ -941,6 +945,7 @@ const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):
     }
 
     await revealDocumentInVisibleEditorsAsync(doc);
+    return true;
 }
 
 /**

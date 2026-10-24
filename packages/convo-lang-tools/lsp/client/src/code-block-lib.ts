@@ -6,8 +6,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Readable } from 'stream';
 import * as vscode from 'vscode';
-import { commands, ExtensionContext, Range, Uri, window, workspace } from "vscode";
-import { revealDocumentEndAsync } from './util';
+import { commands, ExtensionContext, Range, Uri, window, workspace, WorkspaceEdit } from "vscode";
+import { revealDocumentInVisibleEditorsAsync } from './util';
 
 export interface OutputTagBase
 {
@@ -182,19 +182,41 @@ export const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:
     return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath && t.index===index);
 }
 
-export const getActiveOutputTag=(targetPath:string,index:number):OutputTagInfo|undefined=>{
-    const editor=window.activeTextEditor;
-    if(!editor){
+/**
+ * Returns the most up to date output tag for the given args using the document the tag is
+ * defined in. Falls back to the active editor if the args do not define a document URI.
+ */
+export const getOutputTagFromArgsAsync=async (args:OutputTagBase):Promise<OutputTagInfo|undefined>=>{
+    try{
+        const document=args.documentUri?
+            await workspace.openTextDocument(args.documentUri)
+        :
+            window.activeTextEditor?.document;
+        return document?getOutputTagForTargetPath(document,args.targetPath,args.index):undefined;
+    }catch(ex){
+        console.error('Failed to open document for output tag',ex);
         return undefined;
     }
+}
 
-    return getOutputTagForTargetPath(editor.document,targetPath,index);
+/**
+ * Returns the open text document for the given file path if one exists
+ */
+const getOpenFileDocument=(filePath:string):vscode.TextDocument|undefined=>{
+    const normalized=path.normalize(filePath);
+    return workspace.textDocuments.find(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===normalized);
 }
 
 const createOutputPreviewUri=(targetPath:string):Uri=>{
     return Uri.parse(`convo-output:${encodeURIComponent(targetPath)}`);
 }
 export const outputPreviewContent=new Map<string,string>();
+
+/**
+ * Fires when the content of an output preview document changes
+ */
+export const outputPreviewChangeEmitter=new vscode.EventEmitter<Uri>();
+
 export const showOutputDiffAsync=async (
     tag:OutputTagBase,
 ):Promise<boolean>=>{
@@ -205,6 +227,7 @@ export const showOutputDiffAsync=async (
     }
     const previewUri=createOutputPreviewUri(targetPath);
     outputPreviewContent.set(previewUri.toString(),content);
+    outputPreviewChangeEmitter.fire(previewUri);
 
     let targetExists=true;
     try{
@@ -230,16 +253,22 @@ export const showOutputDiffAsync=async (
 
 const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
     const targetPath=tag.targetPath;
-    await fs.mkdir(path.dirname(targetPath),{recursive:true});
     const outputContent=await getCodeBlockOutputAsync(tag);
     if(outputContent===undefined){
         return;
     }
-    await fs.writeFile(targetPath,outputContent,'utf8');
 
-    const openEditors=workspace.textDocuments.filter(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===path.normalize(targetPath));
-    for(const doc of openEditors){
-        await doc.save();
+    const openDoc=getOpenFileDocument(targetPath);
+    if(openDoc){
+        const edit=new WorkspaceEdit();
+        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),outputContent);
+        if(!await workspace.applyEdit(edit) || !await openDoc.save()){
+            void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+            return;
+        }
+    }else{
+        await fs.mkdir(path.dirname(targetPath),{recursive:true});
+        await fs.writeFile(targetPath,outputContent,'utf8');
     }
 
     void window.showInformationMessage(`Wrote output to ${targetPath}`);
@@ -260,7 +289,8 @@ export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|un
         }
         const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
         outputs.sort((a,b)=>a.index-b.index);
-        let content=await readFileAsStringAsync(targetPath);
+        const openTarget=getOpenFileDocument(targetPath);
+        let content=openTarget?openTarget.getText():await readFileAsStringAsync(targetPath);
         let notFound:string[]=[];
         for(const r of outputs){
             const replacement=replaceConvoBlockContent(content,r.codeBlock);
@@ -290,7 +320,7 @@ export const writeOutputTagAsync=async (args:OutputTagCodeLensArgs|HasArgs)=>{
         return;
     }
 
-    const tag=getActiveOutputTag(targetPath,args.index);
+    const tag=await getOutputTagFromArgsAsync(args);
     if(!tag){
         void window.showErrorMessage('Unable to find output tag content for the selected target.');
         return;
@@ -330,6 +360,16 @@ export const setClipboardUsingOutputTagAsync=async (tag:OutputTagBase)=>{
     void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
 }
 
+/**
+ * Appends text to the end of the given document without requiring the document to be focused
+ */
+const appendToDocumentAsync=async (document:vscode.TextDocument,text:string):Promise<void>=>{
+    const edit=new WorkspaceEdit();
+    edit.insert(document.uri,document.positionAt(document.getText().length),text);
+    if(await workspace.applyEdit(edit)){
+        await revealDocumentInVisibleEditorsAsync(document);
+    }
+}
 
 export const executeShellOutputTagAsync=async (
     context:ExtensionContext,
@@ -342,7 +382,7 @@ export const executeShellOutputTagAsync=async (
     }
 
 
-    const tag=getActiveOutputTag(targetPath,args.index);
+    const tag=await getOutputTagFromArgsAsync(args);
     if(!tag){
         void window.showErrorMessage('Unable to find output tag content for the selected target.');
         return;
@@ -355,21 +395,12 @@ export const executeShellOutputTagAsync=async (
         }
     }
 
-    const editor=window.activeTextEditor;
-    if(!editor){
-        return;
-    }
-
-    const document=editor.document;
+    const document=await workspace.openTextDocument(tag.documentUri);
     const scriptName=escapeXmlAttr(targetPath);
     const header=createScriptOutputHeader(document.getText(),scriptName);
     const footer='\n```\n</SCRIPT_OUTPUT>\n';
 
-    await editor.edit(builder=>{
-        builder.insert(document.positionAt(document.getText().length),header);
-    });
-
-    await revealDocumentEndAsync(editor);
+    await appendToDocumentAsync(document,header);
 
     const processCwd=args.cwd || process.cwd();
     let command:string;
@@ -426,30 +457,20 @@ export const executeShellOutputTagAsync=async (
     let prevEnd:string='';
     const appendAsync=(value:string,end:boolean)=>{
         return appendQueue=appendQueue.then(async ()=>{
-            const activeEditor=window.activeTextEditor;
-            if(!activeEditor || activeEditor.document.uri.toString()!==document.uri.toString()){
-                return;
-            }
             let v=prevEnd+value;
             if(end){
                 prevEnd='';
             }else{
                 const ei=v.lastIndexOf('\n');
                 if(ei===-1){
-                    prevEnd+=v;
+                    prevEnd=v;
                     return;
                 }
                 prevEnd=v.substring(ei+1);
                 v=v.substring(0,ei+1);
             }
             if(v){
-                await activeEditor.edit(builder=>{
-                    builder.insert(
-                        activeEditor.document.positionAt(activeEditor.document.getText().length),
-                        escapeConvo(v),
-                    );
-                });
-                await revealDocumentEndAsync(activeEditor);
+                await appendToDocumentAsync(document,escapeConvo(v));
             }
         });
     };
@@ -497,17 +518,9 @@ export const executeShellOutputTagAsync=async (
                 }
                 appendAsync(endNote,true).then(async ()=>{
                     await appendQueue;
-                    const activeEditor=window.activeTextEditor;
-                    if(activeEditor && activeEditor.document.uri.toString()===document.uri.toString()){
-                        await activeEditor.edit(builder=>{
-                            builder.insert(
-                                activeEditor.document.positionAt(activeEditor.document.getText().length),
-                                footer,
-                            );
-                        });
-                        await revealDocumentEndAsync(activeEditor);
-                    }
+                    await appendToDocumentAsync(document,footer);
                     if(args.complete && !killed){
+                        await window.showTextDocument(document,{preview:false});
                         await vscode.commands.executeCommand('convo.complete');
                     }
                     resolve();

@@ -1,0 +1,211 @@
+@import ./_extension.convo
+
+> user
+When a completion finishes for a document and the document does not have focus display an notification
+when an open button to open the the document scrolled to the last completion
+
+@time 2026-10-24T09:25:58-04:00
+@tokenUsage 101768 / 999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before making changes:
+
+1. What should count as the document "not having focus"?
+   - a) The document is not in the active text editor
+   - b) The VS Code window itself is not focused
+   - c) Either a or b
+   - d) The document is not visible in any editor (an unfocused but visible editor counts as focused)
+
+2. Where should "scrolled to the last completion" place the cursor?
+   - a) At the start of the newly appended response, such as the first `> assistant` line added by the completion
+   - b) At the end of the document, which is the current behavior of `revealDocumentEndAsync`
+
+3. Which completions should trigger the notification?
+   - a) All flows that use `completeAsync`: `convo.complete`, `convo.complete-graph`, `convo.split-complete`, and "Run Script and Complete"
+   - b) Only `convo.complete`
+   - c) Option a plus failed completions, with a different message for errors
+
+4. Should there be a setting to turn this on or off?
+   - a) Yes. Add `convo.notifyOnCompletion` (boolean, default `true`) to `package.json`
+   - b) No, always notify
+
+5. When the user clicks Open, where should the document open?
+   - a) In the editor group where it is already visible, otherwise the active group
+   - b) Always in the active editor group
+
+6. Notification content:
+   - a) "Completion finished: {file name}" with an Open button
+   - b) The same as a, but with a short preview of the first line of the response
+
+For implementation, I plan to add a dedicated `completion-notification.ts` file. It would export `registerCompletionNotification(context,ext)`, which registers any resources, and a `notifyCompletionAsync(document,startOffset)` helper. `completeAsync` in `completion-provider.ts` would call this helper after the final edit is applied. Does that structure work for you?
+
+
+> user
+1. a
+2. b
+3. a
+4. a
+5. a
+6. a
+
+yes
+
+@time 2026-10-24T09:32:06-04:00
+@tokenUsage 102395 / 4405
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes. I left out `registerCompletionNotification` because the feature doesn't need any registered resources, so it would have been an empty function. The new file only exports `notifyCompletionAsync`.
+
+<FILE_CONTENT name="completion-notification.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-notification.ts">
+``` ts
+import * as path from 'path';
+import { TextDocument, window, workspace } from 'vscode';
+import { revealDocumentEndAsync } from './util.js';
+
+/**
+ * Displays a notification with an Open button when a completion finishes for a document that is
+ * not in the active text editor. Clicking Open shows the document in the editor group it is
+ * already visible in, or the active group, and scrolls it to the end of the document.
+ */
+export const notifyCompletionAsync=async (document:TextDocument):Promise<void>=>{
+    if(!workspace.getConfiguration('convo').get<boolean>('notifyOnCompletion',true)){
+        return;
+    }
+
+    const uri=document.uri.toString();
+    if(window.activeTextEditor?.document.uri.toString()===uri){
+        return;
+    }
+
+    const action=await window.showInformationMessage(
+        `Completion finished: ${path.basename(document.fileName)}`,
+        'Open',
+    );
+    if(action!=='Open'){
+        return;
+    }
+
+    const visible=window.visibleTextEditors.find(e=>e.document.uri.toString()===uri);
+    const doc=await workspace.openTextDocument(document.uri);
+    const editor=await window.showTextDocument(doc,{preview:false,viewColumn:visible?.viewColumn});
+    await revealDocumentEndAsync(editor);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+import { extensionPublisher } from './build-const.js';
+//// replace-with ////
+import { extensionPublisher } from './build-const.js';
+import { notifyCompletionAsync } from './completion-notification.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+                    if(isFinal){
+                        await applyFinalEditAsync(document,code,getRange());
+                        return;
+                    }
+//// replace-with ////
+                    if(isFinal){
+                        return await applyFinalEditAsync(document,code,getRange());
+                    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+                await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+//// replace-with ////
+                const applied=await setCodeAsync(cli.buffer.join('')+(lastMsg?.role===convoRoles.goto?'\n':'\n\n> user\n'),true,false);
+                if(applied){
+                    void notifyCompletionAsync(document);
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+        if(e.affectsConfiguration('convo')){
+//// replace-with ////
+        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion')){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+ * If the edit fails the response is opened in a new untitled convo document.
+ */
+const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<void>=>{
+//// replace-with ////
+ * If the edit fails the response is opened in a new untitled convo document. Returns true if the
+ * edit was applied to the document.
+ */
+const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<boolean>=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+            viewColumn:ViewColumn.Beside,
+        });
+        return;
+    }
+//// replace-with ////
+            viewColumn:ViewColumn.Beside,
+        });
+        return false;
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+    await revealDocumentInVisibleEditorsAsync(doc);
+}
+
+/**
+ * Scrolls all visible editors
+//// replace-with ////
+    await revealDocumentInVisibleEditorsAsync(doc);
+    return true;
+}
+
+/**
+ * Scrolls all visible editors
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                }
+//// replace-with ////
+                "convo.openRouterApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenRouter API key for authentication",
+                    "order": 8
+                },
+                "convo.notifyOnCompletion": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display a notification when a completion finishes for a document that is not in the active editor",
+                    "order": 9
+                }
+```
+</FILE_CONTENT>
+
+Notes:
+- I excluded `convo.notifyOnCompletion` from the "Reload window" prompt, because the setting is read each time a completion finishes and doesn't need a reload.
+- The notification only appears when the final edit is applied successfully. Errors and the fallback untitled document don't trigger it.
+- "Run Script and Complete" focuses the document before completing, so it will usually not show a notification unless you switch away while the completion is running.
+
+
+> user

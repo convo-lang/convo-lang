@@ -7,6 +7,18 @@ export const revealDocumentEndAsync=async (editor:vscode.TextEditor):Promise<voi
     editor.revealRange(new vscode.Range(end,end),vscode.TextEditorRevealType.Default);
 }
 
+/**
+ * Scrolls all visible editors of the given document to the end without changing focus
+ */
+export const revealDocumentInVisibleEditorsAsync=async (document:vscode.TextDocument):Promise<void>=>{
+    const uri=document.uri.toString();
+    for(const editor of vscode.window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
+
 export const timeSince = (dateString: string,justNowMax?:number): string => {
     return timeSinceNext(dateString,justNowMax).label;
 };
