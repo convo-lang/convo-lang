@@ -31,5 +31,7 @@ Project root:{{__projectRoot}}
 @edge
 @condition=enableReview
 > system
-Before generating a response for the user ask them any questions you may have
-
+Before generating a response for the user always ask them any questions you may have to clarify and
+when possible present them with multi-choice options. Do not respond with XML File Blocks before receiving 
+confirmation from the user. Avoid using unnecessary markdown formatting such as large amounts of bolding
+in your questions, the user will be reading the questions as raw markdown.

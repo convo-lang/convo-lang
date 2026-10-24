@@ -1,0 +1,281 @@
+@import ./_extension.convo
+
+> user
+Lets add a new command called `convo.extend-template-named`. It should function the same as the
+extend template command but prompt the user for a name to append to the new file to create. The
+name given by the user should be sanitized only excepting characters matching a regex of `[\w-]`.
+replace invalid characters with an underscore.
+
+Assign a shortcut of `cmd+shift+option+m` for macos and `ctrl+shift+alt+m` for windows and linux
+
+New file name example: `example-2026-10-24-0003-some_name.convo`
+
+@time 2026-10-24T07:14:09-04:00
+@tokenUsage 100215 / 1123
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write the code, a few questions:
+
+1. Where should the new command live?
+   - a) In `extend-template.ts`, registered by the existing `registerExtendTemplateCommand`, sharing the existing helpers (recommended, since it is a variant of the same command)
+   - b) In a new file `extend-template-named.ts` with its own `registerExtendTemplateNamedCommand`, with the shared helpers exported from `extend-template.ts`
+
+2. How should the sequence number work when named files exist?
+   - a) Shared counter. If `example-2026-10-24-0003.convo` or `example-2026-10-24-0003-other.convo` exists, the next file gets `0004` (recommended, avoids duplicate numbers)
+   - b) Only check whether the exact path exists, so `0003-some_name` could coexist with `0003`
+
+3. Suppose the source file already has a name suffix, such as `example-2026-10-24-0003-some_name.convo`, and has no `!template` imports. How should the base name be derived?
+   - a) Strip both the date/number and the name suffix, so the base is `example` (recommended)
+   - b) Strip only the date/number pattern, and treat anything that does not match as part of the base name
+
+4. What should happen if the user submits an empty name? (Pressing Escape will always cancel.)
+   - a) Cancel the command
+   - b) Create the file without a name suffix, the same as `convo.extend-template`
+   - c) Show a validation error in the input box until a non-empty name is entered
+
+5. Should the input be trimmed before sanitizing, so that `" some name "` becomes `some_name` rather than `_some_name_`?
+   - a) Yes, trim first (recommended)
+   - b) No, sanitize the raw input
+
+6. Should the command be added to the editor title menu as well?
+   - a) No, only the command palette and the keybinding
+   - b) Yes, add it next to the existing Extend Template button, using a different icon
+
+
+> user
+1. a
+2. a
+3. a
+4. a
+5. a
+6. a
+
+@time 2026-10-24T07:16:39-04:00
+@tokenUsage 100877 / 4553
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes. Both commands now share the same flow, and the numbering counter is shared across named and unnamed files.
+
+<FILE_CONTENT name="extend-template.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extend-template.ts">
+``` ts
+import { pathExistsAsync } from '@iyio/node-common';
+import { readdir } from 'fs/promises';
+import * as path from 'path';
+import { ExtensionContext, Uri, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { revealDocumentEndAsync } from './util.js';
+
+/**
+ * Registers the `convo.extend-template` and `convo.extend-template-named` commands. The commands
+ * create a new convo file in the same directory as the active convo file that imports the active
+ * file. If the active file already extends one or more templates using the `!template` import
+ * modifier the new file extends the same templates instead. The named variant prompts the user for
+ * a name that is appended to the new file name.
+ */
+export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    context.subscriptions.push(commands.registerCommand('convo.extend-template',async ()=>{
+        await extendTemplateAsync(false);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.extend-template-named',async ()=>{
+        await extendTemplateAsync(true);
+    }));
+}
+
+const extendTemplateAsync=async (named:boolean)=>{
+    const document=window.activeTextEditor?.document;
+    if(document?.languageId!=='source.convo'){
+        void window.showWarningMessage('Extend template requires an open convo file');
+        return;
+    }
+
+    if(document.isUntitled || document.uri.scheme!=='file'){
+        void window.showWarningMessage('Save the convo file before extending it');
+        return;
+    }
+
+    let name:string|undefined;
+    if(named){
+        const input=await window.showInputBox({
+            prompt:'Name to append to the new convo file',
+            placeHolder:'some-name',
+        });
+        name=input?sanitizeName(input):undefined;
+        if(!name){
+            return;
+        }
+    }
+
+    const filePath=document.uri.fsPath;
+    const dir=path.dirname(filePath);
+    const templates=getTemplateImports(document.getText());
+
+    let saveTo:string;
+    let imports:string[];
+    if(templates[0]){
+        saveTo=await getNextDatedConvoPathAsync(dir,path.basename(templates[0]),name);
+        imports=templates.map(t=>rebuildImportPath(t,dir));
+    }else{
+        if(document.isDirty && !await document.save()){
+            return;
+        }
+        saveTo=await getNextDatedConvoPathAsync(dir,path.basename(filePath),name);
+        imports=[`./${path.basename(filePath)}`];
+    }
+
+    const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n\n`;
+
+    const uri=Uri.file(saveTo);
+    await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);
+
+    const doc=await workspace.openTextDocument(uri);
+    const editor=await window.showTextDocument(doc,{preview:false});
+    await revealDocumentEndAsync(editor);
+}
+
+/**
+ * Trims the name and replaces all characters not matching `[\w-]` with an underscore
+ */
+const sanitizeName=(name:string):string=>{
+    return name.trim().replace(/[^\w-]/g,'_');
+}
+
+/**
+ * Returns the import paths of all imports using the `!template` modifier
+ */
+const getTemplateImports=(content:string):string[]=>{
+    const imports:string[]=[];
+    for(const match of content.matchAll(/^@import[ \t]+(\S+)[^\n]*!template/gm)){
+        const importPath=match[1];
+        if(importPath && !importPath.startsWith('!')){
+            imports.push(importPath);
+        }
+    }
+    return imports;
+}
+
+/**
+ * Rebuilds a relative import path relative to the given directory. Non-relative imports such as
+ * URIs and absolute paths are returned as-is.
+ */
+const rebuildImportPath=(importPath:string,dir:string):string=>{
+    if(/^[\w-]+:/.test(importPath) || path.isAbsolute(importPath)){
+        return importPath;
+    }
+    const rel=path.relative(dir,path.resolve(dir,importPath)).split(path.sep).join('/');
+    return rel.startsWith('.')?rel:`./${rel}`;
+}
+
+/**
+ * Returns the next available dated path in the given directory for the given convo file name. If
+ * the file name already contains a date suffix, with or without a name, the base name is reused and
+ * the number is incremented. Numbers are shared between named and unnamed files.
+ */
+const getNextDatedConvoPathAsync=async (dir:string,fileName:string,name?:string):Promise<string>=>{
+    let baseName=fileName;
+    if(baseName.startsWith('_') && baseName.length>1){
+        baseName=baseName.substring(1);
+    }
+    let n=1;
+
+    const match=/-(\d{4}-\d{2}-\d{2}-(\d+))(-[\w-]+)?\.convo$/i.exec(baseName);
+    if(match){
+        n=Number(match[2])+1;
+        baseName=baseName.substring(0,match.index);
+    }else if(baseName.toLowerCase().endsWith('.convo')){
+        baseName=baseName.substring(0,baseName.length-6);
+    }
+
+    const d=new Date();
+    const date=`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+    const prefix=`${baseName}-${date}-`;
+    const suffix=name?`-${name}`:'';
+
+    const used=new Set<number>();
+    try{
+        for(const file of await readdir(dir)){
+            if(!file.startsWith(prefix)){
+                continue;
+            }
+            const m=/^(\d+)(-[\w-]+)?\.convo$/i.exec(file.substring(prefix.length));
+            if(m){
+                used.add(Number(m[1]));
+            }
+        }
+    }catch{
+        //
+    }
+
+    while(true){
+        const p=path.join(dir,`${prefix}${n.toString().padStart(4,'0')}${suffix}.convo`);
+        if(!used.has(n) && !await pathExistsAsync(p)){
+            return p;
+        }
+        n++;
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                {
+                    "command": "convo.extend-template",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.extend-template",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
+                    "command": "convo.extend-template-named",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "icon": "$(notebook-template)"
+            },
+//// replace-with ////
+                "icon": "$(notebook-template)"
+            },
+            {
+                "command": "convo.extend-template-named",
+                "title": "Convo: Extend Template Named - Creates a new named convo file that imports the current file",
+                "shortTitle": "Convo: Extend Template Named",
+                "icon": "$(new-file)"
+            },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "mac": "cmd+shift+m",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+//// replace-with ////
+                "mac": "cmd+shift+m",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.extend-template-named",
+                "key": "ctrl+shift+alt+m",
+                "mac": "cmd+shift+alt+m",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+```
+</FILE_CONTENT>
+
+Notes:
+- `extension.ts` does not need any changes, because `registerExtendTemplateCommand` registers both commands.
+- The new editor title button shares the `navigation@04` group with Extend Template, so the two buttons sit next to each other.
+
+
+> user

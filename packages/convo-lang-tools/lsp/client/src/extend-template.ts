@@ -1,55 +1,84 @@
 import { pathExistsAsync } from '@iyio/node-common';
+import { readdir } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, Uri, commands, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 import { revealDocumentEndAsync } from './util.js';
 
 /**
- * Registers the `convo.extend-template` command. The command creates a new convo file in the same
- * directory as the active convo file that imports the active file. If the active file already
- * extends one or more templates using the `!template` import modifier the new file extends the
- * same templates instead.
+ * Registers the `convo.extend-template` and `convo.extend-template-named` commands. The commands
+ * create a new convo file in the same directory as the active convo file that imports the active
+ * file. If the active file already extends one or more templates using the `!template` import
+ * modifier the new file extends the same templates instead. The named variant prompts the user for
+ * a name that is appended to the new file name.
  */
 export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoExt)=>{
 
     context.subscriptions.push(commands.registerCommand('convo.extend-template',async ()=>{
-        const document=window.activeTextEditor?.document;
-        if(document?.languageId!=='source.convo'){
-            void window.showWarningMessage('Extend template requires an open convo file');
-            return;
-        }
-
-        if(document.isUntitled || document.uri.scheme!=='file'){
-            void window.showWarningMessage('Save the convo file before extending it');
-            return;
-        }
-
-        const filePath=document.uri.fsPath;
-        const dir=path.dirname(filePath);
-        const templates=getTemplateImports(document.getText());
-
-        let saveTo:string;
-        let imports:string[];
-        if(templates[0]){
-            saveTo=await getNextDatedConvoPathAsync(dir,path.basename(templates[0]));
-            imports=templates.map(t=>rebuildImportPath(t,dir));
-        }else{
-            if(document.isDirty && !await document.save()){
-                return;
-            }
-            saveTo=await getNextDatedConvoPathAsync(dir,path.basename(filePath));
-            imports=[`./${path.basename(filePath)}`];
-        }
-
-        const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n\n`;
-
-        const uri=Uri.file(saveTo);
-        await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);
-
-        const doc=await workspace.openTextDocument(uri);
-        const editor=await window.showTextDocument(doc,{preview:false});
-        await revealDocumentEndAsync(editor);
+        await extendTemplateAsync(false);
     }));
+
+    context.subscriptions.push(commands.registerCommand('convo.extend-template-named',async ()=>{
+        await extendTemplateAsync(true);
+    }));
+}
+
+const extendTemplateAsync=async (named:boolean)=>{
+    const document=window.activeTextEditor?.document;
+    if(document?.languageId!=='source.convo'){
+        void window.showWarningMessage('Extend template requires an open convo file');
+        return;
+    }
+
+    if(document.isUntitled || document.uri.scheme!=='file'){
+        void window.showWarningMessage('Save the convo file before extending it');
+        return;
+    }
+
+    let name:string|undefined;
+    if(named){
+        const input=await window.showInputBox({
+            prompt:'Name to append to the new convo file',
+            placeHolder:'some-name',
+        });
+        name=input?sanitizeName(input):undefined;
+        if(!name){
+            return;
+        }
+    }
+
+    const filePath=document.uri.fsPath;
+    const dir=path.dirname(filePath);
+    const templates=getTemplateImports(document.getText());
+
+    let saveTo:string;
+    let imports:string[];
+    if(templates[0]){
+        saveTo=await getNextDatedConvoPathAsync(dir,path.basename(templates[0]),name);
+        imports=templates.map(t=>rebuildImportPath(t,dir));
+    }else{
+        if(document.isDirty && !await document.save()){
+            return;
+        }
+        saveTo=await getNextDatedConvoPathAsync(dir,path.basename(filePath),name);
+        imports=[`./${path.basename(filePath)}`];
+    }
+
+    const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n\n`;
+
+    const uri=Uri.file(saveTo);
+    await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);
+
+    const doc=await workspace.openTextDocument(uri);
+    const editor=await window.showTextDocument(doc,{preview:false});
+    await revealDocumentEndAsync(editor);
+}
+
+/**
+ * Trims the name and replaces all characters not matching `[\w-]` with an underscore
+ */
+const sanitizeName=(name:string):string=>{
+    return name.trim().replace(/[^\w-]/g,'_');
 }
 
 /**
@@ -80,16 +109,17 @@ const rebuildImportPath=(importPath:string,dir:string):string=>{
 
 /**
  * Returns the next available dated path in the given directory for the given convo file name. If
- * the file name already contains a date suffix the base name is reused and the number is incremented.
+ * the file name already contains a date suffix, with or without a name, the base name is reused and
+ * the number is incremented. Numbers are shared between named and unnamed files.
  */
-const getNextDatedConvoPathAsync=async (dir:string,fileName:string):Promise<string>=>{
+const getNextDatedConvoPathAsync=async (dir:string,fileName:string,name?:string):Promise<string>=>{
     let baseName=fileName;
     if(baseName.startsWith('_') && baseName.length>1){
         baseName=baseName.substring(1);
     }
     let n=1;
 
-    const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo$/i.exec(baseName);
+    const match=/-(\d{4}-\d{2}-\d{2}-(\d+))(-[\w-]+)?\.convo$/i.exec(baseName);
     if(match){
         n=Number(match[2])+1;
         baseName=baseName.substring(0,match.index);
@@ -99,10 +129,27 @@ const getNextDatedConvoPathAsync=async (dir:string,fileName:string):Promise<stri
 
     const d=new Date();
     const date=`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+    const prefix=`${baseName}-${date}-`;
+    const suffix=name?`-${name}`:'';
+
+    const used=new Set<number>();
+    try{
+        for(const file of await readdir(dir)){
+            if(!file.startsWith(prefix)){
+                continue;
+            }
+            const m=/^(\d+)(-[\w-]+)?\.convo$/i.exec(file.substring(prefix.length));
+            if(m){
+                used.add(Number(m[1]));
+            }
+        }
+    }catch{
+        //
+    }
 
     while(true){
-        const p=path.join(dir,`${baseName}-${date}-${n.toString().padStart(4,'0')}.convo`);
-        if(!await pathExistsAsync(p)){
+        const p=path.join(dir,`${prefix}${n.toString().padStart(4,'0')}${suffix}.convo`);
+        if(!used.has(n) && !await pathExistsAsync(p)){
             return p;
         }
         n++;

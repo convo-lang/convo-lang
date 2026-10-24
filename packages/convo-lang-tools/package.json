@@ -123,6 +123,11 @@
                     "group": "navigation@04"
                 },
                 {
+                    "command": "convo.extend-template-named",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@04"
+                },
+                {
                     "command": "convo.convert",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@05"
@@ -493,6 +498,12 @@
                 "icon": "$(notebook-template)"
             },
             {
+                "command": "convo.extend-template-named",
+                "title": "Convo: Extend Template Named - Creates a new named convo file that imports the current file",
+                "shortTitle": "Convo: Extend Template Named",
+                "icon": "$(new-file)"
+            },
+            {
                 "command": "convo.modules",
                 "title": "Convo: Modules",
                 "icon": "$(extensions)"
@@ -524,6 +535,12 @@
                 "command": "convo.extend-template",
                 "key": "ctrl+shift+m",
                 "mac": "cmd+shift+m",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.extend-template-named",
+                "key": "ctrl+shift+k",
+                "mac": "cmd+shift+k",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             },
             {
