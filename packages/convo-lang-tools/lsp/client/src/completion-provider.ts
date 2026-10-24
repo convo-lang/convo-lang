@@ -613,14 +613,15 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                         return;
                     }
 
-                    const editor=await window.showTextDocument(document);
-
-                    await editor.edit(builder=>{
-                        if(done && !isFinal){
-                            return;
+                    try{
+                        const edit=new WorkspaceEdit();
+                        edit.replace(document.uri,getRange(),code);
+                        if(await workspace.applyEdit(edit)){
+                            await revealDocumentInVisibleEditorsAsync(document);
                         }
-                        builder.replace(getRange(),code);
-                    })
+                    }catch{
+                        //
+                    }
                 }finally{
                     release();
                 }
@@ -939,7 +940,14 @@ const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):
         await doc.save();
     }
 
-    const uri=doc.uri.toString();
+    await revealDocumentInVisibleEditorsAsync(doc);
+}
+
+/**
+ * Scrolls all visible editors of the given document to the end without changing focus
+ */
+const revealDocumentInVisibleEditorsAsync=async (document:TextDocument):Promise<void>=>{
+    const uri=document.uri.toString();
     for(const editor of window.visibleTextEditors){
         if(editor.document.uri.toString()===uri){
             await revealDocumentEndAsync(editor);

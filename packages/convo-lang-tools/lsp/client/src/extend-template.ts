@@ -64,7 +64,7 @@ const extendTemplateAsync=async (named:boolean)=>{
         imports=[`./${path.basename(filePath)}`];
     }
 
-    const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n\n`;
+    const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n`;
 
     const uri=Uri.file(saveTo);
     await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);

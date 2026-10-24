@@ -1,0 +1,818 @@
+@import ./_extension.convo
+
+> user
+When pressing the write output button when a diff is open the command fails and sometimes when opening
+the diff it shows no changes when there should be.
+
+@time 2026-10-24T08:38:09-04:00
+@tokenUsage 101075 / 1955
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I think I've found the causes. Here's what's going wrong, then a few questions before I make changes.
+
+## Likely causes
+
+1. **Write Output fails while a diff is open.** `writeOutputTagAsync` finds the tag through `getActiveOutputTag`, which reads `window.activeTextEditor`. When the diff has focus, the active editor is the `convo-output:` preview or the target file, not the convo document. The tag lookup fails and you get "Unable to find output tag content". `executeShellOutputTagAsync` has the same problem.
+
+2. **The diff sometimes shows no changes.** The preview URI is always `convo-output:<targetPath>`. The content provider registered in `output-tag-code-lens.ts` has no `onDidChange` event. Once VS Code opens that virtual document, it keeps the cached content, so later diffs reuse stale preview content.
+
+3. **A related risk.** After `fs.writeFile`, `_writeOutputTagAsync` calls `doc.save()` on any open editor of the target file. If that file has unsaved edits, the save can overwrite what was just written. Also, find-replace blocks read the base content from disk, not from the open editor, so unsaved edits are ignored.
+
+## Questions
+
+1. How should stale previews be fixed?
+   - a) A content provider with an `onDidChange` emitter that fires on every diff, reusing one diff tab per target (recommended)
+   - b) A unique preview URI per diff (timestamp query), which opens a new diff tab each time
+
+2. When writing output and the target file is open with unsaved changes:
+   - a) Apply the content to the open document with a `WorkspaceEdit`, then save (recommended, no conflicts)
+   - b) Write to disk and revert open documents (discards unsaved edits)
+   - c) Show a warning and ask the user to choose
+
+3. Should find-replace blocks use the open document's text as the base instead of the file on disk?
+   - a) Yes, use the open buffer when available (recommended)
+   - b) No, keep reading from disk
+
+4. Should the shell commands also stop depending on the active editor? They would resolve the convo document from `documentUri` and append script output to it even when it isn't focused.
+   - a) Yes (recommended)
+   - b) No, only fix write and diff
+
+5. After a successful write from a diff, what should happen to the diff?
+   - a) Leave it open; it refreshes to show no changes
+   - b) Close the diff tab
+   - c) Nothing special
+
+6. Where should the preview content provider live? Per the extension guidelines, I'd move it into a dedicated `output-preview-provider.ts` with a `registerOutputPreviewProvider(context,ext)` function.
+   - a) Yes, dedicated file (recommended)
+   - b) Keep it in `output-tag-code-lens.ts`
+
+
+> user
+1. a
+2. a
+3. a
+4. a
+5. a
+6. b
+
+@time 2026-10-24T08:51:08-04:00
+@tokenUsage 102025 / 14231
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes:
+
+- Tags are now looked up from `documentUri`, so Write, Diff and Run Script no longer depend on which editor is active.
+- The preview content provider now has an `onDidChange` event. Each diff refreshes the existing preview tab instead of showing stale content.
+- When the target file is already open, writing applies a `WorkspaceEdit` to that document and then saves it, so unsaved edits aren't overwritten by a save after the write. An open diff updates to show no changes.
+- Find-replace blocks use the open document's text as their base when the file is open.
+- Shell scripts append their output to the convo document through `WorkspaceEdit`, even when it isn't focused.
+- I also fixed a small bug in the shell output buffering. `prevEnd+=v` duplicated partial lines; it is now `prevEnd=v`.
+
+I added `revealDocumentInVisibleEditorsAsync` to `util.ts` for the code block lib. `completion-provider.ts` has a private copy of the same function, but I left that file alone because it has uncommitted changes. It can be switched to the shared helper later.
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="276dbeb31db31b28f4449189acfc8bb2c438e60e">
+``` ts
+import { ConvoCodeBlock, ConvoMessage, defaultConvoFindReplaceSeparator, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import { readFileAsStringAsync } from '@iyio/node-common';
+import { spawn } from 'child_process';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { Readable } from 'stream';
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, Range, Uri, window, workspace, WorkspaceEdit } from "vscode";
+import { revealDocumentInVisibleEditorsAsync } from './util';
+
+export interface OutputTagBase
+{
+
+    targetPath:string;
+    /**
+     * URI of document the code block is defined in
+     */
+    documentUri:Uri;
+    index:number;
+    cwd?:string;
+    codeBlock:ConvoCodeBlock;
+    autoConfirm?:boolean;
+}
+
+export interface OutputTagCodeLensArgs extends OutputTagBase
+{
+    complete?:boolean;
+}
+
+export interface OutputTagInfo extends OutputTagBase
+{
+    range:Range;
+    type:'file'|'shell'|'other';
+}
+
+export interface ParsedOutputTagInfo extends OutputTagInfo
+{
+    message:ConvoMessage;
+    messageIndex:number;
+}
+
+export interface MessageTagGroup
+{
+    message:ConvoMessage;
+    messageUri:Uri;
+    messageIndex:number;
+    tags:ParsedOutputTagInfo[];
+    isLast:boolean;
+}
+
+export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
+    return getOutputTagsFromSource(document.getText(),document,document.uri.scheme==='file'?document.uri.fsPath:undefined);
+}
+
+export const getOutputTagsFromSource=(source:string,document:vscode.TextDocument,filePath?:string):OutputTagInfo[]=>{
+    const baseDir=filePath?path.dirname(filePath):'';
+
+    const result=parseConvoCode(source,{
+        enableCodeBlocks:true,
+    });
+
+    const messages=result.result ?? [];
+    const tags:OutputTagInfo[]=[];
+
+    for(const message of messages){
+        const codeBlocks=message.codeBlocks;
+        if(!codeBlocks?.length){
+            continue;
+        }
+
+        for(const b of codeBlocks){
+            const type=(
+                ('target-output-path' in b.attributes)?
+                    'file'
+                :('target-shell-type' in b.attributes)?
+                    'shell'
+                :
+                    'other'
+            );
+            const start=document.positionAt(b.startIndex);
+            const end=document.positionAt(b.endIndex);
+            const targetPath=b.attributes['target-output-path']??'';
+
+            const ac=b.attributes['cwd'];
+
+            tags.push({
+                codeBlock:b,
+                targetPath:(baseDir && type==='file')?
+                    path.resolve(baseDir,targetPath)
+                :type==='shell'?
+                    (b.attributes['script-name']??'script')
+                :
+                    targetPath,
+                type,
+                range:new vscode.Range(start,end),
+                index:b.index,
+                cwd:ac?path.join(baseDir,ac):baseDir,
+                documentUri:document.uri,
+            });
+        }
+    }
+
+    return tags;
+}
+
+export const getParsedOutputTagGroups=(document:vscode.TextDocument):MessageTagGroup[]=>{
+    if(document.languageId!=='source.convo'){
+        return [];
+    }
+
+    const result=parseConvoCode(document.getText(),{
+        enableCodeBlocks:true,
+    });
+
+    const messages=result.result ?? [];
+    const baseDir=document.uri.scheme==='file'?path.dirname(document.uri.fsPath):'';
+    const groups:MessageTagGroup[]=[];
+
+    for(let messageIndex=0;messageIndex<messages.length;messageIndex++){
+        const message=messages[messageIndex];
+        if(!message){
+            continue;
+        }
+        const codeBlocks=message.codeBlocks;
+        if(!codeBlocks?.length){
+            continue;
+        }
+
+        const tags:ParsedOutputTagInfo[]=[];
+
+        for(const b of codeBlocks){
+            const type=(
+                ('target-output-path' in b.attributes)?
+                    'file'
+                :('target-shell-type' in b.attributes)?
+                    'shell'
+                :
+                    'other'
+            );
+            const start=document.positionAt(message.s ?? b.startIndex);
+            const end=document.positionAt(message.e ?? b.endIndex);
+            const targetPath=b.attributes['target-output-path']??'';
+
+            tags.push({
+                codeBlock:b,
+                message,
+                messageIndex,
+                targetPath:(baseDir && type==='file')?
+                        path.resolve(baseDir,targetPath)
+                    :type==='shell'?
+                        (b.attributes['script-name']??'script')
+                    :
+                        targetPath,
+                type,
+                range:new vscode.Range(start,end),
+                index:b.index,
+                cwd:b.attributes['cwd'],
+                documentUri:document.uri,
+            });
+        }
+
+        groups.push({
+            message,
+            messageIndex,
+            tags,
+            isLast:false,
+            messageUri:document.uri,
+        });
+    }
+
+    const last=groups[groups.length-1];
+    if(last){
+        last.isLast=true;
+    }
+
+    return groups;
+}
+
+export const getOutputTagForTargetPath=(document:vscode.TextDocument,targetPath:string,index:number):OutputTagInfo|undefined=>{
+    const normalizedTargetPath=path.normalize(targetPath);
+    return getOutputTags(document).find(t=>path.normalize(t.targetPath)===normalizedTargetPath && t.index===index);
+}
+
+/**
+ * Returns the most up to date output tag for the given args using the document the tag is
+ * defined in. Falls back to the active editor if the args do not define a document URI.
+ */
+export const getOutputTagFromArgsAsync=async (args:OutputTagBase):Promise<OutputTagInfo|undefined>=>{
+    try{
+        const document=args.documentUri?
+            await workspace.openTextDocument(args.documentUri)
+        :
+            window.activeTextEditor?.document;
+        return document?getOutputTagForTargetPath(document,args.targetPath,args.index):undefined;
+    }catch(ex){
+        console.error('Failed to open document for output tag',ex);
+        return undefined;
+    }
+}
+
+/**
+ * Returns the open text document for the given file path if one exists
+ */
+const getOpenFileDocument=(filePath:string):vscode.TextDocument|undefined=>{
+    const normalized=path.normalize(filePath);
+    return workspace.textDocuments.find(d=>d.uri.scheme==='file' && path.normalize(d.uri.fsPath)===normalized);
+}
+
+const createOutputPreviewUri=(targetPath:string):Uri=>{
+    return Uri.parse(`convo-output:${encodeURIComponent(targetPath)}`);
+}
+export const outputPreviewContent=new Map<string,string>();
+
+/**
+ * Fires when the content of an output preview document changes
+ */
+export const outputPreviewChangeEmitter=new vscode.EventEmitter<Uri>();
+
+export const showOutputDiffAsync=async (
+    tag:OutputTagBase,
+):Promise<boolean>=>{
+    const targetPath=tag.targetPath;
+    const content=await getCodeBlockOutputAsync(tag);
+    if(content===undefined){
+        return false;
+    }
+    const previewUri=createOutputPreviewUri(targetPath);
+    outputPreviewContent.set(previewUri.toString(),content);
+    outputPreviewChangeEmitter.fire(previewUri);
+
+    let targetExists=true;
+    try{
+        await workspace.fs.stat(Uri.file(targetPath));
+    }catch{
+        targetExists=false;
+    }
+
+    const leftUri=targetExists?
+        Uri.file(targetPath)
+    :
+        Uri.parse('untitled:'+targetPath);
+
+    await commands.executeCommand(
+        'vscode.diff',
+        leftUri,
+        previewUri,
+        `Output Diff: ${path.basename(targetPath)}`,
+    );
+
+    return true;
+}
+
+const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
+    const targetPath=tag.targetPath;
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+
+    const openDoc=getOpenFileDocument(targetPath);
+    if(openDoc){
+        const edit=new WorkspaceEdit();
+        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),outputContent);
+        if(!await workspace.applyEdit(edit) || !await openDoc.save()){
+            void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+            return;
+        }
+    }else{
+        await fs.mkdir(path.dirname(targetPath),{recursive:true});
+        await fs.writeFile(targetPath,outputContent,'utf8');
+    }
+
+    void window.showInformationMessage(`Wrote output to ${targetPath}`);
+}
+
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|undefined>=>{
+    const targetPath=tag.targetPath;
+    if(!tag.codeBlock.findReplace){
+        return tag.codeBlock.content;
+    }
+    try{
+        const doc=await workspace.openTextDocument(tag.documentUri);
+        if(!doc){
+            const msg=`Failed to find document for Convo-Lang file-replace block: ${tag.documentUri}`;
+            console.error(msg);
+            await window.showErrorMessage(msg);
+            return;
+        }
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
+        outputs.sort((a,b)=>a.index-b.index);
+        const openTarget=getOpenFileDocument(targetPath);
+        let content=openTarget?openTarget.getText():await readFileAsStringAsync(targetPath);
+        let notFound:string[]=[];
+        for(const r of outputs){
+            const replacement=replaceConvoBlockContent(content,r.codeBlock);
+            if(!replacement.replaceCount){
+                notFound.push(`find-replace target not found. path:${tag.documentUri}, index:${r.codeBlock.index}, separator:${r.codeBlock.findReplaceSeparator??defaultConvoFindReplaceSeparator}`)
+            }else{
+                content=replacement.content;
+            }
+        }
+        if(notFound.length){
+            window.showErrorMessage(notFound.join('\n'));
+        }
+        return content;
+    }catch(ex){
+        const msg=`Failed to read content of targetPath for Convo-Lang file-replace block: ${targetPath}. Error:${getErrorMessage(ex)}`;
+        console.error(msg,ex);
+        await window.showErrorMessage(msg);
+        return undefined;
+    }
+    
+}
+
+export const writeOutputTagAsync=async (args:OutputTagCodeLensArgs|HasArgs)=>{
+    args=getFileBlockArgs(args);
+    const targetPath=args?.targetPath;
+    if(!targetPath || !args){
+        return;
+    }
+
+    const tag=await getOutputTagFromArgsAsync(args);
+    if(!tag){
+        void window.showErrorMessage('Unable to find output tag content for the selected target.');
+        return;
+    }
+
+    if(!args.autoConfirm){
+        const action=await window.showWarningMessage(
+            `Write output to ${path.basename(targetPath)}?`,
+            { modal:true },
+            'Write File',
+            'View Diff',
+        );
+
+        if(action==='View Diff'){
+            await showOutputDiffAsync(tag);
+            return;
+        }
+
+        if(action!=='Write File'){
+            return;
+        }
+    }
+
+    await _writeOutputTagAsync(tag);
+}
+
+export const setClipboardUsingOutputTagAsync=async (tag:OutputTagBase)=>{
+    const targetPath=tag?.targetPath;
+    if(!targetPath){
+        return;
+    }
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+    await vscode.env.clipboard.writeText(outputContent);
+    void window.showInformationMessage(`Copied output for ${path.basename(targetPath)}`);
+}
+
+/**
+ * Appends text to the end of the given document without requiring the document to be focused
+ */
+const appendToDocumentAsync=async (document:vscode.TextDocument,text:string):Promise<void>=>{
+    const edit=new WorkspaceEdit();
+    edit.insert(document.uri,document.positionAt(document.getText().length),text);
+    if(await workspace.applyEdit(edit)){
+        await revealDocumentInVisibleEditorsAsync(document);
+    }
+}
+
+export const executeShellOutputTagAsync=async (
+    context:ExtensionContext,
+    args:OutputTagCodeLensArgs|HasArgs,
+):Promise<void>=>{
+    args=getFileBlockArgs(args);
+    const targetPath=args?.targetPath;
+    if(!targetPath || !args){
+        return;
+    }
+
+
+    const tag=await getOutputTagFromArgsAsync(args);
+    if(!tag){
+        void window.showErrorMessage('Unable to find output tag content for the selected target.');
+        return;
+    }
+
+    if(!args.autoConfirm){
+        const allowed=await confirmShellRunAsync(context,tag);
+        if(!allowed){
+            return;
+        }
+    }
+
+    const document=await workspace.openTextDocument(tag.documentUri);
+    const scriptName=escapeXmlAttr(targetPath);
+    const header=createScriptOutputHeader(document.getText(),scriptName);
+    const footer='\n```\n</SCRIPT_OUTPUT>\n';
+
+    await appendToDocumentAsync(document,header);
+
+    const processCwd=args.cwd || process.cwd();
+    let command:string;
+    let commandArgs:string[];
+    let stdIn:string|undefined;
+    let exitCode:number|undefined;
+    const shellType=tag.codeBlock.attributes['target-shell-type'];
+    switch(shellType){
+
+        case 'bash':
+            command='bash';
+            commandArgs=[];
+            stdIn=tag.codeBlock.content;
+            break;
+
+        case 'node':
+            command='node';
+            commandArgs=['--input-type=module'];
+            stdIn=tag.codeBlock.content;
+            break;
+
+        case 'bun':
+            command='bun';
+            commandArgs=['run','-'];
+            stdIn=tag.codeBlock.content;
+            break;
+
+        case 'python':
+            command='python3';
+            commandArgs=['-'];
+            stdIn=tag.codeBlock.content;
+            break;
+
+        default:
+            command='echo';
+            commandArgs=[`Unknown shell type - ${JSON.stringify(shellType)}`];
+            exitCode=1;
+            break;
+
+    }
+    const child=spawn(command,commandArgs,{
+        cwd:processCwd,
+        env:process.env,
+    });
+
+    if(stdIn!==undefined){
+        const stream=Readable.from(stdIn);
+        stream.pipe(child.stdin,{end:true});
+    }
+    
+
+    let appendQueue=Promise.resolve();
+    let killed=false;
+    let prevEnd:string='';
+    const appendAsync=(value:string,end:boolean)=>{
+        return appendQueue=appendQueue.then(async ()=>{
+            let v=prevEnd+value;
+            if(end){
+                prevEnd='';
+            }else{
+                const ei=v.lastIndexOf('\n');
+                if(ei===-1){
+                    prevEnd=v;
+                    return;
+                }
+                prevEnd=v.substring(ei+1);
+                v=v.substring(0,ei+1);
+            }
+            if(v){
+                await appendToDocumentAsync(document,escapeConvo(v));
+            }
+        });
+    };
+
+    child.stdout.on('data',(data)=>{
+        void appendAsync(data.toString(),false);
+    });
+
+    child.stderr.on('data',(data)=>{
+        void appendAsync(data.toString(),false);
+    });
+
+    child.on('error',(err)=>{
+        void appendAsync(`\n[process error] ${err.message}\n`,false);
+    });
+
+    await window.withProgress({
+        location:vscode.ProgressLocation.Notification,
+        title:'Running script',
+        cancellable:true,
+    },async (progress,token)=>{
+        const pid=child.pid ?? 'unknown';
+        progress.report({message:`PID: ${pid}`});
+
+        token.onCancellationRequested(()=>{
+            killed=true;
+            try{
+                child.kill('SIGTERM');
+            }catch{
+            }
+        });
+
+        await new Promise<void>((resolve)=>{
+            child.on('close',(code,signal)=>{
+                if(exitCode!==undefined){
+                    code=exitCode;
+                }
+                let endNote='';
+                if(killed){
+                    endNote+=`\n[process killed${child.pid?` pid ${child.pid}`:''}]\n`;
+                }else if(signal){
+                    endNote+=`\n[process exited by signal ${signal}]\n`;
+                }else if(code!==0){
+                    endNote+=`\n[process exited with code ${code}]\n`;
+                }
+                appendAsync(endNote,true).then(async ()=>{
+                    await appendQueue;
+                    await appendToDocumentAsync(document,footer);
+                    if(args.complete && !killed){
+                        await window.showTextDocument(document,{preview:false});
+                        await vscode.commands.executeCommand('convo.complete');
+                    }
+                    resolve();
+                });
+            });
+        });
+    });
+}
+
+
+const confirmShellRunAsync=async (
+    context:ExtensionContext,
+    tag:OutputTagInfo,
+):Promise<boolean>=>{
+    const config=workspace.getConfiguration('convo');
+    const alwaysRun=config.get<boolean>('alwaysRunOutputScripts') ?? false;
+    if(alwaysRun){
+        return true;
+    }
+
+    const detail=[
+        `Script: ${tag.targetPath}`,
+        tag.cwd?`CWD: ${tag.cwd}`:undefined,
+    ].filter(Boolean).join('\n');
+
+    const action=await window.showWarningMessage(
+        'Run shell script from convo output?',
+        { modal:true, detail },
+        'Run Script',
+        'Always Run Script',
+    );
+
+    if(action==='Always Run Script'){
+        await config.update('alwaysRunOutputScripts',true,vscode.ConfigurationTarget.Global);
+        return true;
+    }
+
+    return action==='Run Script';
+}
+
+
+const createScriptOutputHeader=(text:string,scriptName:string):string=>{
+    const trimmedEnd=text.trimEnd();
+    const endsWithUser=/>\s*user\s*$/m.test(trimmedEnd) && trimmedEnd.split(/\r?\n/).slice(-1)[0]?.trim()==='> user';
+    return `${text.length?'\n\n':''}${endsWithUser?'':'> user\n\n'}<SCRIPT_OUTPUT script-name="${scriptName}">\n\`\`\` output\n`;
+}
+
+const escapeXmlAttr=(value:string):string=>{
+    return value
+        .replace(/&/g,'&amp;')
+        .replace(/"/g,'&quot;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;');
+}
+
+
+export interface HasArgs
+{
+    args:OutputTagCodeLensArgs;
+}
+
+export const isHasArgs=(value:any):value is HasArgs=>{
+    return typeof value?.args === 'object';
+}
+
+export const getFileBlockArgs=(args:OutputTagCodeLensArgs|HasArgs):OutputTagCodeLensArgs=>{
+    if(isHasArgs(args)){
+        return args.args;
+    }else{
+        return args;
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="output-tag-code-lens.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0">
+``` ts
+import * as vscode from 'vscode';
+import { commands, ExtensionContext, Uri, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt';
+import { executeShellOutputTagAsync, getFileBlockArgs, getOutputTagFromArgsAsync, getOutputTags, HasArgs, outputPreviewChangeEmitter, outputPreviewContent, OutputTagCodeLensArgs, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib';
+
+
+export const registerOutTagCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    context.subscriptions.push(outputPreviewChangeEmitter);
+
+    context.subscriptions.push(workspace.registerTextDocumentContentProvider('convo-output',{
+        onDidChange:outputPreviewChangeEmitter.event,
+        provideTextDocumentContent(uri:Uri):string{
+            return outputPreviewContent.get(uri.toString()) ?? '';
+        },
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-open',async (args?:OutputTagCodeLensArgs)=>{
+        const targetPath=args?.targetPath;
+        if(!targetPath){
+            return;
+        }
+        const doc=await workspace.openTextDocument(Uri.file(targetPath));
+        await window.showTextDocument(doc);
+    }));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-write',writeOutputTagAsync));
+    
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-diff',async (args?:OutputTagCodeLensArgs)=>{
+        if(!args){
+            return;
+        }
+        const tag=await getOutputTagFromArgsAsync(args);
+        if(!tag){
+            void window.showErrorMessage('Unable to find output tag content for the selected target.');
+            return;
+        }
+        await showOutputDiffAsync(tag);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-copy',async (args?:OutputTagCodeLensArgs)=>{
+        if(args){
+            await setClipboardUsingOutputTagAsync(args);
+        }
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell',async (args:OutputTagCodeLensArgs|HasArgs)=>{
+        args=getFileBlockArgs(args);
+        await executeShellOutputTagAsync(context,args);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.output-tag-execute-shell-complete',async (args:OutputTagCodeLensArgs|HasArgs)=>{
+        args=getFileBlockArgs(args);
+        await executeShellOutputTagAsync(context,args?{...args,complete:true}:args);
+    }));
+}
+
+
+
+export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
+{
+    public provideCodeLenses(document:vscode.TextDocument):vscode.CodeLens[]
+    {
+        const lenses:vscode.CodeLens[]=[];
+        const outputTags=getOutputTags(document);
+
+        for(const tag of outputTags){
+            switch(tag.type){
+
+                case 'file':
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Open Output',
+                            command:'convo.output-tag-open',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Write Output',
+                            command:'convo.output-tag-write',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Open Diff',
+                            command:'convo.output-tag-diff',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Copy Output',
+                            command:'convo.output-tag-copy',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    break;
+
+                case 'shell':
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Run Script',
+                            command:'convo.output-tag-execute-shell',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:'Run Script and complete',
+                            command:'convo.output-tag-execute-shell-complete',
+                            arguments:[{targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:document.uri,complete:true,codeBlock:tag.codeBlock} satisfies OutputTagCodeLensArgs],
+                        }),
+                    );
+                    break;
+            }
+        }
+
+        return lenses;
+    }
+}
+
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="util.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/util.ts" last-commit="224067979b13beb14aefecf4bd53a225992c5a51" find-replace>
+``` ts
+    editor.revealRange(new vscode.Range(end,end),vscode.TextEditorRevealType.Default);
+}
+//// replace-with ////
+    editor.revealRange(new vscode.Range(end,end),vscode.TextEditorRevealType.Default);
+}
+
+/**
+ * Scrolls all visible editors of the given document to the end without changing focus
+ */
+export const revealDocumentInVisibleEditorsAsync=async (document:vscode.TextDocument):Promise<void>=>{
+    const uri=document.uri.toString();
+    for(const editor of vscode.window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user

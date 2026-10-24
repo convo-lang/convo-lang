@@ -162,3 +162,125 @@ const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):
 
 
 > user
+Focus is still being stolen. When the edit is made the edited document gets shown if I'm editing a different document
+
+@time 2026-10-24T08:20:40-04:00
+@tokenUsage 103732 / 1990
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I think the focus is coming from the intermediate updates, not the final edit. The final edit no longer calls `window.showTextDocument`, but the non-final path in `setCodeAsync` still does:
+
+```ts
+const editor=await window.showTextDocument(document);
+```
+
+That path runs in three places:
+
+1. When the `// completing...` placeholder is added. This happens right when you trigger the command, so it's harmless.
+2. Every time `cli.convo.onAppend` fires during the completion, for example on function calls, function results or the assistant message.
+3. In the `allowExec` handler.
+
+The `onAppend` subscription calls `setCodeAsync` without awaiting it. So an append that fires near the end of the completion can race with the final edit. If it gets the lock before `done` is checked, it calls `showTextDocument` and pulls the convo document into view.
+
+The other steps shouldn't steal focus:
+- `workspace.applyEdit`
+- `doc.save()`
+- `revealDocumentEndAsync`, which only sets the selection and scrolls that editor
+- the code block refresh
+
+Before I change it, a few questions:
+
+1. How should intermediate updates be handled?
+   - a) Apply all of them in the background with `WorkspaceEdit` and remove `showTextDocument` from `setCodeAsync` entirely. This is what I recommend.
+   - b) Use `editor.edit` only when the convo document is the active editor, and fall back to a background `WorkspaceEdit` otherwise.
+
+2. Should intermediate updates also scroll visible, unfocused editors of the document to the end, without stealing focus?
+   - a) Yes, scroll on every intermediate update.
+   - b) No, scroll only after the final edit.
+
+3. What should happen if an intermediate background edit fails, for example because the document was closed?
+   - a) Ignore it silently. The final edit's fallback document still keeps the response.
+   - b) Log it to the console only.
+
+
+> user
+1. a
+2. a
+3. a
+
+@time 2026-10-24T08:34:13-04:00
+@tokenUsage 104376 / 1784
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The focus was coming from the intermediate updates. Each one called `window.showTextDocument`, which brings the convo document into view. They now use the same background approach as the final edit.
+
+Changes:
+- **Background edits.** Intermediate updates now apply through `workspace.applyEdit` with a `WorkspaceEdit`. `window.showTextDocument` is no longer called anywhere in `setCodeAsync`.
+- **Scrolling.** After each successful intermediate update, any visible editor showing the document scrolls to the end without taking focus.
+- **Failed edits.** If an intermediate edit fails, it's ignored silently. The final edit's fallback document still keeps the response.
+- **Shared scroll helper.** The scroll-to-end loop is now a small helper, `revealDocumentInVisibleEditorsAsync`, used by both the intermediate and final edits.
+
+The only remaining `showTextDocument` calls in `completeAsync` are in the "not a .convo file" branch. That branch runs when you trigger the command, before the completion starts.
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="b1a19c8078b06a799779bef50031c5ad24eea787" find-replace>
+``` ts
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        builder.replace(getRange(),code);
+                    })
+//// replace-with ////
+                    try{
+                        const edit=new WorkspaceEdit();
+                        edit.replace(document.uri,getRange(),code);
+                        if(await workspace.applyEdit(edit)){
+                            await revealDocumentInVisibleEditorsAsync(document);
+                        }
+                    }catch{
+                        //
+                    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="b1a19c8078b06a799779bef50031c5ad24eea787" find-replace>
+``` ts
+    const doc=await workspace.openTextDocument(document.uri);
+    if(!doc.isUntitled){
+        await doc.save();
+    }
+
+    const uri=doc.uri.toString();
+    for(const editor of window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
+//// replace-with ////
+    const doc=await workspace.openTextDocument(document.uri);
+    if(!doc.isUntitled){
+        await doc.save();
+    }
+
+    await revealDocumentInVisibleEditorsAsync(doc);
+}
+
+/**
+ * Scrolls all visible editors of the given document to the end without changing focus
+ */
+const revealDocumentInVisibleEditorsAsync=async (document:TextDocument):Promise<void>=>{
+    const uri=document.uri.toString();
+    for(const editor of window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
