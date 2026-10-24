@@ -6,7 +6,9 @@ import { revealDocumentEndAsync } from './util.js';
 
 /**
  * Registers the `convo.extend-template` command. The command creates a new convo file in the same
- * directory as the active convo file that imports the active file.
+ * directory as the active convo file that imports the active file. If the active file already
+ * extends one or more templates using the `!template` import modifier the new file extends the
+ * same templates instead.
  */
 export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoExt)=>{
 
@@ -22,13 +24,24 @@ export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoEx
             return;
         }
 
-        if(document.isDirty && !await document.save()){
-            return;
+        const filePath=document.uri.fsPath;
+        const dir=path.dirname(filePath);
+        const templates=getTemplateImports(document.getText());
+
+        let saveTo:string;
+        let imports:string[];
+        if(templates[0]){
+            saveTo=await getNextDatedConvoPathAsync(dir,path.basename(templates[0]));
+            imports=templates.map(t=>rebuildImportPath(t,dir));
+        }else{
+            if(document.isDirty && !await document.save()){
+                return;
+            }
+            saveTo=await getNextDatedConvoPathAsync(dir,path.basename(filePath));
+            imports=[`./${path.basename(filePath)}`];
         }
 
-        const filePath=document.uri.fsPath;
-        const saveTo=await getNextDatedConvoPathAsync(filePath);
-        const content=`@import ./${path.basename(filePath)}\n\n> user\n\n`;
+        const content=`${imports.map(i=>`@import ${i} !template`).join('\n')}\n\n> user\n\n`;
 
         const uri=Uri.file(saveTo);
         await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);
@@ -40,12 +53,37 @@ export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoEx
 }
 
 /**
- * Returns the next available dated path for the given convo file. If the file name already
- * contains a date suffix the base name is reused and the number is incremented.
+ * Returns the import paths of all imports using the `!template` modifier
  */
-const getNextDatedConvoPathAsync=async (filePath:string):Promise<string>=>{
-    const dir=path.dirname(filePath);
-    let baseName=path.basename(filePath);
+const getTemplateImports=(content:string):string[]=>{
+    const imports:string[]=[];
+    for(const match of content.matchAll(/^@import[ \t]+(\S+)[^\n]*!template/gm)){
+        const importPath=match[1];
+        if(importPath && !importPath.startsWith('!')){
+            imports.push(importPath);
+        }
+    }
+    return imports;
+}
+
+/**
+ * Rebuilds a relative import path relative to the given directory. Non-relative imports such as
+ * URIs and absolute paths are returned as-is.
+ */
+const rebuildImportPath=(importPath:string,dir:string):string=>{
+    if(/^[\w-]+:/.test(importPath) || path.isAbsolute(importPath)){
+        return importPath;
+    }
+    const rel=path.relative(dir,path.resolve(dir,importPath)).split(path.sep).join('/');
+    return rel.startsWith('.')?rel:`./${rel}`;
+}
+
+/**
+ * Returns the next available dated path in the given directory for the given convo file name. If
+ * the file name already contains a date suffix the base name is reused and the number is incremented.
+ */
+const getNextDatedConvoPathAsync=async (dir:string,fileName:string):Promise<string>=>{
+    let baseName=fileName;
     if(baseName.startsWith('_') && baseName.length>1){
         baseName=baseName.substring(1);
     }
