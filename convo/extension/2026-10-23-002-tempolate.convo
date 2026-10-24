@@ -1,0 +1,226 @@
+@import ./_extension.convo
+
+> user
+Add a new command that creates a new Convo file that imports the currently open convo file and
+saves the new file in the same directly.
+
+Example files names:
+active file: user-actions.convo
+new file to create: user-actions-2026-10-23-001.convo
+
+New File Example:
+``` convo
+@import ./user-actions.convo
+
+\> user
+
+```
+
+at the end of the command show the new file and place the cursor at the end.
+
+Add a keyboard shortcut of cmd+shift+n to run the command. The command should only work when a 
+convo file is open
+
+
+@time 2026-10-23T11:10:34-04:00
+@tokenUsage 98185 / 840
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before I implement this:
+
+1. **Number padding:** Your example uses 3 digits (`-001`), but the existing `convo.split` command uses 4 (`-0001`). Should I use 3 digits?
+
+2. **Already-dated active file:** If the active file is already a generated file, such as `user-actions-2026-10-23-001.convo`, which behavior do you want?
+   - **Option a:** Import that file and name the new one `user-actions-2026-10-23-002.convo`, reusing the base name the way `convo.split` does.
+   - **Option b:** Append a new date suffix to the full name.
+
+3. **Command ID and title:** Is `convo.new-import` with the title `Convo: New Import - Creates a new convo file that imports the current file` okay?
+
+4. **Keybindings:**
+   - On macOS, `cmd+shift+n` normally opens a new window. I'd limit it with `editorTextFocus && editorLangId == 'source.convo'` so it only overrides that shortcut inside convo files. Does that work for you?
+   - Should Windows and Linux use `ctrl+shift+n`?
+
+5. **Toolbar button:** Should the command also appear in the editor title bar menu next to the other convo buttons? If so, what icon would you like (for example, `$(new-file)`)?
+
+6. **Unsaved or untitled files:**
+   - If the active file has unsaved changes, should I save it before creating the new file?
+   - If the file is untitled, it has no path to import. Should I show a warning and stop?
+
+7. **Date:** Should the date in the filename use local time? That's what `convo.split` currently does.
+
+
+> user
+1. use 4
+2. a
+3. use 'convo.extend-template'
+4. Use cmd+shift+m and ctrl+shift+m for window and linux
+5. Yes, you pick an icon
+6. yes
+7. yes
+
+@time 2026-10-23T11:16:11-04:00
+@tokenUsage 98795 / 4072
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I added the `convo.extend-template` command in a new file and registered it in `extension.ts`. I also added it to `package.json` with a title bar button and the shortcut.
+
+- **Naming:** if the active file already has a date suffix, the new file reuses the base name and increments the 4-digit number. This matches `convo.split`.
+- **Unsaved and untitled files:** unsaved changes are saved first. An untitled file shows a warning and the command stops.
+- **Shortcut:** `cmd+shift+m` on macOS and `ctrl+shift+m` on Windows/Linux. It only works when a convo editor has focus, where it overrides VS Code's default "Toggle Problems" shortcut.
+- **Icon:** `$(new-file)`.
+
+<FILE_CONTENT name="extend-template.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extend-template.ts">
+``` ts
+import { pathExistsAsync } from '@iyio/node-common';
+import * as path from 'path';
+import { ExtensionContext, Uri, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { revealDocumentEndAsync } from './util.js';
+
+/**
+ * Registers the `convo.extend-template` command. The command creates a new convo file in the same
+ * directory as the active convo file that imports the active file.
+ */
+export const registerExtendTemplateCommand=(context:ExtensionContext,ext:ConvoExt)=>{
+
+    context.subscriptions.push(commands.registerCommand('convo.extend-template',async ()=>{
+        const document=window.activeTextEditor?.document;
+        if(document?.languageId!=='source.convo'){
+            void window.showWarningMessage('Extend template requires an open convo file');
+            return;
+        }
+
+        if(document.isUntitled || document.uri.scheme!=='file'){
+            void window.showWarningMessage('Save the convo file before extending it');
+            return;
+        }
+
+        if(document.isDirty && !await document.save()){
+            return;
+        }
+
+        const filePath=document.uri.fsPath;
+        const saveTo=await getNextDatedConvoPathAsync(filePath);
+        const content=`@import ./${path.basename(filePath)}\n\n> user\n\n`;
+
+        const uri=Uri.file(saveTo);
+        await workspace.fs.writeFile(uri,Buffer.from(content,'utf8') as Uint8Array);
+
+        const doc=await workspace.openTextDocument(uri);
+        const editor=await window.showTextDocument(doc,{preview:false});
+        await revealDocumentEndAsync(editor);
+    }));
+}
+
+/**
+ * Returns the next available dated path for the given convo file. If the file name already
+ * contains a date suffix the base name is reused and the number is incremented.
+ */
+const getNextDatedConvoPathAsync=async (filePath:string):Promise<string>=>{
+    const dir=path.dirname(filePath);
+    let baseName=path.basename(filePath);
+    let n=1;
+
+    const match=/-(\d{4}-\d{2}-\d{2}-(\d+))\.convo$/i.exec(baseName);
+    if(match){
+        n=Number(match[2])+1;
+        baseName=baseName.substring(0,match.index);
+    }else if(baseName.toLowerCase().endsWith('.convo')){
+        baseName=baseName.substring(0,baseName.length-6);
+    }
+
+    const d=new Date();
+    const date=`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+
+    while(true){
+        const p=path.join(dir,`${baseName}-${date}-${n.toString().padStart(4,'0')}.convo`);
+        if(!await pathExistsAsync(p)){
+            return p;
+        }
+        n++;
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+import { ConvoExt } from './ConvoExt.js';
+//// replace-with ////
+import { ConvoExt } from './ConvoExt.js';
+import { registerExtendTemplateCommand } from './extend-template.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+    registerConvoStdDocumentProvider(context);
+//// replace-with ////
+    registerConvoStdDocumentProvider(context);
+    registerExtendTemplateCommand(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                }
+//// replace-with ////
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@11"
+                },
+                {
+                    "command": "convo.extend-template",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@12"
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+//// replace-with ////
+            {
+                "command": "convo.new",
+                "title": "Convo: New File"
+            },
+            {
+                "command": "convo.extend-template",
+                "title": "Convo: Extend Template - Creates a new convo file that imports the current file",
+                "shortTitle": "Convo: Extend Template",
+                "icon": "$(new-file)"
+            },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+//// replace-with ////
+                "command": "convo.new",
+                "key": "shift+alt+ctrl+n",
+                "mac": "shift+alt+cmd+n"
+            },
+            {
+                "command": "convo.extend-template",
+                "key": "ctrl+shift+m",
+                "mac": "cmd+shift+m",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+```
+</FILE_CONTENT>
+
+
+> user

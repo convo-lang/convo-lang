@@ -6,13 +6,14 @@ import { CancelToken, Lock, LogLevel, createJsonRefReplacer, getDirectoryName, g
 import { pathExistsAsync, readFileAsStringAsync } from '@iyio/node-common';
 import { realpath } from 'fs/promises';
 import * as path from 'path';
-import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, window, workspace } from 'vscode';
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { extensionPublisher } from './build-const.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
 import { registerOutTagCommands } from './output-tag-code-lens.js';
+import { revealDocumentEndAsync } from './util.js';
 
 export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=>{
 
@@ -603,16 +604,22 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                     if(!isFinal && tmpAppend){
                         code=tmpAppend+'\n\n'+code;
                     }
+                    const getRange=()=>append?
+                        new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                        new Range(document.positionAt(0),document.positionAt(document.getText().length));
+
+                    if(isFinal){
+                        await applyFinalEditAsync(document,code,getRange());
+                        return;
+                    }
+
                     const editor=await window.showTextDocument(document);
 
                     await editor.edit(builder=>{
                         if(done && !isFinal){
                             return;
                         }
-                        const all=append?
-                            new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
-                            new Range(document.positionAt(0),document.positionAt(document.getText().length));
-                        builder.replace(all,code);
+                        builder.replace(getRange(),code);
                     })
                 }finally{
                     release();
@@ -897,6 +904,48 @@ interface CompletionOptions
 
 
 const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+
+/**
+ * Applies the final completion edit in the background without focusing the document. The
+ * document is saved after the edit and visible editors of the document are scrolled to the end.
+ * If the edit fails the response is opened in a new untitled convo document.
+ */
+const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<void>=>{
+    const edit=new WorkspaceEdit();
+    edit.replace(document.uri,range,code);
+
+    let applied=false;
+    try{
+        applied=await workspace.applyEdit(edit);
+    }catch(ex){
+        console.error('Failed to apply completion edit',ex);
+    }
+
+    if(!applied){
+        const fallback=await workspace.openTextDocument({
+            language:'source.convo',
+            content:`// Unable to append the following response to ${path.basename(document.fileName)}\n\n${code}`,
+        });
+        await window.showTextDocument(fallback,{
+            preview:false,
+            preserveFocus:true,
+            viewColumn:ViewColumn.Beside,
+        });
+        return;
+    }
+
+    const doc=await workspace.openTextDocument(document.uri);
+    if(!doc.isUntitled){
+        await doc.save();
+    }
+
+    const uri=doc.uri.toString();
+    for(const editor of window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
 
 const example=/*convo*/`
 # Builds a vehicle for the user

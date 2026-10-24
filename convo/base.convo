@@ -3,9 +3,9 @@
 
 > define
 openAiModel='gpt-5.5'
-claudeModel='open-router/anthropic/claude-opus-4.8'
+claudeModel='open-router/anthropic/claude-opus-5.5'
 
-__model=openAiModel
+__model=claudeModel
 
 __trackModel=true
 __trackTokenUsage=true;

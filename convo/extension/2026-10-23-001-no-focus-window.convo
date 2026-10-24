@@ -1,0 +1,164 @@
+@import ./_extension.convo
+
+> user
+After a completion has completed in the `completeAsync` function of the `completion-provider.ts` file
+do not focus / show the window to make the edit. If the user is typing in another open window while
+the edit is being made the edit fails and the response from the LLM is lost. The edit should happen in
+the background but also not write directly to disk, the edit api should still be used.
+
+@time 2026-10-23T08:42:37-04:00
+@tokenUsage 97511 / 981
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I make the change, I have a few questions.
+
+**Proposed approach:** I'd replace `window.showTextDocument(document)` and `editor.edit(...)` in `setCodeAsync` with a `WorkspaceEdit` applied through `workspace.applyEdit(...)`. This edits the document's in-memory buffer without focusing it, works whether or not the document is visible, and doesn't write to disk.
+
+1. **Streaming updates:** Should the intermediate updates (the `// completing...` placeholder and appended messages) also be applied in the background? Or should only the final edit change?
+
+2. **Scrolling:** If the convo document is visible in an editor that isn't focused, should I move the cursor and scroll to the end of the response? I'd do this without stealing focus. Or should the editor be left alone?
+
+3. **Saving:** Should the document stay unsaved/dirty after completion, as it does now? Or should I call `document.save()` once the final edit is applied?
+
+4. **Failed edits:** If `applyEdit` returns `false` (for example, the document was closed), how should the response be kept? Options:
+   - a) Open the response in a new untitled convo document.
+   - b) Copy it to the clipboard and show a warning.
+   - c) Both.
+
+5. **User edits to the same document:** The final edit currently replaces the whole document with `cli.buffer`. Any typing in that same document during the completion would be overwritten. Should I leave this as is? Or should I only replace the range from `startLength` to the end, so earlier edits are kept?
+
+6. **`nextCommand` and `convo.code-blocks-refresh`:** These still run after completion. Is that fine?
+
+
+> user
+1. Just the final edit
+2. yes, scroll the document without stealing focus
+3. Save the document
+4. a, add a comment to the top of the document saying: `// Unable to append the following response to {FILE_NAME}`
+5. leave as is
+6. Do the cause focus to be stolen if the user is editing a different document?
+
+@time 2026-10-23T09:09:58-04:00
+@tokenUsage 98159 / 4247
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+**Answer to #6:** No, neither one steals focus.
+- `convo.code-blocks-refresh` only calls `provider.refresh()`, which fires tree and decoration change events.
+- `nextCommand` isn't passed by any current caller of `completeAsync`. A future caller could pass a command that opens or shows an editor, and that would take focus, but nothing does today.
+
+**Changes:**
+- **Final edit runs in the background.** It uses `workspace.applyEdit` with a `WorkspaceEdit`, so the window isn't focused and nothing is written directly to disk.
+- **The document is saved after the edit.** Untitled documents are skipped, because saving them would open a "Save As" dialog that takes focus.
+- **Scrolling without focus.** Any visible editor showing the document moves its cursor to the end and scrolls there, without taking focus.
+- **Fallback if the edit fails.** The response opens in a new untitled convo document beside the current editor, without taking focus. It starts with the comment `// Unable to append the following response to {FILE_NAME}`.
+- **Unchanged parts.** Intermediate streaming updates work as before. The error path also uses the final edit, so it gets the same background behavior.
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="224067979b13beb14aefecf4bd53a225992c5a51" find-replace>
+``` ts
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, commands, window, workspace } from 'vscode';
+//// replace-with ////
+import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="224067979b13beb14aefecf4bd53a225992c5a51" find-replace>
+``` ts
+import { registerOutTagCommands } from './output-tag-code-lens.js';
+//// replace-with ////
+import { registerOutTagCommands } from './output-tag-code-lens.js';
+import { revealDocumentEndAsync } from './util.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="224067979b13beb14aefecf4bd53a225992c5a51" find-replace>
+``` ts
+                    if(!isFinal && tmpAppend){
+                        code=tmpAppend+'\n\n'+code;
+                    }
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        const all=append?
+                            new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                            new Range(document.positionAt(0),document.positionAt(document.getText().length));
+                        builder.replace(all,code);
+                    })
+//// replace-with ////
+                    if(!isFinal && tmpAppend){
+                        code=tmpAppend+'\n\n'+code;
+                    }
+                    const getRange=()=>append?
+                        new Range(document.positionAt(startLength),document.positionAt(document.getText().length)):
+                        new Range(document.positionAt(0),document.positionAt(document.getText().length));
+
+                    if(isFinal){
+                        await applyFinalEditAsync(document,code,getRange());
+                        return;
+                    }
+
+                    const editor=await window.showTextDocument(document);
+
+                    await editor.edit(builder=>{
+                        if(done && !isFinal){
+                            return;
+                        }
+                        builder.replace(getRange(),code);
+                    })
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="224067979b13beb14aefecf4bd53a225992c5a51" find-replace>
+``` ts
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+//// replace-with ////
+const defaultMakeLogLevel=LogLevel.log|LogLevel.warn|LogLevel.error;
+
+/**
+ * Applies the final completion edit in the background without focusing the document. The
+ * document is saved after the edit and visible editors of the document are scrolled to the end.
+ * If the edit fails the response is opened in a new untitled convo document.
+ */
+const applyFinalEditAsync=async (document:TextDocument,code:string,range:Range):Promise<void>=>{
+    const edit=new WorkspaceEdit();
+    edit.replace(document.uri,range,code);
+
+    let applied=false;
+    try{
+        applied=await workspace.applyEdit(edit);
+    }catch(ex){
+        console.error('Failed to apply completion edit',ex);
+    }
+
+    if(!applied){
+        const fallback=await workspace.openTextDocument({
+            language:'source.convo',
+            content:`// Unable to append the following response to ${path.basename(document.fileName)}\n\n${code}`,
+        });
+        await window.showTextDocument(fallback,{
+            preview:false,
+            preserveFocus:true,
+            viewColumn:ViewColumn.Beside,
+        });
+        return;
+    }
+
+    const doc=await workspace.openTextDocument(document.uri);
+    if(!doc.isUntitled){
+        await doc.save();
+    }
+
+    const uri=doc.uri.toString();
+    for(const editor of window.visibleTextEditors){
+        if(editor.document.uri.toString()===uri){
+            await revealDocumentEndAsync(editor);
+        }
+    }
+}
+```
+</FILE_CONTENT>
+
+
+> user
