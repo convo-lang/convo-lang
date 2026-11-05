@@ -572,14 +572,14 @@
             },
             {
                 "command": "convo.answer-questions",
-                "key": "ctrl+shift+l",
-                "mac": "cmd+shift+l",
+                "key": "ctrl+alt+shift+l",
+                "mac": "cmd+alt+shift+l",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             },
             {
                 "command": "convo.answer-questions-split",
-                "key": "ctrl+alt+shift+l",
-                "mac": "cmd+alt+shift+l",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             }
         ],
