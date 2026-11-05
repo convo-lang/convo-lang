@@ -1,0 +1,351 @@
+@import ./_extension.convo
+
+> user
+Add a new command to help answer questions using a split view (`convo.answer-questions-split`). 
+The command should:
+
+- split the current editor window
+- collapse the side panel
+- resize the editor window so the left side takes 2/3 of the screen
+- call the `convo.answer-questions` command
+
+
+@time 2026-11-04T19:47:31-05:00
+@tokenUsage 104026 / 1233
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write the code, I have a few questions:
+
+1. Where should the command live?
+   - a) A new dedicated file `answer-questions-split.ts` with its own `registerAnswerQuestionsSplitCommand`, registered in `extension.ts`
+   - b) Added to the existing `answer-questions.ts` and registered by `registerAnswerQuestionsCommand`
+
+2. After splitting, which editor should get the answer placeholders and focus?
+   - a) The new right editor (1/3) gets the cursor for answering. The left editor (2/3) stays scrolled to the questions.
+   - b) The left editor (2/3) gets the cursor. The right editor shows the questions.
+
+3. What should "collapse the side panel" close?
+   - a) Only the primary sidebar (`workbench.action.closeSidebar`)
+   - b) The primary sidebar and the secondary/auxiliary sidebar
+   - c) The primary sidebar, the auxiliary sidebar, and the bottom panel
+
+4. Sizing uses `vscode.setEditorLayout` with a 2/3 to 1/3 horizontal split. This replaces the current editor group layout. How should existing splits be handled?
+   - a) Always force a two-column `[0.67, 0.33]` layout. Editors in extra groups get merged by VS Code.
+   - b) If the document is already open in a second group, reuse that group and only resize it instead of splitting again.
+   - c) Both: reuse an existing split if there is one, and otherwise create a new split. Either way, apply the 2/3 to 1/3 layout.
+
+5. How should the command be exposed in `package.json`?
+   - a) Command palette only
+   - b) Also add an `editor/title` menu button (for example a `$(split-horizontal)` icon after Answer Questions)
+   - c) Also add a keybinding (for example `ctrl+alt+shift+l` / `cmd+alt+shift+l`)
+   - d) Both b and c
+
+6. If the last assistant message has no numbered questions, `convo.answer-questions` only shows a message. Should the split and layout changes still happen in that case?
+   - a) Yes, always split and resize first
+   - b) No, check for questions first and skip the layout changes if none are found. This would mean exporting a small helper from `answer-questions.ts`.
+
+
+> user
+1. b
+2. a
+3. a
+4. b
+5. d
+6. b
+
+Also after splitting the editor window word wrapping should be enabled
+
+@time 2026-11-04T19:52:27-05:00
+@tokenUsage 104831 / 5595
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I put the new command in `answer-questions.ts`, as you chose. The question lookup is now a shared helper, so the split command can check for questions before it changes the layout.
+
+One limitation: VS Code has no API to set word wrap for a single editor, only `editor.action.toggleWordWrap`. The toggle is stored per document, so it covers both sides of the split. To keep it from flipping word wrap back off, the toggle only runs when `editor.wordWrap` is `off`, and only once per document per session. If you already toggled wrapping on by hand in that document, running the command will turn it off.
+
+When an existing split is reused, the answer placeholders go into the rightmost editor of that document. The 2/3 to 1/3 layout is then applied to the two groups.
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts">
+``` ts
+import { ConvoMessage, convoRoles, parseConvoCode } from '@convo-lang/convo-lang';
+import { ExtensionContext, Range, Selection, TextEditorRevealType, WorkspaceEdit, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const questionReg=/(^|\n)[ *~`_]*(\d+)[ *~`_]*\./g;
+
+/**
+ * URIs of documents word wrapping has been enabled for by the split command
+ */
+const wordWrapEnabledUris=new Set<string>();
+
+interface AssistantQuestions
+{
+    messages:ConvoMessage[];
+    assistantIndex:number;
+    numbers:string[];
+}
+
+/**
+ * Registers the `convo.answer-questions` and `convo.answer-questions-split` commands. The
+ * `convo.answer-questions` command searches the last assistant message for numbered questions and
+ * adds numbered placeholder answers in a user message at the end of the document. The cursor is
+ * placed after the first placeholder. The `convo.answer-questions-split` command splits the editor,
+ * collapses the side bar, sizes the left editor to 2/3 of the window, enables word wrapping and then
+ * calls `convo.answer-questions` in the right editor.
+ */
+export const registerAnswerQuestionsCommand=(context:ExtensionContext,ext:ConvoExt)=>{
+    context.subscriptions.push(commands.registerCommand('convo.answer-questions',answerQuestionsAsync));
+    context.subscriptions.push(commands.registerCommand('convo.answer-questions-split',answerQuestionsSplitAsync));
+}
+
+const answerQuestionsAsync=async ()=>{
+    const editor=window.activeTextEditor;
+    const document=editor?.document;
+    if(!editor || document?.languageId!=='source.convo'){
+        return;
+    }
+
+    const text=document.getText();
+    const questions=getLastAssistantQuestions(text);
+    if(!questions){
+        return;
+    }
+    const {messages,assistantIndex,numbers}=questions;
+    const first=numbers[0];
+
+    const lastMsg=messages[messages.length-1];
+    const appendToUser=assistantIndex<messages.length-1 && lastMsg?.role===convoRoles.user;
+    const trimmedLength=text.trimEnd().length;
+
+    const header=(
+        !appendToUser?
+            `${trimmedLength?'\n\n':''}> user\n`
+        :lastMsg?.content?.trim()?
+            '\n\n'
+        :
+            '\n'
+    );
+    const insert=`${header}${numbers.map(n=>`${n}. `).join('\n')}\n`;
+
+    const edit=new WorkspaceEdit();
+    edit.replace(document.uri,new Range(document.positionAt(trimmedLength),document.positionAt(text.length)),insert);
+    if(!await workspace.applyEdit(edit)){
+        void window.showErrorMessage('Failed to add question placeholders');
+        return;
+    }
+
+    const pos=document.positionAt(trimmedLength+header.length+`${first}. `.length);
+    editor.selection=new Selection(pos,pos);
+    editor.revealRange(new Range(pos,pos),TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
+const answerQuestionsSplitAsync=async ()=>{
+    const editor=window.activeTextEditor;
+    const document=editor?.document;
+    if(!editor || document?.languageId!=='source.convo'){
+        return;
+    }
+
+    if(!getLastAssistantQuestions(document.getText())){
+        return;
+    }
+
+    const uri=document.uri.toString();
+    const existing=window.visibleTextEditors
+        .filter(e=>e.document.uri.toString()===uri && e.viewColumn!==undefined)
+        .sort((a,b)=>(a.viewColumn??0)-(b.viewColumn??0));
+
+    if(existing.length<2){
+        await commands.executeCommand('workbench.action.splitEditorRight');
+    }
+
+    const column=existing.length>=2?
+        existing[existing.length-1]?.viewColumn
+    :
+        window.activeTextEditor?.viewColumn;
+
+    await commands.executeCommand('workbench.action.closeSidebar');
+    await commands.executeCommand('vscode.setEditorLayout',{orientation:0,groups:[{size:2/3},{size:1/3}]});
+    await window.showTextDocument(document,{viewColumn:column,preview:false,preserveFocus:false});
+
+    if(!wordWrapEnabledUris.has(uri) && workspace.getConfiguration('editor',document).get<string>('wordWrap')==='off'){
+        await commands.executeCommand('editor.action.toggleWordWrap');
+    }
+    wordWrapEnabledUris.add(uri);
+
+    await commands.executeCommand('convo.answer-questions');
+}
+
+/**
+ * Returns the numbered questions of the last assistant message in the given convo source. If no
+ * assistant message or questions are found an information message is displayed and undefined is
+ * returned.
+ */
+const getLastAssistantQuestions=(text:string):AssistantQuestions|undefined=>{
+    const messages=parseConvoCode(text).result??[];
+
+    let assistantIndex=-1;
+    for(let i=messages.length-1;i>=0;i--){
+        if(messages[i]?.role===convoRoles.assistant){
+            assistantIndex=i;
+            break;
+        }
+    }
+
+    const assistant=messages[assistantIndex];
+    if(!assistant){
+        void window.showInformationMessage('No assistant message found');
+        return undefined;
+    }
+
+    const numbers=getQuestionNumbers(assistant.content??'');
+    if(!numbers[0]){
+        void window.showInformationMessage('No numbered questions found in the last assistant message');
+        return undefined;
+    }
+
+    return {messages,assistantIndex,numbers};
+}
+
+/**
+ * Returns the unique question numbers found in the given content in order of first appearance
+ */
+const getQuestionNumbers=(content:string):string[]=>{
+    const numbers:string[]=[];
+    for(const match of content.matchAll(questionReg)){
+        const n=match[2];
+        if(n && !numbers.includes(n)){
+            numbers.push(n);
+        }
+    }
+    return numbers;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                {
+                    "command": "convo.answer-questions",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@13"
+                }
+            ],
+//// replace-with ////
+                {
+                    "command": "convo.answer-questions",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@13"
+                },
+                {
+                    "command": "convo.answer-questions-split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@14"
+                }
+            ],
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "shortTitle": "Convo: Answer Questions",
+                "icon": "$(question)"
+            }
+        ],
+//// replace-with ////
+                "shortTitle": "Convo: Answer Questions",
+                "icon": "$(question)"
+            },
+            {
+                "command": "convo.answer-questions-split",
+                "title": "Convo: Answer Questions Split - Splits the editor and adds numbered placeholder answers in the right editor",
+                "shortTitle": "Convo: Answer Questions Split",
+                "icon": "$(split-horizontal)"
+            }
+        ],
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+            {
+                "command": "convo.answer-questions",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            }
+        ],
+//// replace-with ////
+            {
+                "command": "convo.answer-questions",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.answer-questions-split",
+                "key": "ctrl+alt+shift+l",
+                "mac": "cmd+alt+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            }
+        ],
+```
+</FILE_CONTENT>
+
+
+> user
+The split window on the right should receive focus for the user to answer questions in. Right
+now the window on the left receives focus
+
+@time 2026-11-04T20:00:17-05:00
+@tokenUsage 109500 / 1801
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The left editor was getting focus because `window.activeTextEditor` doesn't always update right after `workbench.action.splitEditorRight`. The target column was read before VS Code switched the active editor, so it pointed at the left group. Applying the layout could also shift group numbers.
+
+The fix focuses the last (right) editor group after the layout is applied. It then shows the document in that active group, so the right editor gets focus. This works for both a new split and a reused one.
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts" find-replace>
+``` ts
+import { ExtensionContext, Range, Selection, TextEditorRevealType, WorkspaceEdit, commands, window, workspace } from 'vscode';
+//// replace-with ////
+import { ExtensionContext, Range, Selection, TextEditorRevealType, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts" find-replace>
+``` ts
+    const uri=document.uri.toString();
+    const existing=window.visibleTextEditors
+        .filter(e=>e.document.uri.toString()===uri && e.viewColumn!==undefined)
+        .sort((a,b)=>(a.viewColumn??0)-(b.viewColumn??0));
+
+    if(existing.length<2){
+        await commands.executeCommand('workbench.action.splitEditorRight');
+    }
+
+    const column=existing.length>=2?
+        existing[existing.length-1]?.viewColumn
+    :
+        window.activeTextEditor?.viewColumn;
+
+    await commands.executeCommand('workbench.action.closeSidebar');
+    await commands.executeCommand('vscode.setEditorLayout',{orientation:0,groups:[{size:2/3},{size:1/3}]});
+    await window.showTextDocument(document,{viewColumn:column,preview:false,preserveFocus:false});
+//// replace-with ////
+    const uri=document.uri.toString();
+    const existing=window.visibleTextEditors.filter(e=>e.document.uri.toString()===uri && e.viewColumn!==undefined);
+
+    if(existing.length<2){
+        await commands.executeCommand('workbench.action.splitEditorRight');
+    }
+
+    await commands.executeCommand('workbench.action.closeSidebar');
+    await commands.executeCommand('vscode.setEditorLayout',{orientation:0,groups:[{size:2/3},{size:1/3}]});
+    await commands.executeCommand('workbench.action.focusLastEditorGroup');
+    await window.showTextDocument(document,{viewColumn:ViewColumn.Active,preview:false,preserveFocus:false});
+```
+</FILE_CONTENT>
+
+
+> user

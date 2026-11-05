@@ -171,6 +171,11 @@
                     "command": "convo.answer-questions",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@13"
+                },
+                {
+                    "command": "convo.answer-questions-split",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@14"
                 }
             ],
             "view/title": [
@@ -522,6 +527,12 @@
                 "title": "Convo: Answer Questions - Adds numbered placeholder answers for questions in the last assistant message",
                 "shortTitle": "Convo: Answer Questions",
                 "icon": "$(question)"
+            },
+            {
+                "command": "convo.answer-questions-split",
+                "title": "Convo: Answer Questions Split - Splits the editor and adds numbered placeholder answers in the right editor",
+                "shortTitle": "Convo: Answer Questions Split",
+                "icon": "$(split-horizontal)"
             }
         ],
         "keybindings": [
@@ -563,6 +574,12 @@
                 "command": "convo.answer-questions",
                 "key": "ctrl+shift+l",
                 "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.answer-questions-split",
+                "key": "ctrl+alt+shift+l",
+                "mac": "cmd+alt+shift+l",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             }
         ],
