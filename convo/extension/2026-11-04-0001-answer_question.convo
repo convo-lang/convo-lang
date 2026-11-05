@@ -1,0 +1,281 @@
+@import ./_extension.convo
+
+> user
+Add a new command to help answer questions (`convo.answer-questions`). The command will be used to 
+help the user answer questions asked by the last assistant message. It should do the following:
+
+- Search the last assistant message for numbered questions using a regex: /(^|\n)[ *~`_]*(\d+)[ *~`_]*\./
+- add place holder response with the same found numbers
+- place the cursor at the first question
+
+
+Example assistant message:
+<Assistant>
+Before I make the changes, I have a few questions about the mobile bottom bar.
+
+**1. Breakpoint**
+- a) Below `--bp-md` (920px), the same as the rest of the mobile layout
+- b) A smaller breakpoint, such as 600px
+
+**2. Where chat replies are shown on mobile**
+The chat panel is currently a strip below the main area, with its own textarea.
+- a) Remove the chat strip. The bar's input sends the prompt, and the log opens as a sheet that slides up above the bar. It opens when a message is added, and a tap closes it.
+- b) Keep the chat log strip but remove its textarea. The bar's input replaces it.
+- c) Remove the chat strip. Replies are shown as toasts only.
+
+**3. Screens without a chat panel**
+This covers Profile, Archive Settings, flows, intake and the decision path editor's rail inputs.
+- a) Always show the input. It is passed to the screen's voice command handler, the same as the Speak button.
+- b) Hide the input on those screens and keep only the Menu and Mic buttons.
+- c) Hide the input on carousel and input screens only.
+</Assistant>
+
+Example user response:
+<User>
+1. 
+2. 
+3. 
+</User>
+
+Make sure to include the single space after the numbered responses
+
+Add a keyboard short cut of cmd+shift+a to run the command
+
+@time 2026-11-04T19:27:51-05:00
+@tokenUsage 102965 / 1104
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before I make the changes.
+
+1. Where should the placeholder answers be inserted?
+   - a) If the document already ends with an empty `> user` message (which happens after a completion), add the answers under it. If not, add a new `> user` message to the end of the document.
+   - b) Always add a new `> user` message to the end of the document.
+
+2. How should the last assistant message be found?
+   - a) Use `parseConvoCode` and select the last message with the role `assistant`.
+   - b) Search the raw text for the last `> assistant` header.
+
+3. What should happen with duplicate numbers? For example, a question may contain its own numbered sub-list.
+   - a) Remove duplicates and keep the order of first appearance.
+   - b) Keep every match as it is found.
+   - c) Keep only the numbers that come after the previous number (1, 2, 3...), and ignore restarts.
+
+4. What should happen if no numbered questions are found?
+   - a) Show an information message and change nothing.
+   - b) Add an empty `> user` message and place the cursor in it.
+
+5. What should happen if a `> user` message after the assistant message already has text?
+   - a) Add the placeholders below the existing text.
+   - b) Add a new `> user` message.
+   - c) Show a message and do nothing.
+
+6. Should the command also have a button in the editor title bar?
+   - a) Yes, with an icon such as `$(question)` and the next navigation group (`navigation@13`).
+   - b) No, only the command palette and the keyboard shortcut.
+
+7. What shortcut should Windows and Linux use?
+   - a) `ctrl+shift+a` for Windows and Linux, and `cmd+shift+a` for mac. The shortcut only works when a `.convo` editor has focus.
+   - b) Only add the mac `cmd+shift+a` shortcut.
+
+8. Where exactly should the cursor go?
+   - a) At the end of the `1. ` line, after the space.
+   - b) Select the whole first line.
+
+
+> user
+1. a
+2. a
+3. a
+4. a
+5. a
+6. a
+7. a, but change the letter to l. Macos: cmd+shift+l, win, linux:ctrl+shift+l
+8. a
+
+@time 2026-11-04T19:34:14-05:00
+@tokenUsage 103680 / 4038
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I added a new file for the command, registered it in `extension.ts`, and updated `package.json` with the command, a title bar button and the keybinding.
+
+One thing to know: `cmd+shift+l` and `ctrl+shift+l` are VS Code's default "Select All Occurrences" shortcut. The new binding only applies when a `.convo` editor has focus, so it replaces that shortcut only in convo files.
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts">
+``` ts
+import { convoRoles, parseConvoCode } from '@convo-lang/convo-lang';
+import { ExtensionContext, Range, Selection, TextEditorRevealType, WorkspaceEdit, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+
+const questionReg=/(^|\n)[ *~`_]*(\d+)[ *~`_]*\./g;
+
+/**
+ * Registers the `convo.answer-questions` command. The command searches the last assistant message
+ * for numbered questions and adds numbered placeholder answers in a user message at the end of the
+ * document. The cursor is placed after the first placeholder.
+ */
+export const registerAnswerQuestionsCommand=(context:ExtensionContext,ext:ConvoExt)=>{
+    context.subscriptions.push(commands.registerCommand('convo.answer-questions',answerQuestionsAsync));
+}
+
+const answerQuestionsAsync=async ()=>{
+    const editor=window.activeTextEditor;
+    const document=editor?.document;
+    if(!editor || document?.languageId!=='source.convo'){
+        return;
+    }
+
+    const text=document.getText();
+    const messages=parseConvoCode(text).result??[];
+
+    let assistantIndex=-1;
+    for(let i=messages.length-1;i>=0;i--){
+        if(messages[i]?.role===convoRoles.assistant){
+            assistantIndex=i;
+            break;
+        }
+    }
+
+    const assistant=messages[assistantIndex];
+    if(!assistant){
+        void window.showInformationMessage('No assistant message found');
+        return;
+    }
+
+    const numbers=getQuestionNumbers(assistant.content??'');
+    const first=numbers[0];
+    if(!first){
+        void window.showInformationMessage('No numbered questions found in the last assistant message');
+        return;
+    }
+
+    const lastMsg=messages[messages.length-1];
+    const appendToUser=assistantIndex<messages.length-1 && lastMsg?.role===convoRoles.user;
+    const trimmedLength=text.trimEnd().length;
+
+    const header=(
+        !appendToUser?
+            `${trimmedLength?'\n\n':''}> user\n`
+        :lastMsg?.content?.trim()?
+            '\n\n'
+        :
+            '\n'
+    );
+    const insert=`${header}${numbers.map(n=>`${n}. `).join('\n')}\n`;
+
+    const edit=new WorkspaceEdit();
+    edit.replace(document.uri,new Range(document.positionAt(trimmedLength),document.positionAt(text.length)),insert);
+    if(!await workspace.applyEdit(edit)){
+        void window.showErrorMessage('Failed to add question placeholders');
+        return;
+    }
+
+    const pos=document.positionAt(trimmedLength+header.length+`${first}. `.length);
+    editor.selection=new Selection(pos,pos);
+    editor.revealRange(new Range(pos,pos),TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
+/**
+ * Returns the unique question numbers found in the given content in order of first appearance
+ */
+const getQuestionNumbers=(content:string):string[]=>{
+    const numbers:string[]=[];
+    for(const match of content.matchAll(questionReg)){
+        const n=match[2];
+        if(n && !numbers.includes(n)){
+            numbers.push(n);
+        }
+    }
+    return numbers;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+//// replace-with ////
+import { registerAnswerQuestionsCommand } from './answer-questions.js';
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+    registerExtendTemplateCommand(context,ext);
+//// replace-with ////
+    registerExtendTemplateCommand(context,ext);
+    registerAnswerQuestionsCommand(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@12"
+                }
+//// replace-with ////
+                {
+                    "command": "convo.list-models",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@12"
+                },
+                {
+                    "command": "convo.answer-questions",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@13"
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            }
+//// replace-with ////
+            {
+                "command": "convo.tab",
+                "title": "Convo: Tab"
+            },
+            {
+                "command": "convo.answer-questions",
+                "title": "Convo: Answer Questions - Adds numbered placeholder answers for questions in the last assistant message",
+                "shortTitle": "Convo: Answer Questions",
+                "icon": "$(question)"
+            }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            }
+//// replace-with ////
+            {
+                "command": "convo.tab",
+                "key": "tab",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.answer-questions",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            }
+```
+</FILE_CONTENT>
+
+How the command behaves:
+- It parses the document and finds the last `assistant` message.
+- It collects the unique question numbers in the order they first appear.
+- If the document ends with a `> user` message after that assistant message, the placeholders go below it, with a blank line if the message already has text. If not, a new `> user` message is added.
+- Whitespace at the end of the document is normalized, and the cursor is placed after `1. ` (including the space).
+
+
+> user

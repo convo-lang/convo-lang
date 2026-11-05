@@ -166,6 +166,11 @@
                     "command": "convo.list-models",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@12"
+                },
+                {
+                    "command": "convo.answer-questions",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@13"
                 }
             ],
             "view/title": [
@@ -511,6 +516,12 @@
             {
                 "command": "convo.tab",
                 "title": "Convo: Tab"
+            },
+            {
+                "command": "convo.answer-questions",
+                "title": "Convo: Answer Questions - Adds numbered placeholder answers for questions in the last assistant message",
+                "shortTitle": "Convo: Answer Questions",
+                "icon": "$(question)"
             }
         ],
         "keybindings": [
@@ -547,6 +558,12 @@
                 "command": "convo.tab",
                 "key": "tab",
                 "when": "editorTextFocus && !editorReadonly && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.answer-questions",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
             }
         ],
         "configuration": {
