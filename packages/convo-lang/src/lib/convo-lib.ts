@@ -300,6 +300,11 @@ export const convoRoles={
      * Indicates a worker is ready to run
      */
     run:'run',
+
+    /**
+     * Sets a cache breakpoint
+     */
+    cacheBreakpoint:'cacheBreakpoint',
 } as const;
 
 /**
@@ -673,6 +678,11 @@ export const convoFunctions={
      */
     dbDeleteEmbedding:'dbDeleteEmbedding',
 
+    /**
+     * Enables a caching behaviour
+     * @usage enabledCaching(behaviour='default',model?:string)
+     */
+    enableCaching:'enableCaching'
 
 
 
@@ -968,7 +978,13 @@ export const convoVars={
     /**
      * A ConvoDb connection string
      */
-    __dbConnection:'__dbConnection'
+    __dbConnection:'__dbConnection',
+
+    __cacheBehaviors:'__cacheBehaviors',
+
+    __importTemplates:'__importTemplates',
+
+    __sessionId:'__sessionId',
 
 } as const;
 
@@ -1904,6 +1920,7 @@ export const allowedConvoDefinitionFunctions=[
     convoFunctions.aryFindMatch,
     convoFunctions.aryRemoveMatch,
     convoFunctions.dbConfig,
+    convoFunctions.enableCaching,
     'merge',
     'print',
     'setObjDefaults',
@@ -2985,10 +3002,10 @@ export const getLastNonCalledConvoFlatMessage=(messages:FlatConvoMessage[]):Flat
     return undefined;
 }
 
-export const getLastConvoContentMessage=(messages:FlatConvoMessage[]):FlatConvoMessage|undefined=>{
-    for(let i=messages.length-1;i>=0;i--){
+export const getLastConvoContentMessage=(messages:FlatConvoMessage[],startIndex=messages.length-1,allowSystem=false):FlatConvoMessage|undefined=>{
+    for(let i=startIndex;i>=0;i--){
         const msg=messages[i];
-        if(msg && !msg.called && msg.content!==undefined && msg.role!==convoRoles.system){
+        if(msg && !msg.called && msg.content!==undefined && (allowSystem || (msg.role!==convoRoles.system))){
             return msg;
         }
     }

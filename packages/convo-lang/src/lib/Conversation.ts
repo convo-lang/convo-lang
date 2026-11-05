@@ -3350,20 +3350,19 @@ export class Conversation
         }
         this.importMessages.push(msg);
 
-        let index=Math.max(0,this._messages.indexOf(msg));
         for(const t of msg.tags){
             if(t.name!==convoTags.import || !t.value){
                 continue;
             }
             const externFunctions:Record<string,ConvoScopeFunction>={}
             let l=this._messages.length;
-            index+=this._messages.length-l;
-            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions);
+            const index=Math.max(0,this._messages.indexOf(msg));
+            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions,exe);
             exe?.loadFunctions(imported,externFunctions);
         }
     }
 
-    public async importAsync(name:string,context:ConvoImportContext,index?:number,externFunctions?:Record<string,ConvoScopeFunction>):Promise<ConvoMessage[]>
+    public async importAsync(name:string,context:ConvoImportContext,index?:number,externFunctions?:Record<string,ConvoScopeFunction>,exe?:ConvoExecutionContext):Promise<ConvoMessage[]>
     {
 
         const importBase=parseBaseConvoImport(name);
@@ -3372,6 +3371,14 @@ export class Conversation
         name=_name;
         if(!name){
             throw new Error(`Invalid import - @import ${modifiers.join(' ')}`)
+        }
+
+        if(exe && modifiers.includes('template')){
+            let ary=exe.getVar(convoVars.__importTemplates);
+            if(!Array.isArray(ary)){
+                ary=[];
+            }
+            exe.setVar(true,[...ary,name],convoVars.__importTemplates);
         }
 
         const imports:ConvoModule[]=[];
@@ -4228,6 +4235,7 @@ export class Conversation
             }
 
             let queueRef:ConvoQueueRef|undefined;
+            let sessionId:string|undefined=exe.getStringVar(convoVars.__sessionId);
 
             if(secondPass){
                 let insertLabel='';
@@ -4241,6 +4249,20 @@ export class Conversation
                         continue;
                     }
                     switch(msg.role){
+
+                        case convoRoles.cacheBreakpoint:{
+                            let prev=getLastConvoContentMessage(messages,i-1,true);
+                            console.log('hio 👋 👋 👋 cacheBreakpoint',{msg,prev,ses:msg[convoFlatMessageSourceMessageKey]?.head?.trim()||true});
+                            if(prev){
+                                prev.cacheBreakpoint=msg[convoFlatMessageSourceMessageKey]?.head?.trim()||true;
+                                if(typeof prev.cacheBreakpoint === 'string'){
+                                    sessionId=prev.cacheBreakpoint;
+                                }
+                            }
+                            messages.splice(i,1);
+                            i--;
+                            break;
+                        }
 
                         case convoRoles.insert:
 
@@ -4718,6 +4740,7 @@ export class Conversation
                 afterCall,
                 messageTriggers,
                 enableStreaming:this.enableStreaming,
+                sessionId,
             });
             exe.flat=flat;
             const apiKey=exe.getVar(convoVars.__apiKey);
@@ -4731,6 +4754,16 @@ export class Conversation
 
             if(exe.getVar('__returnEmptyResponse')){
                 flat.returnEmpty=true;
+            }
+
+            const cacheBehaviors=exe.getVar(convoVars.__cacheBehaviors);
+            if(Array.isArray(cacheBehaviors)){
+                flat.cacheBehaviors=cacheBehaviors;
+            }
+
+            const importTemplates=exe.getVar(convoVars.__importTemplates);
+            if(Array.isArray(importTemplates)){
+                flat.importTemplates=importTemplates;
             }
 
             if(isStartOfGoto){
@@ -6098,6 +6131,7 @@ const secondPassRoles:(string|undefined)[]=[
     convoRoles.insertEnd,
     convoRoles.queue,
     convoRoles.flush,
+    convoRoles.cacheBreakpoint,
 ]
 
 

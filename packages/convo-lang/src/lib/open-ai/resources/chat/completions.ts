@@ -1053,6 +1053,8 @@ export interface ChatCompletionCreateParamsBase {
    */
   temperature?: number | null;
 
+  session_id?:string;
+
   /**
    * Controls which (if any) tool is called by the model. `none` means the model will
    * not call any tool and instead generates a message. `auto` means the model can

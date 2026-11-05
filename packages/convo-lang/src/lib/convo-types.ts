@@ -1199,6 +1199,8 @@ export interface FlatConvoMessage
 
     insert?:ConvoInsert;
 
+    cacheBreakpoint?:string|boolean;
+
     order?:number;
 
     /**
@@ -1723,6 +1725,19 @@ export interface FlatConvoConversationBase
      * If true an empty result should be returned from the provider
      */
     returnEmpty?:boolean;
+
+    cacheBehaviors?:ConvoCacheBehavior[];
+
+    importTemplates?:string[];
+
+
+    sessionId?:string;
+}
+
+export interface ConvoCacheBehavior
+{
+    model?:string;
+    behavior?:string;
 }
 
 export const allConvoReasoningEffort=['min','minimal','low','md','medium','high'] as const;

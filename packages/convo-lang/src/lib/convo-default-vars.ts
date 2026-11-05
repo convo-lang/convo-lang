@@ -8,7 +8,7 @@ import { convoArgsName, convoArrayFnName, convoBodyFnName, convoCaseFnName, conv
 import { ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
 import { convoPipeScopeFunction } from "./convo-pipe.js";
 import { createConvoSceneDescription } from "./convo-scene-lib.js";
-import { ConvoIterator, ConvoMultiReadOptions, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
+import { ConvoCacheBehavior, ConvoIterator, ConvoMultiReadOptions, ConvoScope, isConvoMarkdownLine } from "./convo-types.js";
 import { convoTypeToJsonScheme, convoValueToZodType, describeConvoScheme } from "./convo-zod.js";
 import { convoScopeFunctionReadDoc } from "./scope-functions/convoScopeFunctionReadDoc.js";
 
@@ -1824,6 +1824,17 @@ export const extendedConvoVars={
     [convoFunctions.getNodeInfo]:createConvoScopeFunction(getNodeInfo),
 
     [convoFunctions.getNodeInput]:createConvoScopeFunction((scope,ctx)=>getNodeInfo(scope,ctx)?.input),
+
+    [convoFunctions.enableCaching]:createConvoScopeFunction((scope,ctx)=>{
+        const behavior=(typeof scope.paramValues?.[0] === 'string')?scope.paramValues[0]:'default';
+        const model=(typeof scope.paramValues?.[1] === 'string')?scope.paramValues[1]:undefined;
+
+        let ary:ConvoCacheBehavior[]|undefined=ctx.getVar(convoVars.__cacheBehaviors);
+        if(!Array.isArray(ary)){
+            ary=[];
+        }
+        ctx.setVar(true,[...ary,{behavior,model} satisfies ConvoCacheBehavior],convoVars.__cacheBehaviors);
+    })
 
 } as const;
 Object.freeze(extendedConvoVars);

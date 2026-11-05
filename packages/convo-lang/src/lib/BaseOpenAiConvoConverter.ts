@@ -1,8 +1,8 @@
-import { asType, deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
+import { deleteUndefined, getErrorMessage, parseMarkdownImages, zodTypeToJsonScheme } from "@iyio/common";
 import { parseJson5 } from '@iyio/json5';
 import { convoTags, createFunctionCallConvoCompletionMessage, createTextConvoCompletionMessage, getLastConvoContentMessage, getNormalizedFlatMessageList } from "./convo-lib.js";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
-import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation } from "./convo-types.js";
+import { ConvoCompletionMessage, ConvoConversationConverter, ConvoModelInfo, FlatConvoConversation, FlatConvoConversationBase } from "./convo-types.js";
 import { ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionContentPart, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool, ChatCompletionUserMessageParam } from './open-ai/resources/chat/index.js';
 
 export interface BaseOpenAiConvoConverterOptions
@@ -37,8 +37,8 @@ export interface BaseOpenAiConvoConverterOptions
 
     hasVision?:(modelName:string)=>boolean;
 
-    transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
-    transformOutput?:(output:ChatCompletion)=>ChatCompletion;
+    transformInput?:(input:ChatCompletionRequest,flat:FlatConvoConversationBase)=>ChatCompletionRequest;
+    transformOutput?:(output:ChatCompletion,flat:FlatConvoConversationBase)=>ChatCompletion;
 
     getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
 }
@@ -63,8 +63,8 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
     public readonly includeModalities?:boolean;
     public readonly hasVision?:(modelName:string)=>boolean;
 
-    public readonly transformInput?:(input:ChatCompletionRequest)=>ChatCompletionRequest;
-    public readonly transformOutput?:(output:ChatCompletion)=>ChatCompletion;
+    public readonly transformInput?:(input:ChatCompletionRequest,flat:FlatConvoConversationBase)=>ChatCompletionRequest;
+    public readonly transformOutput?:(output:ChatCompletion,flat:FlatConvoConversationBase)=>ChatCompletion;
     private readonly _getModelsAsync?:()=>Promise<ConvoModelInfo[]>;
 
 
@@ -129,7 +129,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         flat:FlatConvoConversation):Promise<ConvoCompletionMessage[]>
     {
         if(this.transformOutput){
-            output=this.transformOutput(output);
+            output=this.transformOutput(output,flat);
         }
         const msg=output.choices[0];
         if(!msg){
@@ -254,10 +254,14 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                 }else{
                     content=m.content??'';
                 }
-                oMsgs.push(deleteUndefined(asType<ChatCompletionUserMessageParam|ChatCompletionAssistantMessageParam|ChatCompletionSystemMessageParam>({
+                const converted:ChatCompletionUserMessageParam|ChatCompletionAssistantMessageParam|ChatCompletionSystemMessageParam={
                     role:this.isKnownRole(m.role)?m.role:'user',
-                    content
-                })))
+                    content,
+                }
+                if(m.cacheBreakpoint){
+                    (converted as any).prompt_cache_options={mode:'explicit'}
+                }
+                oMsgs.push(deleteUndefined(converted))
             }else if(m.called){
                 const toolId=m.tags?.['toolId']??m.called.name;
                 oMsgs.push({
@@ -300,6 +304,10 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
 
         if(this.includeModalities && flat.model?.outputCapabilities?.length){
             cParams.modalities=flat.model.outputCapabilities as any;
+        }
+
+        if(flat.sessionId){
+            cParams.session_id=flat.sessionId;
         }
 
         if(flat.temperature!==undefined){
@@ -359,7 +367,7 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
         }
 
         if(this.transformInput){
-            return this.transformInput(cParams);
+            return this.transformInput(cParams,flat);
         }else{
             return cParams;
         }

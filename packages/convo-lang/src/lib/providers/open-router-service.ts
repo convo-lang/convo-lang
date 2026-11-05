@@ -33,11 +33,35 @@ export const createOpenRouterConvoConverterFromScope=(scope:Scope):BaseOpenAiCon
         supportedInputTypes:[convoOpenRouterInputType],
         supportedOutputTypes:[convoOpenRouterOutputType],
         getModelsAsync:getOpenRouterModelsAsync,
-        transformInput:input=>{
+        transformInput:(input,flat)=>{
             if(input.model===openRouterAutoSelectModel || input.model===openRouterModel){
                 input.model='openrouter/auto'
             }else if(input.model.startsWith(openRouterModelPrefix)){
                 input.model=input.model.substring(openRouterModelPrefix.length);
+            }
+            if(flat.cacheBehaviors){
+                let enabled=false;
+                for(const b of flat.cacheBehaviors){
+                    if(!b.model || b.model===flat.model?.name){
+                        switch(b.behavior){
+
+                            case 'extended':
+                                (input as any).cache_control={type:'ephemeral',ttl:'1h'};
+                                enabled=true;
+                                break;
+
+                            case 'ephemeral':
+                            default:
+                                (input as any).cache_control={type:'ephemeral'}
+                                enabled=true;
+                                break;
+                        }
+                    }
+                }
+                const t=(flat.importTemplates && enabled)?flat.importTemplates[flat.importTemplates.length-1]:undefined;
+                if(t){
+                    input.session_id=t;
+                }
             }
             return input;
         },

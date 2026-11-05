@@ -1,4 +1,4 @@
-import { NotFoundError, SecretManager, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
+import { NotFoundError, SecretManager, deepClone, getErrorMessage, httpClient, joinPaths, shortUuid, uuid } from "@iyio/common";
 import { logFlatConvoMessages } from "./convo-lib.js";
 import { ChatCompletionRequest } from "./convo-openai-types.js";
 import { ConvoCompletionCtx, ConvoCompletionService, ConvoCompletionServiceFeatureSupport, ConvoEmbeddingsGenerationRequest, ConvoEmbeddingsGenerationResult, ConvoEmbeddingsGenerationSupportRequest, ConvoEmbeddingsService, ConvoModelInfo, ConvoTranscriptionRequest, ConvoTranscriptionResult, ConvoTranscriptionResultProviderBase, ConvoTranscriptionService, ConvoTranscriptionSupportRequest, ConvoTtsRequest, ConvoTtsResult, ConvoTtsService, FlatConvoConversationBase } from "./convo-types.js";
@@ -306,6 +306,11 @@ export class BaseOpenAiConvoCompletionService implements
 
         if(!completion){
             throw new NotFoundError();
+        }
+
+        if(flat.logNetworkRequests){
+            console.log('## Completion after network');
+            logCompletionMessages(completion);
         }
 
         return completion;
@@ -631,4 +636,21 @@ export interface Datum {
 export interface Usage {
     prompt_tokens: number;
     total_tokens:  number;
+}
+
+const logCompletionMessages=(completion:ChatCompletion)=>{
+    const copy:Partial<ChatCompletion>={...completion}
+    delete copy.choices;
+    (copy as any).choices=`${completion.choices.length} choices`;
+    console.log(copy);
+    for(let i=0;i<completion.choices.length;i++){
+        let c:Partial<ChatCompletion.Choice>=completion.choices[i]??{}
+        if(c.message?.content && c.message.content.length>500){
+            c=deepClone(c);
+            c.message!.content=c.message!.content.substring(0,500);
+        }
+        console.log(`Choice ${i}`,c);
+
+    }
+
 }
