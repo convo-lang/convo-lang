@@ -640,6 +640,12 @@
                     "default": true,
                     "description": "Display a notification when a completion finishes for a document that is not in the active editor",
                     "order": 9
+                },
+                "convo.alwaysRunOutputScripts": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
+                    "order": 10
                 }
             }
         },

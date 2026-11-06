@@ -1,10 +1,11 @@
 @import ../base.convo
+@import ../../packages/convo-lang-tools/README.md !file
 @import ../../packages/convo-lang-tools/package.json !file
 @import ../../packages/convo-lang-tools/syntaxes/* !file
 @import ../../packages/convo-lang-tools/lsp/client/src/*.ts !file
 
 > system
-You are helping the user modify the Convo-Lang vscode extension. Feature requests will refere to the extension.
+You are helping the user modify the Convo-Lang vscode extension. Feature requests will refer to the extension.
 
 When adding new functionality to the vscode extension place the functionality into a dedicated file
 and export a function the registers the providers and other resources for the required functionality.
@@ -17,4 +18,6 @@ export const registerExampleProvider(context:ExtensionContext,ext:ConvoExt)=>{
 ```
 </EXAMPLE_PROVIDER_FILE>
 
-Make sure to update the `package.json` file when an required changes.
+Make sure to update the `../../packages/convo-lang-tools/package.json` file when an required changes.
+
+Keep `../../packages/convo-lang-tools/README.md` up to date with changes.
