@@ -1,0 +1,384 @@
+@import ./_extension.convo !template
+
+> user
+Add a command that runs the current convo-lang file then applies all resulting file-blocks. In the progress notification 
+include that the completing convo-lang file will automatically write returned file
+blocks and execute bash scripts
+
+
+
+@time 2026-11-11T21:06:16-05:00
+@tokenUsage 128447 / 1370 / $0.541188
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before I implement this.
+
+1. Command name and ID?
+   - a) `convo.complete-apply`, "Convo: Complete and Apply"
+   - b) `convo.complete-apply-all`, "Convo: Complete and Apply All"
+   - c) Something else (please specify)
+
+2. Keybinding?
+   - a) None
+   - b) `Ctrl+Alt+R` / `Cmd+Alt+R`
+   - c) Something else (please specify)
+
+3. Should it also appear as a button in the editor title bar of `.convo` files?
+   - a) Yes, with a `$(rocket)` icon
+   - b) Yes, with a different icon (please specify)
+   - c) No, Command Palette only
+
+4. Which blocks should be applied after the completion finishes?
+   - a) Only blocks in messages added by this completion. This includes multiple assistant messages if function calls happen.
+   - b) Only blocks in the last assistant message
+   - c) Blocks in the last message group that has blocks, the same as the last group in the Code Blocks view
+
+5. You mentioned file blocks, and the notification mentions bash scripts. Should `RUNNABLE_SCRIPT` blocks also run?
+   - a) Yes. Write files and run scripts in the order they appear, the same way `Apply All` works now
+   - b) Yes, but write all files first and then run scripts
+   - c) No, only write file blocks. I will drop the script part from the notification text.
+
+6. Confirmation behavior, since the progress notification already gives a warning:
+   - a) No confirmation. Write files and run scripts automatically, ignoring `convo.alwaysRunOutputScripts`.
+   - b) Write files automatically, but still ask before running scripts unless `convo.alwaysRunOutputScripts` is true
+   - c) Show one confirmation modal before applying, like `Apply All`
+
+7. Progress notification text. Something like this:
+   - a) Title `Completing conversation`, message `<path> · File blocks will be written and scripts will be executed automatically`
+   - b) Title `Completing and applying`, with the same message as a)
+   - c) Custom wording (please specify)
+
+8. If the completion fails or is cancelled, nothing will be applied. If a find-replace target isn't found, what should happen?
+   - a) Show the existing error and continue applying the other blocks
+   - b) Stop and apply nothing more
+
+9. Implementation placement. `completeAsync` lives inside `registerCompletionCommands`. Which approach do you prefer?
+   - a) Add a new `complete-apply.ts` with `registerCompleteApplyCommand`. Add an `onComplete` callback and a `progressMessage` option to `CompletionOptions`, and have the new file call `convo.complete` through an internal command that accepts those options.
+   - b) Extract `completeAsync` into its own exported module so `complete-apply.ts` can call it directly. This is a larger refactor.
+
+
+> user
+1. b
+2. b
+3. a
+4. b
+5. a
+6. b
+7. b
+8. b
+9. Add the command to the completion-provider.ts file
+
+
+
+@time 2026-11-11T21:20:14-05:00
+@tokenUsage 129466 / 11549 / $0.7488440000000001
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here is the implementation. Files are written automatically. Scripts still ask for confirmation unless `convo.alwaysRunOutputScripts` is `true`. If a find-replace target isn't found, an error is shown and no further blocks are applied.
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` ts
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|undefined>=>{
+//// replace-with ////
+export interface CodeBlockOutputOptions
+{
+    /**
+     * If true undefined is returned when any find-replace target is not found
+     */
+    failOnNotFound?:boolean;
+}
+
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` ts
+        if(notFound.length){
+            window.showErrorMessage(notFound.join('\n'));
+        }
+//// replace-with ////
+        if(notFound.length){
+            window.showErrorMessage(notFound.join('\n'));
+            if(options?.failOnNotFound){
+                return undefined;
+            }
+        }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+import { extensionPublisher } from './build-const.js';
+//// replace-with ////
+import { extensionPublisher } from './build-const.js';
+import { OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+    const completeAsync=async (cliOptions:ConvoCliOptions={},{
+        nextCommand,
+        preventDefaultNextCommand=false,
+    }:CompletionOptions={}) => {
+//// replace-with ////
+    const completeAsync=async (cliOptions:ConvoCliOptions={},{
+        nextCommand,
+        preventDefaultNextCommand=false,
+        progressTitle,
+        progressMessage,
+        onComplete,
+    }:CompletionOptions={}) => {
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+            title: cliOptions.graph?"Completing Graph":"Completing conversation",
+//// replace-with ////
+            title: cliOptions.graph?"Completing Graph":(progressTitle??"Completing conversation"),
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+            progress.report({ message:document.uri.path });
+//// replace-with ////
+            progress.report({ message:progressMessage?`${document.uri.path} · ${progressMessage}`:document.uri.path });
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+                if(!preventDefaultNextCommand){
+                    commands.executeCommand('convo.code-blocks-refresh');
+                }
+//// replace-with ////
+                if(!preventDefaultNextCommand){
+                    commands.executeCommand('convo.code-blocks-refresh');
+                }
+
+                if(applied && onComplete){
+                    try{
+                        await onComplete(document);
+                    }catch(ex){
+                        console.error('Completion onComplete handler failed',ex);
+                        void window.showErrorMessage(`Failed to apply completion result. ${getErrorMessage(ex)}`);
+                    }
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
+    }));
+//// replace-with ////
+    context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
+        await completeAsync({graph:true})
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-apply-all', async () => {
+        await completeAsync({},{
+            progressTitle:'Completing and applying',
+            progressMessage:'File blocks will be written and scripts will be executed automatically',
+            onComplete:applyLastAssistantBlocksAsync,
+        });
+    }));
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+interface CompletionOptions
+{
+    nextCommand?:string;
+    preventDefaultNextCommand?:boolean;
+}
+//// replace-with ////
+interface CompletionOptions
+{
+    nextCommand?:string;
+    preventDefaultNextCommand?:boolean;
+    /**
+     * Title of the progress notification
+     */
+    progressTitle?:string;
+    /**
+     * Message appended to the document path in the progress notification
+     */
+    progressMessage?:string;
+    /**
+     * Called after the completion has been applied to the document
+     */
+    onComplete?:(document:TextDocument)=>Promise<void>|void;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+const example=/*convo*/`
+//// replace-with ////
+/**
+ * Writes the file blocks and runs the script blocks of the last assistant message of the given
+ * document in the order they appear. Find-replace blocks targeting the same file are combined into
+ * a single write. Scripts ask for confirmation unless `convo.alwaysRunOutputScripts` is true.
+ * Stops applying blocks if a find-replace target is not found.
+ */
+const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=>{
+    const doc=await workspace.openTextDocument(document.uri);
+    const messages=parseConvoCode(doc.getText(),{enableCodeBlocks:true}).result??[];
+
+    let assistantIndex=-1;
+    for(let i=messages.length-1;i>=0;i--){
+        if(messages[i]?.role===convoRoles.assistant){
+            assistantIndex=i;
+            break;
+        }
+    }
+
+    const group=getParsedOutputTagGroups(doc).find(g=>g.messageIndex===assistantIndex);
+    if(!group?.tags.length){
+        void window.showInformationMessage('No code blocks found in the last assistant message');
+        return;
+    }
+
+    const replaced=new Set<string>();
+    const written=new Set<string>();
+    for(const tag of group.tags){
+        const args:OutputTagCodeLensArgs={
+            targetPath:tag.targetPath,
+            index:tag.index,
+            cwd:tag.cwd,
+            codeBlock:tag.codeBlock,
+            documentUri:doc.uri,
+        };
+        if(tag.type==='file'){
+            if(tag.codeBlock.findReplace){
+                if(replaced.has(tag.targetPath)){
+                    continue;
+                }
+                replaced.add(tag.targetPath);
+            }
+            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true});
+            if(content===undefined){
+                void window.showErrorMessage(`Stopped applying code blocks at ${path.basename(tag.targetPath)}`);
+                return;
+            }
+            if(!await writeFileContentAsync(tag.targetPath,content)){
+                void window.showErrorMessage(`Failed to write output to ${tag.targetPath}. Stopped applying code blocks.`);
+                return;
+            }
+            written.add(tag.targetPath);
+        }else if(tag.type==='shell'){
+            await commands.executeCommand('convo.output-tag-execute-shell',args);
+        }
+    }
+
+    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}`);
+}
+
+const example=/*convo*/`
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` json
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.complete-apply-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
+                    "command": "convo.open-settings",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@02"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` json
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+//// replace-with ////
+            {
+                "command": "convo.complete-apply-all",
+                "title": "Convo: Complete and Apply All - Submits conversation to LLM then writes file blocks and runs scripts of the response",
+                "shortTitle": "Convo: Complete and Apply All",
+                "icon": "$(rocket)"
+            },
+            {
+                "command": "convo.complete-graph",
+                "title": "Convo: Complete Graph - Runs convo as a node graph",
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` json
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+//// replace-with ////
+            {
+                "command": "convo.complete-apply-all",
+                "key": "ctrl+alt+r",
+                "mac": "cmd+alt+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.split-complete",
+                "key": "ctrl+shift+r",
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` md
+| Command                  | ID                     | Keybinding (Win/Linux / macOS)              |
+|--------------------------|------------------------|---------------------------------------------|
+| Convo: Complete          | `convo.complete`       | `Ctrl+R` / `Cmd+R`                          |
+| Convo: Complete Graph    | `convo.complete-graph` |                                             |
+| Convo: New File          | `convo.new`            | `Shift+Alt+Ctrl+N` / `Shift+Alt+Cmd+N`      |
+//// replace-with ////
+| Command                       | ID                         | Keybinding (Win/Linux / macOS)              |
+|-------------------------------|----------------------------|---------------------------------------------|
+| Convo: Complete               | `convo.complete`           | `Ctrl+R` / `Cmd+R`                          |
+| Convo: Complete and Apply All | `convo.complete-apply-all` | `Ctrl+Alt+R` / `Cmd+Alt+R`                  |
+| Convo: Complete Graph         | `convo.complete-graph`     |                                             |
+| Convo: New File               | `convo.new`                | `Shift+Alt+Ctrl+N` / `Shift+Alt+Cmd+N`      |
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` md
+#### Convo: Complete Graph
+Runs the conversation as a node graph and appends the result.
+//// replace-with ////
+#### Convo: Complete and Apply All
+- Completes the conversation like `Convo: Complete`, then applies the `FILE_CONTENT` and
+  `RUNNABLE_SCRIPT` blocks of the last assistant message in the order they appear.
+- The progress notification notes that file blocks will be written and scripts will be executed
+  automatically.
+- Files are written without confirmation. Find-replace blocks targeting the same file are combined
+  into one write.
+- Scripts still ask for confirmation unless `convo.alwaysRunOutputScripts` is `true`.
+- If a find-replace target isn't found, an error is shown and no further blocks are applied.
+- Nothing is applied if the completion fails or is cancelled.
+
+#### Convo: Complete Graph
+Runs the conversation as a node graph and appends the result.
+```
+</FILE_CONTENT>
+
+
+> user

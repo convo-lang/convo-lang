@@ -495,11 +495,12 @@ title bar of `.convo` files.
 
 ### Conversation
 
-| Command                  | ID                     | Keybinding (Win/Linux / macOS)              |
-|--------------------------|------------------------|---------------------------------------------|
-| Convo: Complete          | `convo.complete`       | `Ctrl+R` / `Cmd+R`                          |
-| Convo: Complete Graph    | `convo.complete-graph` |                                             |
-| Convo: New File          | `convo.new`            | `Shift+Alt+Ctrl+N` / `Shift+Alt+Cmd+N`      |
+| Command                       | ID                         | Keybinding (Win/Linux / macOS)              |
+|-------------------------------|----------------------------|---------------------------------------------|
+| Convo: Complete               | `convo.complete`           | `Ctrl+R` / `Cmd+R`                          |
+| Convo: Complete and Apply All | `convo.complete-apply-all` | `Ctrl+Alt+R` / `Cmd+Alt+R`                  |
+| Convo: Complete Graph         | `convo.complete-graph`     |                                             |
+| Convo: New File               | `convo.new`                | `Shift+Alt+Ctrl+N` / `Shift+Alt+Cmd+N`      |
 
 #### Convo: Complete
 - Submits the conversation to the model and appends the response, followed by a new `> user`
@@ -510,6 +511,17 @@ title bar of `.convo` files.
   conversation.
 - If the request fails, the error is appended as a `> result` message. For authentication errors,
   a shortcut to the settings is shown.
+
+#### Convo: Complete and Apply All
+- Completes the conversation like `Convo: Complete`, then applies the `FILE_CONTENT` and
+  `RUNNABLE_SCRIPT` blocks of the last assistant message in the order they appear.
+- The progress notification notes that file blocks will be written and scripts will be executed
+  automatically.
+- Files are written without confirmation. Find-replace blocks targeting the same file are combined
+  into one write.
+- Scripts still ask for confirmation unless `convo.alwaysRunOutputScripts` is `true`.
+- If a find-replace target isn't found, an error is shown and no further blocks are applied.
+- Nothing is applied if the completion fails or is cancelled.
 
 #### Convo: Complete Graph
 Runs the conversation as a node graph and appends the result.

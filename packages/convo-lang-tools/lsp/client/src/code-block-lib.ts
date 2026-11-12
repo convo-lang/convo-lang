@@ -298,7 +298,15 @@ const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
     void window.showInformationMessage(`Wrote output to ${targetPath}`);
 }
 
-export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|undefined>=>{
+export interface CodeBlockOutputOptions
+{
+    /**
+     * If true undefined is returned when any find-replace target is not found
+     */
+    failOnNotFound?:boolean;
+}
+
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
     const targetPath=tag.targetPath;
     if(!tag.codeBlock.findReplace){
         return tag.codeBlock.content;
@@ -326,6 +334,9 @@ export const getCodeBlockOutputAsync=async (tag:OutputTagBase):Promise<string|un
         }
         if(notFound.length){
             window.showErrorMessage(notFound.join('\n'));
+            if(options?.failOnNotFound){
+                return undefined;
+            }
         }
         return content;
     }catch(ex){

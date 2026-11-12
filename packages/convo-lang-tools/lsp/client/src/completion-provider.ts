@@ -8,6 +8,7 @@ import { realpath } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { extensionPublisher } from './build-const.js';
+import { OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
 import { notifyCompletionAsync } from './completion-notification.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
@@ -531,6 +532,9 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
     const completeAsync=async (cliOptions:ConvoCliOptions={},{
         nextCommand,
         preventDefaultNextCommand=false,
+        progressTitle,
+        progressMessage,
+        onComplete,
     }:CompletionOptions={}) => {
 
         const document=window.activeTextEditor?.document;
@@ -571,7 +575,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
 
         await window.withProgress({
             location: ProgressLocation.Notification,
-            title: cliOptions.graph?"Completing Graph":"Completing conversation",
+            title: cliOptions.graph?"Completing Graph":(progressTitle??"Completing conversation"),
             cancellable: true
         }, async (progress, token) => {
 
@@ -584,7 +588,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
             if(!src){
                 return;
             }
-            progress.report({ message:document.uri.path });
+            progress.report({ message:progressMessage?`${document.uri.path} · ${progressMessage}`:document.uri.path });
 
             let done=false;
 
@@ -685,6 +689,15 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
                 if(!preventDefaultNextCommand){
                     commands.executeCommand('convo.code-blocks-refresh');
                 }
+
+                if(applied && onComplete){
+                    try{
+                        await onComplete(document);
+                    }catch(ex){
+                        console.error('Completion onComplete handler failed',ex);
+                        void window.showErrorMessage(`Failed to apply completion result. ${getErrorMessage(ex)}`);
+                    }
+                }
             }catch(ex){
                 const err=JSON.stringify({...(typeof ex === 'object'?ex:null),message:getErrorMessage(ex)},null,4);
                 const tryMsg='Try adding an OpenAI or AWS Bedrock API key to the Convo-Lang extension settings.'
@@ -762,6 +775,14 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
 
     context.subscriptions.push(commands.registerCommand('convo.complete-graph', async () => {
         await completeAsync({graph:true})
+    }));
+
+    context.subscriptions.push(commands.registerCommand('convo.complete-apply-all', async () => {
+        await completeAsync({},{
+            progressTitle:'Completing and applying',
+            progressMessage:'File blocks will be written and scripts will be executed automatically',
+            onComplete:applyLastAssistantBlocksAsync,
+        });
     }));
 
     const splitAsync=async (complete:boolean)=>{
@@ -904,6 +925,18 @@ interface CompletionOptions
 {
     nextCommand?:string;
     preventDefaultNextCommand?:boolean;
+    /**
+     * Title of the progress notification
+     */
+    progressTitle?:string;
+    /**
+     * Message appended to the document path in the progress notification
+     */
+    progressMessage?:string;
+    /**
+     * Called after the completion has been applied to the document
+     */
+    onComplete?:(document:TextDocument)=>Promise<void>|void;
 }
 
 
@@ -958,6 +991,65 @@ const revealDocumentInVisibleEditorsAsync=async (document:TextDocument):Promise<
             await revealDocumentEndAsync(editor);
         }
     }
+}
+
+/**
+ * Writes the file blocks and runs the script blocks of the last assistant message of the given
+ * document in the order they appear. Find-replace blocks targeting the same file are combined into
+ * a single write. Scripts ask for confirmation unless `convo.alwaysRunOutputScripts` is true.
+ * Stops applying blocks if a find-replace target is not found.
+ */
+const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=>{
+    const doc=await workspace.openTextDocument(document.uri);
+    const messages=parseConvoCode(doc.getText(),{enableCodeBlocks:true}).result??[];
+
+    let assistantIndex=-1;
+    for(let i=messages.length-1;i>=0;i--){
+        if(messages[i]?.role===convoRoles.assistant){
+            assistantIndex=i;
+            break;
+        }
+    }
+
+    const group=getParsedOutputTagGroups(doc).find(g=>g.messageIndex===assistantIndex);
+    if(!group?.tags.length){
+        void window.showInformationMessage('No code blocks found in the last assistant message');
+        return;
+    }
+
+    const replaced=new Set<string>();
+    const written=new Set<string>();
+    for(const tag of group.tags){
+        const args:OutputTagCodeLensArgs={
+            targetPath:tag.targetPath,
+            index:tag.index,
+            cwd:tag.cwd,
+            codeBlock:tag.codeBlock,
+            documentUri:doc.uri,
+        };
+        if(tag.type==='file'){
+            if(tag.codeBlock.findReplace){
+                if(replaced.has(tag.targetPath)){
+                    continue;
+                }
+                replaced.add(tag.targetPath);
+            }
+            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true});
+            if(content===undefined){
+                void window.showErrorMessage(`Stopped applying code blocks at ${path.basename(tag.targetPath)}`);
+                return;
+            }
+            if(!await writeFileContentAsync(tag.targetPath,content)){
+                void window.showErrorMessage(`Failed to write output to ${tag.targetPath}. Stopped applying code blocks.`);
+                return;
+            }
+            written.add(tag.targetPath);
+        }else if(tag.type==='shell'){
+            await commands.executeCommand('convo.output-tag-execute-shell',args);
+        }
+    }
+
+    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}`);
 }
 
 const example=/*convo*/`

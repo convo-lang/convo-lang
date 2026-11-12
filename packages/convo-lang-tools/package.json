@@ -108,6 +108,11 @@
                     "group": "navigation@01"
                 },
                 {
+                    "command": "convo.complete-apply-all",
+                    "when": "resourceLangId == source.convo",
+                    "group": "navigation@01"
+                },
+                {
                     "command": "convo.open-settings",
                     "when": "resourceLangId == source.convo",
                     "group": "navigation@02"
@@ -339,6 +344,12 @@
                 "title": "Convo: Complete - Submits conversation to LLM and append response",
                 "shortTitle": "Convo: Complete",
                 "icon": "$(play)"
+            },
+            {
+                "command": "convo.complete-apply-all",
+                "title": "Convo: Complete and Apply All - Submits conversation to LLM then writes file blocks and runs scripts of the response",
+                "shortTitle": "Convo: Complete and Apply All",
+                "icon": "$(rocket)"
             },
             {
                 "command": "convo.complete-graph",
@@ -606,6 +617,12 @@
                 "command": "convo.complete",
                 "key": "ctrl+r",
                 "mac": "cmd+r",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.complete-apply-all",
+                "key": "ctrl+alt+r",
+                "mac": "cmd+alt+r",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
             },
             {
