@@ -97,9 +97,36 @@ const trimBlockEnd=(content:string):string=>{
     return content;
 }
 
+/**
+ * A range of content replaced by a find-replace code block
+ */
+export interface ConvoBlockReplaceRange
+{
+    /**
+     * Start index of the matched content in the source content
+     */
+    sourceStart:number;
+    /**
+     * End index, exclusive, of the matched content in the source content
+     */
+    sourceEnd:number;
+    /**
+     * Start index of the replacement in the resulting content
+     */
+    start:number;
+    /**
+     * End index, exclusive, of the replacement in the resulting content
+     */
+    end:number;
+}
+
 export interface ReplaceConvoBlockResult{
     content:string;
     replaceCount:number;
+    /**
+     * Ranges of each replacement in order of appearance
+     */
+    ranges:ConvoBlockReplaceRange[];
 }
 export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
     const sep=block.findReplaceSeparator??defaultConvoFindReplaceSeparator;
@@ -107,23 +134,55 @@ export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):Repl
     const find=trimBlockEnd(i===-1?block.content:block.content.substring(0,i));
     const replace=trimBlockEnd(trimBlockStart(i===-1?'':block.content.substring(i+sep.length)));
 
-    let replaceCount=0;
+    const ranges:ConvoBlockReplaceRange[]=[];
 
     const parts=content.split(find);
     if(parts.length===1){
-        return {content:parts[0]!,replaceCount}
-    }
-    for(let
-        i=0,
-        limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
-        i<parts.length-1;
-        i+=2
-    ){
-        parts.splice(i+1,0,replaceCount<limit?replace:find);
-        replaceCount++;
+        return {content,replaceCount:0,ranges};
     }
 
-    return {content:parts.join(''),replaceCount}
+    const limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
+    const output:string[]=[];
+    let sourceIndex=0;
+    let index=0;
+    for(let p=0;p<parts.length;p++){
+        const part=parts[p]!;
+        output.push(part);
+        sourceIndex+=part.length;
+        index+=part.length;
+        if(p===parts.length-1){
+            break;
+        }
+        if(ranges.length<limit){
+            ranges.push({sourceStart:sourceIndex,sourceEnd:sourceIndex+find.length,start:index,end:index+replace.length});
+            output.push(replace);
+            index+=replace.length;
+        }else{
+            output.push(find);
+            index+=find.length;
+        }
+        sourceIndex+=find.length;
+    }
+
+    return {content:output.join(''),replaceCount:ranges.length,ranges};
+}
+
+/**
+ * Maps an index in the source content of a replacement to the index in the resulting content.
+ * Indexes inside of a replaced range are clamped to the replacement.
+ */
+export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[]):number=>{
+    let offset=0;
+    for(const r of ranges){
+        if(index<r.sourceStart){
+            break;
+        }
+        if(index<r.sourceEnd){
+            return Math.min(r.start+index-r.sourceStart,r.end);
+        }
+        offset=r.end-r.sourceEnd;
+    }
+    return index+offset;
 }
 
 export const normalizeConvoCodeBlockContent=(tag:string,content:string,attrs?:Record<string,string>):string=>{

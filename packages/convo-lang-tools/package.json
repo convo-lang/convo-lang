@@ -178,6 +178,36 @@
                     "group": "navigation@14"
                 }
             ],
+            "commandPalette": [
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "false"
+                },
+                {
+                    "command": "convo.code-block-review-next",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-previous",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-skip-file",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-toggle-accept",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-finish",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-cancel",
+                    "when": "convo.codeBlockReviewActive"
+                }
+            ],
             "view/title": [
                 {
                     "command": "convo.refresh-make-targets",
@@ -244,6 +274,11 @@
                 {
                     "command": "convo.make-target-open-convo",
                     "when": "view == convoMakeBuild && viewItem =~ /^target-.*-preview.*-convoExists/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
                     "group": "inline"
                 },
                 {
@@ -340,6 +375,37 @@
                 "command": "convo.code-block-group-apply-all",
                 "title": "Convo: Apply All Code Blocks In Message",
                 "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.code-block-group-review",
+                "title": "Convo: Review Code Blocks In Message",
+                "icon": "$(eye)"
+            },
+            {
+                "command": "convo.code-block-review-next",
+                "title": "Convo: Review Next Change",
+                "icon": "$(arrow-down)"
+            },
+            {
+                "command": "convo.code-block-review-previous",
+                "title": "Convo: Review Previous Change",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "convo.code-block-review-skip-file",
+                "title": "Convo: Review Skip File"
+            },
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "title": "Convo: Review Toggle Accept"
+            },
+            {
+                "command": "convo.code-block-review-finish",
+                "title": "Convo: Review Finish"
+            },
+            {
+                "command": "convo.code-block-review-cancel",
+                "title": "Convo: Review Cancel"
             },
             {
                 "command": "convo.code-block-panel-tag-open",
@@ -581,6 +647,21 @@
                 "key": "ctrl+shift+l",
                 "mac": "cmd+shift+l",
                 "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.code-block-review-next",
+                "key": "ctrl+alt+]",
+                "when": "convo.codeBlockReviewActive"
+            },
+            {
+                "command": "convo.code-block-review-previous",
+                "key": "ctrl+alt+[",
+                "when": "convo.codeBlockReviewActive"
+            },
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "key": "ctrl+alt+\\",
+                "when": "convo.codeBlockReviewActive"
             }
         ],
         "configuration": {

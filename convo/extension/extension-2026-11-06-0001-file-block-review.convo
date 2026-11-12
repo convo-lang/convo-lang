@@ -1,0 +1,2068 @@
+@import ./_extension.convo !template
+
+> user
+I would like to add a command to guide the user through a set of file block updates defined in a message.
+
+The command should open the diff for each file and scroll the user to each diff in the file. After moving
+to each file and all diffs the user should be display the option to apply all changes
+
+@time 2026-11-06T11:49:16-05:00
+@tokenUsage 116969 / 1153 / $0.490936
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write anything, a few questions about how the guided review should work.
+
+1. Where should the command be started from?
+   - a) Inline action on message groups in the Code Blocks view, next to `Apply All`
+   - b) Code lens above the first file block of each message
+   - c) Command Palette and keybinding, using the last message in the active document that has file blocks
+   - d) All of the above
+
+2. How should the user move between diffs?
+   - a) A non-modal notification with `Next`, `Previous`, `Skip File` and `Cancel` buttons. `Next` steps to the next change in the current diff, then to the next file.
+   - b) Use VSCode's built-in next/previous change navigation (`Alt+F5` / `Shift+Alt+F5`), and show a notification only to move to the next file
+   - c) Dedicated keybindings such as `Ctrl+Alt+]` / `Ctrl+Alt+[` for next and previous, plus a status bar item showing progress like `File 2/4, Change 3/7`
+   - d) Combine a and c
+
+3. How should multiple find-replace blocks that target the same file be handled?
+   - a) Combine them into one diff per file, like `Apply All` does
+   - b) Show a separate step for each block
+
+4. What should happen to diff tabs as the user moves on?
+   - a) Close each diff tab when moving to the next file
+   - b) Leave them open
+   - c) Reuse a single diff tab
+
+5. What should be offered at the end?
+   - a) A modal with `Apply All` and `Cancel`
+   - b) A modal with `Apply All`, `Restart Review` and `Cancel`
+   - c) Also let the user mark files to accept or reject during the review, then apply only accepted files at the end
+
+6. If the message also contains `RUNNABLE_SCRIPT` blocks, should they be:
+   - a) Ignored, only file blocks are reviewed and applied
+   - b) Included in the final apply step, after files are written
+   - c) Offered as a separate checkbox or button at the end
+
+7. For files that don't exist yet, the diff has no prior content to scroll through. Is it fine to treat each new file as a single step, scrolled to the top?
+   - a) Yes
+   - b) Something else (please describe)
+
+8. Command name and ID. Does `Convo: Review Code Blocks In Message` with ID `convo.code-block-group-review` work, or do you prefer something else?
+
+
+> user
+1. a
+2. d
+3. b
+4. c
+5. c
+6. c
+7. a
+8. yes that works
+
+Would it be possible to add some type of divider and label in the diff showing the index of the code block responsible for the change?
+
+@time 2026-11-06T12:04:06-05:00
+@tokenUsage 117827 / 2472 / $0.520748
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Yes, that's possible. The cleanest way is editor decorations on the right (proposed) side of the diff. The extension owns the `convo-output:` preview document, so it can find the matching visible editor and add a whole-line top border with a label such as `── block #3 · find-replace ──` at the end of the line. Decorations don't change the document text, so the diff stays accurate and nothing extra gets written to the file.
+
+Two other options I'd avoid:
+
+- Inserting real comment lines into the preview. They would show up as changes in the diff and would differ from what gets written.
+- Code lenses. They only appear in diff editors when the user enables `diffEditor.codeLens`, which is off by default.
+
+Your answers raise a few follow-up questions.
+
+1. To place the label, I need the range each block changed. `replaceConvoBlockContent` only returns `content` and `replaceCount`. How should I get the ranges?
+   - a) Update `replaceConvoBlockContent` in `@convo-lang/convo-lang` to also return the changed ranges. This is the most accurate option, including `find-replace="all"`.
+   - b) Keep core untouched. Compare the content before and after each block using a common prefix and suffix. This gives one span per block, so `all` replacements spread across a file would show as one large span.
+   - c) Use a and fall back to b
+
+2. With one step per block (3b) and a single reused diff tab (4c), what should the diff show for block N when several find-replace blocks target the same file?
+   - a) Cumulative: blocks 1 through N applied, with labels on all of them and the current block highlighted
+   - b) Isolated: only block N applied to the current file
+   - c) Cumulative using only the blocks accepted so far
+
+3. For accept and reject (5c), what granularity do you want?
+   - a) Per block. Rejected find-replace blocks are skipped when the accepted blocks for a file are combined.
+   - b) Per file
+
+4. How should the user accept or reject during the review? Notifications get crowded with Next, Previous, Skip File and Cancel already there.
+   - a) Add `Accept & Next` and `Reject & Next` to the notification, and drop `Skip File`
+   - b) Blocks are accepted by default. A `Toggle Accept` keybinding, such as `Ctrl+Alt+\`, changes that, and the status bar shows the state like `Block 2/5 ✓ · Change 1/3`.
+   - c) Both
+
+5. Should the label also mark the current step differently from other labeled blocks, for example with a highlighted background on the current block's lines?
+   - a) Yes
+   - b) No, labels only
+
+6. For scripts at the end (6c), does this final modal work: `Apply Accepted Files`, `Apply Files and Run Scripts`, `Restart Review`, `Cancel`?
+   - a) Yes
+   - b) Something else (please describe)
+
+7. Should the label for full-file replacement blocks sit on the first line of the file?
+   - a) Yes, for example `── block #1 · full file ──`
+   - b) Put it on the first changed hunk instead
+
+@import ../../packages/convo-lang/src/lib/convo-code-block-lib.ts !file
+> user
+1. a, i have included convo-code-block-lib.ts in context
+2. a
+3. a
+4. b
+5. a
+6. a
+7. a
+
+
+@time 2026-11-06T12:17:40-05:00
+@tokenUsage 121049 / 43486 / $1.353916
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The guided review lives in a new `code-block-review.ts` file. It's started from a new `Review` inline action on message groups in the Code Blocks view.
+
+- **Core change:** `replaceConvoBlockContent` now also returns the replaced ranges. A new `mapConvoBlockReplaceIndex` helper keeps earlier block labels in the right place as later blocks are applied.
+- **Shared helpers:** `code-block-lib.ts` now exports `readFileContentAsync` and `writeFileContentAsync`. `Write Output` uses the same write logic.
+- **Diff labels:** each block gets a dashed divider and a label such as `── block #3 · find-replace · ✓ accepted ──`. The current block gets a solid divider, a `▶` prefix and a highlighted background.
+
+<FILE_CONTENT name="convo-code-block-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-code-block-lib.ts" last-commit="937f1d44012f5dcdc997624b6d849fa1687ab5b1">
+``` ts
+import { unescapeHtml } from '@iyio/common';
+import { unescapeConvo } from './convo-parser.js';
+import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey } from './convo-types.js';
+
+
+export const defaultConvoFindReplaceSeparator='//// replace-with ////';
+
+const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```+[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```+[ \t\r\n]*<\/\k<tagName>>/g;
+const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
+
+export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
+    let indexOffset:number;
+    if(typeof indexOffsetOrParentMessage === 'number'){
+        indexOffset=indexOffsetOrParentMessage;
+    }else if(indexOffsetOrParentMessage){
+        const src=indexOffsetOrParentMessage[convoMessageSourceReferenceKey];
+        if(src && indexOffsetOrParentMessage.s!==undefined && indexOffsetOrParentMessage.e!==undefined){
+            text=src.source.substring(indexOffsetOrParentMessage.s,indexOffsetOrParentMessage.e);
+        }
+        indexOffset=indexOffsetOrParentMessage.s??0;
+    }else{
+        indexOffset=0;
+    }
+    
+    blockReg.lastIndex=0;
+
+    let blocks:ConvoCodeBlock[]|undefined;
+
+    let match:RegExpMatchArray|null;
+    while(match=blockReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const tagName=match.groups?.['tagName']??'';
+        const attributes=match.groups?.['attributes']??'';
+        const lang=match.groups?.['lang']||'txt';
+
+        const atts:Record<string,string>={};
+
+        attReg.lastIndex=0;
+        let attMatch:RegExpExecArray|null;
+        while(attMatch=attReg.exec(attributes)){
+            atts[attMatch.groups?.['name']??'']=unescapeHtml(attMatch.groups?.['dq']??attMatch.groups?.['sq']??'');
+        }
+        const findReplace=atts['find-replace'];
+        const findReplaceSeparator=atts['find-replace-separator'];
+        if(!blocks){
+            blocks=[];
+        }
+        blocks.push({
+            tagName,
+            attributes:atts,
+            lang,
+            content:normalizeConvoCodeBlockContent(tagName,match.groups?.['content']??'',atts),
+            index:blockIndexOffset+blocks.length,
+            startIndex:indexOffset+(match.index??0)+start.length,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            findReplace:parseConvoBlockFindReplace(findReplace),
+            findReplaceSeparator,
+        })
+
+    }
+
+    return blocks;
+}
+
+export const parseConvoBlockFindReplace=(value:string|null|undefined):number|'all'|undefined=>{
+    if(value===''){
+        return 1;
+    }
+    if(!value){
+        return undefined;
+    }
+    if(value==='all'){
+        return 'all';
+    }
+    const n=Number(value);
+    return isFinite(n)?n:undefined;
+}
+
+const trimBlockStart=(content:string):string=>{
+    if(content.startsWith('\r')){
+        content=content.substring(1);
+    }
+    if(content.startsWith('\n')){
+        content=content.substring(1);
+    }
+    return content;
+}
+
+const trimBlockEnd=(content:string):string=>{
+    if(content.endsWith('\n')){
+        content=content.substring(0,content.length-1);
+        if(content.endsWith('\r')){
+            content=content.substring(0,content.length-1);
+        }
+    }
+    return content;
+}
+
+/**
+ * A range of content replaced by a find-replace code block
+ */
+export interface ConvoBlockReplaceRange
+{
+    /**
+     * Start index of the matched content in the source content
+     */
+    sourceStart:number;
+    /**
+     * End index, exclusive, of the matched content in the source content
+     */
+    sourceEnd:number;
+    /**
+     * Start index of the replacement in the resulting content
+     */
+    start:number;
+    /**
+     * End index, exclusive, of the replacement in the resulting content
+     */
+    end:number;
+}
+
+export interface ReplaceConvoBlockResult{
+    content:string;
+    replaceCount:number;
+    /**
+     * Ranges of each replacement in order of appearance
+     */
+    ranges:ConvoBlockReplaceRange[];
+}
+export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    const sep=block.findReplaceSeparator??defaultConvoFindReplaceSeparator;
+    const i=block.content.indexOf(sep);
+    const find=trimBlockEnd(i===-1?block.content:block.content.substring(0,i));
+    const replace=trimBlockEnd(trimBlockStart(i===-1?'':block.content.substring(i+sep.length)));
+
+    const ranges:ConvoBlockReplaceRange[]=[];
+
+    const parts=content.split(find);
+    if(parts.length===1){
+        return {content,replaceCount:0,ranges};
+    }
+
+    const limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
+    const output:string[]=[];
+    let sourceIndex=0;
+    let index=0;
+    for(let p=0;p<parts.length;p++){
+        const part=parts[p]!;
+        output.push(part);
+        sourceIndex+=part.length;
+        index+=part.length;
+        if(p===parts.length-1){
+            break;
+        }
+        if(ranges.length<limit){
+            ranges.push({sourceStart:sourceIndex,sourceEnd:sourceIndex+find.length,start:index,end:index+replace.length});
+            output.push(replace);
+            index+=replace.length;
+        }else{
+            output.push(find);
+            index+=find.length;
+        }
+        sourceIndex+=find.length;
+    }
+
+    return {content:output.join(''),replaceCount:ranges.length,ranges};
+}
+
+/**
+ * Maps an index in the source content of a replacement to the index in the resulting content.
+ * Indexes inside of a replaced range are clamped to the replacement.
+ */
+export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[]):number=>{
+    let offset=0;
+    for(const r of ranges){
+        if(index<r.sourceStart){
+            break;
+        }
+        if(index<r.sourceEnd){
+            return Math.min(r.start+index-r.sourceStart,r.end);
+        }
+        offset=r.end-r.sourceEnd;
+    }
+    return index+offset;
+}
+
+export const normalizeConvoCodeBlockContent=(tag:string,content:string,attrs?:Record<string,string>):string=>{
+    content=trimBlockStart(trimBlockEnd(content));
+
+    content=unescapeConvo(content);
+
+    const closing=attrs?.['closing-escape'];
+    
+    if(closing){
+        content=content.split(closing).join(`</${tag}>`);
+    }
+
+    return content.endsWith('\n')?content:content+'\n';
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts">
+``` ts
+import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import * as path from 'path';
+import { DecorationOptions, Disposable, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, getParsedOutputTagGroups, outputPreviewChangeEmitter, outputPreviewContent, readFileContentAsync, writeFileContentAsync } from './code-block-lib.js';
+
+const reviewContextKey='convo.codeBlockReviewActive';
+
+interface ReviewStep
+{
+    tag:ParsedOutputTagInfo;
+    accepted:boolean;
+}
+
+interface BlockRange
+{
+    start:number;
+    end:number;
+}
+
+interface BlockLabel
+{
+    step:ReviewStep;
+    ranges:BlockRange[];
+}
+
+interface FilePreview
+{
+    content:string;
+    labels:BlockLabel[];
+    notFound:ReviewStep[];
+}
+
+interface ReviewSession
+{
+    documentUri:Uri;
+    steps:ReviewStep[];
+    scripts:ParsedOutputTagInfo[];
+    stepIndex:number;
+    changeIndex:number;
+    labels:BlockLabel[];
+    previewUri?:Uri;
+    notificationOpen:boolean;
+}
+
+/**
+ * Registers the `convo.code-block-group-review` command and its navigation commands. The review
+ * steps through each file block of a message using a single reused diff tab, labels the changes
+ * of each block in the diff and lets the user accept or reject blocks before applying them.
+ */
+export const registerCodeBlockReview=(context:ExtensionContext,ext:ConvoExt)=>{
+    const review=new CodeBlockReview();
+    context.subscriptions.push(
+        review,
+        commands.registerCommand('convo.code-block-group-review',(item?:{group?:MessageTagGroup})=>review.startAsync(item?.group)),
+        commands.registerCommand('convo.code-block-review-next',()=>review.nextAsync()),
+        commands.registerCommand('convo.code-block-review-previous',()=>review.previousAsync()),
+        commands.registerCommand('convo.code-block-review-skip-file',()=>review.skipFileAsync()),
+        commands.registerCommand('convo.code-block-review-toggle-accept',()=>review.toggleAccept()),
+        commands.registerCommand('convo.code-block-review-cancel',()=>review.endAsync()),
+        window.onDidChangeVisibleTextEditors(()=>review.decorate()),
+    );
+}
+
+class CodeBlockReview implements Disposable
+{
+    private session:ReviewSession|undefined;
+
+    private readonly statusBar=window.createStatusBarItem(StatusBarAlignment.Left,100);
+
+    private readonly labelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'1px 0 0 0',
+        borderStyle:'dashed',
+        borderColor:new ThemeColor('editorCodeLens.foreground'),
+        after:{
+            color:new ThemeColor('editorCodeLens.foreground'),
+            margin:'0 0 0 3em',
+        },
+    });
+
+    private readonly currentLabelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'2px 0 0 0',
+        borderStyle:'solid',
+        borderColor:new ThemeColor('focusBorder'),
+        after:{
+            color:new ThemeColor('focusBorder'),
+            fontWeight:'bold',
+            margin:'0 0 0 3em',
+        },
+    });
+
+    private readonly currentRangeType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        backgroundColor:new ThemeColor('editor.rangeHighlightBackground'),
+    });
+
+    public dispose():void
+    {
+        this.session=undefined;
+        this.statusBar.dispose();
+        this.labelType.dispose();
+        this.currentLabelType.dispose();
+        this.currentRangeType.dispose();
+    }
+
+    public async startAsync(group?:MessageTagGroup):Promise<void>
+    {
+        if(!group){
+            void window.showInformationMessage('Start a review from a message in the Code Blocks view');
+            return;
+        }
+
+        await this.endAsync();
+
+        const doc=await workspace.openTextDocument(group.messageUri);
+        const tags=(getParsedOutputTagGroups(doc).find(g=>g.messageIndex===group.messageIndex)??group).tags;
+        const files=tags.filter(t=>t.type==='file');
+        if(!files.length){
+            void window.showInformationMessage('No file blocks found in message');
+            return;
+        }
+
+        const order=getTargetPaths(files.map(tag=>({tag,accepted:true})));
+        files.sort((a,b)=>order.indexOf(a.targetPath)-order.indexOf(b.targetPath) || a.index-b.index);
+
+        this.session={
+            documentUri:group.messageUri,
+            steps:files.map(tag=>({tag,accepted:true})),
+            scripts:tags.filter(t=>t.type==='shell'),
+            stepIndex:0,
+            changeIndex:0,
+            labels:[],
+            notificationOpen:false,
+        };
+        await commands.executeCommand('setContext',reviewContextKey,true);
+        await this.showStepAsync(0,0);
+    }
+
+    public async nextAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex<this.getCurrentRanges().length-1){
+            s.changeIndex++;
+            this.showChange();
+        }else if(s.stepIndex<s.steps.length-1){
+            await this.showStepAsync(s.stepIndex+1,0);
+        }else{
+            await this.finishAsync();
+        }
+    }
+
+    public async previousAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex>0){
+            s.changeIndex--;
+            this.showChange();
+        }else if(s.stepIndex>0){
+            await this.showStepAsync(s.stepIndex-1,'last');
+        }else{
+            this.showNotification();
+        }
+    }
+
+    public async skipFileAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const targetPath=s.steps[s.stepIndex]?.tag.targetPath;
+        const next=s.steps.findIndex((st,i)=>i>s.stepIndex && st.tag.targetPath!==targetPath);
+        if(next===-1){
+            await this.finishAsync();
+        }else{
+            await this.showStepAsync(next,0);
+        }
+    }
+
+    public toggleAccept():void
+    {
+        const step=this.session?.steps[this.session.stepIndex];
+        if(!step){
+            return;
+        }
+        step.accepted=!step.accepted;
+        this.decorate();
+        this.updateStatusBar();
+    }
+
+    public async endAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        for(const editor of this.getPreviewEditors()){
+            editor.setDecorations(this.labelType,[]);
+            editor.setDecorations(this.currentLabelType,[]);
+            editor.setDecorations(this.currentRangeType,[]);
+        }
+        this.session=undefined;
+        this.statusBar.hide();
+        await commands.executeCommand('setContext',reviewContextKey,false);
+        if(s.previewUri){
+            outputPreviewContent.delete(s.previewUri.toString());
+            await closeDiffTabsAsync(s.previewUri);
+        }
+    }
+
+    public decorate():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const current=s.steps[s.stepIndex];
+        for(const editor of this.getPreviewEditors()){
+            const doc=editor.document;
+            const labels:DecorationOptions[]=[];
+            const currentLabels:DecorationOptions[]=[];
+            const currentRanges:Range[]=[];
+            for(const label of s.labels){
+                const isCurrent=label.step===current;
+                const contentText=getLabelText(label.step,isCurrent);
+                for(const r of label.ranges){
+                    const lineRange=getLineRange(doc,r);
+                    (isCurrent?currentLabels:labels).push({
+                        range:doc.lineAt(lineRange.start.line).range,
+                        renderOptions:{after:{contentText}},
+                    });
+                    if(isCurrent){
+                        currentRanges.push(lineRange);
+                    }
+                }
+            }
+            editor.setDecorations(this.labelType,labels);
+            editor.setDecorations(this.currentLabelType,currentLabels);
+            editor.setDecorations(this.currentRangeType,currentRanges);
+        }
+    }
+
+    private async showStepAsync(stepIndex:number,changeIndex:number|'last'):Promise<void>
+    {
+        const s=this.session;
+        const step=s?.steps[stepIndex];
+        if(!s || !step){
+            return;
+        }
+
+        const targetPath=step.tag.targetPath;
+        const base=await readFileContentAsync(targetPath);
+        if(this.session!==s){
+            return;
+        }
+
+        const preview=buildFilePreview(base??'',s.steps.slice(0,stepIndex+1).filter(st=>st.tag.targetPath===targetPath));
+        const previewUri=Uri.file(targetPath).with({scheme:'convo-output',query:'review'});
+        const prevUri=s.previewUri;
+
+        s.stepIndex=stepIndex;
+        s.labels=preview.labels;
+        s.previewUri=previewUri;
+        const changeCount=this.getCurrentRanges().length;
+        s.changeIndex=changeIndex==='last'?Math.max(0,changeCount-1):changeIndex;
+
+        outputPreviewContent.set(previewUri.toString(),preview.content);
+        outputPreviewChangeEmitter.fire(previewUri);
+
+        if(prevUri && prevUri.toString()!==previewUri.toString()){
+            outputPreviewContent.delete(prevUri.toString());
+            await closeDiffTabsAsync(prevUri);
+        }
+
+        if(!getDiffTabs(previewUri).length){
+            await commands.executeCommand(
+                'vscode.diff',
+                base===undefined?Uri.parse(`untitled:${targetPath}`):Uri.file(targetPath),
+                previewUri,
+                `Review: ${path.basename(targetPath)}`,
+                {preview:false},
+            );
+        }
+
+        await waitForContentAsync(previewUri,preview.content);
+        if(this.session!==s){
+            return;
+        }
+
+        this.decorate();
+        this.showChange();
+    }
+
+    private showChange():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const r=this.getCurrentRanges()[s.changeIndex];
+        for(const editor of this.getPreviewEditors()){
+            const pos=r?editor.document.positionAt(r.start):new Position(0,0);
+            editor.selection=new Selection(pos,pos);
+            editor.revealRange(new Range(pos,pos),TextEditorRevealType.InCenter);
+        }
+        this.updateStatusBar();
+        this.showNotification();
+    }
+
+    private updateStatusBar():void
+    {
+        const s=this.session;
+        const step=s?.steps[s.stepIndex];
+        if(!s || !step){
+            return;
+        }
+        const changeCount=this.getCurrentRanges().length;
+        const change=changeCount?`Change ${s.changeIndex+1}/${changeCount}`:'Not found';
+        this.statusBar.text=`$(diff) Block ${s.stepIndex+1}/${s.steps.length} ${step.accepted?'✓':'✗'} · ${change}`;
+        this.statusBar.tooltip=`${step.tag.targetPath}\nClick to ${step.accepted?'reject':'accept'} block #${step.tag.index+1}`;
+        this.statusBar.command='convo.code-block-review-toggle-accept';
+        this.statusBar.show();
+    }
+
+    /**
+     * Displays the review notification if it is not already displayed. Only one notification is
+     * displayed at a time since notifications can not be dismissed programmatically.
+     */
+    private showNotification():void
+    {
+        const s=this.session;
+        if(!s || s.notificationOpen){
+            return;
+        }
+        s.notificationOpen=true;
+        void window.showInformationMessage(
+            `Reviewing ${s.steps.length} file block${s.steps.length===1?'':'s'}. Click the status bar item to accept or reject the current block.`,
+            'Next',
+            'Previous',
+            'Skip File',
+            'Cancel',
+        ).then(action=>{
+            if(this.session!==s){
+                return;
+            }
+            s.notificationOpen=false;
+            switch(action){
+                case 'Next':
+                    return this.nextAsync();
+                case 'Previous':
+                    return this.previousAsync();
+                case 'Skip File':
+                    return this.skipFileAsync();
+                case 'Cancel':
+                    return this.endAsync();
+            }
+            return undefined;
+        });
+    }
+
+    private async finishAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+
+        const accepted=s.steps.filter(st=>st.accepted);
+        const fileLines=getTargetPaths(s.steps).map(f=>{
+            const blocks=s.steps.filter(st=>st.tag.targetPath===f).map(st=>`#${st.tag.index+1} ${st.accepted?'✓':'✗'}`);
+            return `${path.basename(f)}: ${blocks.join(', ')}`;
+        });
+        const scriptLine=s.scripts.length?`\n\n${s.scripts.length} script${s.scripts.length===1?'':'s'} in message`:'';
+
+        const applyFiles='Apply Accepted Files';
+        const applyAll='Apply Files and Run Scripts';
+        const restart='Restart Review';
+        const action=await window.showInformationMessage(
+            `${accepted.length} of ${s.steps.length} file blocks accepted. Apply changes?`,
+            {modal:true,detail:`${fileLines.join('\n')}${scriptLine}`},
+            ...(s.scripts.length?[applyFiles,applyAll,restart]:[applyFiles,restart]),
+        );
+        if(this.session!==s){
+            return;
+        }
+
+        if(action===restart){
+            await this.showStepAsync(0,0);
+            return;
+        }
+
+        await this.endAsync();
+
+        if(action===applyFiles || action===applyAll){
+            await applyFilesAsync(accepted);
+        }
+
+        if(action===applyAll){
+            for(const tag of s.scripts){
+                await commands.executeCommand('convo.output-tag-execute-shell',{
+                    targetPath:tag.targetPath,
+                    index:tag.index,
+                    cwd:tag.cwd,
+                    codeBlock:tag.codeBlock,
+                    documentUri:s.documentUri,
+                    autoConfirm:true,
+                } satisfies OutputTagCodeLensArgs);
+            }
+        }
+    }
+
+    private getCurrentRanges():BlockRange[]
+    {
+        const s=this.session;
+        const step=s?.steps[s.stepIndex];
+        return s?.labels.find(l=>l.step===step)?.ranges??[];
+    }
+
+    private getPreviewEditors():TextEditor[]
+    {
+        const key=this.session?.previewUri?.toString();
+        return key?window.visibleTextEditors.filter(e=>e.document.uri.toString()===key):[];
+    }
+}
+
+/**
+ * Applies the given steps to the base content in order. Labels of previous steps are remapped as
+ * each find-replace block is applied. Full file blocks replace the content and all previous labels.
+ */
+const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
+    let content=base;
+    let labels:BlockLabel[]=[];
+    const notFound:ReviewStep[]=[];
+
+    for(const step of steps){
+        const block=step.tag.codeBlock;
+        if(!block.findReplace){
+            content=block.content;
+            labels=[{step,ranges:[{start:0,end:content.length}]}];
+            continue;
+        }
+
+        const result=replaceConvoBlockContent(content,block);
+        if(!result.replaceCount){
+            notFound.push(step);
+            labels.push({step,ranges:[]});
+            continue;
+        }
+
+        labels=labels.map(l=>({step:l.step,ranges:l.ranges.map(r=>mapRange(r,result.ranges))}));
+        labels.push({step,ranges:result.ranges.map(({start,end})=>({start,end}))});
+        content=result.content;
+    }
+
+    return {content,labels,notFound};
+}
+
+const mapRange=(range:BlockRange,ranges:ConvoBlockReplaceRange[]):BlockRange=>({
+    start:mapConvoBlockReplaceIndex(range.start,ranges),
+    end:mapConvoBlockReplaceIndex(range.end,ranges),
+});
+
+const applyFilesAsync=async (steps:ReviewStep[]):Promise<void>=>{
+    const errors:string[]=[];
+    let written=0;
+
+    for(const targetPath of getTargetPaths(steps)){
+        try{
+            const base=await readFileContentAsync(targetPath);
+            const preview=buildFilePreview(base??'',steps.filter(st=>st.tag.targetPath===targetPath));
+            for(const st of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${st.tag.index+1}`);
+            }
+            if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
+                continue;
+            }
+            if(await writeFileContentAsync(targetPath,preview.content)){
+                written++;
+            }else{
+                errors.push(`Failed to write output to ${targetPath}`);
+            }
+        }catch(ex){
+            errors.push(`Failed to write output to ${targetPath}. Error:${getErrorMessage(ex)}`);
+        }
+    }
+
+    if(errors.length){
+        void window.showErrorMessage(errors.join('\n'));
+    }
+    void window.showInformationMessage(`Wrote ${written} file${written===1?'':'s'}`);
+}
+
+const getLabelText=(step:ReviewStep,isCurrent:boolean):string=>{
+    const kind=step.tag.codeBlock.findReplace?'find-replace':'full file';
+    return `${isCurrent?'▶ ':''}── block #${step.tag.index+1} · ${kind} · ${step.accepted?'✓ accepted':'✗ rejected'} ──`;
+}
+
+/**
+ * Returns a whole line range covering the given content range. A range ending at the start of a
+ * line does not include that line.
+ */
+const getLineRange=(doc:TextDocument,r:BlockRange):Range=>{
+    const start=doc.positionAt(r.start);
+    const end=doc.positionAt(r.end);
+    const endLine=(end.character===0 && end.line>start.line)?end.line-1:end.line;
+    return new Range(start.line,0,endLine,0);
+}
+
+const getTargetPaths=(steps:ReviewStep[]):string[]=>[...new Set(steps.map(st=>st.tag.targetPath))];
+
+const getDiffTabs=(uri:Uri):Tab[]=>{
+    const key=uri.toString();
+    return window.tabGroups.all.flatMap(g=>g.tabs).filter(t=>t.input instanceof TabInputTextDiff && t.input.modified.toString()===key);
+}
+
+const closeDiffTabsAsync=async (uri:Uri):Promise<void>=>{
+    const tabs=getDiffTabs(uri);
+    if(tabs.length){
+        await window.tabGroups.close(tabs);
+    }
+}
+
+/**
+ * Waits for the preview document to contain the given content so decorations line up
+ */
+const waitForContentAsync=async (uri:Uri,content:string):Promise<void>=>{
+    const key=uri.toString();
+    for(let i=0;i<40;i++){
+        if(workspace.textDocuments.find(d=>d.uri.toString()===key)?.getText()===content){
+            return;
+        }
+        await new Promise(r=>setTimeout(r,25));
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
+    const targetPath=tag.targetPath;
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+
+    const openDoc=getOpenFileDocument(targetPath);
+    if(openDoc){
+        const edit=new WorkspaceEdit();
+        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),outputContent);
+        if(!await workspace.applyEdit(edit) || !await openDoc.save()){
+            void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+            return;
+        }
+    }else{
+        await fs.mkdir(path.dirname(targetPath),{recursive:true});
+        await fs.writeFile(targetPath,outputContent,'utf8');
+    }
+
+    void window.showInformationMessage(`Wrote output to ${targetPath}`);
+}
+//// replace-with ////
+/**
+ * Returns the content of the given file using the open text document of the file if one exists.
+ * Undefined is returned if the file does not exist.
+ */
+export const readFileContentAsync=async (filePath:string):Promise<string|undefined>=>{
+    const openDoc=getOpenFileDocument(filePath);
+    if(openDoc){
+        return openDoc.getText();
+    }
+    try{
+        return await readFileAsStringAsync(filePath);
+    }catch{
+        return undefined;
+    }
+}
+
+/**
+ * Writes content to the target path. If the target is open in an editor it is updated through the
+ * editor and saved. Returns true if the content was written.
+ */
+export const writeFileContentAsync=async (targetPath:string,content:string):Promise<boolean>=>{
+    const openDoc=getOpenFileDocument(targetPath);
+    if(openDoc){
+        const edit=new WorkspaceEdit();
+        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),content);
+        return await workspace.applyEdit(edit) && await openDoc.save();
+    }
+    await fs.mkdir(path.dirname(targetPath),{recursive:true});
+    await fs.writeFile(targetPath,content,'utf8');
+    return true;
+}
+
+const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
+    const targetPath=tag.targetPath;
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+
+    if(!await writeFileContentAsync(targetPath,outputContent)){
+        void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+        return;
+    }
+
+    void window.showInformationMessage(`Wrote output to ${targetPath}`);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="2db1aa782ec6cfd4904f7042be1cdfdb18ca474d" find-replace>
+``` ts
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+//// replace-with ////
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCodeBlockReview } from './code-block-review.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="2db1aa782ec6cfd4904f7042be1cdfdb18ca474d" find-replace>
+``` ts
+    registerConvoCodeBlockView(context,ext);
+//// replace-with ////
+    registerConvoCodeBlockView(context,ext);
+    registerCodeBlockReview(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="d70348411ab4cfdf0cba7c6acfb19e791d4adf39" last-commit="5c48512cc06dfc9abbf47ef778055c7eacc2313d" find-replace>
+``` json
+            "view/title": [
+//// replace-with ////
+            "commandPalette": [
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "false"
+                },
+                {
+                    "command": "convo.code-block-review-next",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-previous",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-skip-file",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-toggle-accept",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-cancel",
+                    "when": "convo.codeBlockReviewActive"
+                }
+            ],
+            "view/title": [
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="d70348411ab4cfdf0cba7c6acfb19e791d4adf39" last-commit="5c48512cc06dfc9abbf47ef778055c7eacc2313d" find-replace>
+``` json
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.code-block-group-apply-all",
+                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "group": "inline"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="d70348411ab4cfdf0cba7c6acfb19e791d4adf39" last-commit="5c48512cc06dfc9abbf47ef778055c7eacc2313d" find-replace>
+``` json
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+//// replace-with ////
+            {
+                "command": "convo.code-block-group-apply-all",
+                "title": "Convo: Apply All Code Blocks In Message",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "convo.code-block-group-review",
+                "title": "Convo: Review Code Blocks In Message",
+                "icon": "$(eye)"
+            },
+            {
+                "command": "convo.code-block-review-next",
+                "title": "Convo: Review Next Change",
+                "icon": "$(arrow-down)"
+            },
+            {
+                "command": "convo.code-block-review-previous",
+                "title": "Convo: Review Previous Change",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "convo.code-block-review-skip-file",
+                "title": "Convo: Review Skip File"
+            },
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "title": "Convo: Review Toggle Accept"
+            },
+            {
+                "command": "convo.code-block-review-cancel",
+                "title": "Convo: Review Cancel"
+            },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="d70348411ab4cfdf0cba7c6acfb19e791d4adf39" last-commit="5c48512cc06dfc9abbf47ef778055c7eacc2313d" find-replace>
+``` json
+            {
+                "command": "convo.answer-questions-split",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            }
+        ],
+//// replace-with ////
+            {
+                "command": "convo.answer-questions-split",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus && editorLangId == 'source.convo'"
+            },
+            {
+                "command": "convo.code-block-review-next",
+                "key": "ctrl+alt+]",
+                "when": "convo.codeBlockReviewActive"
+            },
+            {
+                "command": "convo.code-block-review-previous",
+                "key": "ctrl+alt+[",
+                "when": "convo.codeBlockReviewActive"
+            },
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "key": "ctrl+alt+\\",
+                "when": "convo.codeBlockReviewActive"
+            }
+        ],
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" dirty file-hash="6736465d0dc419fbd0f5cfd4ce5bdfc37159ce99" last-commit="9d789a6f341f99c5606617bb805af463c1bbca4a" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace>
+``` md
+7. The model responds with `FILE_CONTENT` blocks. Use the `Open Diff` code lens, or the Code
+   Blocks view, to review each change. Then use `Write Output` or `Apply All` to write the files.
+//// replace-with ////
+7. The model responds with `FILE_CONTENT` blocks. Click `Review` on the message in the Code Blocks
+   view to step through each change, accept or reject blocks and apply the accepted ones. You can
+   also use the `Open Diff` code lens, then `Write Output` or `Apply All`. See
+   [Guided review](#guided-review).
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" dirty file-hash="6736465d0dc419fbd0f5cfd4ce5bdfc37159ce99" last-commit="9d789a6f341f99c5606617bb805af463c1bbca4a" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace>
+``` md
+- Inline action on message groups: `Apply All`. This writes every file and runs every script in
+  the message after a single confirmation. Find-replace blocks targeting the same file are
+  combined into one write.
+- Documents can be pinned so they stay in the view while you work in other files. Clicking a
+  document item switches the view to that document.
+//// replace-with ////
+- Inline action on message groups: `Review`. This starts a guided review of the file blocks in the
+  message. See [Guided review](#guided-review).
+- Inline action on message groups: `Apply All`. This writes every file and runs every script in
+  the message after a single confirmation. Find-replace blocks targeting the same file are
+  combined into one write.
+- Documents can be pinned so they stay in the view while you work in other files. Clicking a
+  document item switches the view to that document.
+
+### Guided review
+
+The `Review` action on a message group in the Code Blocks view walks through every `FILE_CONTENT`
+block in the message, one block at a time.
+
+- Files are reviewed in the order they first appear in the message.
+- A single diff tab is reused. It is replaced when the review moves to the next file.
+- The diff is cumulative. For find-replace blocks, the proposed side shows the current file with
+  every block up to the current one applied.
+- Each block's changes are marked with a divider and a label, such as
+  `── block #3 · find-replace · ✓ accepted ──`. Block numbers start at 1 and follow the order of
+  blocks in the message. Full file blocks are labeled on the first line.
+- The current block has a solid divider, a `▶` prefix and highlighted lines.
+- `Next` moves to the next change in the current block, then to the next block. `Previous` moves
+  back. `Skip File` jumps to the first block of the next file.
+- Blocks are accepted by default. Click the status bar item, or press `Ctrl+Alt+\`, to accept or
+  reject the current block. The status bar shows progress, such as `Block 2/5 ✓ · Change 1/3`.
+- After the last block, a dialog offers `Apply Accepted Files` and `Restart Review`. If the message
+  contains scripts, it also offers `Apply Files and Run Scripts`.
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+
+| Action         | Keybinding     | Notification button |
+|----------------|----------------|---------------------|
+| Next change    | `Ctrl+Alt+]`   | `Next`              |
+| Previous change| `Ctrl+Alt+[`   | `Previous`          |
+| Skip file      |                | `Skip File`         |
+| Toggle accept  | `Ctrl+Alt+\`   |                     |
+| Cancel         |                | `Cancel`            |
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" dirty file-hash="6736465d0dc419fbd0f5cfd4ce5bdfc37159ce99" last-commit="9d789a6f341f99c5606617bb805af463c1bbca4a" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace>
+``` md
+| Convo: Apply All Code Blocks In Message| `convo.code-block-group-apply-all`         | Writes all files and runs all scripts in a message             |
+//// replace-with ////
+| Convo: Apply All Code Blocks In Message| `convo.code-block-group-apply-all`         | Writes all files and runs all scripts in a message             |
+| Convo: Review Code Blocks In Message   | `convo.code-block-group-review`            | Starts a guided review of the file blocks in a message         |
+| Convo: Review Next Change              | `convo.code-block-review-next`             | Moves to the next change or block (`Ctrl+Alt+]`)               |
+| Convo: Review Previous Change          | `convo.code-block-review-previous`         | Moves to the previous change or block (`Ctrl+Alt+[`)           |
+| Convo: Review Skip File                | `convo.code-block-review-skip-file`        | Jumps to the first block of the next file                      |
+| Convo: Review Toggle Accept            | `convo.code-block-review-toggle-accept`    | Accepts or rejects the current block (`Ctrl+Alt+\`)            |
+| Convo: Review Cancel                   | `convo.code-block-review-cancel`           | Ends the review and closes the diff                            |
+```
+</FILE_CONTENT>
+
+Notes:
+- **`replaceCount` change:** it now counts only the replacements actually made. Before, it counted every match, including matches beyond the `find-replace` limit. Existing callers only check whether it is zero, so they behave the same.
+- **One notification at a time:** VSCode can't dismiss notifications from code. When you navigate with keybindings, the open notification stays as is. The status bar always shows the current progress.
+- **Keybindings:** the review keybindings only apply while a review is active (`convo.codeBlockReviewActive`). They use `Ctrl+Alt` on every platform because `Cmd+Alt+[` and `Cmd+Alt+]` are fold and unfold on macOS.
+- **Review command placement:** `Convo: Review Code Blocks In Message` is hidden from the Command Palette because it needs a message group. The navigation commands only appear in the palette during a review.
+
+
+> user
+When opening the diff in review mode all file block changes should be displayed instead just the current block being reviewed
+
+@time 2026-11-06T12:28:18-05:00
+@tokenUsage 147353 / 986 / $0.6091319999999999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Showing every block for the file in the diff makes sense. Moving between blocks of the same file would then only move the cursor and highlight, without rebuilding the preview. A few questions first:
+
+1. How should rejected blocks appear in the diff?
+   - a) Always applied. Rejected blocks keep their label with `✗ rejected`, so the diff shows every proposed change.
+   - b) Removed from the preview when rejected, and added back when accepted again. The diff then matches what will be written. A rejected block has no applied range, so its label would sit at the location where its find text matches in the current content.
+   - c) Same as a during the review. Before the final dialog, offer a last diff that shows only the accepted changes.
+
+2. When a full file block comes after other blocks for the same file, the earlier blocks get overwritten and have nothing to show. A full file block that comes first gets partly hidden by the find-replace blocks after it. How should these be handled?
+   - a) Keep the current behavior. Overwritten blocks show `Not found` in the status bar, and navigation scrolls to the top.
+   - b) Skip overwritten blocks during navigation, but still list them in the final dialog.
+   - c) Label overwritten blocks `· overwritten by #N` and skip them during navigation.
+
+3. With all changes visible at once, what order should `Next` follow within a file?
+   - a) Block order in the message, as now
+   - b) Position in the file, top to bottom, across all blocks
+
+4. Should the status bar also show the file's total, for example `File 1/3 · Block 2/5 ✓ · Change 1/3`?
+   - a) Yes
+   - b) No, keep it as is
+
+
+> user
+1. a
+2. a
+3. b
+4. a
+
+Also, I dont like the notification approach for navigation. Lets change the navigation to code lens actions
+
+
+@time 2026-11-06T12:35:46-05:00
+@tokenUsage 147939 / 1672 / $0.625196
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Code lenses are a better fit. One catch: VSCode turns code lenses off in diff editors by default (`diffEditor.codeLens` is `false`), so the lenses won't show unless that setting is on. A few questions before I make the change:
+
+1. How should `diffEditor.codeLens` be handled?
+   - a) Turn it on automatically when a review starts, then restore the previous value when the review ends
+   - b) On the first review, ask the user to turn it on permanently (`Enable` / `Cancel`), and save it to user settings
+   - c) Check the setting at review start. If it's off, show a message with an `Enable` button and don't start the review until it's on.
+
+2. Where should the navigation lenses go?
+   - a) Above the current change only, for example `✓ Accept #3 | ◀ Previous | Next ▶ | Skip File | Finish | Cancel`
+   - b) Above every change. Each lens has an accept or reject toggle for its own block plus `Go to`. The full navigation set appears only on the current change.
+   - c) A single toolbar lens on line 1 of the file with all the actions, plus a small per-change lens with only the accept or reject toggle for that block
+
+3. Should the label text move into the code lens?
+   - a) Yes. The lens shows `block #3 · find-replace · ✓ accepted` as its first item. The divider and current-block highlight stay as decorations, and the `after` text decoration is removed.
+   - b) No. Keep the label decoration and use lenses only for actions.
+
+4. Should a file-level lens on line 1 show progress and finish actions, for example `File 1/3 · Block 2/5 · Change 1/3 | Apply Accepted | Cancel`?
+   - a) Yes, and keep the status bar item too
+   - b) Yes, and remove the status bar item
+   - c) No, the status bar is enough
+
+5. After the last change, `Next` currently opens the modal with `Apply Accepted Files`, `Apply Files and Run Scripts` and `Restart Review`. Should that stay?
+   - a) Yes, keep the modal and open it from `Next` on the last change or from a `Finish` lens
+   - b) Replace the modal with lenses on line 1 of the last file: `Apply Accepted Files | Apply Files and Run Scripts | Restart Review`
+
+6. Should the keybindings `Ctrl+Alt+]`, `Ctrl+Alt+[` and `Ctrl+Alt+\` stay alongside the lenses?
+   - a) Yes
+   - b) No, remove them
+
+
+> user
+1. a
+2. b, start each blocks status as pending and once all blocks are accepted or rejected show the Finish option
+3. a
+4. c
+5. a
+6. a
+
+
+@time 2026-11-06T12:45:00-05:00
+@tokenUsage 148831 / 23150 / $1.058324
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The review now runs from code lenses in the diff instead of notifications. Every block for a file is shown in the diff, and blocks start as pending.
+
+- **Whole file in the diff:** the diff shows every block for the current file applied. Moving between changes in the same file only moves the cursor, the highlight and the lenses. The preview is rebuilt only when the review moves to another file.
+- **Order of changes:** within a file, changes are visited top to bottom across all blocks. A block whose find text isn't found, or that is overwritten by a later full file block, gets one entry on line 1 marked `not found`.
+- **Lens on every change:** shows the label, for example `block #3 · find-replace · ○ pending`, and `Accept` or `Reject` for its block. Pending blocks show both. Other changes also get `Go to`.
+- **Lens on the current change:** also shows `◀ Previous`, `Next ▶`, `Skip File` and `Cancel`. `Finish` appears once no block is pending.
+- **Pending blocks at the end:** `Next` on the last change, or `Finish`, opens the apply dialog. If blocks are still pending, a message appears and the review jumps to the first pending block instead.
+- **Status bar:** shows `File 1/3 · Block 2/5 ○ · Change 1/3`. Clicking it, or pressing `Ctrl+Alt+\`, toggles the current block between accepted and rejected.
+- **`diffEditor.codeLens`:** turned on in user settings when a review starts and restored when it ends.
+- **Notifications removed:** all notification code is gone. The label text moved from the decoration into the lens. The dividers and the current-block highlight are still decorations.
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" dirty file-hash="7996832b43cd2a0a16780cff20f79051b2b2c0b1">
+``` ts
+import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import * as path from 'path';
+import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, getParsedOutputTagGroups, outputPreviewChangeEmitter, outputPreviewContent, readFileContentAsync, writeFileContentAsync } from './code-block-lib.js';
+
+const reviewContextKey='convo.codeBlockReviewActive';
+
+type ReviewStatus='pending'|'accepted'|'rejected';
+
+interface ReviewStep
+{
+    tag:ParsedOutputTagInfo;
+    status:ReviewStatus;
+}
+
+interface BlockRange
+{
+    start:number;
+    end:number;
+}
+
+interface BlockLabel
+{
+    step:ReviewStep;
+    ranges:BlockRange[];
+}
+
+interface FilePreview
+{
+    content:string;
+    labels:BlockLabel[];
+    notFound:ReviewStep[];
+}
+
+/**
+ * A single navigable change in the preview of a file
+ */
+interface ReviewChange
+{
+    step:ReviewStep;
+    /**
+     * Range of the change in the preview. Undefined if the block has nothing to show in the preview.
+     */
+    range?:BlockRange;
+}
+
+interface DiffCodeLensRestore
+{
+    value:boolean|undefined;
+}
+
+interface ReviewSession
+{
+    documentUri:Uri;
+    steps:ReviewStep[];
+    scripts:ParsedOutputTagInfo[];
+    targetPaths:string[];
+    fileIndex:number;
+    changeIndex:number;
+    changes:ReviewChange[];
+    previewUri?:Uri;
+    diffCodeLens?:DiffCodeLensRestore;
+}
+
+/**
+ * Registers the `convo.code-block-group-review` command and its navigation commands. The review
+ * steps through the file blocks of a message one file at a time using a single reused diff tab.
+ * Each change is labeled with a code lens that lets the user accept or reject its block and
+ * navigate between changes.
+ */
+export const registerCodeBlockReview=(context:ExtensionContext,ext:ConvoExt)=>{
+    const review=new CodeBlockReview();
+    context.subscriptions.push(
+        review,
+        languages.registerCodeLensProvider({scheme:'convo-output'},review),
+        commands.registerCommand('convo.code-block-group-review',(item?:{group?:MessageTagGroup})=>review.startAsync(item?.group)),
+        commands.registerCommand('convo.code-block-review-next',()=>review.nextAsync()),
+        commands.registerCommand('convo.code-block-review-previous',()=>review.previousAsync()),
+        commands.registerCommand('convo.code-block-review-skip-file',()=>review.skipFileAsync()),
+        commands.registerCommand('convo.code-block-review-toggle-accept',()=>review.toggleAccept()),
+        commands.registerCommand('convo.code-block-review-set-status',(stepIndex:number,status:ReviewStatus)=>review.setStatus(stepIndex,status)),
+        commands.registerCommand('convo.code-block-review-goto',(changeIndex:number)=>review.gotoChange(changeIndex)),
+        commands.registerCommand('convo.code-block-review-finish',()=>review.finishAsync()),
+        commands.registerCommand('convo.code-block-review-cancel',()=>review.endAsync()),
+        window.onDidChangeVisibleTextEditors(()=>review.decorate()),
+    );
+}
+
+class CodeBlockReview implements CodeLensProvider, Disposable
+{
+    private session:ReviewSession|undefined;
+
+    private readonly lensChangeEmitter=new EventEmitter<void>();
+    public readonly onDidChangeCodeLenses=this.lensChangeEmitter.event;
+
+    private readonly statusBar=window.createStatusBarItem(StatusBarAlignment.Left,100);
+
+    private readonly labelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'1px 0 0 0',
+        borderStyle:'dashed',
+        borderColor:new ThemeColor('editorCodeLens.foreground'),
+    });
+
+    private readonly currentLabelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'2px 0 0 0',
+        borderStyle:'solid',
+        borderColor:new ThemeColor('focusBorder'),
+    });
+
+    private readonly currentRangeType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        backgroundColor:new ThemeColor('editor.rangeHighlightBackground'),
+    });
+
+    public dispose():void
+    {
+        void restoreDiffCodeLensAsync(this.session?.diffCodeLens);
+        this.session=undefined;
+        this.lensChangeEmitter.dispose();
+        this.statusBar.dispose();
+        this.labelType.dispose();
+        this.currentLabelType.dispose();
+        this.currentRangeType.dispose();
+    }
+
+    public provideCodeLenses(document:TextDocument):CodeLens[]
+    {
+        const s=this.session;
+        if(!s || document.uri.toString()!==s.previewUri?.toString()){
+            return [];
+        }
+
+        const canFinish=!s.steps.some(st=>st.status==='pending');
+        const lenses:CodeLens[]=[];
+
+        for(let i=0;i<s.changes.length;i++){
+            const change=s.changes[i];
+            if(!change){
+                continue;
+            }
+            const step=change.step;
+            const isCurrent=i===s.changeIndex;
+            const stepIndex=s.steps.indexOf(step);
+            const line=change.range?document.positionAt(change.range.start).line:0;
+            const range=new Range(line,0,line,0);
+            const add=(title:string,command:string,...args:any[])=>{
+                lenses.push(new CodeLens(range,{title,command,arguments:args}));
+            };
+
+            add(getLabelText(change,isCurrent),'');
+            if(step.status!=='accepted'){
+                add('✓ Accept','convo.code-block-review-set-status',stepIndex,'accepted');
+            }
+            if(step.status!=='rejected'){
+                add('✗ Reject','convo.code-block-review-set-status',stepIndex,'rejected');
+            }
+
+            if(!isCurrent){
+                add('Go to','convo.code-block-review-goto',i);
+                continue;
+            }
+
+            add('◀ Previous','convo.code-block-review-previous');
+            add('Next ▶','convo.code-block-review-next');
+            add('Skip File','convo.code-block-review-skip-file');
+            if(canFinish){
+                add('Finish','convo.code-block-review-finish');
+            }
+            add('Cancel','convo.code-block-review-cancel');
+        }
+
+        return lenses;
+    }
+
+    public async startAsync(group?:MessageTagGroup):Promise<void>
+    {
+        if(!group){
+            void window.showInformationMessage('Start a review from a message in the Code Blocks view');
+            return;
+        }
+
+        await this.endAsync();
+
+        const doc=await workspace.openTextDocument(group.messageUri);
+        const tags=(getParsedOutputTagGroups(doc).find(g=>g.messageIndex===group.messageIndex)??group).tags;
+        const files=tags.filter(t=>t.type==='file');
+        if(!files.length){
+            void window.showInformationMessage('No file blocks found in message');
+            return;
+        }
+
+        const order=[...new Set(files.map(t=>t.targetPath))];
+        files.sort((a,b)=>order.indexOf(a.targetPath)-order.indexOf(b.targetPath) || a.index-b.index);
+
+        const diffCodeLens=await enableDiffCodeLensAsync();
+
+        this.session={
+            documentUri:group.messageUri,
+            steps:files.map(tag=>({tag,status:'pending'})),
+            scripts:tags.filter(t=>t.type==='shell'),
+            targetPaths:order,
+            fileIndex:0,
+            changeIndex:0,
+            changes:[],
+            diffCodeLens,
+        };
+        await commands.executeCommand('setContext',reviewContextKey,true);
+        await this.showFileAsync(0,0);
+    }
+
+    public async nextAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex<s.changes.length-1){
+            s.changeIndex++;
+            this.showChange();
+        }else if(s.fileIndex<s.targetPaths.length-1){
+            await this.showFileAsync(s.fileIndex+1,0);
+        }else{
+            await this.finishAsync();
+        }
+    }
+
+    public async previousAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex>0){
+            s.changeIndex--;
+            this.showChange();
+        }else if(s.fileIndex>0){
+            await this.showFileAsync(s.fileIndex-1,'last');
+        }
+    }
+
+    public async skipFileAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.fileIndex<s.targetPaths.length-1){
+            await this.showFileAsync(s.fileIndex+1,0);
+        }else{
+            await this.finishAsync();
+        }
+    }
+
+    public gotoChange(changeIndex:number):void
+    {
+        const s=this.session;
+        if(!s || !s.changes[changeIndex]){
+            return;
+        }
+        s.changeIndex=changeIndex;
+        this.showChange();
+    }
+
+    public setStatus(stepIndex:number,status:ReviewStatus):void
+    {
+        const step=this.session?.steps[stepIndex];
+        if(!step){
+            return;
+        }
+        step.status=status;
+        this.refresh();
+    }
+
+    public toggleAccept():void
+    {
+        const s=this.session;
+        const step=s?.changes[s.changeIndex]?.step;
+        if(!step){
+            return;
+        }
+        step.status=step.status==='accepted'?'rejected':'accepted';
+        this.refresh();
+    }
+
+    public async endAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        for(const editor of this.getPreviewEditors()){
+            editor.setDecorations(this.labelType,[]);
+            editor.setDecorations(this.currentLabelType,[]);
+            editor.setDecorations(this.currentRangeType,[]);
+        }
+        this.session=undefined;
+        this.statusBar.hide();
+        this.lensChangeEmitter.fire();
+        await commands.executeCommand('setContext',reviewContextKey,false);
+        if(s.previewUri){
+            outputPreviewContent.delete(s.previewUri.toString());
+            await closeDiffTabsAsync(s.previewUri);
+        }
+        await restoreDiffCodeLensAsync(s.diffCodeLens);
+    }
+
+    public decorate():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const current=s.changes[s.changeIndex]?.step;
+        for(const editor of this.getPreviewEditors()){
+            const doc=editor.document;
+            const labels:Range[]=[];
+            const currentLabels:Range[]=[];
+            const currentRanges:Range[]=[];
+            for(const change of s.changes){
+                if(!change.range){
+                    continue;
+                }
+                const lineRange=getLineRange(doc,change.range);
+                const labelRange=doc.lineAt(lineRange.start.line).range;
+                if(change.step===current){
+                    currentLabels.push(labelRange);
+                    currentRanges.push(lineRange);
+                }else{
+                    labels.push(labelRange);
+                }
+            }
+            editor.setDecorations(this.labelType,labels);
+            editor.setDecorations(this.currentLabelType,currentLabels);
+            editor.setDecorations(this.currentRangeType,currentRanges);
+        }
+    }
+
+    public async finishAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+
+        const pending=s.steps.filter(st=>st.status==='pending');
+        const firstPending=pending[0];
+        if(firstPending){
+            void window.showInformationMessage(`${pending.length} block${pending.length===1?' is':'s are'} still pending. Accept or reject every block to finish.`);
+            await this.showFileAsync(s.targetPaths.indexOf(firstPending.tag.targetPath),firstPending);
+            return;
+        }
+
+        const accepted=s.steps.filter(st=>st.status==='accepted');
+        const fileLines=s.targetPaths.map(f=>{
+            const blocks=s.steps.filter(st=>st.tag.targetPath===f).map(st=>`#${st.tag.index+1} ${getStatusIcon(st.status)}`);
+            return `${path.basename(f)}: ${blocks.join(', ')}`;
+        });
+        const scriptLine=s.scripts.length?`\n\n${s.scripts.length} script${s.scripts.length===1?'':'s'} in message`:'';
+
+        const applyFiles='Apply Accepted Files';
+        const applyAll='Apply Files and Run Scripts';
+        const restart='Restart Review';
+        const action=await window.showInformationMessage(
+            `${accepted.length} of ${s.steps.length} file blocks accepted. Apply changes?`,
+            {modal:true,detail:`${fileLines.join('\n')}${scriptLine}`},
+            ...(s.scripts.length?[applyFiles,applyAll,restart]:[applyFiles,restart]),
+        );
+        if(this.session!==s){
+            return;
+        }
+
+        if(action===restart){
+            await this.showFileAsync(0,0);
+            return;
+        }
+
+        if(action!==applyFiles && action!==applyAll){
+            return;
+        }
+
+        await this.endAsync();
+        await applyFilesAsync(accepted);
+
+        if(action===applyAll){
+            for(const tag of s.scripts){
+                await commands.executeCommand('convo.output-tag-execute-shell',{
+                    targetPath:tag.targetPath,
+                    index:tag.index,
+                    cwd:tag.cwd,
+                    codeBlock:tag.codeBlock,
+                    documentUri:s.documentUri,
+                    autoConfirm:true,
+                } satisfies OutputTagCodeLensArgs);
+            }
+        }
+    }
+
+    /**
+     * Shows the diff of the file at the given index with all blocks of the file applied. The
+     * change to select can be an index, the last change or the first change of a step.
+     */
+    private async showFileAsync(fileIndex:number,change:number|'last'|ReviewStep):Promise<void>
+    {
+        const s=this.session;
+        const targetPath=s?.targetPaths[fileIndex];
+        if(!s || !targetPath){
+            return;
+        }
+
+        const base=await readFileContentAsync(targetPath);
+        if(this.session!==s){
+            return;
+        }
+
+        const preview=buildFilePreview(base??'',s.steps.filter(st=>st.tag.targetPath===targetPath));
+        const changes=getChanges(preview.labels,s.steps);
+        const previewUri=Uri.file(targetPath).with({scheme:'convo-output',query:'review'});
+        const prevUri=s.previewUri;
+
+        s.fileIndex=fileIndex;
+        s.changes=changes;
+        s.previewUri=previewUri;
+        s.changeIndex=(
+            change==='last'?
+                Math.max(0,changes.length-1)
+            :typeof change==='number'?
+                change
+            :
+                Math.max(0,changes.findIndex(c=>c.step===change))
+        );
+
+        outputPreviewContent.set(previewUri.toString(),preview.content);
+        outputPreviewChangeEmitter.fire(previewUri);
+
+        if(prevUri && prevUri.toString()!==previewUri.toString()){
+            outputPreviewContent.delete(prevUri.toString());
+            await closeDiffTabsAsync(prevUri);
+        }
+
+        if(!getDiffTabs(previewUri).length){
+            await commands.executeCommand(
+                'vscode.diff',
+                base===undefined?Uri.parse(`untitled:${targetPath}`):Uri.file(targetPath),
+                previewUri,
+                `Review: ${path.basename(targetPath)}`,
+                {preview:false},
+            );
+        }
+
+        await waitForContentAsync(previewUri,preview.content);
+        if(this.session!==s){
+            return;
+        }
+
+        this.showChange();
+    }
+
+    private showChange():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const r=s.changes[s.changeIndex]?.range;
+        for(const editor of this.getPreviewEditors()){
+            const pos=r?editor.document.positionAt(r.start):new Position(0,0);
+            editor.selection=new Selection(pos,pos);
+            editor.revealRange(new Range(pos,pos),TextEditorRevealType.InCenter);
+        }
+        this.refresh();
+    }
+
+    private refresh():void
+    {
+        this.decorate();
+        this.updateStatusBar();
+        this.lensChangeEmitter.fire();
+    }
+
+    private updateStatusBar():void
+    {
+        const s=this.session;
+        const current=s?.changes[s.changeIndex];
+        if(!s || !current){
+            return;
+        }
+        const step=current.step;
+        const change=current.range?`Change ${s.changeIndex+1}/${s.changes.length}`:'Not found';
+        this.statusBar.text=`$(diff) File ${s.fileIndex+1}/${s.targetPaths.length} · Block ${s.steps.indexOf(step)+1}/${s.steps.length} ${getStatusIcon(step.status)} · ${change}`;
+        this.statusBar.tooltip=`${step.tag.targetPath}\nClick to ${step.status==='accepted'?'reject':'accept'} block #${step.tag.index+1}`;
+        this.statusBar.command='convo.code-block-review-toggle-accept';
+        this.statusBar.show();
+    }
+
+    private getPreviewEditors():TextEditor[]
+    {
+        const key=this.session?.previewUri?.toString();
+        return key?window.visibleTextEditors.filter(e=>e.document.uri.toString()===key):[];
+    }
+}
+
+/**
+ * Applies the given steps to the base content in order. Labels of previous steps are remapped as
+ * each find-replace block is applied. Full file blocks replace the content and clear the ranges of
+ * all previous labels.
+ */
+const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
+    let content=base;
+    let labels:BlockLabel[]=[];
+    const notFound:ReviewStep[]=[];
+
+    for(const step of steps){
+        const block=step.tag.codeBlock;
+        if(!block.findReplace){
+            content=block.content;
+            labels=[...labels.map(l=>({step:l.step,ranges:[]})),{step,ranges:[{start:0,end:content.length}]}];
+            continue;
+        }
+
+        const result=replaceConvoBlockContent(content,block);
+        if(!result.replaceCount){
+            notFound.push(step);
+            labels.push({step,ranges:[]});
+            continue;
+        }
+
+        labels=labels.map(l=>({step:l.step,ranges:l.ranges.map(r=>mapRange(r,result.ranges))}));
+        labels.push({step,ranges:result.ranges.map(({start,end})=>({start,end}))});
+        content=result.content;
+    }
+
+    return {content,labels,notFound};
+}
+
+/**
+ * Returns the changes of the given labels ordered by position in the file. Labels without ranges
+ * produce a single change placed at the top of the file.
+ */
+const getChanges=(labels:BlockLabel[],steps:ReviewStep[]):ReviewChange[]=>{
+    const changes:ReviewChange[]=labels.flatMap(l=>l.ranges.length?l.ranges.map(range=>({step:l.step,range})):[{step:l.step}]);
+    return changes.sort((a,b)=>(a.range?.start??0)-(b.range?.start??0) || steps.indexOf(a.step)-steps.indexOf(b.step));
+}
+
+const mapRange=(range:BlockRange,ranges:ConvoBlockReplaceRange[]):BlockRange=>({
+    start:mapConvoBlockReplaceIndex(range.start,ranges),
+    end:mapConvoBlockReplaceIndex(range.end,ranges),
+});
+
+const applyFilesAsync=async (steps:ReviewStep[]):Promise<void>=>{
+    const errors:string[]=[];
+    let written=0;
+
+    for(const targetPath of getTargetPaths(steps)){
+        try{
+            const base=await readFileContentAsync(targetPath);
+            const preview=buildFilePreview(base??'',steps.filter(st=>st.tag.targetPath===targetPath));
+            for(const st of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${st.tag.index+1}`);
+            }
+            if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
+                continue;
+            }
+            if(await writeFileContentAsync(targetPath,preview.content)){
+                written++;
+            }else{
+                errors.push(`Failed to write output to ${targetPath}`);
+            }
+        }catch(ex){
+            errors.push(`Failed to write output to ${targetPath}. Error:${getErrorMessage(ex)}`);
+        }
+    }
+
+    if(errors.length){
+        void window.showErrorMessage(errors.join('\n'));
+    }
+    void window.showInformationMessage(`Wrote ${written} file${written===1?'':'s'}`);
+}
+
+const getStatusIcon=(status:ReviewStatus):string=>(
+    status==='accepted'?
+        '✓'
+    :status==='rejected'?
+        '✗'
+    :
+        '○'
+);
+
+const getLabelText=(change:ReviewChange,isCurrent:boolean):string=>{
+    const step=change.step;
+    const kind=step.tag.codeBlock.findReplace?'find-replace':'full file';
+    return `${isCurrent?'▶ ':''}block #${step.tag.index+1} · ${kind} · ${getStatusIcon(step.status)} ${step.status}${change.range?'':' · not found'}`;
+}
+
+/**
+ * Turns on `diffEditor.codeLens` in user settings if it is off. Returns the previous user setting
+ * value so it can be restored, or undefined if nothing was changed.
+ */
+const enableDiffCodeLensAsync=async ():Promise<DiffCodeLensRestore|undefined>=>{
+    const config=workspace.getConfiguration('diffEditor');
+    if(config.get<boolean>('codeLens')){
+        return undefined;
+    }
+    const value=config.inspect<boolean>('codeLens')?.globalValue;
+    await config.update('codeLens',true,ConfigurationTarget.Global);
+    return {value};
+}
+
+const restoreDiffCodeLensAsync=async (restore:DiffCodeLensRestore|undefined):Promise<void>=>{
+    if(restore){
+        await workspace.getConfiguration('diffEditor').update('codeLens',restore.value,ConfigurationTarget.Global);
+    }
+}
+
+/**
+ * Returns a whole line range covering the given content range. A range ending at the start of a
+ * line does not include that line.
+ */
+const getLineRange=(doc:TextDocument,r:BlockRange):Range=>{
+    const start=doc.positionAt(r.start);
+    const end=doc.positionAt(r.end);
+    const endLine=(end.character===0 && end.line>start.line)?end.line-1:end.line;
+    return new Range(start.line,0,endLine,0);
+}
+
+const getTargetPaths=(steps:ReviewStep[]):string[]=>[...new Set(steps.map(st=>st.tag.targetPath))];
+
+const getDiffTabs=(uri:Uri):Tab[]=>{
+    const key=uri.toString();
+    return window.tabGroups.all.flatMap(g=>g.tabs).filter(t=>t.input instanceof TabInputTextDiff && t.input.modified.toString()===key);
+}
+
+const closeDiffTabsAsync=async (uri:Uri):Promise<void>=>{
+    const tabs=getDiffTabs(uri);
+    if(tabs.length){
+        await window.tabGroups.close(tabs);
+    }
+}
+
+/**
+ * Waits for the preview document to contain the given content so decorations and code lenses line up
+ */
+const waitForContentAsync=async (uri:Uri,content:string):Promise<void>=>{
+    const key=uri.toString();
+    for(let i=0;i<40;i++){
+        if(workspace.textDocuments.find(d=>d.uri.toString()===key)?.getText()===content){
+            return;
+        }
+        await new Promise(r=>setTimeout(r,25));
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="a663fd90d01a5fb93543c9a88036da887e037414" last-commit="87e5d52f5ebb05b3b52029c0dd0330d3fa5b905b" find-replace>
+``` json
+                {
+                    "command": "convo.code-block-review-toggle-accept",
+                    "when": "convo.codeBlockReviewActive"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.code-block-review-toggle-accept",
+                    "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-block-review-finish",
+                    "when": "convo.codeBlockReviewActive"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" dirty file-hash="a663fd90d01a5fb93543c9a88036da887e037414" last-commit="87e5d52f5ebb05b3b52029c0dd0330d3fa5b905b" find-replace>
+``` json
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "title": "Convo: Review Toggle Accept"
+            },
+//// replace-with ////
+            {
+                "command": "convo.code-block-review-toggle-accept",
+                "title": "Convo: Review Toggle Accept"
+            },
+            {
+                "command": "convo.code-block-review-finish",
+                "title": "Convo: Review Finish"
+            },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" dirty file-hash="dcdf1105bf06a7f4540c523d81c174f603134d2e" last-commit="87e5d52f5ebb05b3b52029c0dd0330d3fa5b905b" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace>
+``` md
+The `Review` action on a message group in the Code Blocks view walks through every `FILE_CONTENT`
+block in the message, one block at a time.
+
+- Files are reviewed in the order they first appear in the message.
+- A single diff tab is reused. It is replaced when the review moves to the next file.
+- The diff is cumulative. For find-replace blocks, the proposed side shows the current file with
+  every block up to the current one applied.
+- Each block's changes are marked with a divider and a label, such as
+  `── block #3 · find-replace · ✓ accepted ──`. Block numbers start at 1 and follow the order of
+  blocks in the message. Full file blocks are labeled on the first line.
+- The current block has a solid divider, a `▶` prefix and highlighted lines.
+- `Next` moves to the next change in the current block, then to the next block. `Previous` moves
+  back. `Skip File` jumps to the first block of the next file.
+- Blocks are accepted by default. Click the status bar item, or press `Ctrl+Alt+\`, to accept or
+  reject the current block. The status bar shows progress, such as `Block 2/5 ✓ · Change 1/3`.
+- After the last block, a dialog offers `Apply Accepted Files` and `Restart Review`. If the message
+  contains scripts, it also offers `Apply Files and Run Scripts`.
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+
+| Action         | Keybinding     | Notification button |
+|----------------|----------------|---------------------|
+| Next change    | `Ctrl+Alt+]`   | `Next`              |
+| Previous change| `Ctrl+Alt+[`   | `Previous`          |
+| Skip file      |                | `Skip File`         |
+| Toggle accept  | `Ctrl+Alt+\`   |                     |
+| Cancel         |                | `Cancel`            |
+//// replace-with ////
+The `Review` action on a message group in the Code Blocks view walks through every `FILE_CONTENT`
+block in the message, one file at a time.
+
+- Files are reviewed in the order they first appear in the message. A single diff tab is reused
+  and is replaced when the review moves to the next file.
+- The diff shows every block for the file applied, whether it is pending, accepted or rejected.
+- Within a file, changes are visited from top to bottom across all blocks.
+- Every change has a code lens with a label, such as `block #3 · find-replace · ○ pending`, and
+  `Accept` or `Reject` actions for its block. Other changes have a `Go to` action. Block numbers
+  start at 1 and follow the order of blocks in the message.
+- The code lens of the current change adds `Previous`, `Next`, `Skip File` and `Cancel`. `Finish`
+  appears once every block is accepted or rejected.
+- Each change is marked with a divider. The current block has a solid divider, highlighted lines
+  and a `▶` prefix in its label.
+- Some blocks have nothing to show in the diff, for example when the find text isn't found or a
+  later full file block overwrites the content. These blocks are labeled `not found` on the first
+  line.
+- Blocks start as pending. The status bar shows progress, such as
+  `File 1/3 · Block 2/5 ○ · Change 1/3`. Click the status bar item, or press `Ctrl+Alt+\`, to
+  toggle the current block between accepted and rejected.
+- `Next` on the last change, or `Finish`, opens a dialog with `Apply Accepted Files` and
+  `Restart Review`. If the message contains scripts, it also offers `Apply Files and Run Scripts`.
+  If any block is still pending, the review jumps to the first pending block instead.
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+- Code lenses in diff editors are controlled by the `diffEditor.codeLens` setting, which is off by
+  default. The review turns it on when it starts and restores the previous value when it ends.
+
+| Action         | Keybinding     | Code lens          |
+|----------------|----------------|--------------------|
+| Next change    | `Ctrl+Alt+]`   | `Next ▶`           |
+| Previous change| `Ctrl+Alt+[`   | `◀ Previous`       |
+| Skip file      |                | `Skip File`        |
+| Accept / reject| `Ctrl+Alt+\`   | `Accept`, `Reject` |
+| Go to change   |                | `Go to`            |
+| Finish         |                | `Finish`           |
+| Cancel         |                | `Cancel`           |
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" dirty file-hash="dcdf1105bf06a7f4540c523d81c174f603134d2e" last-commit="87e5d52f5ebb05b3b52029c0dd0330d3fa5b905b" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace>
+``` md
+| Convo: Review Next Change              | `convo.code-block-review-next`             | Moves to the next change or block (`Ctrl+Alt+]`)               |
+| Convo: Review Previous Change          | `convo.code-block-review-previous`         | Moves to the previous change or block (`Ctrl+Alt+[`)           |
+| Convo: Review Skip File                | `convo.code-block-review-skip-file`        | Jumps to the first block of the next file                      |
+| Convo: Review Toggle Accept            | `convo.code-block-review-toggle-accept`    | Accepts or rejects the current block (`Ctrl+Alt+\`)            |
+//// replace-with ////
+| Convo: Review Next Change              | `convo.code-block-review-next`             | Moves to the next change or file (`Ctrl+Alt+]`)                |
+| Convo: Review Previous Change          | `convo.code-block-review-previous`         | Moves to the previous change or file (`Ctrl+Alt+[`)            |
+| Convo: Review Skip File                | `convo.code-block-review-skip-file`        | Jumps to the first change of the next file                     |
+| Convo: Review Toggle Accept            | `convo.code-block-review-toggle-accept`    | Accepts or rejects the current block (`Ctrl+Alt+\`)            |
+| Convo: Review Finish                   | `convo.code-block-review-finish`           | Opens the apply dialog once no block is pending                |
+```
+</FILE_CONTENT>
+
+Notes:
+- **Status bar toggle:** a pending block becomes accepted on the first toggle. After that, it switches between accepted and rejected.
+- **Internal commands:** `convo.code-block-review-set-status` and `convo.code-block-review-goto` are only called from code lenses. They aren't declared in `package.json`, so they don't appear in the Command Palette.
+- **Label lens:** the label lens uses an empty command, so clicking it does nothing.
+- **`diffEditor.codeLens` scope:** the setting is changed in user settings only. If a workspace setting turns it off, the workspace value wins and the lenses won't show.
+
+
+> user

@@ -251,6 +251,38 @@ export const showOutputDiffAsync=async (
     return true;
 }
 
+/**
+ * Returns the content of the given file using the open text document of the file if one exists.
+ * Undefined is returned if the file does not exist.
+ */
+export const readFileContentAsync=async (filePath:string):Promise<string|undefined>=>{
+    const openDoc=getOpenFileDocument(filePath);
+    if(openDoc){
+        return openDoc.getText();
+    }
+    try{
+        return await readFileAsStringAsync(filePath);
+    }catch{
+        return undefined;
+    }
+}
+
+/**
+ * Writes content to the target path. If the target is open in an editor it is updated through the
+ * editor and saved. Returns true if the content was written.
+ */
+export const writeFileContentAsync=async (targetPath:string,content:string):Promise<boolean>=>{
+    const openDoc=getOpenFileDocument(targetPath);
+    if(openDoc){
+        const edit=new WorkspaceEdit();
+        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),content);
+        return await workspace.applyEdit(edit) && await openDoc.save();
+    }
+    await fs.mkdir(path.dirname(targetPath),{recursive:true});
+    await fs.writeFile(targetPath,content,'utf8');
+    return true;
+}
+
 const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
     const targetPath=tag.targetPath;
     const outputContent=await getCodeBlockOutputAsync(tag);
@@ -258,17 +290,9 @@ const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
         return;
     }
 
-    const openDoc=getOpenFileDocument(targetPath);
-    if(openDoc){
-        const edit=new WorkspaceEdit();
-        edit.replace(openDoc.uri,new Range(openDoc.positionAt(0),openDoc.positionAt(openDoc.getText().length)),outputContent);
-        if(!await workspace.applyEdit(edit) || !await openDoc.save()){
-            void window.showErrorMessage(`Failed to write output to ${targetPath}`);
-            return;
-        }
-    }else{
-        await fs.mkdir(path.dirname(targetPath),{recursive:true});
-        await fs.writeFile(targetPath,outputContent,'utf8');
+    if(!await writeFileContentAsync(targetPath,outputContent)){
+        void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+        return;
     }
 
     void window.showInformationMessage(`Wrote output to ${targetPath}`);

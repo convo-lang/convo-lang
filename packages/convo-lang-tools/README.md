@@ -240,8 +240,10 @@ layout from [Prompts as Source Files](#prompts-as-source-files).
     ```
 
 6. Fill in the answers and press `Ctrl+R` / `Cmd+R`.
-7. The model responds with `FILE_CONTENT` blocks. Use the `Open Diff` code lens, or the Code
-   Blocks view, to review each change. Then use `Write Output` or `Apply All` to write the files.
+7. The model responds with `FILE_CONTENT` blocks. Click `Review` on the message in the Code Blocks
+   view to step through each change, accept or reject blocks and apply the accepted ones. You can
+   also use the `Open Diff` code lens, then `Write Output` or `Apply All`. See
+   [Guided review](#guided-review).
 8. Commit the source changes along with the conversation file.
 
 For the next task, press `Ctrl+Shift+K` again from inside the dated conversation. Because the
@@ -438,11 +440,52 @@ The Convo-Lang activity bar includes a Code Blocks view. It lists the output blo
 - Clicking a group or block jumps to it in the document.
 - Inline actions on file blocks: Open, Write, Diff and Copy.
 - Inline actions on script blocks: Run Script and Run Script and Complete.
+- Inline action on message groups: `Review`. This starts a guided review of the file blocks in the
+  message. See [Guided review](#guided-review).
 - Inline action on message groups: `Apply All`. This writes every file and runs every script in
   the message after a single confirmation. Find-replace blocks targeting the same file are
   combined into one write.
 - Documents can be pinned so they stay in the view while you work in other files. Clicking a
   document item switches the view to that document.
+
+### Guided review
+
+The `Review` action on a message group in the Code Blocks view walks through every `FILE_CONTENT`
+block in the message, one file at a time.
+
+- Files are reviewed in the order they first appear in the message. A single diff tab is reused
+  and is replaced when the review moves to the next file.
+- The diff shows every block for the file applied, whether it is pending, accepted or rejected.
+- Within a file, changes are visited from top to bottom across all blocks.
+- Every change has a code lens with a label, such as `block #3 · find-replace · ○ pending`, and
+  `Accept` or `Reject` actions for its block. Other changes have a `Go to` action. Block numbers
+  start at 1 and follow the order of blocks in the message.
+- The code lens of the current change adds `Previous`, `Next`, `Skip File` and `Cancel`. `Finish`
+  appears once every block is accepted or rejected.
+- Each change is marked with a divider. The current block has a solid divider, highlighted lines
+  and a `▶` prefix in its label.
+- Some blocks have nothing to show in the diff, for example when the find text isn't found or a
+  later full file block overwrites the content. These blocks are labeled `not found` on the first
+  line.
+- Blocks start as pending. The status bar shows progress, such as
+  `File 1/3 · Block 2/5 ○ · Change 1/3`. Click the status bar item, or press `Ctrl+Alt+\`, to
+  toggle the current block between accepted and rejected.
+- `Next` on the last change, or `Finish`, opens a dialog with `Apply Accepted Files` and
+  `Restart Review`. If the message contains scripts, it also offers `Apply Files and Run Scripts`.
+  If any block is still pending, the review jumps to the first pending block instead.
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+- Code lenses in diff editors are controlled by the `diffEditor.codeLens` setting, which is off by
+  default. The review turns it on when it starts and restores the previous value when it ends.
+
+| Action         | Keybinding     | Code lens          |
+|----------------|----------------|--------------------|
+| Next change    | `Ctrl+Alt+]`   | `Next ▶`           |
+| Previous change| `Ctrl+Alt+[`   | `◀ Previous`       |
+| Skip file      |                | `Skip File`        |
+| Accept / reject| `Ctrl+Alt+\`   | `Accept`, `Reject` |
+| Go to change   |                | `Go to`            |
+| Finish         |                | `Finish`           |
+| Cancel         |                | `Cancel`           |
 
 
 ## Commands
@@ -552,6 +595,13 @@ or selection.
 | Convo: Pin Code Block View             | `convo.code-block-view-pin`                | Pins a document to the Code Blocks view                        |
 | Convo: Unpin Code Block View           | `convo.code-block-view-unpin`              | Unpins a document from the Code Blocks view                    |
 | Convo: Apply All Code Blocks In Message| `convo.code-block-group-apply-all`         | Writes all files and runs all scripts in a message             |
+| Convo: Review Code Blocks In Message   | `convo.code-block-group-review`            | Starts a guided review of the file blocks in a message         |
+| Convo: Review Next Change              | `convo.code-block-review-next`             | Moves to the next change or file (`Ctrl+Alt+]`)                |
+| Convo: Review Previous Change          | `convo.code-block-review-previous`         | Moves to the previous change or file (`Ctrl+Alt+[`)            |
+| Convo: Review Skip File                | `convo.code-block-review-skip-file`        | Jumps to the first change of the next file                     |
+| Convo: Review Toggle Accept            | `convo.code-block-review-toggle-accept`    | Accepts or rejects the current block (`Ctrl+Alt+\`)            |
+| Convo: Review Finish                   | `convo.code-block-review-finish`           | Opens the apply dialog once no block is pending                |
+| Convo: Review Cancel                   | `convo.code-block-review-cancel`           | Ends the review and closes the diff                            |
 | Convo: Open Output                     | `convo.code-block-panel-tag-open`          | Opens the target file of a file block                          |
 | Convo: Write Output                    | `convo.code-block-panel-tag-write`         | Writes a file block to its target path                         |
 | Convo: Open Output Diff                | `convo.code-block-panel-tag-diff`          | Diffs a file block against its target file                     |
