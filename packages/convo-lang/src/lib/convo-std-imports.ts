@@ -1,4 +1,4 @@
-import { convoStdImportPrefix } from "./convo-lib.js";
+import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction } from "./convo-lib.js";
 import { ConvoImport, ConvoModule } from "./convo-types.js";
 
 export const getStdConvoImportAsync=async (name:string):Promise<ConvoModule|undefined>=>{
@@ -39,6 +39,7 @@ XML File Block Attributes:
 - file-hash: The hash of the file, usually only set when the file is dirty
 - last-commit: The hash of the last commit the file was part of
 - showing-ranges: If present only a limited range of the file will be displayed. Ranges are displayed in FILE_CONTENT_RANGE xml tags
+- truncated: If present only part of the file is displayed. A ${t}<FILE_CONTENT_TRUNCATION/>${t} tag marks the end of the displayed content
 - find-replace: Find and replace content instead of replacing the full content. Defaults to finding and replacing the first instance of the string to find. Can be used as a boolean attribute or the attribute can be a number or the value "all".
 - find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
 
@@ -47,6 +48,9 @@ DO NOT USE any of the following characters in a file-replace-separator: ${t}<>&"
 
 You must always wrap the inner contents of the XML block with a markdown code fence to improve 
 syntax highlighting for the user.
+
+When a file block has the ${t}truncated${t} attribute you do not have the full contents of the file.
+Before replacing the file or doing a find and replace on it, request the full file from the user.
 
 Example of full file replacement:
 <FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts">
@@ -279,6 +283,25 @@ ${t3}
 When asked to run Python code you should use a ${t}RUNNABLE_SCRIPT${t}
 `.trim()};
 
+        case 'file-imports.convo':return {
+            name,
+            uri:name,
+            convo:/*convo*/`
+> system
+Use the ${t}addFileImports${t} function to import files by name. Files imported using ${t}addFileImports${t} will be updated in place in context as changes are made to the files, so reimporting is unnecessary after making a change.
+
+# Imports files in to context. Returns an array of file paths imported.
+@importWrapper
+> extern addFileImports(
+    # Paths of files to import
+    paths:array(string)
+)
+`.trim(),
+            externScopeFunctions:{
+                addFileImports,
+            },
+        };
+
         default:
             return undefined;
     }
@@ -286,6 +309,22 @@ When asked to run Python code you should use a ${t}RUNNABLE_SCRIPT${t}
 
 const t='`';
 const t3='```';
+
+/**
+ * Queues file paths to be imported using the `!file` modifier on the result message of the call.
+ * Relative paths are resolved relative to the `__file` variable when the result message is written.
+ */
+const addFileImports=createConvoScopeFunction((scope,ctx)=>{
+    const value=convoLabeledScopeParamsToObj(scope)['paths']??scope.paramValues?.[0];
+    const paths:string[]=(Array.isArray(value)?value:[value]).filter(p=>p && (typeof p === 'string'));
+    const existing=ctx.getVar(convoVars.__resultImports);
+    ctx.setVar(
+        true,
+        [...(Array.isArray(existing)?existing:[]),...paths],
+        convoVars.__resultImports
+    );
+    return paths;
+});
 
 export const convoStdImportHandler=async (_import:ConvoImport):Promise<ConvoModule|undefined>=>{
     if(!_import.name.startsWith(convoStdImportPrefix)){

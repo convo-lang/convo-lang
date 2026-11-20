@@ -305,6 +305,19 @@ export const convoRoles={
      * Sets a cache breakpoint
      */
     cacheBreakpoint:'cacheBreakpoint',
+
+    /**
+     * Starts an import wrapper. Replaces the call message of functions tagged with `@importWrapper`.
+     * When flattened, the message is merged into the function result created by the
+     * following `endFileImport` message.
+     */
+    startFileImport:'startFileImport',
+
+    /**
+     * Ends an import wrapper. Replaces the result message of functions tagged with `@importWrapper`.
+     * Import tags are applied to this message, and when flattened it becomes a function result.
+     */
+    endFileImport:'endFileImport',
 } as const;
 
 /**
@@ -682,9 +695,7 @@ export const convoFunctions={
      * Enables a caching behaviour
      * @usage enabledCaching(behaviour='default',model?:string)
      */
-    enableCaching:'enableCaching'
-
-
+    enableCaching:'enableCaching',
 
 
 } as const;
@@ -985,6 +996,20 @@ export const convoVars={
     __importTemplates:'__importTemplates',
 
     __sessionId:'__sessionId',
+
+    __templateForIndex:'__templateForIndex',
+
+    /**
+     * Array of file paths that will be added as `!file` imports to the next result message
+     * written after a function call. The variable is cleared once the result message is written.
+     */
+    __resultImports:'__resultImports',
+
+    /**
+     * When true, functions tagged with `@importWrapper` are written as standard call and result
+     * messages instead of `startFileImport` and `endFileImport` messages.
+     */
+    __disableImportWrappers:'__disableImportWrappers',
 
 } as const;
 
@@ -1491,6 +1516,13 @@ export const convoTags={
     importMatch:'importMatch',
 
     importRole:'importRole',
+
+    /**
+     * When applied to a function, calls to the function are written as `startFileImport` and
+     * `endFileImport` messages instead of call and result messages. Imports queued in the
+     * `__resultImports` variable are added to the `endFileImport` message.
+     */
+    importWrapper:'importWrapper',
 
     /**
      * Causes a message to be concatenated with the previous message. Both the message the tag
@@ -3776,7 +3808,121 @@ export const parseBaseConvoImport=(name:string):ConvoImportBase=>{
 }
 
 
-export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase):string=>{
+export const defaultConvoImportDocsMaxChars=1500;
+
+/**
+ * Name of the tag inserted at the end of imported content that has been truncated
+ */
+export const convoFileTruncationTag='FILE_CONTENT_TRUNCATION';
+
+const docsShebangReg=/^#![^\n]*(?:\n|$)/;
+const docsPreambleReg=/^(?:[ \t]*\r?\n|[ \t]*#[^\n]*coding[:=][^\n]*(?:\r?\n|$)|[ \t]*(['"])use [\w ]+\1;?[ \t]*(?:\r?\n|$)|[ \t]*<\?xml[^\n]*\?>[ \t]*(?:\r?\n|$)|[ \t]*<!DOCTYPE[^>\n]*>[ \t]*(?:\r?\n|$))*/i;
+const docsRegs:RegExp[]=[
+    /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?=\r?\n|$)/,// front matter
+    /^[ \t]*\/\*[\s\S]*?\*\//,// block comments - js, ts, c, java, go, rust, css
+    /^[ \t]*<!--[\s\S]*?-->/,// html, xml, markdown comments
+    /^[ \t]*[rRuUbB]?("""|''')[\s\S]*?\1/,// python docstrings
+    /^(?:[ \t]*\/\/[^\n]*(?:\r?\n|$))+/,// line comments - js, ts, c, java, go, rust
+    /^(?:[ \t]*--[^\n]*(?:\r?\n|$))+/,// line comments - sql, lua, haskell
+];
+const docsHashReg=/^(?:[ \t]*#[^\n]*(?:\r?\n|$))+/;
+const docsMarkdownExtReg=/\.(md|mdx|markdown)$/i;
+const docsNonSpaceReg=/\S/;
+
+export interface ConvoDocsExtractionResult
+{
+    content:string;
+    /**
+     * True if not all of the content was returned
+     */
+    truncated:boolean;
+}
+
+/**
+ * Extracts the first documentation comment or front matter of a file. Shebangs and preamble lines
+ * such as encoding lines and "use strict" directives are kept but skipped when searching for
+ * documentation. If no documentation is found the content is cut at the last line break before
+ * maxChars.
+ */
+export const extractConvoDocs=(content:string,maxChars=defaultConvoImportDocsMaxChars,fileName?:string):ConvoDocsExtractionResult=>{
+    const shebang=docsShebangReg.exec(content)?.[0]??'';
+    const preamble=docsPreambleReg.exec(content.substring(shebang.length))?.[0]??'';
+    const start=shebang.length+preamble.length;
+    const body=content.substring(start);
+
+    let match:RegExpExecArray|null=null;
+    for(const reg of docsRegs){
+        match=reg.exec(body);
+        if(match){
+            break;
+        }
+    }
+    if(!match && !(fileName && docsMarkdownExtReg.test(fileName))){
+        match=docsHashReg.exec(body);
+    }
+
+    if(match){
+        const end=start+match[0].length;
+        return {
+            content:content.substring(0,end).trimEnd(),
+            truncated:docsNonSpaceReg.test(content.substring(end)),
+        };
+    }
+
+    if(content.length<=maxChars){
+        return {content,truncated:false};
+    }
+    const lineEnd=content.lastIndexOf('\n',maxChars);
+    return {
+        content:content.substring(0,lineEnd>0?lineEnd:maxChars).trimEnd(),
+        truncated:true,
+    };
+}
+
+/**
+ * Returns the max number of characters to import when the docs modifier is used. Undefined is
+ * returned if the docs modifier is not present.
+ */
+export const getConvoImportDocsMaxChars=(convoImport:ConvoImportBase):number|undefined=>{
+    const mod=convoImport.modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+    if(!mod){
+        return undefined;
+    }
+    const value=Number(mod.substring(5));
+    return (mod.length>5 && isFinite(value) && value>0)?value:defaultConvoImportDocsMaxChars;
+}
+
+export interface ConvoImportContentResult
+{
+    content:string;
+    hasRanges:boolean;
+    truncated:boolean;
+}
+
+/**
+ * Applies range and docs modifiers to imported content. Ranges are applied first then docs are
+ * extracted from each range. Docs are only applied to tagged imports.
+ */
+export const applyConvoImportRangeAndDocs=(content:string,convoImport:ConvoImportBase,fileName?:string):ConvoImportContentResult=>{
+    const hasRanges=convoImport.modifiers.some(m=>m.startsWith('range:'));
+    const maxChars=convoImport.tag?getConvoImportDocsMaxChars(convoImport):undefined;
+    let truncated=false;
+    const extract=maxChars===undefined?undefined:(value:string)=>{
+        const r=extractConvoDocs(value,maxChars,fileName);
+        if(r.truncated){
+            truncated=true;
+        }
+        return r.content;
+    };
+    if(hasRanges){
+        content=applyConvoImportRange(content,convoImport,extract);
+    }else if(extract){
+        content=extract(content);
+    }
+    return {content,hasRanges,truncated};
+}
+
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string):string=>{
     const ranges=convoImport.modifiers.filter(m=>m.startsWith('range:'));
     if(!ranges.length){
         return content;
@@ -3798,10 +3944,11 @@ export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase):
             s=e;
             e=tmp;
         }
-        return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${lines.slice(s-1,e).join('\n')}\n</FILE_CONTENT_RANGE>`
+        const rangeContent=lines.slice(s-1,e).join('\n');
+        return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${transformRange?transformRange(rangeContent):rangeContent}\n</FILE_CONTENT_RANGE>`
     }).join('\n');
 }
-export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus,hasRanges?:boolean)=>{
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus,hasRanges?:boolean,truncated?:boolean)=>{
     const tag=convoImport.tag;
     if(!tag){
         return content;
@@ -3833,6 +3980,8 @@ export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,pat
         }"${path?` path="${escapeHtml(path)}"`:''}${
             hasRanges?' showing-ranges':''
         }${
+            truncated?' truncated':''
+        }${
             gitStatus?(
                 (gitStatus.isDirty?` dirty`:'')+
                 (gitStatus.fileHash?` file-hash="${escapeHtml(gitStatus.fileHash)}"`:'')+
@@ -3842,7 +3991,7 @@ export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,pat
             comment?` comment="${comment}"`:''
         }${closingEscape?` closing-escape="${closingEscape}"`:''}>\n${
             content
-        }\n${close}`
+        }${truncated?`\n\n<${convoFileTruncationTag}/>`:''}\n${close}`
     )
 }
 

@@ -1834,7 +1834,8 @@ export const extendedConvoVars={
             ary=[];
         }
         ctx.setVar(true,[...ary,{behavior,model} satisfies ConvoCacheBehavior],convoVars.__cacheBehaviors);
-    })
+    }),
+
 
 } as const;
 Object.freeze(extendedConvoVars);

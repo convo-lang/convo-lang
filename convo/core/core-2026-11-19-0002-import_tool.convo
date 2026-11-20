@@ -1,0 +1,1044 @@
+@import ./_core.convo !template
+
+> user
+Lets add a new std import call file-imports: `@import std://file-imports.convo`. file-imports should 
+expose the `addFileImports` function that LLMs can call. Imports are added to the
+`> return` message of the call.
+
+``` convo
+# Causes the files to be imported into context. Returns an array of file paths imports
+\> addFileImports(
+    # file import paths where each path creates an import with the !file modifier
+    paths:array(string)
+)
+```
+
+@time 2026-11-19T21:08:39-05:00
+@tokenUsage 183302 / 1312 / $0.759448
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before writing this.
+
+1. How should `addFileImports` attach the imports to the `> result` message?
+   - a) The extern function stores the paths in a reserved var such as `__resultImports`. `appendFunctionSetters` then writes one `@import !file {path}` tag per path on the `> result` message and clears the var.
+   - b) The function returns a control-result style marker object, and `_completeAsync` turns it into import tags on the result message.
+   - c) Something else you have in mind.
+
+2. How should relative paths be resolved? Result messages have no source file path, so a relative import would currently resolve against the process cwd.
+   - a) Resolve each path with `ctx.getFullPath(path,scope)`, which respects `__cwd`, before writing the tag.
+   - b) Write paths exactly as the LLM provides them.
+
+3. What should the function return?
+   - a) All requested paths, unvalidated.
+   - b) Only paths that exist, checked via `vfs().getItemAsync`. Missing paths are skipped.
+   - c) An object like `{imported:string[],notFound:string[]}`.
+
+4. How should duplicates be handled?
+   - a) Skip paths already imported in the conversation or already requested earlier.
+   - b) Always add the tag and let the existing `importedModules` check handle it.
+
+5. Should glob patterns (for example `src/**/*.ts`) be allowed?
+   - a) Yes, pass them through, since `!file` already implies `!merge`.
+   - b) No, plain file paths only.
+
+6. Should the function be disabled in `sandboxMode`, so it acts as a no-op like the other extended functions?
+   - a) Yes
+   - b) No
+
+7. Where should the implementation live?
+   - a) Define the extern function in the module's `externScopeFunctions` inside `convo-std-imports.ts`, with the convo signature in the module's `convo`.
+   - b) Add it to `convoFunctions` and `extendedConvoVars` in `convo-default-vars.ts`, so the std import only declares the extern signature.
+
+
+> user
+1. a
+2. a
+3. a
+4. b
+5. a
+6. b
+7. a
+
+
+@time 2026-11-19T21:15:28-05:00
+@tokenUsage 184005 / 5826 / $0.8525400000000001
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes.
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="7fd1ab6f4a19ecdc933c4a7e1ebc84e38df5a462" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    __templateForIndex:'__templateForIndex',
+
+} as const;
+//// replace-with ////
+    __templateForIndex:'__templateForIndex',
+
+    /**
+     * Array of file paths that will be added as `!file` imports to the next result message
+     * written after a function call. The variable is cleared once the result message is written.
+     */
+    __resultImports:'__resultImports',
+
+} as const;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" dirty file-hash="922eabfef1900b71967dc466c578e8f13a886757" last-commit="4525eb4f2bf80e1830fd27c29cc67365c58a824b" find-replace>
+``` ts
+import { convoStdImportPrefix } from "./convo-lib.js";
+//// replace-with ////
+import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction } from "./convo-lib.js";
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" dirty file-hash="922eabfef1900b71967dc466c578e8f13a886757" last-commit="4525eb4f2bf80e1830fd27c29cc67365c58a824b" find-replace>
+``` ts
+        default:
+            return undefined;
+    }
+}
+
+const t='`';
+const t3='```';
+//// replace-with ////
+        case 'file-imports.convo':return {
+            name,
+            uri:name,
+            convo:/*convo*/`
+# Causes the files to be imported into context. Returns an array of file paths imports
+\> extern addFileImports(
+    # file import paths where each path creates an import with the !file modifier
+    paths:array(string)
+)
+`.trim(),
+            externScopeFunctions:{
+                addFileImports,
+            },
+        };
+
+        default:
+            return undefined;
+    }
+}
+
+const t='`';
+const t3='```';
+
+/**
+ * Queues file paths to be imported using the `!file` modifier on the result message of the call
+ */
+const addFileImports=createConvoScopeFunction((scope,ctx)=>{
+    const value=convoLabeledScopeParamsToObj(scope)['paths']??scope.paramValues?.[0];
+    const paths:string[]=(Array.isArray(value)?value:[value]).filter(p=>p && (typeof p === 'string'));
+    const existing=ctx.getVar(convoVars.__resultImports);
+    ctx.setVar(
+        true,
+        [...(Array.isArray(existing)?existing:[]),...paths.map(p=>ctx.getFullPath(p,scope))],
+        convoVars.__resultImports
+    );
+    return paths;
+});
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="8bd6932b49fb6480dab4b2460b7a4064e7034c96" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+        const lines:string[]=[`${role==='result'?'':'\n'}${this.getPrefixTags()}${isControlResult?`@${convoTags.controlResult}\n`:''}> ${role}`];
+//// replace-with ////
+        let importTags='';
+        const resultImports=exe.getVar(convoVars.__resultImports);
+        if(Array.isArray(resultImports) && resultImports.length){
+            importTags=resultImports
+                .filter(p=>p && (typeof p === 'string'))
+                .map(p=>`@${convoTags.import} !file ${p}\n`)
+                .join('');
+            exe.setVar(true,undefined,convoVars.__resultImports);
+        }
+        const lines:string[]=[`${role==='result'?'':'\n'}${this.getPrefixTags()}${importTags}${isControlResult?`@${convoTags.controlResult}\n`:''}> ${role}`];
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="8bd6932b49fb6480dab4b2460b7a4064e7034c96" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+                const s=exe.sharedSetters[i];
+                if(!s){
+                    continue;
+                }
+//// replace-with ////
+                const s=exe.sharedSetters[i];
+                if(!s || s===convoVars.__resultImports){
+                    continue;
+                }
+```
+</FILE_CONTENT>
+
+How it works:
+- `addFileImports` resolves each path with `ctx.getFullPath`, which respects `__cwd`. It appends the resolved paths to `__resultImports` and returns the paths as the LLM provided them.
+- `appendFunctionSetters` writes one `@import !file {path}` tag per queued path on the `> result` message, then clears the var.
+- `__resultImports` is skipped when writing setter lines, so it never shows up as an assignment in the result message.
+- The next flatten sees the `@import` tags on the result message and loads them through the normal import flow. Globs work because `!file` implies `!merge`, and duplicates are handled by the existing `importedModules` check.
+
+One limitation: `parseBaseConvoImport` splits the import value on spaces, so paths containing spaces will not import correctly.
+
+
+> user
+Apply the following changes:
+- Switch the order of import path and modifier: `@import {path} !file`
+- Use the `__file` variable to resolve to set the source path of the result message and use the passed path in the import without resolving
+- When a `!docs` modifier is added to an import it should be considered a different file so that the same file can be imported in full when imported later in the conversation without the `!docs` modifier
+
+@time 2026-11-19T21:34:13-05:00
+@tokenUsage 186887 / 5224 / $0.852028
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the updated changes.
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" dirty file-hash="4148190485aa51bd63266f3912ebb9debdbdedcd" last-commit="4525eb4f2bf80e1830fd27c29cc67365c58a824b" find-replace>
+``` ts
+/**
+ * Queues file paths to be imported using the `!file` modifier on the result message of the call
+ */
+const addFileImports=createConvoScopeFunction((scope,ctx)=>{
+    const value=convoLabeledScopeParamsToObj(scope)['paths']??scope.paramValues?.[0];
+    const paths:string[]=(Array.isArray(value)?value:[value]).filter(p=>p && (typeof p === 'string'));
+    const existing=ctx.getVar(convoVars.__resultImports);
+    ctx.setVar(
+        true,
+        [...(Array.isArray(existing)?existing:[]),...paths.map(p=>ctx.getFullPath(p,scope))],
+        convoVars.__resultImports
+    );
+    return paths;
+});
+//// replace-with ////
+/**
+ * Queues file paths to be imported using the `!file` modifier on the result message of the call.
+ * Relative paths are resolved relative to the `__file` variable when the result message is written.
+ */
+const addFileImports=createConvoScopeFunction((scope,ctx)=>{
+    const value=convoLabeledScopeParamsToObj(scope)['paths']??scope.paramValues?.[0];
+    const paths:string[]=(Array.isArray(value)?value:[value]).filter(p=>p && (typeof p === 'string'));
+    const existing=ctx.getVar(convoVars.__resultImports);
+    ctx.setVar(
+        true,
+        [...(Array.isArray(existing)?existing:[]),...paths],
+        convoVars.__resultImports
+    );
+    return paths;
+});
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="3f73177dedda0f27b61ba94ff2ef2a083f93f275" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+        let importTags='';
+        const resultImports=exe.getVar(convoVars.__resultImports);
+        if(Array.isArray(resultImports) && resultImports.length){
+            importTags=resultImports
+                .filter(p=>p && (typeof p === 'string'))
+                .map(p=>`@${convoTags.import} !file ${p}\n`)
+                .join('');
+            exe.setVar(true,undefined,convoVars.__resultImports);
+        }
+//// replace-with ////
+        let importTags='';
+        let filePath:string|undefined;
+        const resultImports=exe.getVar(convoVars.__resultImports);
+        if(Array.isArray(resultImports) && resultImports.length){
+            importTags=resultImports
+                .filter(p=>p && (typeof p === 'string'))
+                .map(p=>`@${convoTags.import} ${p} !file\n`)
+                .join('');
+            exe.setVar(true,undefined,convoVars.__resultImports);
+            const file=exe.getVar(convoVars.__file);
+            if(file && (typeof file === 'string')){
+                filePath=file;
+            }
+        }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="3f73177dedda0f27b61ba94ff2ef2a083f93f275" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+            return this.append(lines.join('\n'),!isControlResult)?.result??[];
+//// replace-with ////
+            return this.append(lines.join('\n'),{mergeWithPrev:!isControlResult,filePath})?.result??[];
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="3f73177dedda0f27b61ba94ff2ef2a083f93f275" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+        const messages:ConvoMessage[]=[];
+        for(const i of imports){
+            if(!this.importedModules[i.name]){
+                const modMessages=await this.registerModuleAsync(i,{name:i.name,modifiers:registerModifiers,modifierMap,system,ignoreContent,templateName,tag,targetPath,role,assign},index,externFunctions);
+                messages.push(...modMessages);
+            }
+        }
+        return messages;
+//// replace-with ////
+        // docs imports are tracked separately so the full file can be imported later
+        const docsModifier=modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+        const messages:ConvoMessage[]=[];
+        for(const i of imports){
+            const moduleKey=docsModifier?`${i.name} !${docsModifier}`:i.name;
+            if(!this.importedModules[moduleKey]){
+                const modMessages=await this.registerModuleAsync(i,{name:i.name,modifiers:registerModifiers,modifierMap,system,ignoreContent,templateName,tag,targetPath,role,assign},index,externFunctions,moduleKey);
+                messages.push(...modMessages);
+            }
+        }
+        return messages;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="3f73177dedda0f27b61ba94ff2ef2a083f93f275" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+        insertIndex?:number,
+        externFunctions?:Record<string,ConvoScopeFunction>
+    ){
+        if(this.importedModules[module.name]){
+            throw new Error(`ConvoModule already registered by name - ${module.name}`);
+        }
+
+        this.importedModules[module.name]=module;
+//// replace-with ////
+        insertIndex?:number,
+        externFunctions?:Record<string,ConvoScopeFunction>,
+        moduleKey=module.name,
+    ){
+        if(this.importedModules[moduleKey]){
+            throw new Error(`ConvoModule already registered by name - ${moduleKey}`);
+        }
+
+        this.importedModules[moduleKey]=module;
+```
+</FILE_CONTENT>
+
+Summary of changes:
+- Import tags are now written as `@import {path} !file`.
+- `addFileImports` queues the paths exactly as the LLM passed them.
+- When a result message has import tags, its source path is set from `__file`. `loadImportsAsync` already passes `msg[convoMessageSourcePathKey]` as `sourceFilepath`, so relative paths resolve against the directory of `__file`.
+- Imports that use `!docs` or `!docs:N` are registered under the key `{name} !{docsModifier}`. A later import of the same file without `!docs` uses the plain name as its key, so it is imported in full. Repeated `!docs` imports of the same file are still deduplicated.
+
+Note: if `__file` is not set, relative paths fall back to being used as-is. In practice that means they resolve against the process cwd, not `__cwd`.
+
+
+> user
+I added ConvoExecutionContext to your context and added a workaround by getting the source path of the last message in the conversation that defines a source path.
+
+I now what to change the way the call to addFileImports is displayed / appended to the conversation.
+
+Instead of being displayed as a standard tool call I would like to use the `> startFileImport` and `> endFileImport` messages
+to display the imports
+
+The following examples should be equivalent.
+
+Current function call method:
+``` convo
+@time 2026-11-19T22:30:26-05:00
+@toolId toolu_019gQ676WgHyAejF5UHnYNMH
+/> call addFileImports(
+    "paths": [
+        "../pages/apps-page.ts",
+        "../pages/app-page.ts",
+        "../pages/workspaces-page.ts",
+        "../pages/workspace-page.ts",
+        "../pages/server-config-page.ts",
+        "../lib/ui-lib.ts",
+        "../lib/router-lib.ts",
+        "../lib/tool-registry-lib.ts",
+        "../lib/server-config-lib.ts",
+        "../lib/shell-lib.ts",
+        "../lib/state-lib.ts",
+        "../lib/config-lib.ts",
+        "../www/scripts/control-center.ts"
+    ]
+)
+@time 2026-11-19T22:30:26-05:00
+@import ../pages/apps-page.ts !file
+@import ../pages/app-page.ts !file
+@import ../pages/workspaces-page.ts !file
+@import ../pages/workspace-page.ts !file
+@import ../pages/server-config-page.ts !file
+@import ../lib/ui-lib.ts !file
+@import ../lib/router-lib.ts !file
+@import ../lib/tool-registry-lib.ts !file
+@import ../lib/server-config-lib.ts !file
+@import ../lib/shell-lib.ts !file
+@import ../lib/state-lib.ts !file
+@import ../lib/config-lib.ts !file
+@import ../www/scripts/control-center.ts !file
+/> result
+__return=[
+    "../pages/apps-page.ts",
+    "../pages/app-page.ts",
+    "../pages/workspaces-page.ts",
+    "../pages/workspace-page.ts",
+    "../pages/server-config-page.ts",
+    "../lib/ui-lib.ts",
+    "../lib/router-lib.ts",
+    "../lib/tool-registry-lib.ts",
+    "../lib/server-config-lib.ts",
+    "../lib/shell-lib.ts",
+    "../lib/state-lib.ts",
+    "../lib/config-lib.ts",
+    "../www/scripts/control-center.ts"
+]
+```
+
+Dedicated import messages method:
+``` convo
+@time 2026-11-19T22:30:26-05:00
+@toolId toolu_019gQ676WgHyAejF5UHnYNMH
+/> startFileImport
+@import ../pages/apps-page.ts !file
+@import ../pages/app-page.ts !file
+@import ../pages/workspaces-page.ts !file
+@import ../pages/workspace-page.ts !file
+@import ../pages/server-config-page.ts !file
+@import ../lib/ui-lib.ts !file
+@import ../lib/router-lib.ts !file
+@import ../lib/tool-registry-lib.ts !file
+@import ../lib/server-config-lib.ts !file
+@import ../lib/shell-lib.ts !file
+@import ../lib/state-lib.ts !file
+@import ../lib/config-lib.ts !file
+@import ../www/scripts/control-center.ts !file
+/> endFileImport
+```
+
+This behavior should be able to be disabled in a conversation by setting the `__disableImportWrappers` to true.
+
+(note) `> endFileImport` omits the `@time` tag
+
+@time 2026-11-20T06:48:51-05:00
+@tokenUsage 208277 / 1609 / $0.865288
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before making this change.
+
+1. How should `startFileImport` / `endFileImport` be flattened for the LLM? Most providers require each tool call to be followed by a matching tool result with the same `toolId`.
+   - a) Convert them back into an equivalent flat call / result pair during flattening. The call is `addFileImports` with `paths` taken from the `@import` tags. The result's `calledReturn` is the same paths array.
+   - b) Don't send them to the LLM as a tool call at all. Only the imported content is sent.
+   - c) Something else.
+
+2. How should the completion flow produce these messages when the LLM calls `addFileImports`?
+   - a) Intercept the call in `_completeAsync` before writing `> call`. Build the messages directly from `callParams` and skip `appendFunctionSetters` for that call.
+   - b) Execute the function normally, then write `startFileImport` / `endFileImport` in place of the `call` / `result` messages using `__resultImports`.
+
+3. Should the mechanism be specific to `addFileImports` or generic?
+   - a) Hardcoded for `addFileImports`.
+   - b) Generic. For example, a tag on the function definition like `@altCallMessages startFileImport endFileImport` lets other functions opt in later.
+
+4. Should the conversation still auto-complete after the imports, sending the imported content back to the LLM for a response like a normal tool result?
+   - a) Yes
+   - b) No
+
+5. Where should the source path (`__file` or the last-message fallback) be set?
+   - a) On the `startFileImport` message only, since it carries the `@import` tags.
+   - b) On both messages.
+
+6. Should I add `startFileImport` / `endFileImport` to `convoRoles` and `__disableImportWrappers` to `convoVars` with JSDoc?
+   - a) Yes
+   - b) No
+
+7. Your examples use `/>` as the role prefix, as in `/> startFileImport`. Is that just how your UI displays it?
+   - a) Yes, use the normal `>` prefix.
+   - b) No, `/>` is intentional. Please explain what it means.
+
+
+> user
+1. a
+2. b
+3. Make it generic. Activate the behaviour when the `@importWrapper` tag is applied to a function. Add a new property to the `ConvoMessage` interface called `importWrapper` and set it to true in the convo parser
+4. a
+5. b
+6. a
+7. a
+
+
+@time 2026-11-20T07:01:04-05:00
+@tokenUsage 230930 / 17200 / $1.26772
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes.
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="b462e44a49e338de99c75cd4ff78cbf1feeae6cf" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    /**
+     * Sets a cache breakpoint
+     */
+    cacheBreakpoint:'cacheBreakpoint',
+} as const;
+//// replace-with ////
+    /**
+     * Sets a cache breakpoint
+     */
+    cacheBreakpoint:'cacheBreakpoint',
+
+    /**
+     * Starts an import wrapper. Replaces the call message of functions tagged with `@importWrapper`.
+     * When flattened, the message is merged into the function result created by the
+     * following `endFileImport` message.
+     */
+    startFileImport:'startFileImport',
+
+    /**
+     * Ends an import wrapper. Replaces the result message of functions tagged with `@importWrapper`.
+     * Import tags are applied to this message, and when flattened it becomes a function result.
+     */
+    endFileImport:'endFileImport',
+} as const;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="b462e44a49e338de99c75cd4ff78cbf1feeae6cf" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    __resultImports:'__resultImports',
+
+} as const;
+//// replace-with ////
+    __resultImports:'__resultImports',
+
+    /**
+     * When true, functions tagged with `@importWrapper` are written as standard call and result
+     * messages instead of `startFileImport` and `endFileImport` messages.
+     */
+    __disableImportWrappers:'__disableImportWrappers',
+
+} as const;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="b462e44a49e338de99c75cd4ff78cbf1feeae6cf" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    importRole:'importRole',
+//// replace-with ////
+    importRole:'importRole',
+
+    /**
+     * When applied to a function, calls to the function are written as `startFileImport` and
+     * `endFileImport` messages instead of call and result messages. Imports queued in the
+     * `__resultImports` variable are added to the `endFileImport` message.
+     */
+    importWrapper:'importWrapper',
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    /**
+     * Used by import templates to match imports
+     */
+    importMatch?:ConvoImportMatch;
+//// replace-with ////
+    /**
+     * Used by import templates to match imports
+     */
+    importMatch?:ConvoImportMatch;
+
+    /**
+     * If true the message is a function tagged with `@importWrapper`. Calls to the function are
+     * written as `startFileImport` and `endFileImport` messages instead of call and result messages.
+     */
+    importWrapper?:boolean;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-parser.ts" target-output-path="../../packages/convo-lang/src/lib/convo-parser.ts" last-commit="276dbeb31db31b28f4449189acfc8bb2c438e60e" find-replace>
+``` ts
+                    case convoTags.docRef:
+//// replace-with ////
+                    case convoTags.importWrapper:
+                        if(msg.fn){
+                            msg.importWrapper=true;
+                        }
+                        break;
+
+                    case convoTags.docRef:
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" dirty file-hash="7b102036e111b2725adde99af20fa3d5dc5e566e" last-commit="4525eb4f2bf80e1830fd27c29cc67365c58a824b" find-replace>
+``` ts
+# Imports files in to context. Returns an array of file paths imported.
+\> extern addFileImports(
+//// replace-with ////
+# Imports files in to context. Returns an array of file paths imported.
+@importWrapper
+\> extern addFileImports(
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="d7dd1ed57b333dc8807e7ecf874a1ef9e303a4a0" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+                }else if(msg.callFn){
+                    let callMessage:ConvoMessage|undefined;
+                    if(lastMsgIsFnCall){
+                        callMessage=lastMsg;
+                        if(!callMessage){
+                            throw new Error('Call last message failed')
+                        }
+                    }else{
+                        const callMsg=`${
+                            this.getPrefixTags({includeTokenUsage,msg})
+                        }${
+                            tagsCode
+                        }> call ${
+                            msg.callFn
+                        }(${
+                            msg.callParams===undefined?'':spreadConvoArgs(msg.callParams,true)
+                        })`
+                        const result=isDefaultTask?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
+//// replace-with ////
+                }else if(msg.callFn){
+                    const importWrapper=(
+                        isDefaultTask &&
+                        !lastMsgIsFnCall &&
+                        !exe.getVar(convoVars.__disableImportWrappers) &&
+                        this._messages.some(m=>m.importWrapper && m.fn && !m.fn.call && m.fn.name===msg.callFn)
+                    );
+                    let callTags='';
+                    let callMessage:ConvoMessage|undefined;
+                    if(lastMsgIsFnCall){
+                        callMessage=lastMsg;
+                        if(!callMessage){
+                            throw new Error('Call last message failed')
+                        }
+                    }else{
+                        callTags=`${this.getPrefixTags({includeTokenUsage,msg})}${tagsCode}`;
+                        const callMsg=`${callTags}> call ${
+                            msg.callFn
+                        }(${
+                            msg.callParams===undefined?'':spreadConvoArgs(msg.callParams,true)
+                        })`
+                        const result=(isDefaultTask && !importWrapper)?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="d7dd1ed57b333dc8807e7ecf874a1ef9e303a4a0" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+                    const lastContentMessage=getLastConvoContentMessage(flat.messages);
+                    nextCallerExcludeMessages.push(...this.appendFunctionSetters(
+                        exe,isDefaultTask,lastResultValue,isControlResult,
+                        undefined,undefined,undefined,lastContentMessage?.responseAssignTo
+                    ));
+//// replace-with ////
+                    if(importWrapper){
+                        this.appendImportWrapper(exe,callTags);
+                    }else{
+                        const lastContentMessage=getLastConvoContentMessage(flat.messages);
+                        nextCallerExcludeMessages.push(...this.appendFunctionSetters(
+                            exe,isDefaultTask,lastResultValue,isControlResult,
+                            undefined,undefined,undefined,lastContentMessage?.responseAssignTo
+                        ));
+                    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="d7dd1ed57b333dc8807e7ecf874a1ef9e303a4a0" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+                    default:
+                        if(inPara && this.userRoles.includes(msg.role as string) && !msg.fn){
+//// replace-with ////
+                    case convoRoles.startFileImport:
+                        // merged into the flat result created by endFileImport
+                        continue messagesLoop;
+
+                    default:
+                        if(inPara && this.userRoles.includes(msg.role as string) && !msg.fn){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="d7dd1ed57b333dc8807e7ecf874a1ef9e303a4a0" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+                if(msg.fn){
+                    if(msg.fn.handlesMessageRoles){
+//// replace-with ////
+                if(msg.role===convoRoles.endFileImport){
+                    if(!this.flattenImportWrapper(flat,msg,sourceMessages,i,exe)){
+                        continue;
+                    }
+                }else if(msg.fn){
+                    if(msg.fn.handlesMessageRoles){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="d7dd1ed57b333dc8807e7ecf874a1ef9e303a4a0" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+    private appendFunctionSetters(
+        exe:ConvoExecutionContext,
+        isDefaultTask:boolean,
+        lastResultValue:any,
+        isControlResult:boolean,
+        role='result',
+        writeReturn=true,
+        skipEmpty=false,
+        assignTo?:string
+    ):ConvoMessage[]{
+        let importTags='';
+        let filePath:string|undefined;
+        const file=exe.getVar(convoVars.__file);
+        if(file && (typeof file === 'string')){
+            filePath=file;
+        }else{
+            for(let i=this._messages.length-1;i>=0;i--){
+                const path=this._messages[i]?.[convoMessageSourcePathKey];
+                if(path){
+                    filePath=path;
+                    break;
+                }
+            }
+        }
+        const resultImports=exe.getVar(convoVars.__resultImports);
+        if(Array.isArray(resultImports) && resultImports.length){
+            importTags=resultImports
+                .filter(p=>p && (typeof p === 'string'))
+                .map(p=>`@${convoTags.import} ${p} !file\n`)
+                .join('');
+            exe.setVar(true,undefined,convoVars.__resultImports);
+            
+        }
+//// replace-with ////
+    /**
+     * Returns import tags for the queued result imports and the file path relative imports
+     * should be resolved against. Queued result imports are cleared.
+     */
+    private takeResultImports(exe:ConvoExecutionContext):{importTags:string,filePath?:string}{
+        let filePath:string|undefined;
+        const file=exe.getVar(convoVars.__file);
+        if(file && (typeof file === 'string')){
+            filePath=file;
+        }else{
+            for(let i=this._messages.length-1;i>=0;i--){
+                const path=this._messages[i]?.[convoMessageSourcePathKey];
+                if(path){
+                    filePath=path;
+                    break;
+                }
+            }
+        }
+        const resultImports=exe.getVar(convoVars.__resultImports);
+        if(!Array.isArray(resultImports) || !resultImports.length){
+            return {importTags:'',filePath};
+        }
+        exe.setVar(true,undefined,convoVars.__resultImports);
+        return {
+            importTags:resultImports
+                .filter(p=>p && (typeof p === 'string'))
+                .map(p=>`@${convoTags.import} ${p} !file\n`)
+                .join(''),
+            filePath,
+        };
+    }
+
+    /**
+     * Appends startFileImport and endFileImport messages in place of call and result messages
+     */
+    private appendImportWrapper(exe:ConvoExecutionContext,callTags:string){
+        const {importTags,filePath}=this.takeResultImports(exe);
+        this.append(
+            `${callTags}> ${convoRoles.startFileImport}\n\n${importTags}> ${convoRoles.endFileImport}\n`,
+            {filePath}
+        );
+    }
+
+    /**
+     * Converts an endFileImport message into a flat function result equivalent to the call and
+     * result messages of the import wrapper function. Returns false if no import wrapper
+     * function is defined.
+     */
+    private flattenImportWrapper(
+        flat:FlatConvoMessage,
+        msg:ConvoMessage,
+        messages:ConvoMessage[],
+        index:number,
+        exe:ConvoExecutionContext
+    ):boolean{
+        let start:ConvoMessage|undefined;
+        for(let i=index-1;i>=0;i--){
+            const m=messages[i];
+            if(m?.role===convoRoles.startFileImport){
+                start=m;
+                break;
+            }
+            if(m?.role===convoRoles.endFileImport){
+                break;
+            }
+        }
+        const fn=messages.find(m=>m.importWrapper && m.fn && !m.fn.call && (!start?.head || m.fn.name===start.head))?.fn;
+        if(!fn){
+            return false;
+        }
+        const paths=msg.tags?.filter(t=>t.name===convoTags.import && t.value).map(t=>parseBaseConvoImport(t.value??'').name)??[];
+        flat.role='function';
+        flat.called=fn;
+        flat.calledParams={[fn.params[0]?.label??'paths']:paths};
+        flat.calledReturn=paths;
+        if(start?.tags){
+            flat.tags={...convoTagsToMap(start.tags,exe),...flat.tags};
+        }
+        return true;
+    }
+
+    private appendFunctionSetters(
+        exe:ConvoExecutionContext,
+        isDefaultTask:boolean,
+        lastResultValue:any,
+        isControlResult:boolean,
+        role='result',
+        writeReturn=true,
+        skipEmpty=false,
+        assignTo?:string
+    ):ConvoMessage[]{
+        const {importTags,filePath}=this.takeResultImports(exe);
+```
+</FILE_CONTENT>
+
+How it works:
+- The parser sets `importWrapper=true` on function messages tagged with `@importWrapper`. `addFileImports` in `std://file-imports.convo` now has that tag.
+- When the LLM calls an import wrapper function, the call is parsed but not appended, and the function executes normally. After that, `appendImportWrapper` writes the messages:
+  - `startFileImport` carries the prefix tags (such as `@time`) and `@toolId`.
+  - `endFileImport` carries the `@import {path} !file` tags and no `@time`.
+  - Both messages get the source path from `__file`, or from the last message with a source path.
+- During flattening, `startFileImport` is skipped and `endFileImport` becomes a flat `function` message:
+  - `called` is the wrapper function.
+  - `calledParams` is `{paths:[...]}`, using the function's first param label.
+  - `calledReturn` is the paths array.
+  - Tags from the start message are merged in, so the `toolId` matches.
+
+  This mirrors how a normal call and result pair flattens into a single message.
+- Auto-complete continues after the wrapper, so the imported content is sent back to the LLM.
+- Setting `__disableImportWrappers` to true falls back to the standard `call` and `result` messages. A call written manually as the last message also uses the standard flow.
+
+A few limitations:
+- In wrapper mode, only `__resultImports` is written. Any other shared variables set by a wrapper function are not persisted, because `endFileImport` has no body.
+- `startFileImport` has no function name, matching your example. If more than one `@importWrapper` function is defined, the first one is used. A function name can optionally be given in the head, for example `> startFileImport addFileImports`, to choose a specific one.
+
+
+> user
+Imports applied to the `> result` message are getting appended before the call to addFileImports.
+
+Example:
+``` convo
+{{===
+
+@import std://file-imports.convo
+
+> user
+Implement the apps page
+
+
+@toolId toolu_019gQ676WgHyAejF5UHnYNMH
+> startFileImport
+@import ../pages/apps-page.ts !file
+> endFileImport
+
+
+@time 2026-11-19T22:30:39-05:00
+@tokenUsage 191481 / 940 / $0.784724
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write code, I need a few decisions from you. Right now the API has no way to list apps, and the api container doesn't mount `apps/` or `local-apps/`. Only the frontend container does.
+
+1. Where should the list of apps come from?
+   - a) The merged server config only. An app is any `apps/{name}` or `local-apps/{name}` dir used by a workspace, plus `defaultApp`. This needs no API or Docker changes, but apps that no workspace uses won't show up.
+   - b) A new `GET /control-center/apps` route that reads the `apps/` and `local-apps/` directories on disk. This needs `./apps` and `./local-apps` mounted read-only into the api container in `compose.yaml`.
+   - c) Both: the directories on disk (b), with each app marked by how the config uses it.
+
+2. What should each app show in the list?
+   - a) Name only, linking to `/apps/:appName`
+   - b) Name, plus whether it's in `apps/`, `local-apps/` or both
+   - c) Option b, plus the workspaces that use it and whether it's the `defaultApp`
+
+3. Should the list page have any actions?
+   - a) Read-only list with links
+   - b) A list plus a name filter
+   - c) Option b, plus "Set as default app", which edits `defaultApp` in `local-server-config.json` with the same save path as the Server config page
+
+4. Should I also build the app detail page (`/apps/:appName`) in this task, or only the list?
+   - a) Only the list. The detail page stays a placeholder.
+   - b) Both, as two steps: the list first, then the detail page after you approve.
+
+5. Tools: I plan to add `apps_getApps()`, which returns the list. If you pick 3c, I'd also add `apps_setDefaultApp(name)`. Should these be `page-global`, so an LLM can find them from any page, or `page`?
+   - a) `page-global`
+   - b) `page`
+
+My recommendation is 1c, 2c, 3b, 4b and 5a.
+
+
+> user
+
+===}}
+```
+
+Converted JSON:
+``` json
+{
+    "model": "gpt-4.1",
+    "stream": false,
+    "messages": [
+        {
+            "role": "system",
+            "content": "Use the `addFileImports` function to import files by name. Files imported using `addFileImports` will be updated in place in context as changes are made to the files, so reimporting is unnecessary after making a change."
+        },
+        {
+            "role": "user",
+            "content": "Implement the apps page"
+        },
+        {
+            "role": "system",
+            "content": "<FILE_CONTENT name=\"apps-page.ts\" path=\"../pages/apps-page.ts\" last-commit=\"e4f37c2197cb3932fc483eaebc42f935898ea790\">\n/**\n * Apps page\n *\n * Route: `/apps`\n *\n * Placeholder. Will list the apps of the deployment, served from the `apps` and `local-apps` directories.\n *\n * Tools: `apps_getInfo`\n */\n\nimport type { CcPage } from \"../lib/router-lib\";\nimport { renderShell } from \"../lib/shell-lib\";\nimport { placeholderHtml, scrollAreaHtml } from \"../lib/ui-lib\";\n\nconst description='The apps of the deployment, served from the apps and local-apps directories.';\n\nexport const appsPage:CcPage={\n    screen:'apps',\n    path:'/apps',\n    render:()=>{\n        renderShell({\n            top:{title:'Apps',sub:'All apps'},\n            main:scrollAreaHtml(placeholderHtml('Apps',description)),\n        });\n    },\n    tools:[\n        {\n            signature:'getInfo()',\n            description:'Returns what the Apps page shows. The page is not built yet and has no app data.',\n            visibility:'page',\n            run:()=>({built:false,description}),\n        },\n    ],\n};\n\n</FILE_CONTENT>"
+        },
+        {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+                {
+                    "id": "toolu_019gQ676WgHyAejF5UHnYNMH",
+                    "type": "function",
+                    "function": {
+                        "name": "addFileImports",
+                        "arguments": "{\"paths\":[\"../pages/apps-page.ts\"]}"
+                    }
+                }
+            ]
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "toolu_019gQ676WgHyAejF5UHnYNMH",
+            "content": "[\"../pages/apps-page.ts\"]"
+        },
+        {
+            "role": "assistant",
+            "content": "Before I write code, I need a few decisions from you. Right now the API has no way to list apps, and the api container doesn't mount `apps/` or `local-apps/`. Only the frontend container does.\n\n1. Where should the list of apps come from?\n   - a) The merged server config only. An app is any `apps/{name}` or `local-apps/{name}` dir used by a workspace, plus `defaultApp`. This needs no API or Docker changes, but apps that no workspace uses won't show up.\n   - b) A new `GET /control-center/apps` route that reads the `apps/` and `local-apps/` directories on disk. This needs `./apps` and `./local-apps` mounted read-only into the api container in `compose.yaml`.\n   - c) Both: the directories on disk (b), with each app marked by how the config uses it.\n\n2. What should each app show in the list?\n   - a) Name only, linking to `/apps/:appName`\n   - b) Name, plus whether it's in `apps/`, `local-apps/` or both\n   - c) Option b, plus the workspaces that use it and whether it's the `defaultApp`\n\n3. Should the list page have any actions?\n   - a) Read-only list with links\n   - b) A list plus a name filter\n   - c) Option b, plus \"Set as default app\", which edits `defaultApp` in `local-server-config.json` with the same save path as the Server config page\n\n4. Should I also build the app detail page (`/apps/:appName`) in this task, or only the list?\n   - a) Only the list. The detail page stays a placeholder.\n   - b) Both, as two steps: the list first, then the detail page after you approve.\n\n5. Tools: I plan to add `apps_getApps()`, which returns the list. If you pick 3c, I'd also add `apps_setDefaultApp(name)`. Should these be `page-global`, so an LLM can find them from any page, or `page`?\n   - a) `page-global`\n   - b) `page`\n\nMy recommendation is 1c, 2c, 3b, 4b and 5a."
+        }
+    ],
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "addFileImports",
+                "description": "Imports files in to context. Returns an array of file paths imported.",
+                "parameters": {
+                    "type": "object",
+                    "required": [
+                        "paths"
+                    ],
+                    "properties": {
+                        "paths": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Paths of files to import"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
+```
+
+@time 2026-11-20T07:12:53-05:00
+@tokenUsage 241180 / 2664 / $1.018
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The imported messages are inserted at the index of the message that holds the `@import` tags, so they end up before it. For a top-level import that is the right place. For `> result` and `> endFileImport` messages, though, the content lands before the tool call in the flattened conversation.
+
+The fix is to insert imports after the message for those two roles. The insertion index also advances after each import, so files keep the order of their tags.
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="3230a8e88aa9ffc9ae8cbff0d2175357e947cbc9" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+        for(const t of msg.tags){
+            if(t.name!==convoTags.import || !t.value){
+                continue;
+            }
+            const externFunctions:Record<string,ConvoScopeFunction>={}
+            let l=this._messages.length;
+            const index=Math.max(0,this._messages.indexOf(msg));
+            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions,exe);
+            exe?.loadFunctions(imported,externFunctions);
+        }
+//// replace-with ////
+        // imports of result messages are inserted after the message so they follow the function call
+        const insertAfter=msg.role===convoRoles.result || msg.role===convoRoles.endFileImport;
+        let afterIndex=insertAfter?this._messages.indexOf(msg)+1:0;
+
+        for(const t of msg.tags){
+            if(t.name!==convoTags.import || !t.value){
+                continue;
+            }
+            const externFunctions:Record<string,ConvoScopeFunction>={}
+            const index=insertAfter?afterIndex:Math.max(0,this._messages.indexOf(msg));
+            const imported=await this.importAsync(t.value,{sourceFilepath:msg[convoMessageSourcePathKey]},index,externFunctions,exe);
+            if(insertAfter){
+                afterIndex+=imported.length;
+            }
+            exe?.loadFunctions(imported,externFunctions);
+        }
+```
+</FILE_CONTENT>
+
+How the flatten loop handles this:
+- After loading imports, the loop does `i--` and reprocesses the same index.
+- With after-insertion, the `endFileImport` or `result` message is flattened first. It is skipped for importing because it is already in `importMessages`.
+- The imported messages come next, so their content follows the tool call and tool result.
+
+If the message is not in `_messages`, for example when a message override is used, `indexOf` returns `-1`. The insertion index then becomes `0`, which matches the previous fallback.
+
+
+> user
+Can you verify that the LLM will see the imports when the result is returned too it
+
+@time 2026-11-20T07:20:43-05:00
+@tokenUsage 242270 / 5914 / $1.0873599999999999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I traced the flow from the LLM's `addFileImports` call to the next request. In the normal case the LLM does see the imported content. There is one case where it doesn't, and one provider-dependent concern.
+
+## Trace
+
+1. The LLM calls `addFileImports`. In `_completeAsync`, `importWrapper` is true, so the call is parsed but not appended. The function runs and `__resultImports` is set.
+2. `appendImportWrapper` appends `startFileImport` and `endFileImport`. The `@import` tags move to `endFileImport` because `endStrMsg` pushes trailing tags onto the next message. `filePath` is set on both messages.
+3. `hasReturnValue` is true and `disableAutoComplete` is false, so `_completeAsync` recurses and creates a new flat conversation right away. The auto flatten from `append` waits 30ms and goes through `flattenLock`. Both flattens are guarded by `importMessages`, so the file is imported only once.
+4. In the flatten loop:
+   - `startFileImport` is skipped.
+   - `endFileImport` has an unloaded `@import`, so `loadImportsAsync` inserts the file messages after it. Then `i--` runs.
+   - `endFileImport` is processed again. It is in `convoRoles`, so `isUserMessage` returns false and it isn't dropped as an empty user message. `flattenImportWrapper` turns it into a `function` flat message with `called`, `calledParams`, `calledReturn` and the `toolId` from the start message.
+   - Next come the imported messages. They have role `system` because `registerModuleAsync` uses that role for content without a role.
+5. The final flat order is: user, tool call / tool result, file content. The converter sends the file content after the `tool` message.
+
+Other things I checked:
+- `getLastCompletionMessage` skips both `function` and `system` messages. RAG and trigger checks therefore behave the same as with a normal tool result.
+- `lastMsg` is now the imported message, not a call message, so none of the special completion branches (call, invoke, eval, component) are taken.
+- When a saved conversation is reloaded, the imports are inserted after `endFileImport` and before the later assistant message. The order is preserved.
+
+## Issue 1: copied source messages miss the imports
+
+`loadImportsAsync` inserts into `this._messages`. `flattenAsync` iterates `sourceMessages`, and that is a copy when any of these apply:
+- `getStartOfConversation` returns messages
+- the conversation contains `> node` messages (`copySourceMessages`)
+- the conversation contains `> group` / `> groupEnd` messages
+- a `messages` override is passed
+
+In those cases the flatten right after the call doesn't include the imported content. That flatten is the one sent to the LLM, so the LLM gets the tool result without the files. Later completions do include them. Top-level imports have the same flaw, but it rarely matters for them because an earlier flatten usually loads them first.
+
+## Issue 2: system role placement
+
+I can't see the provider converters. Your JSON shows the OpenAI format keeping the mid-conversation `system` message in place, which is fine. A converter that moves system messages into a top-level system prompt (as Anthropic-style APIs do) would still let the LLM see the files. However, the content would no longer sit after the tool call, and every new import would change the system prompt, which invalidates prompt caching.
+
+## Questions
+
+1. How should I fix issue 1?
+   - a) Have `loadImportsAsync` return the imported messages and where they were inserted. When `sourceMessages` is a copy, the flatten loop inserts them into the copy too.
+   - b) Leave it as a known limitation.
+
+2. What role should the imported file content use?
+   - a) Keep `system`.
+   - b) Use `user` by having `appendImportWrapper` write `@import {path} !file !role:user`. Most converters merge it into the user turn that holds the tool result.
+   - c) Make it configurable through a variable such as `__resultImportRole`, defaulting to `system`.
+
+
+> user

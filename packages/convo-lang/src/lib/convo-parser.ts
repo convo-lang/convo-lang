@@ -1444,6 +1444,12 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         break;
                     }
 
+                    case convoTags.importWrapper:
+                        if(msg.fn){
+                            msg.importWrapper=true;
+                        }
+                        break;
+
                     case convoTags.docRef:
                         if(tag.value){
                             if(!msg.docRefs){

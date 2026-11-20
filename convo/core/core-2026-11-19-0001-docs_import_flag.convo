@@ -1,0 +1,418 @@
+@import ./_core.convo !template
+
+> user
+Add support for a `!docs` modifier that works with the `!file` modifier to only
+import the first comment,  of a file. Use regular expressions to match common
+programming languages.
+
+Also include support for python triple double quotes and front matter.
+
+Ignore shebangs at the start of files should be ignored when looking for documentation.
+
+Examples:
+
+Source:
+``` js
+#!/usr/bin/env bun
+/**
+ * File documentation here
+ */
+
+const someConst=1;
+
+export const someLongFunction=()=>{
+    // lots of lines of code
+}
+```
+
+Imported value:
+``` js
+#!/usr/bin/env bun
+/**
+ * File documentation here
+ */
+```
+
+
+If documentation is not found at the start of a file the first 1500 characters should be imported
+
+A file truncated XML tag should be inserted at the end of the imported content if the entire file content.
+is not imported and FILE_CONTENT blocks should also
+include a truncated boolean attribute and the system prompt for code blocks should document the behavior
+
+Truncation example:
+<FILE_CONTENT name="control-center.md" target-output-path="../context/control-center.md" truncated>
+``` md
+# Controls center
+... more content here
+
+<FILE_CONTENT_TRUNCATION/>
+```
+</FILE_CONTENT>
+
+
+@time 2026-11-19T09:33:33-05:00
+@tokenUsage 176781 / 2070 / $0.748524
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before I make changes.
+
+1. **Shebang handling.** Your example keeps the shebang in the imported output. Should it be kept?
+   - a) Keep the shebang in the output, but skip it when searching for docs (matches your example)
+   - b) Strip the shebang from the output
+
+2. **Comment styles to detect.** Which of these should count as the "first comment"?
+   - a) `/** */` and `/* */` (JS, TS, C, Java, Go, Rust, CSS, etc.)
+   - b) Runs of consecutive `//` lines
+   - c) Runs of consecutive `#` lines (Python, shell, Ruby, YAML, TOML)
+   - d) Python `"""` docstrings (should `'''` be included too?)
+   - e) `<!-- -->` (HTML, XML, Markdown)
+   - f) Runs of consecutive `--` lines (SQL, Lua, Haskell)
+   - g) Front matter `---\n...\n---`
+   - h) All of the above
+
+3. **Front matter.** For a markdown file with front matter followed by content:
+   - a) Import only the front matter block
+   - b) Import the front matter plus an immediately following comment, if one exists
+
+4. **Leading content before the comment.** Should blank lines, and Python encoding lines like `# -*- coding: utf-8 -*-`, be allowed before the doc comment?
+   - a) Allow leading blank lines only
+   - b) Allow blank lines and encoding or `use strict` style lines
+   - c) The comment must be the very first thing after the shebang
+
+5. **1500 character fallback.**
+   - a) Cut at exactly 1500 characters
+   - b) Cut at the last line break before 1500 characters, to avoid partial lines
+   - c) Make the limit configurable, e.g. `!docs:3000`, defaulting to 1500 (cutting style a or b?)
+
+6. **Modifier scope.** Should `!docs` only work with `!file`, or with any `!tag:` import?
+   - a) Only with `!file`
+   - b) With any tagged import
+   - c) With any import, tagged or not
+
+7. **Interaction with `!range`.** If both `!docs` and `!range` are used:
+   - a) `!docs` takes precedence and ranges are ignored
+   - b) Ranges are applied first, then docs are extracted
+   - c) Throw an error
+
+8. **Truncation tag placement.** `applyConvoImportTag` doesn't add code fences; it wraps raw content in the XML tag. I plan to append `\n\n<FILE_CONTENT_TRUNCATION/>` to the end of the content, just before the closing tag. Should the tag name follow the import's tag name, or always be `FILE_CONTENT_TRUNCATION`?
+   - a) Always `FILE_CONTENT_TRUNCATION`
+   - b) Derive it from the tag, e.g. `!tag:SOURCE` produces `SOURCE_TRUNCATION`
+
+9. **System prompt for code blocks.** I don't see the file that contains the XML File Blocks instructions. It isn't in the files you shared, and it may be a `.convo` file in the std imports or in `convo-system-messages.ts`. Could you share it or tell me its path? I also want to confirm what the documentation should say: that a `truncated` attribute means only part of the file is shown, that the model must not do full-file replacements on truncated files, and that it should use find-replace or ask for the full file instead. Does that match what you want?
+
+
+> user
+1. a
+2. h
+3. a
+4. b
+5. c, cutting style: b
+6. b
+7. b
+8. a
+9. I've have now included `convo-std-imports.ts` which contains the system prompt for file blocks. The documentation use suggested is good, but tell the model to request the full file before replacing it or doing a find and replace.
+
+
+@time 2026-11-19T09:46:43-05:00
+@tokenUsage 182482 / 18821 / $1.106348
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes:
+
+- **Docs extraction.** `!docs` (or `!docs:N`) only applies to tagged imports. It skips a leading shebang and allowed preamble lines (blank lines, encoding lines, `"use strict"` style directives, `<?xml ?>` and `<!DOCTYPE>`), then extracts the first doc block.
+- **Fallback.** If no doc block is found, it imports up to N characters (1500 by default), cut at the last line break.
+- **Ranges.** Ranges are applied first, and docs are then extracted from each range's content.
+- **Markdown.** In `.md`, `.mdx` and `.markdown` files, `#` lines are treated as headings, not comments.
+- **Truncation.** Truncated imports get a `truncated` attribute and a `<FILE_CONTENT_TRUNCATION/>` tag at the end of the content.
+
+I also fixed two existing problems in the merge path that would have broken this feature:
+- Ranges were applied twice: once in the merge branch, then again in `registerModuleAsync`. For tagged imports they were applied to the already-wrapped content.
+- `first.sourceContent` overrode the merged content.
+
+Ranges and docs are now applied once per file, before tagging.
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="07c47912978bb6c53ce9a580545a5b93d28ed695" last-commit="413a657ce1d7e7cc67cc645192ca40bfd49f802f" find-replace>
+``` ts
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase):string=>{
+//// replace-with ////
+export const defaultConvoImportDocsMaxChars=1500;
+
+/**
+ * Name of the tag inserted at the end of imported content that has been truncated
+ */
+export const convoFileTruncationTag='FILE_CONTENT_TRUNCATION';
+
+const docsShebangReg=/^#![^\n]*(?:\n|$)/;
+const docsPreambleReg=/^(?:[ \t]*\r?\n|[ \t]*#[^\n]*coding[:=][^\n]*(?:\r?\n|$)|[ \t]*(['"])use [\w ]+\1;?[ \t]*(?:\r?\n|$)|[ \t]*<\?xml[^\n]*\?>[ \t]*(?:\r?\n|$)|[ \t]*<!DOCTYPE[^>\n]*>[ \t]*(?:\r?\n|$))*/i;
+const docsRegs:RegExp[]=[
+    /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?=\r?\n|$)/,// front matter
+    /^[ \t]*\/\*[\s\S]*?\*\//,// block comments - js, ts, c, java, go, rust, css
+    /^[ \t]*<!--[\s\S]*?-->/,// html, xml, markdown comments
+    /^[ \t]*[rRuUbB]?("""|''')[\s\S]*?\1/,// python docstrings
+    /^(?:[ \t]*\/\/[^\n]*(?:\r?\n|$))+/,// line comments - js, ts, c, java, go, rust
+    /^(?:[ \t]*--[^\n]*(?:\r?\n|$))+/,// line comments - sql, lua, haskell
+];
+const docsHashReg=/^(?:[ \t]*#[^\n]*(?:\r?\n|$))+/;
+const docsMarkdownExtReg=/\.(md|mdx|markdown)$/i;
+const docsNonSpaceReg=/\S/;
+
+export interface ConvoDocsExtractionResult
+{
+    content:string;
+    /**
+     * True if not all of the content was returned
+     */
+    truncated:boolean;
+}
+
+/**
+ * Extracts the first documentation comment or front matter of a file. Shebangs and preamble lines
+ * such as encoding lines and "use strict" directives are kept but skipped when searching for
+ * documentation. If no documentation is found the content is cut at the last line break before
+ * maxChars.
+ */
+export const extractConvoDocs=(content:string,maxChars=defaultConvoImportDocsMaxChars,fileName?:string):ConvoDocsExtractionResult=>{
+    const shebang=docsShebangReg.exec(content)?.[0]??'';
+    const preamble=docsPreambleReg.exec(content.substring(shebang.length))?.[0]??'';
+    const start=shebang.length+preamble.length;
+    const body=content.substring(start);
+
+    let match:RegExpExecArray|null=null;
+    for(const reg of docsRegs){
+        match=reg.exec(body);
+        if(match){
+            break;
+        }
+    }
+    if(!match && !(fileName && docsMarkdownExtReg.test(fileName))){
+        match=docsHashReg.exec(body);
+    }
+
+    if(match){
+        const end=start+match[0].length;
+        return {
+            content:content.substring(0,end).trimEnd(),
+            truncated:docsNonSpaceReg.test(content.substring(end)),
+        };
+    }
+
+    if(content.length<=maxChars){
+        return {content,truncated:false};
+    }
+    const lineEnd=content.lastIndexOf('\n',maxChars);
+    return {
+        content:content.substring(0,lineEnd>0?lineEnd:maxChars).trimEnd(),
+        truncated:true,
+    };
+}
+
+/**
+ * Returns the max number of characters to import when the docs modifier is used. Undefined is
+ * returned if the docs modifier is not present.
+ */
+export const getConvoImportDocsMaxChars=(convoImport:ConvoImportBase):number|undefined=>{
+    const mod=convoImport.modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+    if(!mod){
+        return undefined;
+    }
+    const value=Number(mod.substring(5));
+    return (mod.length>5 && isFinite(value) && value>0)?value:defaultConvoImportDocsMaxChars;
+}
+
+export interface ConvoImportContentResult
+{
+    content:string;
+    hasRanges:boolean;
+    truncated:boolean;
+}
+
+/**
+ * Applies range and docs modifiers to imported content. Ranges are applied first then docs are
+ * extracted from each range. Docs are only applied to tagged imports.
+ */
+export const applyConvoImportRangeAndDocs=(content:string,convoImport:ConvoImportBase,fileName?:string):ConvoImportContentResult=>{
+    const hasRanges=convoImport.modifiers.some(m=>m.startsWith('range:'));
+    const maxChars=convoImport.tag?getConvoImportDocsMaxChars(convoImport):undefined;
+    let truncated=false;
+    const extract=maxChars===undefined?undefined:(value:string)=>{
+        const r=extractConvoDocs(value,maxChars,fileName);
+        if(r.truncated){
+            truncated=true;
+        }
+        return r.content;
+    };
+    if(hasRanges){
+        content=applyConvoImportRange(content,convoImport,extract);
+    }else if(extract){
+        content=extract(content);
+    }
+    return {content,hasRanges,truncated};
+}
+
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string):string=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+        return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${lines.slice(s-1,e).join('\n')}\n</FILE_CONTENT_RANGE>`
+//// replace-with ////
+        const rangeContent=lines.slice(s-1,e).join('\n');
+        return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${transformRange?transformRange(rangeContent):rangeContent}\n</FILE_CONTENT_RANGE>`
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus,hasRanges?:boolean)=>{
+//// replace-with ////
+export const applyConvoImportTag=(content:string,convoImport:ConvoImportBase,path?:string,gitStatus?:ConvoGitFileStatus,hasRanges?:boolean,truncated?:boolean)=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+            hasRanges?' showing-ranges':''
+//// replace-with ////
+            hasRanges?' showing-ranges':''
+        }${
+            truncated?' truncated':''
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+            content
+        }\n${close}`
+//// replace-with ////
+            content
+        }${truncated?`\n\n<${convoFileTruncationTag}/>`:''}\n${close}`
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+applyConvoImportRange, applyConvoImportTag,
+//// replace-with ////
+applyConvoImportRangeAndDocs, applyConvoImportTag,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+        let handler=name.startsWith(convoStdImportPrefix)?convoStdImportHandler:this.defaultOptions.importHandler;
+//// replace-with ////
+        let registerModifiers=modifiers;
+        let handler=name.startsWith(convoStdImportPrefix)?convoStdImportHandler:this.defaultOptions.importHandler;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                            first.content=result.map(r=>{
+                                let content=r.content??'';
+                                const hasRanges=importBase.modifiers.some(m=>m.startsWith('range:'));
+                                if(hasRanges){
+                                    content=applyConvoImportRange(content,importBase);
+                                }
+                                if(importBase.tag){
+                                    content=applyConvoImportTag(
+                                        r.sourceContent??r.content??'',
+                                        importBase,
+                                        r.relativeName,
+                                        r.filePath?status?.find(s=>s?.filePath===r.filePath)?.status:undefined
+                                    )
+                                }
+                                return content;
+                            }).join('\n\n\n');
+                            imports.push(first);
+//// replace-with ////
+                            first.content=result.map(r=>{
+                                const src=importBase.tag?(r.sourceContent??r.content??''):(r.content??'');
+                                const {content,hasRanges,truncated}=applyConvoImportRangeAndDocs(src,importBase,r.filePath??r.name);
+                                if(!importBase.tag){
+                                    return content;
+                                }
+                                return applyConvoImportTag(
+                                    content,
+                                    importBase,
+                                    r.relativeName,
+                                    r.filePath?status?.find(s=>s?.filePath===r.filePath)?.status:undefined,
+                                    hasRanges,
+                                    truncated,
+                                );
+                            }).join('\n\n\n');
+                            // merged content has already had ranges and docs applied
+                            delete first.sourceContent;
+                            registerModifiers=modifiers.filter(m=>!m.startsWith('range:') && m!=='docs' && !m.startsWith('docs:'));
+                            imports.push(first);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                const modMessages=await this.registerModuleAsync(i,{name:i.name,modifiers,modifierMap,
+//// replace-with ////
+                const modMessages=await this.registerModuleAsync(i,{name:i.name,modifiers:registerModifiers,modifierMap,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+        let content=escapeConvo(contentSrc);
+        const hasRanges=importStatement.modifiers.some(m=>m.startsWith('range:'));
+        if(hasRanges){
+            content=applyConvoImportRange(content,importStatement);
+        }
+        if(importStatement.tag){
+            const status=!module.filePath?undefined:await convoGitService.get()?.gitStatusSingleAsync({
+                path:module.filePath,
+                includeFileHash:'if-dirty',
+            });
+            content=applyConvoImportTag(content,importStatement,module.relativeName,status?.success?status.result:undefined,hasRanges);
+        }
+//// replace-with ////
+        const rangeAndDocs=applyConvoImportRangeAndDocs(escapeConvo(contentSrc),importStatement,module.filePath??module.name);
+        let content=rangeAndDocs.content;
+        if(importStatement.tag){
+            const status=!module.filePath?undefined:await convoGitService.get()?.gitStatusSingleAsync({
+                path:module.filePath,
+                includeFileHash:'if-dirty',
+            });
+            content=applyConvoImportTag(
+                content,
+                importStatement,
+                module.relativeName,
+                status?.success?status.result:undefined,
+                rangeAndDocs.hasRanges,
+                rangeAndDocs.truncated,
+            );
+        }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" find-replace>
+``` ts
+- showing-ranges: If present only a limited range of the file will be displayed. Ranges are displayed in FILE_CONTENT_RANGE xml tags
+//// replace-with ////
+- showing-ranges: If present only a limited range of the file will be displayed. Ranges are displayed in FILE_CONTENT_RANGE xml tags
+- truncated: If present only part of the file is displayed. A ${t}<FILE_CONTENT_TRUNCATION/>${t} tag marks the end of the displayed content
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" find-replace>
+``` ts
+syntax highlighting for the user.
+//// replace-with ////
+syntax highlighting for the user.
+
+When a file block has the ${t}truncated${t} attribute you do not have the full contents of the file.
+Before replacing the file or doing a find and replace on it, request the full file from the user.
+```
+</FILE_CONTENT>
+
+Usage: `@import !file !docs ./src/lib/*.ts` or `@import !file !docs:3000 ./docs/*.md`.
+
+
+> user

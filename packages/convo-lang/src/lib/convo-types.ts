@@ -247,6 +247,12 @@ export interface ConvoMessage
     importMatch?:ConvoImportMatch;
 
     /**
+     * If true the message is a function tagged with `@importWrapper`. Calls to the function are
+     * written as `startFileImport` and `endFileImport` messages instead of call and result messages.
+     */
+    importWrapper?:boolean;
+
+    /**
      * Array of code blocks found in the message. By default codeBlocks will always be undefined.
      * Code block parsing must be enabled during convo source code parsing. Messages that define
      * dynamic content will have code blocks parsed during the flatting of a conversation at 
