@@ -658,7 +658,9 @@ These commands are mainly used from the Code Blocks view and code lenses. See
     - Python strings starting with `"""*convo*`
     - Markdown fenced code blocks with the `convo` language
 - Fenced code blocks inside convo files are highlighted for JSON, XML, JS, TS, SQL, shell, Python,
-  HTML, YAML, TOML, diff and GraphQL.
+  HTML, CSS, YAML, TOML, diff, GraphQL, CSV and TSV.
+- CSV and TSV columns are colored in a repeating cycle of 8 colors. Quoted CSV values are treated
+  as a single column.
 
 ### Markdown preview
 Convo code blocks in Markdown files are syntax highlighted in the built-in Markdown preview, using

@@ -964,6 +964,50 @@
             "name":"keyword.control"
         },
 
+        "csvRow":{
+            "match":"(?=.)([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$)(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?(?:([ \\t]*\"(?:[^\"]|\"\")*\"[ \\t]*|[^,]*)(,|$))?",
+            "captures":{
+                "1":{"name":"variable.csv.column1"},
+                "2":{"name":"punctuation.separator.csv"},
+                "3":{"name":"keyword.control.csv.column2"},
+                "4":{"name":"punctuation.separator.csv"},
+                "5":{"name":"entity.name.function.csv.column3"},
+                "6":{"name":"punctuation.separator.csv"},
+                "7":{"name":"string.csv.column4"},
+                "8":{"name":"punctuation.separator.csv"},
+                "9":{"name":"entity.name.type.csv.column5"},
+                "10":{"name":"punctuation.separator.csv"},
+                "11":{"name":"constant.numeric.csv.column6"},
+                "12":{"name":"punctuation.separator.csv"},
+                "13":{"name":"entity.name.tag.csv.column7"},
+                "14":{"name":"punctuation.separator.csv"},
+                "15":{"name":"constant.character.escape.csv.column8"},
+                "16":{"name":"punctuation.separator.csv"}
+            }
+        },
+
+        "tsvRow":{
+            "match":"(?=.)([^\\t]*)(\\t|$)(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?(?:([^\\t]*)(\\t|$))?",
+            "captures":{
+                "1":{"name":"variable.tsv.column1"},
+                "2":{"name":"punctuation.separator.tsv"},
+                "3":{"name":"keyword.control.tsv.column2"},
+                "4":{"name":"punctuation.separator.tsv"},
+                "5":{"name":"entity.name.function.tsv.column3"},
+                "6":{"name":"punctuation.separator.tsv"},
+                "7":{"name":"string.tsv.column4"},
+                "8":{"name":"punctuation.separator.tsv"},
+                "9":{"name":"entity.name.type.tsv.column5"},
+                "10":{"name":"punctuation.separator.tsv"},
+                "11":{"name":"constant.numeric.tsv.column6"},
+                "12":{"name":"punctuation.separator.tsv"},
+                "13":{"name":"entity.name.tag.tsv.column7"},
+                "14":{"name":"punctuation.separator.tsv"},
+                "15":{"name":"constant.character.escape.tsv.column8"},
+                "16":{"name":"punctuation.separator.tsv"}
+            }
+        },
+
         "fenced_code_block": {
             "patterns": [
                 {"include": "#fenced_code_block_json"},
@@ -977,7 +1021,10 @@
                 {"include": "#fenced_code_block_yaml"},
                 {"include": "#fenced_code_block_toml"},
                 {"include": "#fenced_code_block_diff"},
-                {"include": "#fenced_code_block_graphql"}
+                {"include": "#fenced_code_block_graphql"},
+                {"include": "#fenced_code_block_css"},
+                {"include": "#fenced_code_block_csv"},
+                {"include": "#fenced_code_block_tsv"}
             ]
         },
 
@@ -1359,6 +1406,99 @@
           "patterns": [
             {
               "include": "source.graphql"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_css": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(css)(\\s+|:|,|\\{|\\?)[^`]*$|css$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.css",
+          "patterns": [
+            {
+              "include": "source.css"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_csv": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(csv)(\\s+|:|,|\\{|\\?)[^`]*$|csv$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.csv",
+          "patterns": [
+            {
+              "include": "#csvRow"
+            }
+          ]
+        }
+      ]
+    },
+
+    "fenced_code_block_tsv": {
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(tsv)(\\s+|:|,|\\{|\\?)[^`]*$|tsv$)",
+      "name": "markup.fenced_code.block.markdown",
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.tsv",
+          "patterns": [
+            {
+              "include": "#tsvRow"
             }
           ]
         }

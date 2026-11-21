@@ -1028,7 +1028,13 @@ export const convoImportModifiers={
      * Merges the contents of multiple files into a single imports. This is useful when importing
      * multiple content files using a glob.
      */
-    merge:'merge'
+    merge:'merge',
+
+    /**
+     * Lists imported files in a FILE_LIST xml tag in CSV format instead of importing their content.
+     * The number of head characters can be configured using `!ls:{count}`
+     */
+    ls:'ls',
 } as const;
 
 /**
@@ -3892,6 +3898,69 @@ export const getConvoImportDocsMaxChars=(convoImport:ConvoImportBase):number|und
     return (mod.length>5 && isFinite(value) && value>0)?value:defaultConvoImportDocsMaxChars;
 }
 
+export const defaultConvoImportLsHeadChars=200;
+
+/**
+ * Name of the tag used to wrap file lists created by the ls import modifier
+ */
+export const convoFileListTag='FILE_LIST';
+
+/**
+ * Returns the ls modifier of an import or undefined if not present
+ */
+export const getConvoImportLsModifier=(convoImport:ConvoImportBase):string|undefined=>{
+    return convoImport.modifiers.find(m=>m===convoImportModifiers.ls || m.startsWith(`${convoImportModifiers.ls}:`));
+}
+
+/**
+ * Returns the number of head characters to include when the ls modifier is used. Undefined is
+ * returned if the ls modifier is not present.
+ */
+export const getConvoImportLsHeadChars=(convoImport:ConvoImportBase):number|undefined=>{
+    const mod=getConvoImportLsModifier(convoImport);
+    if(!mod){
+        return undefined;
+    }
+    const value=Number(mod.substring(3));
+    return (mod.length>3 && isFinite(value) && value>0)?value:defaultConvoImportLsHeadChars;
+}
+
+export interface ConvoFileListItem
+{
+    path:string;
+    size:number;
+    /**
+     * Content used to create the head column
+     */
+    content:string;
+}
+
+const fileListCsvQuoteReg=/[",\r\n]|^\s|\s$/;
+const escapeConvoFileListCsvValue=(value:string,alwaysQuote=false):string=>(
+    (alwaysQuote || fileListCsvQuoteReg.test(value))?
+        `"${value.replace(/"/g,'""').replace(/\r?\n|\r/g,'\\n')}"`
+    :
+        value
+);
+
+/**
+ * Creates an xml tag containing a CSV list of files with path, size and head columns.
+ * The tag name defaults to FILE_LIST.
+ */
+export const createConvoFileList=(items:ConvoFileListItem[],headChars=defaultConvoImportLsHeadChars,tagName=convoFileListTag):string=>{
+    const lines=['path, size, head'];
+    for(const item of items){
+        lines.push(`${
+            escapeConvoFileListCsvValue(item.path)
+        }, ${
+            item.size
+        }, ${
+            escapeConvoFileListCsvValue(item.content.substring(0,headChars),true)
+        }`);
+    }
+    return `<${tagName}>\n\`\`\` csv\n${lines.join('\n')}\n\`\`\`\n</${tagName}>`;
+}
+
 export interface ConvoImportContentResult
 {
     content:string;
@@ -3922,7 +3991,11 @@ export const applyConvoImportRangeAndDocs=(content:string,convoImport:ConvoImpor
     return {content,hasRanges,truncated};
 }
 
-export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string):string=>{
+/**
+ * Applies range modifiers to content. If raw is true range content is joined without being
+ * wrapped in FILE_CONTENT_RANGE tags.
+ */
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string,raw?:boolean):string=>{
     const ranges=convoImport.modifiers.filter(m=>m.startsWith('range:'));
     if(!ranges.length){
         return content;
@@ -3945,6 +4018,9 @@ export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,t
             e=tmp;
         }
         const rangeContent=lines.slice(s-1,e).join('\n');
+        if(raw){
+            return transformRange?transformRange(rangeContent):rangeContent;
+        }
         return `<FILE_CONTENT_RANGE start-line="${s}" end-line="${e}" file-line-count="${lines.length}">\n${transformRange?transformRange(rangeContent):rangeContent}\n</FILE_CONTENT_RANGE>`
     }).join('\n');
 }

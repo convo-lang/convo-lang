@@ -1,0 +1,372 @@
+@import ./_core.convo !template
+
+> user
+Lets add an `!ls` import modifier that used with star / glob imports. The modifier will cause
+all imported files of the import to be inserted into a <FILE_LIST> xml tag in CSV format.
+
+Example:
+<FILE_LIST>
+``` csv
+path, size, head
+path/to/file, 766, "This is the start of the documentation of this file\nThis is a new line"
+path/to/other-file, 987, "Here are more docs\nThis is a new line"
+```
+</FILE_LIST>
+
+The `head` column should contain the first 200 characters of the file. The character count should be configurable: `!ls:1000`
+
+paths should be relative to the current file.
+
+The `!ls` modifier should be caused separately similar to the `!docs` modifier
+
+@time 2026-11-20T13:50:20-05:00
+@tokenUsage 224613 / 1259 / $0.9236319999999999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before I write the code.
+
+1. What should the `size` column contain?
+   - a) Character length of the file content (no extra IO)
+   - b) Byte length of the content (UTF-8 encoded)
+   - c) File size on disk from the virtual file system
+
+2. What should the `head` column contain? Your example looks like documentation text.
+   - a) The raw first N characters of the file
+   - b) The docs extracted with `extractConvoDocs`, truncated to N characters
+   - c) The extracted docs if any exist, otherwise the raw first N characters
+
+3. How should paths be made relative to the current file?
+   - a) Compute them from the importing file's directory (`context.sourceFilepath`) to each module's `filePath`
+   - b) Use the module's existing `relativeName`
+
+4. How should CSV values be escaped?
+   - a) Wrap `head` in double quotes, double any inner quotes (`""`), and write newlines as a literal `\n` (matches your example)
+   - b) Use standard CSV with real newlines inside quoted values
+
+5. How should `!ls` interact with other modifiers?
+   - a) `!ls` always produces a single merged message. It ignores `!tag`, `!file`, `!merge` and `!docs`, but still respects `!role` and `!range`.
+   - b) `!ls` can be combined with `!tag`/`!file` to wrap the `FILE_LIST`
+   - c) Something else
+
+6. Should `!ls` only work with glob imports?
+   - a) Yes, ignore it or throw an error on single-file imports
+   - b) No, allow it on single files too, producing a one-row list
+
+7. For the CSV header, should it be exactly `path, size, head` with spaces, or compact `path,size,head`?
+
+8. For caching, I plan to use a separate module key like `${name} !ls:200`, mirroring `!docs`. That way a later full import of the same files still works. Is that what you meant?
+
+
+> user
+1. a
+2. a
+3. Use the same logic used with the `!file` modifier
+4. a
+5. a
+6. b
+7. with spaces
+8. yes
+
+
+@time 2026-11-20T13:57:35-05:00
+@tokenUsage 225295 / 8755 / $1.07628
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here's the implementation. `!ls` works on both glob and single-file imports. It collapses all matched modules into one `FILE_LIST` module, cached under its own key (for example `src/*.ts !ls:200`).
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+    /**
+     * Merges the contents of multiple files into a single imports. This is useful when importing
+     * multiple content files using a glob.
+     */
+    merge:'merge'
+} as const;
+//// replace-with ////
+    /**
+     * Merges the contents of multiple files into a single imports. This is useful when importing
+     * multiple content files using a glob.
+     */
+    merge:'merge',
+
+    /**
+     * Lists imported files in a FILE_LIST xml tag in CSV format instead of importing their content.
+     * The number of head characters can be configured using `!ls:{count}`
+     */
+    ls:'ls',
+} as const;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+export interface ConvoImportContentResult
+{
+//// replace-with ////
+export const defaultConvoImportLsHeadChars=200;
+
+/**
+ * Name of the tag used to wrap file lists created by the ls import modifier
+ */
+export const convoFileListTag='FILE_LIST';
+
+/**
+ * Returns the ls modifier of an import or undefined if not present
+ */
+export const getConvoImportLsModifier=(convoImport:ConvoImportBase):string|undefined=>{
+    return convoImport.modifiers.find(m=>m===convoImportModifiers.ls || m.startsWith(`${convoImportModifiers.ls}:`));
+}
+
+/**
+ * Returns the number of head characters to include when the ls modifier is used. Undefined is
+ * returned if the ls modifier is not present.
+ */
+export const getConvoImportLsHeadChars=(convoImport:ConvoImportBase):number|undefined=>{
+    const mod=getConvoImportLsModifier(convoImport);
+    if(!mod){
+        return undefined;
+    }
+    const value=Number(mod.substring(3));
+    return (mod.length>3 && isFinite(value) && value>0)?value:defaultConvoImportLsHeadChars;
+}
+
+export interface ConvoFileListItem
+{
+    path:string;
+    size:number;
+    /**
+     * Content used to create the head column
+     */
+    content:string;
+}
+
+const fileListCsvQuoteReg=/[",\r\n]|^\s|\s$/;
+const escapeConvoFileListCsvValue=(value:string,alwaysQuote=false):string=>(
+    (alwaysQuote || fileListCsvQuoteReg.test(value))?
+        `"${value.replace(/"/g,'""').replace(/\r?\n|\r/g,'\\n')}"`
+    :
+        value
+);
+
+/**
+ * Creates a FILE_LIST xml tag containing a CSV list of files with path, size and head columns
+ */
+export const createConvoFileList=(items:ConvoFileListItem[],headChars=defaultConvoImportLsHeadChars):string=>{
+    const lines=['path, size, head'];
+    for(const item of items){
+        lines.push(`${
+            escapeConvoFileListCsvValue(item.path)
+        }, ${
+            item.size
+        }, ${
+            escapeConvoFileListCsvValue(item.content.substring(0,headChars),true)
+        }`);
+    }
+    return `<${convoFileListTag}>\n\`\`\` csv\n${lines.join('\n')}\n\`\`\`\n</${convoFileListTag}>`;
+}
+
+export interface ConvoImportContentResult
+{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string):string=>{
+//// replace-with ////
+/**
+ * Applies range modifiers to content. If raw is true range content is joined without being
+ * wrapped in FILE_CONTENT_RANGE tags.
+ */
+export const applyConvoImportRange=(content:string,convoImport:ConvoImportBase,transformRange?:(rangeContent:string)=>string,raw?:boolean):string=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+        const rangeContent=lines.slice(s-1,e).join('\n');
+        return `<FILE_CONTENT_RANGE
+//// replace-with ////
+        const rangeContent=lines.slice(s-1,e).join('\n');
+        if(raw){
+            return transformRange?transformRange(rangeContent):rangeContent;
+        }
+        return `<FILE_CONTENT_RANGE
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+appendFlatConvoMessageSuffix, applyConvoImportRangeAndDocs, applyConvoImportTag,
+//// replace-with ////
+appendFlatConvoMessageSuffix, applyConvoImportRange, applyConvoImportRangeAndDocs, applyConvoImportTag,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+convoVars, createEmptyConvoTokenUsage,
+//// replace-with ////
+convoVars, createConvoFileList, createEmptyConvoTokenUsage,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+getConvoDebugLabelComment, getConvoStructPropertyCount,
+//// replace-with ////
+getConvoDebugLabelComment, getConvoImportLsHeadChars, getConvoImportLsModifier, getConvoStructPropertyCount,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+        const {name:_name,modifiers,assign,templateName,tag:_tag,role}=importBase;
+        let tag=_tag;
+//// replace-with ////
+        const {name:_name,modifiers,assign,templateName,tag:_tag,role}=importBase;
+        // ls imports ignore tag, file, merge and docs modifiers
+        const lsModifier=getConvoImportLsModifier(importBase);
+        let tag=lsModifier?undefined:_tag;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+                        if(first && modifiers.includes(convoImportModifiers.merge)){
+//// replace-with ////
+                        if(first && !lsModifier && modifiers.includes(convoImportModifiers.merge)){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+        if(!imports.length){
+            throw new Error(`Convo import (${name}) not found`)
+        }
+
+        // docs imports are tracked separately so the full file can be imported later
+        const docsModifier=modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+        const messages:ConvoMessage[]=[];
+        for(const i of imports){
+            const moduleKey=docsModifier?`${i.name} !${docsModifier}`:i.name;
+//// replace-with ////
+        if(!imports.length){
+            throw new Error(`Convo import (${name}) not found`)
+        }
+
+        if(lsModifier){
+            const lsModule:ConvoModule={
+                name,
+                content:createConvoFileList(imports.map(i=>{
+                    const src=i.sourceContent??i.content??'';
+                    return {
+                        path:i.relativeName??i.filePath??i.name,
+                        size:src.length,
+                        content:applyConvoImportRange(src,importBase,undefined,true),
+                    };
+                }),getConvoImportLsHeadChars(importBase)),
+            };
+            imports.splice(0,imports.length,lsModule);
+            // ranges have already been applied to the file list
+            registerModifiers=modifiers.filter(m=>!m.startsWith('range:') && m!=='docs' && !m.startsWith('docs:'));
+        }
+
+        // docs and ls imports are tracked separately so the full file can be imported later
+        const keyModifier=lsModifier??modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+        const messages:ConvoMessage[]=[];
+        for(const i of imports){
+            const moduleKey=keyModifier?`${i.name} !${keyModifier}`:i.name;
+```
+</FILE_CONTENT>
+
+Summary:
+- **Columns**
+  - `path` uses `relativeName ?? filePath ?? name`, the same values that `!file` passes to `applyConvoImportTag`. It is only quoted when it contains special characters.
+  - `size` is the character length of the full file content.
+  - `head` is always quoted. Inner quotes are doubled and newlines are written as a literal `\n`.
+- **`!ls:N`** sets the number of head characters. The default is 200.
+- **Ranges** are applied to the head content without the `FILE_CONTENT_RANGE` wrappers. They are then removed from `registerModifiers` so `registerModuleAsync` doesn't apply them again.
+- **Other modifiers**
+  - `!tag`, `!file`, `!merge` and `!docs` are ignored when `!ls` is present.
+  - `!role` and `as` assignment still work, because `registerModuleAsync` handles them.
+
+
+> user
+Allow the `!tag` modifier to set the tag name and default to FILE_LIST
+
+@time 2026-11-20T14:12:48-05:00
+@tokenUsage 230805 / 861 / $0.9404399999999999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+A couple of quick questions before I make the change:
+
+1. `!file` also sets the tag internally, to `FILE_CONTENT`. How should it behave when combined with `!ls`?
+   - a) Keep ignoring `!file`. Only an explicit `!tag:NAME` changes the list tag.
+   - b) Let `!file` set the tag to `FILE_CONTENT` too.
+
+2. Should the tag name be validated?
+   - a) No validation. Use the value as given.
+   - b) Fall back to `FILE_LIST` if the value isn't a valid XML tag name (for example `!tag:` with an empty value or invalid characters).
+   - c) Throw an error on an invalid tag name.
+
+3. When a custom tag is used, should the opening tag include any attributes, such as `name="{import name}"`, similar to `!tag` on regular imports?
+   - a) No attributes. Just `<NAME>`.
+   - b) Include a `name` attribute with the import name.
+
+
+> user
+1. a
+2. a
+3. a
+
+
+@time 2026-11-20T14:15:01-05:00
+@tokenUsage 231137 / 1912 / $0.962788
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+`!tag:NAME` now sets the list tag name when used with `!ls`, and the tag defaults to `FILE_LIST`. `!file` is still ignored, the value is used as given, and the opening tag has no attributes.
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="168701d617b2142a539e33124a8e33184155749d" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+/**
+ * Creates a FILE_LIST xml tag containing a CSV list of files with path, size and head columns
+ */
+export const createConvoFileList=(items:ConvoFileListItem[],headChars=defaultConvoImportLsHeadChars):string=>{
+//// replace-with ////
+/**
+ * Creates an xml tag containing a CSV list of files with path, size and head columns.
+ * The tag name defaults to FILE_LIST.
+ */
+export const createConvoFileList=(items:ConvoFileListItem[],headChars=defaultConvoImportLsHeadChars,tagName=convoFileListTag):string=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" dirty file-hash="168701d617b2142a539e33124a8e33184155749d" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+    return `<${convoFileListTag}>\n\`\`\` csv\n${lines.join('\n')}\n\`\`\`\n</${convoFileListTag}>`;
+//// replace-with ////
+    return `<${tagName}>\n\`\`\` csv\n${lines.join('\n')}\n\`\`\`\n</${tagName}>`;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="861039f61c00750ee5ac0f562537a2b063b53288" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+        // ls imports ignore tag, file, merge and docs modifiers
+//// replace-with ////
+        // ls imports use !tag as the list tag name and ignore file, merge and docs modifiers
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" dirty file-hash="861039f61c00750ee5ac0f562537a2b063b53288" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+                }),getConvoImportLsHeadChars(importBase)),
+//// replace-with ////
+                }),getConvoImportLsHeadChars(importBase),modifiers.find(m=>m.startsWith('tag:'))?.substring(4)),
+```
+</FILE_CONTENT>
+
+The tag name comes from the `tag:` modifier directly rather than from `importBase.tag`. This is because `parseBaseConvoImport` also sets `importBase.tag` to `FILE_CONTENT` for `!file`, so reading it there would make `!file` change the list tag.
+
+
+> user

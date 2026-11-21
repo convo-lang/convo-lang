@@ -14,7 +14,7 @@ import { ConvoComponentCompletionCtx, ConvoComponentCompletionHandler, ConvoComp
 import { evalConvoMessageAsCodeAsync } from "./convo-eval.js";
 import { ConvoForm } from "./convo-forms-types.js";
 import { getGlobalConversationLock } from "./convo-lang-lock.js";
-import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, applyConvoImportRangeAndDocs, applyConvoImportTag, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoUtilModels, convoVars, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoNodeId, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoContentMessage, groupConvoMessages, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, logConvoMessages, logFlatConvoMessages, mapToConvoTags, parseBaseConvoImport, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
+import { FindConvoMessageOptions, addConvoUsageTokens, appendFlatConvoMessageSuffix, applyConvoImportRange, applyConvoImportRangeAndDocs, applyConvoImportTag, containsConvoTag, contentHasConvoRole, convertFlatConvoMessageToCompletionMessage, convoControlResult, convoControlResultKeys, convoDescriptionToComment, convoDisableAutoCompleteName, convoFunctions, convoImportModifiers, convoLabeledScopeParamsToObj, convoMessageToString, convoMsgModifiers, convoPartialUsageTokensToUsage, convoRagDocRefToMessage, convoResultReturnName, convoRoles, convoScopedModifiers, convoStdImportPrefix, convoStringToComment, convoTagMapToCode, convoTags, convoTagsToMap, convoTaskTriggers, convoUsageTokensToString, convoUtilModels, convoVars, createConvoFileList, createEmptyConvoTokenUsage, defaultConversationName, defaultConvoCacheType, defaultConvoImportServicePriority, defaultConvoNodeId, defaultConvoPrintFunction, defaultConvoRagTol, defaultConvoTask, defaultConvoTransformGroup, defaultConvoVisionSystemMessage, escapeConvo, escapeConvoMessageContent, evalConvoTransformCondition, findConvoMessage, formatConvoContentSpace, formatConvoMessage, getAssumedConvoCompletionValue, getConvoCompletionServiceModelsAsync, getConvoDateString, getConvoDebugLabelComment, getConvoImportLsHeadChars, getConvoImportLsModifier, getConvoStructPropertyCount, getConvoTag, getFlatConvoMessageCachedJsonValue, getFlatConvoMessageCondition, getFlatConvoTagBoolean, getFlatConvoTagValues, getFlattenConversationDisplayString, getFullFlatConvoMessageContent, getLastCalledConvoMessage, getLastCompletionMessage, getLastConvoContentMessage, groupConvoMessages, insertConvoContentIntoSlot, isConvoThreadFilterMatch, isValidConvoIdentifier, logConvoMessages, logFlatConvoMessages, mapToConvoTags, parseBaseConvoImport, parseConvoJsonMessage, parseConvoMessageTemplate, parseConvoTransformTag, setFlatConvoMessageCachedJsonValue, setFlatConvoMessageCondition, spreadConvoArgs, validateConvoFunctionName, validateConvoTypeName, validateConvoVarName } from "./convo-lib.js";
 import { ConvoNodeOrderingResult, applyConvoNodeOrdering, convoTagToNodeRoute, getConvoConvoNodeResults, getConvoNodeOutput, removeConvoNodeMessages } from "./convo-node-graph-lib.js";
 import { ConvoNodeDescription, ConvoNodeRoute, ConvoRuntimeNodeInfo } from "./convo-node-graph-types.js";
 import { parseConvoCode } from "./convo-parser.js";
@@ -3381,7 +3381,9 @@ export class Conversation
 
         const importBase=parseBaseConvoImport(name);
         const {name:_name,modifiers,assign,templateName,tag:_tag,role}=importBase;
-        let tag=_tag;
+        // ls imports use !tag as the list tag name and ignore file, merge and docs modifiers
+        const lsModifier=getConvoImportLsModifier(importBase);
+        let tag=lsModifier?undefined:_tag;
         name=_name;
         if(!name){
             throw new Error(`Invalid import - @import ${modifiers.join(' ')}`)
@@ -3472,7 +3474,7 @@ export class Conversation
                         }
 
                         const first=result[0];
-                        if(first && modifiers.includes(convoImportModifiers.merge)){
+                        if(first && !lsModifier && modifiers.includes(convoImportModifiers.merge)){
                             const git=convoGitService.get();
                             const status=(!git || !importBase.tag)?null:await Promise.all(result.map(async r=>{
                                 if(!r.filePath){
@@ -3529,11 +3531,28 @@ export class Conversation
             throw new Error(`Convo import (${name}) not found`)
         }
 
-        // docs imports are tracked separately so the full file can be imported later
-        const docsModifier=modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
+        if(lsModifier){
+            const lsModule:ConvoModule={
+                name,
+                content:createConvoFileList(imports.map(i=>{
+                    const src=i.sourceContent??i.content??'';
+                    return {
+                        path:i.relativeName??i.filePath??i.name,
+                        size:src.length,
+                        content:applyConvoImportRange(src,importBase,undefined,true),
+                    };
+                }),getConvoImportLsHeadChars(importBase),modifiers.find(m=>m.startsWith('tag:'))?.substring(4)),
+            };
+            imports.splice(0,imports.length,lsModule);
+            // ranges have already been applied to the file list
+            registerModifiers=modifiers.filter(m=>!m.startsWith('range:') && m!=='docs' && !m.startsWith('docs:'));
+        }
+
+        // docs and ls imports are tracked separately so the full file can be imported later
+        const keyModifier=lsModifier??modifiers.find(m=>m==='docs' || m.startsWith('docs:'));
         const messages:ConvoMessage[]=[];
         for(const i of imports){
-            const moduleKey=docsModifier?`${i.name} !${docsModifier}`:i.name;
+            const moduleKey=keyModifier?`${i.name} !${keyModifier}`:i.name;
             if(!this.importedModules[moduleKey]){
                 const modMessages=await this.registerModuleAsync(i,{name:i.name,modifiers:registerModifiers,modifierMap,system,ignoreContent,templateName,tag,targetPath,role,assign},index,externFunctions,moduleKey);
                 messages.push(...modMessages);

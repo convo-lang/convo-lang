@@ -1,10 +1,2 @@
 @import ../base.convo
-@import ../../tsconfig.base.json !file
-@import ../../packages/convo-lang/tsconfig.json !file
-@import ../../packages/convo-lang/src/lib/Conversation.ts !file
-@import ../../packages/convo-lang/src/lib/ConvoExecutionContext.ts !file
-@import ../../packages/convo-lang/src/lib/convo-parser.ts !file
-@import ../../packages/convo-lang/src/lib/convo-types.ts !file
-@import ../../packages/convo-lang/src/lib/convo-lib.ts !file
-@import ../../packages/convo-lang/src/lib/convo-default-vars.ts !file
-@import ../../packages/convo-lang/src/lib/convo-std-imports.ts !file
+@import ./_core-context.convo
