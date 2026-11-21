@@ -329,7 +329,23 @@ export interface ConvoCodeBlock
      * @default "//// replace-with ////"
      */
     findReplaceSeparator?:string;
+
+    /**
+     * The file operation of a self-closing `FILE_OP` block. Undefined for other blocks or when the
+     * op attribute is not a valid file operation. FILE_OP blocks have empty content and lang.
+     */
+    fileOp?:ConvoFileOpType;
 }
+
+/**
+ * File operations that can be defined using self-closing `FILE_OP` XML tags.
+ * - rename: Renames a file using the `from` and `to` attributes
+ * - delete: Deletes files matching the `path` attribute. Globs are supported
+ * - setMode: Sets the mode of files matching the `path` attribute to the `mode` attribute. Globs are supported
+ */
+export const allConvoFileOpTypes=['rename','delete','setMode'] as const;
+export type ConvoFileOpType=typeof allConvoFileOpTypes[number];
+export const isConvoFileOpType=(value:any):value is ConvoFileOpType=>allConvoFileOpTypes.includes(value);
 
 /**
  * A reference to convo source

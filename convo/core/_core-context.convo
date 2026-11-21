@@ -7,3 +7,12 @@
 @import ../../packages/convo-lang/src/lib/convo-lib.ts !file
 @import ../../packages/convo-lang/src/lib/convo-default-vars.ts !file
 @import ../../packages/convo-lang/src/lib/convo-std-imports.ts !file
+@import ../../packages/convo-lang/src/lib/convo-code-block-lib.ts !file
+@import ../../packages/convo-lang/src/lib/convo-completion-lib.ts !file
+@import ../../packages/convo-lang/src/lib/convo-helpers.ts !file
+@import ../../packages/convo-lang/src/lib/convo-zod.ts !file
+@import ../../packages/convo-lang/src/lib/convoAsync.ts !file
+@import ../../packages/convo-lang/src/lib/HttpConvoCompletionService.ts !file
+@import ../../packages/convo-lang/src/lib/BaseOpenAiConvoCompletionService.ts !file
+@import ../../packages/convo-lang/src/lib/BaseOpenAiConvoConverter.ts !file
+@import ../../packages/convo-lang/src/lib/result-type.ts !file

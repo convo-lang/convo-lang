@@ -1,11 +1,17 @@
 import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
 import { getErrorMessage } from '@iyio/common';
 import * as path from 'path';
-import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
+import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputText, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 import { MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, getParsedOutputTagGroups, outputPreviewChangeEmitter, outputPreviewContent, readFileContentAsync, writeFileContentAsync } from './code-block-lib.js';
+import { applyFileOpAsync, getFileOpPreviewText, resolveFileOpAsync } from './file-op-lib.js';
 
 const reviewContextKey='convo.codeBlockReviewActive';
+
+/**
+ * Key of the review page that lists the file operations of a message
+ */
+const fileOpsPageKey='::file-ops::';
 
 type ReviewStatus='pending'|'accepted'|'rejected';
 
@@ -27,10 +33,14 @@ interface BlockLabel
     ranges:BlockRange[];
 }
 
-interface FilePreview
+interface PagePreview
 {
     content:string;
     labels:BlockLabel[];
+}
+
+interface FilePreview extends PagePreview
+{
     notFound:ReviewStep[];
 }
 
@@ -56,6 +66,9 @@ interface ReviewSession
     documentUri:Uri;
     steps:ReviewStep[];
     scripts:ParsedOutputTagInfo[];
+    /**
+     * Target paths of reviewed files. Ends with fileOpsPageKey if the message contains file operations.
+     */
     targetPaths:string[];
     fileIndex:number;
     changeIndex:number;
@@ -67,6 +80,7 @@ interface ReviewSession
 /**
  * Registers the `convo.code-block-group-review` command and its navigation commands. The review
  * steps through the file blocks of a message one file at a time using a single reused diff tab.
+ * File operations are reviewed on a final page listing each operation and the files it matches.
  * Each change is labeled with a code lens that lets the user accept or reject its block and
  * navigate between changes.
  */
@@ -188,19 +202,23 @@ class CodeBlockReview implements CodeLensProvider, Disposable
         const doc=await workspace.openTextDocument(group.messageUri);
         const tags=(getParsedOutputTagGroups(doc).find(g=>g.messageIndex===group.messageIndex)??group).tags;
         const files=tags.filter(t=>t.type==='file');
-        if(!files.length){
-            void window.showInformationMessage('No file blocks found in message');
+        const ops=tags.filter(t=>t.type==='op');
+        if(!files.length && !ops.length){
+            void window.showInformationMessage('No file blocks or file operations found in message');
             return;
         }
 
         const order=[...new Set(files.map(t=>t.targetPath))];
         files.sort((a,b)=>order.indexOf(a.targetPath)-order.indexOf(b.targetPath) || a.index-b.index);
+        if(ops.length){
+            order.push(fileOpsPageKey);
+        }
 
         const diffCodeLens=await enableDiffCodeLensAsync();
 
         this.session={
             documentUri:group.messageUri,
-            steps:files.map(tag=>({tag,status:'pending'})),
+            steps:[...files,...ops].map(tag=>({tag,status:'pending'})),
             scripts:tags.filter(t=>t.type==='shell'),
             targetPaths:order,
             fileIndex:0,
@@ -303,7 +321,7 @@ class CodeBlockReview implements CodeLensProvider, Disposable
         await commands.executeCommand('setContext',reviewContextKey,false);
         if(s.previewUri){
             outputPreviewContent.delete(s.previewUri.toString());
-            await closeDiffTabsAsync(s.previewUri);
+            await closePreviewTabsAsync(s.previewUri);
         }
         await restoreDiffCodeLensAsync(s.diffCodeLens);
     }
@@ -350,14 +368,14 @@ class CodeBlockReview implements CodeLensProvider, Disposable
         const firstPending=pending[0];
         if(firstPending){
             void window.showInformationMessage(`${pending.length} block${pending.length===1?' is':'s are'} still pending. Accept or reject every block to finish.`);
-            await this.showFileAsync(s.targetPaths.indexOf(firstPending.tag.targetPath),firstPending);
+            await this.showFileAsync(s.targetPaths.indexOf(getStepPageKey(firstPending)),firstPending);
             return;
         }
 
         const accepted=s.steps.filter(st=>st.status==='accepted');
         const fileLines=s.targetPaths.map(f=>{
-            const blocks=s.steps.filter(st=>st.tag.targetPath===f).map(st=>`#${st.tag.index+1} ${getStatusIcon(st.status)}`);
-            return `${path.basename(f)}: ${blocks.join(', ')}`;
+            const blocks=getPageSteps(s.steps,f).map(st=>`#${st.tag.index+1} ${getStatusIcon(st.status)}`);
+            return `${f===fileOpsPageKey?'File operations':path.basename(f)}: ${blocks.join(', ')}`;
         });
         const scriptLine=s.scripts.length?`\n\n${s.scripts.length} script${s.scripts.length===1?'':'s'} in message`:'';
 
@@ -365,7 +383,7 @@ class CodeBlockReview implements CodeLensProvider, Disposable
         const applyAll='Apply Files and Run Scripts';
         const restart='Restart Review';
         const action=await window.showInformationMessage(
-            `${accepted.length} of ${s.steps.length} file blocks accepted. Apply changes?`,
+            `${accepted.length} of ${s.steps.length} blocks accepted. Apply changes?`,
             {modal:true,detail:`${fileLines.join('\n')}${scriptLine}`},
             ...(s.scripts.length?[applyFiles,applyAll,restart]:[applyFiles,restart]),
         );
@@ -383,7 +401,7 @@ class CodeBlockReview implements CodeLensProvider, Disposable
         }
 
         await this.endAsync();
-        await applyFilesAsync(accepted);
+        await applyAcceptedAsync(accepted);
 
         if(action===applyAll){
             for(const tag of s.scripts){
@@ -400,25 +418,32 @@ class CodeBlockReview implements CodeLensProvider, Disposable
     }
 
     /**
-     * Shows the diff of the file at the given index with all blocks of the file applied. The
-     * change to select can be an index, the last change or the first change of a step.
+     * Shows the page at the given index. File pages show a diff with all blocks of the file
+     * applied. The file operations page lists each operation and the files it matches. The change
+     * to select can be an index, the last change or the first change of a step.
      */
     private async showFileAsync(fileIndex:number,change:number|'last'|ReviewStep):Promise<void>
     {
         const s=this.session;
-        const targetPath=s?.targetPaths[fileIndex];
-        if(!s || !targetPath){
+        const pageKey=s?.targetPaths[fileIndex];
+        if(!s || !pageKey){
             return;
         }
 
-        const base=await readFileContentAsync(targetPath);
+        const isOps=pageKey===fileOpsPageKey;
+        const pageSteps=getPageSteps(s.steps,pageKey);
+        const base=isOps?undefined:await readFileContentAsync(pageKey);
+        const preview:PagePreview=isOps?await buildOpsPreviewAsync(pageSteps):buildFilePreview(base??'',pageSteps);
         if(this.session!==s){
             return;
         }
 
-        const preview=buildFilePreview(base??'',s.steps.filter(st=>st.tag.targetPath===targetPath));
         const changes=getChanges(preview.labels,s.steps);
-        const previewUri=Uri.file(targetPath).with({scheme:'convo-output',query:'review'});
+        const previewUri=(isOps?
+            Uri.from({scheme:'convo-output',path:'/File Operations',query:'review'})
+        :
+            Uri.file(pageKey).with({scheme:'convo-output',query:'review'})
+        );
         const prevUri=s.previewUri;
 
         s.fileIndex=fileIndex;
@@ -438,17 +463,21 @@ class CodeBlockReview implements CodeLensProvider, Disposable
 
         if(prevUri && prevUri.toString()!==previewUri.toString()){
             outputPreviewContent.delete(prevUri.toString());
-            await closeDiffTabsAsync(prevUri);
+            await closePreviewTabsAsync(prevUri);
         }
 
-        if(!getDiffTabs(previewUri).length){
-            await commands.executeCommand(
-                'vscode.diff',
-                base===undefined?Uri.parse(`untitled:${targetPath}`):Uri.file(targetPath),
-                previewUri,
-                `Review: ${path.basename(targetPath)}`,
-                {preview:false},
-            );
+        if(!getPreviewTabs(previewUri).length){
+            if(isOps){
+                await window.showTextDocument(previewUri,{preview:false});
+            }else{
+                await commands.executeCommand(
+                    'vscode.diff',
+                    base===undefined?Uri.parse(`untitled:${pageKey}`):Uri.file(pageKey),
+                    previewUri,
+                    `Review: ${path.basename(pageKey)}`,
+                    {preview:false},
+                );
+            }
         }
 
         await waitForContentAsync(previewUri,preview.content);
@@ -537,6 +566,27 @@ const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
 }
 
 /**
+ * Builds a page listing each file operation followed by the files it matches
+ */
+const buildOpsPreviewAsync=async (steps:ReviewStep[]):Promise<PagePreview>=>{
+    const plans=await Promise.all(steps.map(st=>resolveFileOpAsync(st.tag)));
+    let content='';
+    const labels:BlockLabel[]=[];
+    for(let i=0;i<steps.length;i++){
+        const step=steps[i];
+        const plan=plans[i];
+        if(!step || !plan){
+            continue;
+        }
+        const start=content.length;
+        content+=`${getFileOpPreviewText(plan)}\n`;
+        labels.push({step,ranges:[{start,end:content.length}]});
+        content+='\n';
+    }
+    return {content,labels};
+}
+
+/**
  * Returns the changes of the given labels ordered by position in the file. Labels without ranges
  * produce a single change placed at the top of the file.
  */
@@ -550,16 +600,45 @@ const mapRange=(range:BlockRange,ranges:ConvoBlockReplaceRange[]):BlockRange=>({
     end:mapConvoBlockReplaceIndex(range.end,ranges),
 });
 
-const applyFilesAsync=async (steps:ReviewStep[]):Promise<void>=>{
-    const errors:string[]=[];
-    let written=0;
+const getPageSteps=(steps:ReviewStep[],pageKey:string):ReviewStep[]=>(
+    pageKey===fileOpsPageKey?
+        steps.filter(st=>st.tag.type==='op')
+    :
+        steps.filter(st=>st.tag.type==='file' && st.tag.targetPath===pageKey)
+);
 
-    for(const targetPath of getTargetPaths(steps)){
+const getStepPageKey=(step:ReviewStep):string=>step.tag.type==='op'?fileOpsPageKey:step.tag.targetPath;
+
+/**
+ * Applies accepted file blocks and file operations in the order they appear in the message. All
+ * accepted blocks of a file are combined into a single write at the first block of the file.
+ */
+const applyAcceptedAsync=async (steps:ReviewStep[]):Promise<void>=>{
+    const errors:string[]=[];
+    const handled=new Set<string>();
+    let written=0;
+    let ops=0;
+
+    for(const st of [...steps].sort((a,b)=>a.tag.index-b.tag.index)){
+        const tag=st.tag;
+        if(tag.type==='op'){
+            if(await applyFileOpAsync(tag,{autoConfirm:true})){
+                ops++;
+            }
+            continue;
+        }
+
+        const targetPath=tag.targetPath;
+        if(handled.has(targetPath)){
+            continue;
+        }
+        handled.add(targetPath);
+
         try{
             const base=await readFileContentAsync(targetPath);
-            const preview=buildFilePreview(base??'',steps.filter(st=>st.tag.targetPath===targetPath));
-            for(const st of preview.notFound){
-                errors.push(`find-replace target not found. path:${targetPath}, block:#${st.tag.index+1}`);
+            const preview=buildFilePreview(base??'',getPageSteps(steps,targetPath));
+            for(const nf of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${nf.tag.index+1}`);
             }
             if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
                 continue;
@@ -577,7 +656,7 @@ const applyFilesAsync=async (steps:ReviewStep[]):Promise<void>=>{
     if(errors.length){
         void window.showErrorMessage(errors.join('\n'));
     }
-    void window.showInformationMessage(`Wrote ${written} file${written===1?'':'s'}`);
+    void window.showInformationMessage(`Wrote ${written} file${written===1?'':'s'}${ops?` · applied ${ops} file operation${ops===1?'':'s'}`:''}`);
 }
 
 const getStatusIcon=(status:ReviewStatus):string=>(
@@ -591,7 +670,15 @@ const getStatusIcon=(status:ReviewStatus):string=>(
 
 const getLabelText=(change:ReviewChange,isCurrent:boolean):string=>{
     const step=change.step;
-    const kind=step.tag.codeBlock.findReplace?'find-replace':'full file';
+    const block=step.tag.codeBlock;
+    const kind=(
+        step.tag.type==='op'?
+            (block.fileOp??'file op')
+        :block.findReplace?
+            'find-replace'
+        :
+            'full file'
+    );
     return `${isCurrent?'▶ ':''}block #${step.tag.index+1} · ${kind} · ${getStatusIcon(step.status)} ${step.status}${change.range?'':' · not found'}`;
 }
 
@@ -626,15 +713,19 @@ const getLineRange=(doc:TextDocument,r:BlockRange):Range=>{
     return new Range(start.line,0,endLine,0);
 }
 
-const getTargetPaths=(steps:ReviewStep[]):string[]=>[...new Set(steps.map(st=>st.tag.targetPath))];
-
-const getDiffTabs=(uri:Uri):Tab[]=>{
+/**
+ * Returns diff tabs modifying the given uri and text tabs showing the given uri
+ */
+const getPreviewTabs=(uri:Uri):Tab[]=>{
     const key=uri.toString();
-    return window.tabGroups.all.flatMap(g=>g.tabs).filter(t=>t.input instanceof TabInputTextDiff && t.input.modified.toString()===key);
+    return window.tabGroups.all.flatMap(g=>g.tabs).filter(t=>(
+        (t.input instanceof TabInputTextDiff && t.input.modified.toString()===key) ||
+        (t.input instanceof TabInputText && t.input.uri.toString()===key)
+    ));
 }
 
-const closeDiffTabsAsync=async (uri:Uri):Promise<void>=>{
-    const tabs=getDiffTabs(uri);
+const closePreviewTabsAsync=async (uri:Uri):Promise<void>=>{
+    const tabs=getPreviewTabs(uri);
     if(tabs.length){
         await window.tabGroups.close(tabs);
     }

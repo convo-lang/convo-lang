@@ -1,0 +1,2009 @@
+@import ./_extension-and-core.convo !template
+
+> user
+Lets add some new file operation features to `std://file-blocks.convo` via a FILE_OP xml tag:
+
+- `rename`: Rename a file
+- `delete`: Delete a file
+- `setMode`: Set the mode `chmod` of a file
+
+Example:
+
+``` convo
+
+\> assistant
+
+<FILE_OP op="rename" from="path/to/current/location" to="path/to/new/location"/>
+<FILE_OP op="delete" path="path/to/location"/>
+<FILE_OP op="delete" path="path/to/location/*.ts"/>
+<FILE_OP op="delete" path="path/to/location/**.ts"/>
+<FILE_OP op="setMode" path="path/to/location" mode="700"/>
+<FILE_OP op="setMode" path="path/to/location" mode="+x"/>
+
+```
+
+The delete and setMode ops paths should support globs
+
+@time 2026-11-20T19:43:46-05:00
+@tokenUsage 404587 / 1989 / $1.6581279999999998
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before writing any code, I have some questions.
+
+1. Where should `FILE_OP` tags be parsed?
+   - a) In the core `convo-lang` package. Extend `parseConvoCodeBlocks` so self-closing `FILE_OP` tags become `ConvoCodeBlock` entries with an empty `content` and `lang`. They would then show up in `message.codeBlocks` next to `FILE_CONTENT` and `RUNNABLE_SCRIPT`.
+   - b) In the core package, but as a separate `fileOps` array on `ConvoMessage`, with a new `ConvoFileOp` type.
+   - c) Only in the VSCode extension (`code-block-lib.ts`).
+
+2. Which extension features should support file ops?
+   - a) All of them: code lenses (`Apply Op`, plus `Preview` to list matched files), the Code Blocks view, `Apply All`, `Complete and Apply All`, and Guided review.
+   - b) All of the above except Guided review. The review would stay focused on `FILE_CONTENT` diffs, and ops would run after the accepted files are applied.
+   - c) Only code lenses and the Code Blocks view.
+
+3. How should delete work?
+   - a) Move files to the trash (`workspace.fs.delete` with `useTrash:true`), after a confirmation that lists the matched files.
+   - b) Delete permanently, after a confirmation.
+   - c) Move to the trash, and skip confirmation when applied through Apply All or Complete and Apply All.
+
+4. Glob semantics. Your example has both `*.ts` and `**.ts`.
+   - a) Standard globs: `*` matches within one directory and `**` matches any depth. `path/**.ts` would be treated as `path/**/*.ts`.
+   - b) Treat `**.ts` exactly as written, using minimatch semantics. This is effectively the same as `*.ts`.
+   - c) Something else. Please describe.
+
+5. Which glob implementation should be used?
+   - a) `workspace.findFiles` with a `RelativePattern` based on the `.convo` file's directory. This adds no dependency, but it is limited to the workspace and respects `files.exclude`.
+   - b) Add `minimatch` or `fast-glob` as a dependency.
+   - c) Node's built-in `fs.glob`. This requires Node 22, so it depends on the VSCode version.
+
+6. What `setMode` syntax should be supported?
+   - a) Octal (`700`, `0644`) and full symbolic chmod syntax (`+x`, `u+x`, `go-w`, `a=r`, comma lists), with a small parser.
+   - b) Octal plus simple forms only (`+x`, `-x`, `+w`, `-w`, `+r`, `-r`, applied to all users).
+   - c) Octal only.
+
+   On Windows, should `setMode` be skipped with a warning? (yes / no)
+
+7. How should rename behave?
+   - a) Use `WorkspaceEdit.renameFile` so open editors follow the file. Create parent directories as needed, and fail if the target already exists.
+   - b) Same as (a), but ask whether to overwrite when the target exists.
+   - c) Allow globs or directories in `from` as well.
+
+8. Within one message, how should ops be ordered against `FILE_CONTENT` blocks?
+   - a) In order of appearance. For example, a rename followed by a `FILE_CONTENT` for the new path works naturally.
+   - b) Run all `FILE_CONTENT` blocks first, then the ops.
+   - c) Run the ops first, then the file blocks.
+
+9. Path safety: should paths that resolve outside the workspace folder be rejected?
+   - a) Yes, reject them.
+   - b) Allow them, but show a warning in the confirmation.
+   - c) Allow them with no check.
+
+Once you answer, I'll update `convo-std-imports.ts` (the prompt instructions), the parser and types, the extension files, `package.json`, and `README.md`.
+
+
+> user
+1. a
+2. a
+3. c
+4. a
+5. a
+6. b, yes
+7. a
+8. a
+9. a
+
+
+@time 2026-11-20T20:01:33-05:00
+@tokenUsage 405955 / 57755 / $2.77892
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes, based on your answers.
+
+<FILE_CONTENT name="convo-code-block-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-code-block-lib.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c">
+``` ts
+import { unescapeHtml } from '@iyio/common';
+import { unescapeConvo } from './convo-parser.js';
+import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, isConvoFileOpType } from './convo-types.js';
+
+
+export const defaultConvoFindReplaceSeparator='//// replace-with ////';
+
+/**
+ * Name of the self-closing XML tag used to define file operations
+ */
+export const convoFileOpTagName='FILE_OP';
+
+const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```+[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```+[ \t\r\n]*<\/\k<tagName>>/g;
+const fileOpReg=/(?<start>(^|\r|\n)[ \t]*)<FILE_OP(?<attributes>(\s[^>]*?)?)\/>/g;
+const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
+
+const parseConvoCodeBlockAttributes=(attributes:string):Record<string,string>=>{
+    const atts:Record<string,string>={};
+    attReg.lastIndex=0;
+    let attMatch:RegExpExecArray|null;
+    while(attMatch=attReg.exec(attributes)){
+        atts[attMatch.groups?.['name']??'']=unescapeHtml(attMatch.groups?.['dq']??attMatch.groups?.['sq']??'');
+    }
+    return atts;
+}
+
+/**
+ * Parses XML tagged code blocks and self-closing `FILE_OP` tags. Blocks are returned in order of
+ * appearance. `FILE_OP` tags inside of the content of another block are ignored.
+ */
+export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
+    let indexOffset:number;
+    if(typeof indexOffsetOrParentMessage === 'number'){
+        indexOffset=indexOffsetOrParentMessage;
+    }else if(indexOffsetOrParentMessage){
+        const src=indexOffsetOrParentMessage[convoMessageSourceReferenceKey];
+        if(src && indexOffsetOrParentMessage.s!==undefined && indexOffsetOrParentMessage.e!==undefined){
+            text=src.source.substring(indexOffsetOrParentMessage.s,indexOffsetOrParentMessage.e);
+        }
+        indexOffset=indexOffsetOrParentMessage.s??0;
+    }else{
+        indexOffset=0;
+    }
+
+    const found:Omit<ConvoCodeBlock,'index'>[]=[];
+
+    blockReg.lastIndex=0;
+    let match:RegExpMatchArray|null;
+    while(match=blockReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const tagName=match.groups?.['tagName']??'';
+        const lang=match.groups?.['lang']||'txt';
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+
+        found.push({
+            tagName,
+            attributes:atts,
+            lang,
+            content:normalizeConvoCodeBlockContent(tagName,match.groups?.['content']??'',atts),
+            startIndex:indexOffset+(match.index??0)+start.length,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            findReplace:parseConvoBlockFindReplace(atts['find-replace']),
+            findReplaceSeparator:atts['find-replace-separator'],
+        });
+    }
+
+    fileOpReg.lastIndex=0;
+    while(match=fileOpReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const startIndex=indexOffset+(match.index??0)+start.length;
+        if(found.some(b=>startIndex>=b.startIndex && startIndex<b.endIndex)){
+            continue;
+        }
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+        const op=atts['op'];
+        found.push({
+            tagName:convoFileOpTagName,
+            attributes:atts,
+            lang:'',
+            content:'',
+            startIndex,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            fileOp:isConvoFileOpType(op)?op:undefined,
+        });
+    }
+
+    if(!found.length){
+        return undefined;
+    }
+
+    found.sort((a,b)=>a.startIndex-b.startIndex);
+    return found.map((b,i)=>({...b,index:blockIndexOffset+i}));
+}
+
+export const parseConvoBlockFindReplace=(value:string|null|undefined):number|'all'|undefined=>{
+    if(value===''){
+        return 1;
+    }
+    if(!value){
+        return undefined;
+    }
+    if(value==='all'){
+        return 'all';
+    }
+    const n=Number(value);
+    return isFinite(n)?n:undefined;
+}
+
+const trimBlockStart=(content:string):string=>{
+    if(content.startsWith('\r')){
+        content=content.substring(1);
+    }
+    if(content.startsWith('\n')){
+        content=content.substring(1);
+    }
+    return content;
+}
+
+const trimBlockEnd=(content:string):string=>{
+    if(content.endsWith('\n')){
+        content=content.substring(0,content.length-1);
+        if(content.endsWith('\r')){
+            content=content.substring(0,content.length-1);
+        }
+    }
+    return content;
+}
+
+/**
+ * A range of content replaced by a find-replace code block
+ */
+export interface ConvoBlockReplaceRange
+{
+    /**
+     * Start index of the matched content in the source content
+     */
+    sourceStart:number;
+    /**
+     * End index, exclusive, of the matched content in the source content
+     */
+    sourceEnd:number;
+    /**
+     * Start index of the replacement in the resulting content
+     */
+    start:number;
+    /**
+     * End index, exclusive, of the replacement in the resulting content
+     */
+    end:number;
+}
+
+export interface ReplaceConvoBlockResult{
+    content:string;
+    replaceCount:number;
+    /**
+     * Ranges of each replacement in order of appearance
+     */
+    ranges:ConvoBlockReplaceRange[];
+}
+export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    const sep=block.findReplaceSeparator??defaultConvoFindReplaceSeparator;
+    const i=block.content.indexOf(sep);
+    const find=trimBlockEnd(i===-1?block.content:block.content.substring(0,i));
+    const replace=trimBlockEnd(trimBlockStart(i===-1?'':block.content.substring(i+sep.length)));
+
+    const ranges:ConvoBlockReplaceRange[]=[];
+
+    const parts=content.split(find);
+    if(parts.length===1){
+        return {content,replaceCount:0,ranges};
+    }
+
+    const limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
+    const output:string[]=[];
+    let sourceIndex=0;
+    let index=0;
+    for(let p=0;p<parts.length;p++){
+        const part=parts[p]!;
+        output.push(part);
+        sourceIndex+=part.length;
+        index+=part.length;
+        if(p===parts.length-1){
+            break;
+        }
+        if(ranges.length<limit){
+            ranges.push({sourceStart:sourceIndex,sourceEnd:sourceIndex+find.length,start:index,end:index+replace.length});
+            output.push(replace);
+            index+=replace.length;
+        }else{
+            output.push(find);
+            index+=find.length;
+        }
+        sourceIndex+=find.length;
+    }
+
+    return {content:output.join(''),replaceCount:ranges.length,ranges};
+}
+
+/**
+ * Maps an index in the source content of a replacement to the index in the resulting content.
+ * Indexes inside of a replaced range are clamped to the replacement.
+ */
+export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[]):number=>{
+    let offset=0;
+    for(const r of ranges){
+        if(index<r.sourceStart){
+            break;
+        }
+        if(index<r.sourceEnd){
+            return Math.min(r.start+index-r.sourceStart,r.end);
+        }
+        offset=r.end-r.sourceEnd;
+    }
+    return index+offset;
+}
+
+export const normalizeConvoCodeBlockContent=(tag:string,content:string,attrs?:Record<string,string>):string=>{
+    content=trimBlockStart(trimBlockEnd(content));
+
+    content=unescapeConvo(content);
+
+    const closing=attrs?.['closing-escape'];
+    
+    if(closing){
+        content=content.split(closing).join(`</${tag}>`);
+    }
+
+    return content.endsWith('\n')?content:content+'\n';
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace find-replace-separator="==== REPLACE ====">
+``` ts
+    /**
+     * Used to define a custom separator between content to find and the content to replace it with.
+     * @default "//// replace-with ////"
+     */
+    findReplaceSeparator?:string;
+}
+==== REPLACE ====
+    /**
+     * Used to define a custom separator between content to find and the content to replace it with.
+     * @default "//// replace-with ////"
+     */
+    findReplaceSeparator?:string;
+
+    /**
+     * The file operation of a self-closing `FILE_OP` block. Undefined for other blocks or when the
+     * op attribute is not a valid file operation. FILE_OP blocks have empty content and lang.
+     */
+    fileOp?:ConvoFileOpType;
+}
+
+/**
+ * File operations that can be defined using self-closing `FILE_OP` XML tags.
+ * - rename: Renames a file using the `from` and `to` attributes
+ * - delete: Deletes files matching the `path` attribute. Globs are supported
+ * - setMode: Sets the mode of files matching the `path` attribute to the `mode` attribute. Globs are supported
+ */
+export const allConvoFileOpTypes=['rename','delete','setMode'] as const;
+export type ConvoFileOpType=typeof allConvoFileOpTypes[number];
+export const isConvoFileOpType=(value:any):value is ConvoFileOpType=>allConvoFileOpTypes.includes(value);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" last-commit="4f0f23e3bd1c29fd5d9a7b166d7ffd6b2ee2f608" find-replace>
+``` ts
+Before replacing the file or doing a find and replace on it, request the full file from the user.
+//// replace-with ////
+Before replacing the file or doing a find and replace on it, request the full file from the user.
+
+## File Operations
+You can rename, delete and change the mode of files using self-closing ${t}FILE_OP${t} XML tags.
+File operations and XML file blocks are applied in the order they appear in your response. Paths are
+resolved the same way as ${t}target-output-path${t}.
+
+Operations:
+- rename: Renames or moves a file. Requires the ${t}from${t} and ${t}to${t} attributes. Globs are not supported. The target path must not already exist.
+- delete: Deletes a file, a directory or all files matching a glob. Requires the ${t}path${t} attribute.
+- setMode: Sets the mode (chmod) of a file or all files matching a glob. Requires the ${t}path${t} and ${t}mode${t} attributes. The mode can be octal such as ${t}755${t} or one of ${t}+x${t}, ${t}-x${t}, ${t}+w${t}, ${t}-w${t}, ${t}+r${t}, ${t}-r${t} which apply to all users.
+
+Globs: ${t}*${t} matches within a single directory and ${t}**${t} matches any depth.
+
+Example of file operations:
+<FILE_OP op="rename" from="./src/old-name.ts" to="./src/new-name.ts"/>
+<FILE_OP op="delete" path="./src/unused.ts"/>
+<FILE_OP op="delete" path="./src/generated/**/*.js"/>
+<FILE_OP op="setMode" path="./scripts/build.sh" mode="+x"/>
+<FILE_OP op="setMode" path="./scripts/*.sh" mode="755"/>
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="file-op-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/file-op-lib.ts">
+``` ts
+import { ConvoCodeBlock, ConvoFileOpType } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { ExtensionContext, RelativePattern, Uri, WorkspaceEdit, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { HasArgs, OutputTagBase, OutputTagCodeLensArgs, getFileBlockArgs, getOutputTagFromArgsAsync } from './code-block-lib.js';
+
+const globReg=/[*?{}[\]]/;
+const maxDetailFiles=50;
+
+/**
+ * A file operation resolved against the file system
+ */
+export interface FileOpPlan
+{
+    op?:ConvoFileOpType;
+    /**
+     * Short description of the op as written in the block
+     */
+    label:string;
+    /**
+     * Files the op applies to. For rename this is the source file.
+     */
+    files:Uri[];
+    from?:Uri;
+    to?:Uri;
+    mode?:string;
+    error?:string;
+}
+
+export interface ApplyFileOpOptions
+{
+    /**
+     * If true the op is applied without a confirmation prompt
+     */
+    autoConfirm?:boolean;
+}
+
+/**
+ * Registers the `convo.file-op-apply` and `convo.file-op-preview` commands used by code lenses
+ * and the Code Blocks view to apply and preview `FILE_OP` blocks.
+ */
+export const registerFileOpCommands=(context:ExtensionContext,ext:ConvoExt)=>{
+    context.subscriptions.push(
+        commands.registerCommand('convo.file-op-apply',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+            const tag=await getTagAsync(args);
+            if(tag){
+                await applyFileOpAsync(tag,{autoConfirm:tag.autoConfirm});
+            }
+        }),
+        commands.registerCommand('convo.file-op-preview',async (args?:OutputTagCodeLensArgs|HasArgs)=>{
+            const tag=await getTagAsync(args);
+            if(tag){
+                await previewFileOpAsync(tag);
+            }
+        }),
+    );
+}
+
+/**
+ * Returns the most up to date version of the tag for the given args
+ */
+const getTagAsync=async (args?:OutputTagCodeLensArgs|HasArgs):Promise<OutputTagBase|undefined>=>{
+    if(!args){
+        return undefined;
+    }
+    const a=getFileBlockArgs(args);
+    const tag=await getOutputTagFromArgsAsync(a);
+    if(!tag){
+        void window.showErrorMessage('Unable to find the file operation for the selected target.');
+        return undefined;
+    }
+    return {...tag,autoConfirm:a.autoConfirm};
+}
+
+/**
+ * Returns a short description of a FILE_OP block
+ */
+export const getFileOpLabel=(block:ConvoCodeBlock):string=>{
+    const a=block.attributes;
+    switch(block.fileOp){
+        case 'rename':
+            return `rename ${a['from']??''} → ${a['to']??''}`;
+        case 'setMode':
+            return `setMode ${a['mode']??''} ${a['path']??''}`;
+        case 'delete':
+            return `delete ${a['path']??''}`;
+        default:
+            return `${a['op']??'unknown'} file op`;
+    }
+}
+
+/**
+ * Resolves the paths of a FILE_OP block relative to the convo file it is defined in. Paths outside
+ * of the workspace folder of the convo file are rejected.
+ */
+export const resolveFileOpAsync=async (tag:OutputTagBase):Promise<FileOpPlan>=>{
+    const block=tag.codeBlock;
+    const atts=block.attributes;
+    const op=block.fileOp;
+    const plan:FileOpPlan={op,label:getFileOpLabel(block),files:[]};
+    const fail=(error:string):FileOpPlan=>({...plan,error});
+
+    if(!op){
+        return fail(`Unknown file operation - ${atts['op']??''}`);
+    }
+
+    const root=workspace.getWorkspaceFolder(tag.documentUri)?.uri.fsPath;
+    if(!root || tag.documentUri.scheme!=='file'){
+        return fail('File operations require a saved convo file inside of a workspace folder');
+    }
+    const dir=path.dirname(tag.documentUri.fsPath);
+
+    if(op==='rename'){
+        const from=atts['from'];
+        const to=atts['to'];
+        if(!from || !to){
+            return fail('rename requires the from and to attributes');
+        }
+        if(globReg.test(from) || globReg.test(to)){
+            return fail('rename does not support globs');
+        }
+        const fromPath=path.resolve(dir,from);
+        const toPath=path.resolve(dir,to);
+        if(!isInside(root,fromPath) || !isInside(root,toPath)){
+            return fail('Paths must be inside of the workspace folder');
+        }
+        if(!await existsAsync(fromPath)){
+            return fail(`File not found - ${from}`);
+        }
+        if(await existsAsync(toPath)){
+            return fail(`Target already exists - ${to}`);
+        }
+        return {...plan,from:Uri.file(fromPath),to:Uri.file(toPath),files:[Uri.file(fromPath)]};
+    }
+
+    const target=atts['path'];
+    if(!target){
+        return fail(`${op} requires the path attribute`);
+    }
+
+    if(op==='setMode'){
+        const mode=atts['mode'];
+        if(!mode || !parseFileMode(mode)){
+            return fail(`Invalid mode - ${mode??''}`);
+        }
+        plan.mode=mode;
+    }
+
+    const files=await matchFilesAsync(root,dir,target);
+    if(typeof files === 'string'){
+        return fail(files);
+    }
+    if(!files.length){
+        return fail(`No files matched - ${target}`);
+    }
+    return {...plan,files};
+}
+
+/**
+ * Applies a FILE_OP block. Returns true if the op was applied or skipped. Deleted files are moved
+ * to the trash.
+ */
+export const applyFileOpAsync=async (tag:OutputTagBase,{autoConfirm}:ApplyFileOpOptions={}):Promise<boolean>=>{
+    const plan=await resolveFileOpAsync(tag);
+    if(plan.error){
+        void window.showErrorMessage(`${plan.label}: ${plan.error}`);
+        return false;
+    }
+
+    if(plan.op==='setMode' && process.platform==='win32'){
+        void window.showWarningMessage(`${plan.label}: setMode is not supported on Windows and was skipped`);
+        return true;
+    }
+
+    if(!autoConfirm && !await confirmFileOpAsync(plan)){
+        return false;
+    }
+
+    try{
+        switch(plan.op){
+
+            case 'rename':{
+                if(!plan.from || !plan.to){
+                    return false;
+                }
+                await fs.mkdir(path.dirname(plan.to.fsPath),{recursive:true});
+                const edit=new WorkspaceEdit();
+                edit.renameFile(plan.from,plan.to,{overwrite:false});
+                if(!await workspace.applyEdit(edit)){
+                    void window.showErrorMessage(`${plan.label}: rename failed`);
+                    return false;
+                }
+                break;
+            }
+
+            case 'delete':
+                for(const f of plan.files){
+                    await workspace.fs.delete(f,{recursive:true,useTrash:true});
+                }
+                break;
+
+            case 'setMode':{
+                const apply=parseFileMode(plan.mode??'');
+                if(!apply){
+                    return false;
+                }
+                for(const f of plan.files){
+                    const stat=await fs.stat(f.fsPath);
+                    await fs.chmod(f.fsPath,apply(stat.mode&0o7777));
+                }
+                break;
+            }
+
+            default:
+                return false;
+        }
+    }catch(ex){
+        void window.showErrorMessage(`${plan.label}: ${getErrorMessage(ex)}`);
+        return false;
+    }
+
+    if(!autoConfirm){
+        void window.showInformationMessage(`Applied ${plan.label}`);
+    }
+    return true;
+}
+
+/**
+ * Displays the files matched by a FILE_OP block in a quick pick. Selecting a file opens it.
+ */
+export const previewFileOpAsync=async (tag:OutputTagBase):Promise<void>=>{
+    const plan=await resolveFileOpAsync(tag);
+    if(plan.error){
+        void window.showErrorMessage(`${plan.label}: ${plan.error}`);
+        return;
+    }
+    const count=plan.files.length;
+    const items=getFileOpLines(plan).map((label,i)=>({label,uri:plan.files[i]}));
+    const picked=await window.showQuickPick(items,{
+        placeHolder:`${plan.label} · ${count} item${count===1?'':'s'}`,
+    });
+    if(!picked?.uri){
+        return;
+    }
+    try{
+        await window.showTextDocument(await workspace.openTextDocument(picked.uri),{preview:true});
+    }catch{
+        void window.showInformationMessage(`Unable to open ${picked.label}`);
+    }
+}
+
+/**
+ * Returns a line for each file of the plan relative to the workspace
+ */
+export const getFileOpLines=(plan:FileOpPlan,max=Number.MAX_SAFE_INTEGER):string[]=>{
+    if(plan.error){
+        return [`✗ ${plan.error}`];
+    }
+    if(plan.from && plan.to){
+        return [`${toRel(plan.from)} → ${toRel(plan.to)}`];
+    }
+    const lines=plan.files.slice(0,max).map(toRel);
+    if(plan.files.length>max){
+        lines.push(`... and ${plan.files.length-max} more`);
+    }
+    return lines;
+}
+
+/**
+ * Returns the label of the plan followed by an indented line for each file
+ */
+export const getFileOpPreviewText=(plan:FileOpPlan):string=>{
+    return [plan.label,...getFileOpLines(plan).map(l=>`    ${l}`)].join('\n');
+}
+
+const confirmFileOpAsync=async (plan:FileOpPlan):Promise<boolean>=>{
+    const count=plan.files.length;
+    const lines=getFileOpLines(plan,maxDetailFiles);
+    if(plan.op==='delete'){
+        lines.push('',`${count} item${count===1?'':'s'} will be moved to the trash`);
+    }
+    const action=await window.showWarningMessage(
+        `Apply ${plan.label}?`,
+        {modal:true,detail:lines.join('\n')},
+        'Apply',
+    );
+    return action==='Apply';
+}
+
+/**
+ * Parses an octal mode or a simple symbolic mode such as `+x` or `-w`. Symbolic modes apply to
+ * all users. Returns a function that converts the current mode into the new mode.
+ */
+const parseFileMode=(mode:string):((current:number)=>number)|undefined=>{
+    if(/^[0-7]{3,4}$/.test(mode)){
+        const value=parseInt(mode,8);
+        return ()=>value;
+    }
+    const match=/^([+-])([rwx]+)$/.exec(mode);
+    if(!match){
+        return undefined;
+    }
+    let bits=0;
+    for(const c of match[2]??''){
+        bits|=c==='r'?0o444:c==='w'?0o222:0o111;
+    }
+    return match[1]==='+'?current=>current|bits:current=>current&~bits;
+}
+
+/**
+ * Returns the files matching the target path. Globs are matched using `workspace.findFiles` with a
+ * base directory of the static part of the path. `**.ts` is treated as `**\/*.ts`. Returns an
+ * error message if the path is outside of the workspace.
+ */
+const matchFilesAsync=async (root:string,dir:string,target:string):Promise<Uri[]|string>=>{
+    const full=path.resolve(dir,target);
+    if(!globReg.test(target)){
+        if(!isInside(root,full)){
+            return 'Path must be inside of the workspace folder';
+        }
+        return await existsAsync(full)?[Uri.file(full)]:[];
+    }
+
+    const parts=full.split(path.sep).join('/').replace(/\*\*(?=[^/])/g,'**/*').split('/');
+    const globStart=parts.findIndex(p=>globReg.test(p));
+    const base=parts.slice(0,globStart).join('/')||'/';
+    if(!isInside(root,base,true)){
+        return 'Path must be inside of the workspace folder';
+    }
+
+    const files=await workspace.findFiles(new RelativePattern(Uri.file(base),parts.slice(globStart).join('/')));
+    return files.filter(f=>isInside(root,f.fsPath)).sort((a,b)=>a.fsPath.localeCompare(b.fsPath));
+}
+
+const isInside=(root:string,p:string,allowRoot=false):boolean=>{
+    const rel=path.relative(root,p);
+    if(!rel){
+        return allowRoot;
+    }
+    return rel.split(/[\\/]/)[0]!=='..' && !path.isAbsolute(rel);
+}
+
+const existsAsync=async (p:string):Promise<boolean>=>{
+    try{
+        await fs.stat(p);
+        return true;
+    }catch{
+        return false;
+    }
+}
+
+const toRel=(uri:Uri):string=>workspace.asRelativePath(uri,false);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+    type:'file'|'shell'|'other';
+//// replace-with ////
+    type:'file'|'shell'|'op'|'other';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
+//// replace-with ////
+const getBlockType=(b:ConvoCodeBlock):OutputTagInfo['type']=>(
+    ('target-output-path' in b.attributes)?
+        'file'
+    :('target-shell-type' in b.attributes)?
+        'shell'
+    :b.fileOp?
+        'op'
+    :
+        'other'
+);
+
+/**
+ * Returns the target path of a block. File and op paths are resolved relative to baseDir. For
+ * rename ops the `from` path is used.
+ */
+const getBlockTargetPath=(b:ConvoCodeBlock,type:OutputTagInfo['type'],baseDir:string):string=>{
+    switch(type){
+        case 'shell':
+            return b.attributes['script-name']??'script';
+        case 'op':{
+            const p=b.attributes['path']??b.attributes['from']??'';
+            return baseDir?path.resolve(baseDir,p):p;
+        }
+        default:{
+            const p=b.attributes['target-output-path']??'';
+            return (baseDir && type==='file')?path.resolve(baseDir,p):p;
+        }
+    }
+}
+
+export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace="all">
+``` ts
+            const type=(
+                ('target-output-path' in b.attributes)?
+                    'file'
+                :('target-shell-type' in b.attributes)?
+                    'shell'
+                :
+                    'other'
+            );
+//// replace-with ////
+            const type=getBlockType(b);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+            const end=document.positionAt(b.endIndex);
+            const targetPath=b.attributes['target-output-path']??'';
+
+            const ac=b.attributes['cwd'];
+//// replace-with ////
+            const end=document.positionAt(b.endIndex);
+
+            const ac=b.attributes['cwd'];
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+                targetPath:(baseDir && type==='file')?
+                    path.resolve(baseDir,targetPath)
+                :type==='shell'?
+                    (b.attributes['script-name']??'script')
+                :
+                    targetPath,
+//// replace-with ////
+                targetPath:getBlockTargetPath(b,type,baseDir),
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+            const end=document.positionAt(message.e ?? b.endIndex);
+            const targetPath=b.attributes['target-output-path']??'';
+//// replace-with ////
+            const end=document.positionAt(message.e ?? b.endIndex);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+                targetPath:(baseDir && type==='file')?
+                        path.resolve(baseDir,targetPath)
+                    :type==='shell'?
+                        (b.attributes['script-name']??'script')
+                    :
+                        targetPath,
+//// replace-with ////
+                targetPath:getBlockTargetPath(b,type,baseDir),
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c">
+``` ts
+import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { getErrorMessage } from '@iyio/common';
+import * as path from 'path';
+import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputText, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, getParsedOutputTagGroups, outputPreviewChangeEmitter, outputPreviewContent, readFileContentAsync, writeFileContentAsync } from './code-block-lib.js';
+import { applyFileOpAsync, getFileOpPreviewText, resolveFileOpAsync } from './file-op-lib.js';
+
+const reviewContextKey='convo.codeBlockReviewActive';
+
+/**
+ * Key of the review page that lists the file operations of a message
+ */
+const fileOpsPageKey='::file-ops::';
+
+type ReviewStatus='pending'|'accepted'|'rejected';
+
+interface ReviewStep
+{
+    tag:ParsedOutputTagInfo;
+    status:ReviewStatus;
+}
+
+interface BlockRange
+{
+    start:number;
+    end:number;
+}
+
+interface BlockLabel
+{
+    step:ReviewStep;
+    ranges:BlockRange[];
+}
+
+interface PagePreview
+{
+    content:string;
+    labels:BlockLabel[];
+}
+
+interface FilePreview extends PagePreview
+{
+    notFound:ReviewStep[];
+}
+
+/**
+ * A single navigable change in the preview of a file
+ */
+interface ReviewChange
+{
+    step:ReviewStep;
+    /**
+     * Range of the change in the preview. Undefined if the block has nothing to show in the preview.
+     */
+    range?:BlockRange;
+}
+
+interface DiffCodeLensRestore
+{
+    value:boolean|undefined;
+}
+
+interface ReviewSession
+{
+    documentUri:Uri;
+    steps:ReviewStep[];
+    scripts:ParsedOutputTagInfo[];
+    /**
+     * Target paths of reviewed files. Ends with fileOpsPageKey if the message contains file operations.
+     */
+    targetPaths:string[];
+    fileIndex:number;
+    changeIndex:number;
+    changes:ReviewChange[];
+    previewUri?:Uri;
+    diffCodeLens?:DiffCodeLensRestore;
+}
+
+/**
+ * Registers the `convo.code-block-group-review` command and its navigation commands. The review
+ * steps through the file blocks of a message one file at a time using a single reused diff tab.
+ * File operations are reviewed on a final page listing each operation and the files it matches.
+ * Each change is labeled with a code lens that lets the user accept or reject its block and
+ * navigate between changes.
+ */
+export const registerCodeBlockReview=(context:ExtensionContext,ext:ConvoExt)=>{
+    const review=new CodeBlockReview();
+    context.subscriptions.push(
+        review,
+        languages.registerCodeLensProvider({scheme:'convo-output'},review),
+        commands.registerCommand('convo.code-block-group-review',(item?:{group?:MessageTagGroup})=>review.startAsync(item?.group)),
+        commands.registerCommand('convo.code-block-review-next',()=>review.nextAsync()),
+        commands.registerCommand('convo.code-block-review-previous',()=>review.previousAsync()),
+        commands.registerCommand('convo.code-block-review-skip-file',()=>review.skipFileAsync()),
+        commands.registerCommand('convo.code-block-review-toggle-accept',()=>review.toggleAccept()),
+        commands.registerCommand('convo.code-block-review-set-status',(stepIndex:number,status:ReviewStatus)=>review.setStatus(stepIndex,status)),
+        commands.registerCommand('convo.code-block-review-goto',(changeIndex:number)=>review.gotoChange(changeIndex)),
+        commands.registerCommand('convo.code-block-review-finish',()=>review.finishAsync()),
+        commands.registerCommand('convo.code-block-review-cancel',()=>review.endAsync()),
+        window.onDidChangeVisibleTextEditors(()=>review.decorate()),
+    );
+}
+
+class CodeBlockReview implements CodeLensProvider, Disposable
+{
+    private session:ReviewSession|undefined;
+
+    private readonly lensChangeEmitter=new EventEmitter<void>();
+    public readonly onDidChangeCodeLenses=this.lensChangeEmitter.event;
+
+    private readonly statusBar=window.createStatusBarItem(StatusBarAlignment.Left,100);
+
+    private readonly labelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'1px 0 0 0',
+        borderStyle:'dashed',
+        borderColor:new ThemeColor('editorCodeLens.foreground'),
+    });
+
+    private readonly currentLabelType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        borderWidth:'2px 0 0 0',
+        borderStyle:'solid',
+        borderColor:new ThemeColor('focusBorder'),
+    });
+
+    private readonly currentRangeType=window.createTextEditorDecorationType({
+        isWholeLine:true,
+        backgroundColor:new ThemeColor('editor.rangeHighlightBackground'),
+    });
+
+    public dispose():void
+    {
+        void restoreDiffCodeLensAsync(this.session?.diffCodeLens);
+        this.session=undefined;
+        this.lensChangeEmitter.dispose();
+        this.statusBar.dispose();
+        this.labelType.dispose();
+        this.currentLabelType.dispose();
+        this.currentRangeType.dispose();
+    }
+
+    public provideCodeLenses(document:TextDocument):CodeLens[]
+    {
+        const s=this.session;
+        if(!s || document.uri.toString()!==s.previewUri?.toString()){
+            return [];
+        }
+
+        const canFinish=!s.steps.some(st=>st.status==='pending');
+        const lenses:CodeLens[]=[];
+
+        for(let i=0;i<s.changes.length;i++){
+            const change=s.changes[i];
+            if(!change){
+                continue;
+            }
+            const step=change.step;
+            const isCurrent=i===s.changeIndex;
+            const stepIndex=s.steps.indexOf(step);
+            const line=change.range?document.positionAt(change.range.start).line:0;
+            const range=new Range(line,0,line,0);
+            const add=(title:string,command:string,...args:any[])=>{
+                lenses.push(new CodeLens(range,{title,command,arguments:args}));
+            };
+
+            add(getLabelText(change,isCurrent),'');
+            if(step.status!=='accepted'){
+                add('✓ Accept','convo.code-block-review-set-status',stepIndex,'accepted');
+            }
+            if(step.status!=='rejected'){
+                add('✗ Reject','convo.code-block-review-set-status',stepIndex,'rejected');
+            }
+
+            if(!isCurrent){
+                add('Go to','convo.code-block-review-goto',i);
+                continue;
+            }
+
+            add('◀ Previous','convo.code-block-review-previous');
+            add('Next ▶','convo.code-block-review-next');
+            add('Skip File','convo.code-block-review-skip-file');
+            if(canFinish){
+                add('Finish','convo.code-block-review-finish');
+            }
+            add('Cancel','convo.code-block-review-cancel');
+        }
+
+        return lenses;
+    }
+
+    public async startAsync(group?:MessageTagGroup):Promise<void>
+    {
+        if(!group){
+            void window.showInformationMessage('Start a review from a message in the Code Blocks view');
+            return;
+        }
+
+        await this.endAsync();
+
+        const doc=await workspace.openTextDocument(group.messageUri);
+        const tags=(getParsedOutputTagGroups(doc).find(g=>g.messageIndex===group.messageIndex)??group).tags;
+        const files=tags.filter(t=>t.type==='file');
+        const ops=tags.filter(t=>t.type==='op');
+        if(!files.length && !ops.length){
+            void window.showInformationMessage('No file blocks or file operations found in message');
+            return;
+        }
+
+        const order=[...new Set(files.map(t=>t.targetPath))];
+        files.sort((a,b)=>order.indexOf(a.targetPath)-order.indexOf(b.targetPath) || a.index-b.index);
+        if(ops.length){
+            order.push(fileOpsPageKey);
+        }
+
+        const diffCodeLens=await enableDiffCodeLensAsync();
+
+        this.session={
+            documentUri:group.messageUri,
+            steps:[...files,...ops].map(tag=>({tag,status:'pending'})),
+            scripts:tags.filter(t=>t.type==='shell'),
+            targetPaths:order,
+            fileIndex:0,
+            changeIndex:0,
+            changes:[],
+            diffCodeLens,
+        };
+        await commands.executeCommand('setContext',reviewContextKey,true);
+        await this.showFileAsync(0,0);
+    }
+
+    public async nextAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex<s.changes.length-1){
+            s.changeIndex++;
+            this.showChange();
+        }else if(s.fileIndex<s.targetPaths.length-1){
+            await this.showFileAsync(s.fileIndex+1,0);
+        }else{
+            await this.finishAsync();
+        }
+    }
+
+    public async previousAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.changeIndex>0){
+            s.changeIndex--;
+            this.showChange();
+        }else if(s.fileIndex>0){
+            await this.showFileAsync(s.fileIndex-1,'last');
+        }
+    }
+
+    public async skipFileAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        if(s.fileIndex<s.targetPaths.length-1){
+            await this.showFileAsync(s.fileIndex+1,0);
+        }else{
+            await this.finishAsync();
+        }
+    }
+
+    public gotoChange(changeIndex:number):void
+    {
+        const s=this.session;
+        if(!s || !s.changes[changeIndex]){
+            return;
+        }
+        s.changeIndex=changeIndex;
+        this.showChange();
+    }
+
+    public setStatus(stepIndex:number,status:ReviewStatus):void
+    {
+        const step=this.session?.steps[stepIndex];
+        if(!step){
+            return;
+        }
+        step.status=status;
+        this.refresh();
+    }
+
+    public toggleAccept():void
+    {
+        const s=this.session;
+        const step=s?.changes[s.changeIndex]?.step;
+        if(!step){
+            return;
+        }
+        step.status=step.status==='accepted'?'rejected':'accepted';
+        this.refresh();
+    }
+
+    public async endAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        for(const editor of this.getPreviewEditors()){
+            editor.setDecorations(this.labelType,[]);
+            editor.setDecorations(this.currentLabelType,[]);
+            editor.setDecorations(this.currentRangeType,[]);
+        }
+        this.session=undefined;
+        this.statusBar.hide();
+        this.lensChangeEmitter.fire();
+        await commands.executeCommand('setContext',reviewContextKey,false);
+        if(s.previewUri){
+            outputPreviewContent.delete(s.previewUri.toString());
+            await closePreviewTabsAsync(s.previewUri);
+        }
+        await restoreDiffCodeLensAsync(s.diffCodeLens);
+    }
+
+    public decorate():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const current=s.changes[s.changeIndex]?.step;
+        for(const editor of this.getPreviewEditors()){
+            const doc=editor.document;
+            const labels:Range[]=[];
+            const currentLabels:Range[]=[];
+            const currentRanges:Range[]=[];
+            for(const change of s.changes){
+                if(!change.range){
+                    continue;
+                }
+                const lineRange=getLineRange(doc,change.range);
+                const labelRange=doc.lineAt(lineRange.start.line).range;
+                if(change.step===current){
+                    currentLabels.push(labelRange);
+                    currentRanges.push(lineRange);
+                }else{
+                    labels.push(labelRange);
+                }
+            }
+            editor.setDecorations(this.labelType,labels);
+            editor.setDecorations(this.currentLabelType,currentLabels);
+            editor.setDecorations(this.currentRangeType,currentRanges);
+        }
+    }
+
+    public async finishAsync():Promise<void>
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+
+        const pending=s.steps.filter(st=>st.status==='pending');
+        const firstPending=pending[0];
+        if(firstPending){
+            void window.showInformationMessage(`${pending.length} block${pending.length===1?' is':'s are'} still pending. Accept or reject every block to finish.`);
+            await this.showFileAsync(s.targetPaths.indexOf(getStepPageKey(firstPending)),firstPending);
+            return;
+        }
+
+        const accepted=s.steps.filter(st=>st.status==='accepted');
+        const fileLines=s.targetPaths.map(f=>{
+            const blocks=getPageSteps(s.steps,f).map(st=>`#${st.tag.index+1} ${getStatusIcon(st.status)}`);
+            return `${f===fileOpsPageKey?'File operations':path.basename(f)}: ${blocks.join(', ')}`;
+        });
+        const scriptLine=s.scripts.length?`\n\n${s.scripts.length} script${s.scripts.length===1?'':'s'} in message`:'';
+
+        const applyFiles='Apply Accepted Files';
+        const applyAll='Apply Files and Run Scripts';
+        const restart='Restart Review';
+        const action=await window.showInformationMessage(
+            `${accepted.length} of ${s.steps.length} blocks accepted. Apply changes?`,
+            {modal:true,detail:`${fileLines.join('\n')}${scriptLine}`},
+            ...(s.scripts.length?[applyFiles,applyAll,restart]:[applyFiles,restart]),
+        );
+        if(this.session!==s){
+            return;
+        }
+
+        if(action===restart){
+            await this.showFileAsync(0,0);
+            return;
+        }
+
+        if(action!==applyFiles && action!==applyAll){
+            return;
+        }
+
+        await this.endAsync();
+        await applyAcceptedAsync(accepted);
+
+        if(action===applyAll){
+            for(const tag of s.scripts){
+                await commands.executeCommand('convo.output-tag-execute-shell',{
+                    targetPath:tag.targetPath,
+                    index:tag.index,
+                    cwd:tag.cwd,
+                    codeBlock:tag.codeBlock,
+                    documentUri:s.documentUri,
+                    autoConfirm:true,
+                } satisfies OutputTagCodeLensArgs);
+            }
+        }
+    }
+
+    /**
+     * Shows the page at the given index. File pages show a diff with all blocks of the file
+     * applied. The file operations page lists each operation and the files it matches. The change
+     * to select can be an index, the last change or the first change of a step.
+     */
+    private async showFileAsync(fileIndex:number,change:number|'last'|ReviewStep):Promise<void>
+    {
+        const s=this.session;
+        const pageKey=s?.targetPaths[fileIndex];
+        if(!s || !pageKey){
+            return;
+        }
+
+        const isOps=pageKey===fileOpsPageKey;
+        const pageSteps=getPageSteps(s.steps,pageKey);
+        const base=isOps?undefined:await readFileContentAsync(pageKey);
+        const preview:PagePreview=isOps?await buildOpsPreviewAsync(pageSteps):buildFilePreview(base??'',pageSteps);
+        if(this.session!==s){
+            return;
+        }
+
+        const changes=getChanges(preview.labels,s.steps);
+        const previewUri=(isOps?
+            Uri.from({scheme:'convo-output',path:'/File Operations',query:'review'})
+        :
+            Uri.file(pageKey).with({scheme:'convo-output',query:'review'})
+        );
+        const prevUri=s.previewUri;
+
+        s.fileIndex=fileIndex;
+        s.changes=changes;
+        s.previewUri=previewUri;
+        s.changeIndex=(
+            change==='last'?
+                Math.max(0,changes.length-1)
+            :typeof change==='number'?
+                change
+            :
+                Math.max(0,changes.findIndex(c=>c.step===change))
+        );
+
+        outputPreviewContent.set(previewUri.toString(),preview.content);
+        outputPreviewChangeEmitter.fire(previewUri);
+
+        if(prevUri && prevUri.toString()!==previewUri.toString()){
+            outputPreviewContent.delete(prevUri.toString());
+            await closePreviewTabsAsync(prevUri);
+        }
+
+        if(!getPreviewTabs(previewUri).length){
+            if(isOps){
+                await window.showTextDocument(previewUri,{preview:false});
+            }else{
+                await commands.executeCommand(
+                    'vscode.diff',
+                    base===undefined?Uri.parse(`untitled:${pageKey}`):Uri.file(pageKey),
+                    previewUri,
+                    `Review: ${path.basename(pageKey)}`,
+                    {preview:false},
+                );
+            }
+        }
+
+        await waitForContentAsync(previewUri,preview.content);
+        if(this.session!==s){
+            return;
+        }
+
+        this.showChange();
+    }
+
+    private showChange():void
+    {
+        const s=this.session;
+        if(!s){
+            return;
+        }
+        const r=s.changes[s.changeIndex]?.range;
+        for(const editor of this.getPreviewEditors()){
+            const pos=r?editor.document.positionAt(r.start):new Position(0,0);
+            editor.selection=new Selection(pos,pos);
+            editor.revealRange(new Range(pos,pos),TextEditorRevealType.InCenter);
+        }
+        this.refresh();
+    }
+
+    private refresh():void
+    {
+        this.decorate();
+        this.updateStatusBar();
+        this.lensChangeEmitter.fire();
+    }
+
+    private updateStatusBar():void
+    {
+        const s=this.session;
+        const current=s?.changes[s.changeIndex];
+        if(!s || !current){
+            return;
+        }
+        const step=current.step;
+        const change=current.range?`Change ${s.changeIndex+1}/${s.changes.length}`:'Not found';
+        this.statusBar.text=`$(diff) File ${s.fileIndex+1}/${s.targetPaths.length} · Block ${s.steps.indexOf(step)+1}/${s.steps.length} ${getStatusIcon(step.status)} · ${change}`;
+        this.statusBar.tooltip=`${step.tag.targetPath}\nClick to ${step.status==='accepted'?'reject':'accept'} block #${step.tag.index+1}`;
+        this.statusBar.command='convo.code-block-review-toggle-accept';
+        this.statusBar.show();
+    }
+
+    private getPreviewEditors():TextEditor[]
+    {
+        const key=this.session?.previewUri?.toString();
+        return key?window.visibleTextEditors.filter(e=>e.document.uri.toString()===key):[];
+    }
+}
+
+/**
+ * Applies the given steps to the base content in order. Labels of previous steps are remapped as
+ * each find-replace block is applied. Full file blocks replace the content and clear the ranges of
+ * all previous labels.
+ */
+const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
+    let content=base;
+    let labels:BlockLabel[]=[];
+    const notFound:ReviewStep[]=[];
+
+    for(const step of steps){
+        const block=step.tag.codeBlock;
+        if(!block.findReplace){
+            content=block.content;
+            labels=[...labels.map(l=>({step:l.step,ranges:[]})),{step,ranges:[{start:0,end:content.length}]}];
+            continue;
+        }
+
+        const result=replaceConvoBlockContent(content,block);
+        if(!result.replaceCount){
+            notFound.push(step);
+            labels.push({step,ranges:[]});
+            continue;
+        }
+
+        labels=labels.map(l=>({step:l.step,ranges:l.ranges.map(r=>mapRange(r,result.ranges))}));
+        labels.push({step,ranges:result.ranges.map(({start,end})=>({start,end}))});
+        content=result.content;
+    }
+
+    return {content,labels,notFound};
+}
+
+/**
+ * Builds a page listing each file operation followed by the files it matches
+ */
+const buildOpsPreviewAsync=async (steps:ReviewStep[]):Promise<PagePreview>=>{
+    const plans=await Promise.all(steps.map(st=>resolveFileOpAsync(st.tag)));
+    let content='';
+    const labels:BlockLabel[]=[];
+    for(let i=0;i<steps.length;i++){
+        const step=steps[i];
+        const plan=plans[i];
+        if(!step || !plan){
+            continue;
+        }
+        const start=content.length;
+        content+=`${getFileOpPreviewText(plan)}\n`;
+        labels.push({step,ranges:[{start,end:content.length}]});
+        content+='\n';
+    }
+    return {content,labels};
+}
+
+/**
+ * Returns the changes of the given labels ordered by position in the file. Labels without ranges
+ * produce a single change placed at the top of the file.
+ */
+const getChanges=(labels:BlockLabel[],steps:ReviewStep[]):ReviewChange[]=>{
+    const changes:ReviewChange[]=labels.flatMap(l=>l.ranges.length?l.ranges.map(range=>({step:l.step,range})):[{step:l.step}]);
+    return changes.sort((a,b)=>(a.range?.start??0)-(b.range?.start??0) || steps.indexOf(a.step)-steps.indexOf(b.step));
+}
+
+const mapRange=(range:BlockRange,ranges:ConvoBlockReplaceRange[]):BlockRange=>({
+    start:mapConvoBlockReplaceIndex(range.start,ranges),
+    end:mapConvoBlockReplaceIndex(range.end,ranges),
+});
+
+const getPageSteps=(steps:ReviewStep[],pageKey:string):ReviewStep[]=>(
+    pageKey===fileOpsPageKey?
+        steps.filter(st=>st.tag.type==='op')
+    :
+        steps.filter(st=>st.tag.type==='file' && st.tag.targetPath===pageKey)
+);
+
+const getStepPageKey=(step:ReviewStep):string=>step.tag.type==='op'?fileOpsPageKey:step.tag.targetPath;
+
+/**
+ * Applies accepted file blocks and file operations in the order they appear in the message. All
+ * accepted blocks of a file are combined into a single write at the first block of the file.
+ */
+const applyAcceptedAsync=async (steps:ReviewStep[]):Promise<void>=>{
+    const errors:string[]=[];
+    const handled=new Set<string>();
+    let written=0;
+    let ops=0;
+
+    for(const st of [...steps].sort((a,b)=>a.tag.index-b.tag.index)){
+        const tag=st.tag;
+        if(tag.type==='op'){
+            if(await applyFileOpAsync(tag,{autoConfirm:true})){
+                ops++;
+            }
+            continue;
+        }
+
+        const targetPath=tag.targetPath;
+        if(handled.has(targetPath)){
+            continue;
+        }
+        handled.add(targetPath);
+
+        try{
+            const base=await readFileContentAsync(targetPath);
+            const preview=buildFilePreview(base??'',getPageSteps(steps,targetPath));
+            for(const nf of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${nf.tag.index+1}`);
+            }
+            if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
+                continue;
+            }
+            if(await writeFileContentAsync(targetPath,preview.content)){
+                written++;
+            }else{
+                errors.push(`Failed to write output to ${targetPath}`);
+            }
+        }catch(ex){
+            errors.push(`Failed to write output to ${targetPath}. Error:${getErrorMessage(ex)}`);
+        }
+    }
+
+    if(errors.length){
+        void window.showErrorMessage(errors.join('\n'));
+    }
+    void window.showInformationMessage(`Wrote ${written} file${written===1?'':'s'}${ops?` · applied ${ops} file operation${ops===1?'':'s'}`:''}`);
+}
+
+const getStatusIcon=(status:ReviewStatus):string=>(
+    status==='accepted'?
+        '✓'
+    :status==='rejected'?
+        '✗'
+    :
+        '○'
+);
+
+const getLabelText=(change:ReviewChange,isCurrent:boolean):string=>{
+    const step=change.step;
+    const block=step.tag.codeBlock;
+    const kind=(
+        step.tag.type==='op'?
+            (block.fileOp??'file op')
+        :block.findReplace?
+            'find-replace'
+        :
+            'full file'
+    );
+    return `${isCurrent?'▶ ':''}block #${step.tag.index+1} · ${kind} · ${getStatusIcon(step.status)} ${step.status}${change.range?'':' · not found'}`;
+}
+
+/**
+ * Turns on `diffEditor.codeLens` in user settings if it is off. Returns the previous user setting
+ * value so it can be restored, or undefined if nothing was changed.
+ */
+const enableDiffCodeLensAsync=async ():Promise<DiffCodeLensRestore|undefined>=>{
+    const config=workspace.getConfiguration('diffEditor');
+    if(config.get<boolean>('codeLens')){
+        return undefined;
+    }
+    const value=config.inspect<boolean>('codeLens')?.globalValue;
+    await config.update('codeLens',true,ConfigurationTarget.Global);
+    return {value};
+}
+
+const restoreDiffCodeLensAsync=async (restore:DiffCodeLensRestore|undefined):Promise<void>=>{
+    if(restore){
+        await workspace.getConfiguration('diffEditor').update('codeLens',restore.value,ConfigurationTarget.Global);
+    }
+}
+
+/**
+ * Returns a whole line range covering the given content range. A range ending at the start of a
+ * line does not include that line.
+ */
+const getLineRange=(doc:TextDocument,r:BlockRange):Range=>{
+    const start=doc.positionAt(r.start);
+    const end=doc.positionAt(r.end);
+    const endLine=(end.character===0 && end.line>start.line)?end.line-1:end.line;
+    return new Range(start.line,0,endLine,0);
+}
+
+/**
+ * Returns diff tabs modifying the given uri and text tabs showing the given uri
+ */
+const getPreviewTabs=(uri:Uri):Tab[]=>{
+    const key=uri.toString();
+    return window.tabGroups.all.flatMap(g=>g.tabs).filter(t=>(
+        (t.input instanceof TabInputTextDiff && t.input.modified.toString()===key) ||
+        (t.input instanceof TabInputText && t.input.uri.toString()===key)
+    ));
+}
+
+const closePreviewTabsAsync=async (uri:Uri):Promise<void>=>{
+    const tabs=getPreviewTabs(uri);
+    if(tabs.length){
+        await window.tabGroups.close(tabs);
+    }
+}
+
+/**
+ * Waits for the preview document to contain the given content so decorations and code lenses line up
+ */
+const waitForContentAsync=async (uri:Uri,content:string):Promise<void>=>{
+    const key=uri.toString();
+    for(let i=0;i<40;i++){
+        if(workspace.textDocuments.find(d=>d.uri.toString()===key)?.getText()===content){
+            return;
+        }
+        await new Promise(r=>setTimeout(r,25));
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="output-tag-code-lens.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/output-tag-code-lens.ts" last-commit="01607cf18908409f702d93ed3c7a192f81c1fc48" find-replace>
+``` ts
+                    break;
+            }
+        }
+
+        return lenses;
+//// replace-with ////
+                    break;
+
+                case 'op':{
+                    const args:OutputTagCodeLensArgs={targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock};
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:`Apply ${tag.codeBlock.fileOp}`,
+                            command:'convo.file-op-apply',
+                            arguments:[args],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Preview',
+                            command:'convo.file-op-preview',
+                            arguments:[args],
+                        }),
+                    );
+                    break;
+                }
+            }
+        }
+
+        return lenses;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+import { timeSince, timeSinceNext } from './util.js';
+//// replace-with ////
+import { applyFileOpAsync, getFileOpLabel } from './file-op-lib.js';
+import { timeSince, timeSinceNext } from './util.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+            const first=tags[0];
+//// replace-with ////
+            const first=tags.find(t=>t.type==='file');
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+            }else if(tag.type==='shell'){
+                await commands.executeCommand('convo.output-tag-execute-shell',{...args,autoConfirm:true});
+//// replace-with ////
+            }else if(tag.type==='op'){
+                await applyFileOpAsync(args,{autoConfirm:true});
+            }else if(tag.type==='shell'){
+                await commands.executeCommand('convo.output-tag-execute-shell',{...args,autoConfirm:true});
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+//// replace-with ////
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.fileOp || tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(
+            tag.type==='shell'?
+                'terminal'
+            :tag.codeBlock.fileOp==='delete'?
+                'trash'
+            :tag.codeBlock.fileOp==='rename'?
+                'edit'
+            :tag.codeBlock.fileOp==='setMode'?
+                'lock'
+            :
+                'file-code'
+        );
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+//// replace-with ////
+    if(tag.type==='op'){
+        return `${tag.codeBlock.fileOp} ${path.basename(tag.targetPath)}`;
+    }
+
+    if(tag.type==='file'){
+        return path.basename(tag.targetPath) || tag.targetPath;
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :
+        lang;
+//// replace-with ////
+    :tag.type==='file'?
+        `${lang} • ${tag.targetPath}`
+    :tag.type==='op'?
+        getFileOpLabel(tag.codeBlock)
+    :
+        lang;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="ec0a853ccd94ad28db0fd51f7c515478b5e332c0" find-replace>
+``` ts
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+//// replace-with ////
+        tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.type==='op'?`Op: ${getFileOpLabel(tag.codeBlock)}`:undefined,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+import { notifyCompletionAsync } from './completion-notification.js';
+//// replace-with ////
+import { notifyCompletionAsync } from './completion-notification.js';
+import { applyFileOpAsync } from './file-op-lib.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+            progressMessage:'File blocks will be written and scripts will be executed automatically',
+//// replace-with ////
+            progressMessage:'File blocks and file operations will be applied and scripts will be executed automatically',
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+    const replaced=new Set<string>();
+    const written=new Set<string>();
+//// replace-with ////
+    const replaced=new Set<string>();
+    const written=new Set<string>();
+    let ops=0;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+        }else if(tag.type==='shell'){
+            await commands.executeCommand('convo.output-tag-execute-shell',args);
+//// replace-with ////
+        }else if(tag.type==='op'){
+            if(!await applyFileOpAsync(args,{autoConfirm:true})){
+                void window.showErrorMessage(`Stopped applying code blocks at ${tag.codeBlock.fileOp} file operation`);
+                return;
+            }
+            ops++;
+        }else if(tag.type==='shell'){
+            await commands.executeCommand('convo.output-tag-execute-shell',args);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` ts
+    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}`);
+//// replace-with ////
+    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}${ops?` · applied ${ops} file operation${ops===1?'':'s'}`:''}`);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` ts
+import { registerExtendTemplateCommand } from './extend-template.js';
+//// replace-with ////
+import { registerExtendTemplateCommand } from './extend-template.js';
+import { registerFileOpCommands } from './file-op-lib.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" last-commit="b0c3d6cecd0e2d54ff1d0426ddea72dd415e7c2c" find-replace>
+``` ts
+    registerCodeBlockReview(context,ext);
+//// replace-with ////
+    registerCodeBlockReview(context,ext);
+    registerFileOpCommands(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` json
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "false"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.code-block-group-review",
+                    "when": "false"
+                },
+                {
+                    "command": "convo.file-op-apply",
+                    "when": "false"
+                },
+                {
+                    "command": "convo.file-op-preview",
+                    "when": "false"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` json
+                {
+                    "command": "convo.code-block-panel-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+//// replace-with ////
+                {
+                    "command": "convo.code-block-panel-tag-copy",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.file-op-apply",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-op/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.file-op-preview",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-op/",
+                    "group": "inline"
+                },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" last-commit="dd7d25b672bad4ec61dfa759bc9660c1af26e96a" find-replace>
+``` json
+            {
+                "command": "convo.code-block-panel-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+//// replace-with ////
+            {
+                "command": "convo.code-block-panel-tag-copy",
+                "title": "Convo: Copy Output",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "convo.file-op-apply",
+                "title": "Convo: Apply File Operation",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.file-op-preview",
+                "title": "Convo: Preview File Operation",
+                "icon": "$(eye)"
+            },
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- Review, diff and write `FILE_CONTENT` blocks generated by the model
+//// replace-with ////
+- Review, diff and write `FILE_CONTENT` blocks generated by the model
+- Rename, delete and change the mode of files with `FILE_OP` blocks
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+Target paths are resolved relative to the `.convo` file.
+//// replace-with ////
+Target paths are resolved relative to the `.convo` file.
+
+### File operations
+
+File blocks also teach the model to rename, delete and change the mode of files using self-closing
+`FILE_OP` tags.
+
+~~~xml
+<FILE_OP op="rename" from="./src/old-name.ts" to="./src/new-name.ts"/>
+<FILE_OP op="delete" path="./src/unused.ts"/>
+<FILE_OP op="delete" path="./src/generated/**/*.js"/>
+<FILE_OP op="setMode" path="./scripts/build.sh" mode="+x"/>
+~~~
+
+| Op        | Attributes     | Description                                                                                                  |
+|-----------|----------------|--------------------------------------------------------------------------------------------------------------|
+| `rename`  | `from`, `to`   | Renames or moves a file. Open editors follow the file. Parent directories are created as needed. Fails if the target exists. Globs are not supported. |
+| `delete`  | `path`         | Moves the matched files or directory to the trash                                                            |
+| `setMode` | `path`, `mode` | Sets the mode of the matched files. `mode` can be octal, such as `755`, or `+x`, `-x`, `+w`, `-w`, `+r`, `-r` applied to all users. Skipped with a warning on Windows. |
+
+- Paths are resolved relative to the `.convo` file. Paths outside the workspace folder are rejected.
+- `delete` and `setMode` paths support globs. `*` matches within a directory and `**` matches any
+  depth. `**.ts` is treated as `**/*.ts`. Glob matches respect `files.exclude`.
+- File operations and file blocks are applied in the order they appear in the message.
+- Applying a single operation asks for confirmation and lists the matched files. `Apply All`,
+  `Complete and Apply All` and guided reviews skip the per-operation confirmation.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+| `RUNNABLE_SCRIPT`| `Run Script`, `Run Script and complete`                          |
+//// replace-with ////
+| `RUNNABLE_SCRIPT`| `Run Script`, `Run Script and complete`                          |
+| `FILE_OP`        | `Apply {op}`, `Preview`                                          |
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- `Copy Output` copies the final output to the clipboard.
+//// replace-with ////
+- `Copy Output` copies the final output to the clipboard.
+- `Apply {op}` asks for confirmation, listing the matched files, then applies the file operation.
+- `Preview` lists the files a file operation matches. Selecting a file opens it.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- Inline actions on script blocks: Run Script and Run Script and Complete.
+//// replace-with ////
+- Inline actions on script blocks: Run Script and Run Script and Complete.
+- Inline actions on file operation blocks: Apply and Preview.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- Inline action on message groups: `Apply All`. This writes every file and runs every script in
+  the message after a single confirmation. Find-replace blocks targeting the same file are
+  combined into one write.
+//// replace-with ////
+- Inline action on message groups: `Apply All`. This writes every file, applies every file
+  operation and runs every script in the message after a single confirmation. Find-replace blocks
+  targeting the same file are combined into one write.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+//// replace-with ////
+- Rejected blocks are skipped when the accepted blocks of a file are combined and written.
+- `FILE_OP` blocks are reviewed on a final `File Operations` page that lists each operation and
+  the files it matches. They are accepted or rejected like file blocks.
+- Accepted file blocks and file operations are applied in the order they appear in the message.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+- Completes the conversation like `Convo: Complete`, then applies the `FILE_CONTENT` and
+  `RUNNABLE_SCRIPT` blocks of the last assistant message in the order they appear.
+- The progress notification notes that file blocks will be written and scripts will be executed
+  automatically.
+//// replace-with ////
+- Completes the conversation like `Convo: Complete`, then applies the `FILE_CONTENT`, `FILE_OP`
+  and `RUNNABLE_SCRIPT` blocks of the last assistant message in the order they appear.
+- The progress notification notes that file blocks and file operations will be applied and
+  scripts will be executed automatically.
+- File operations are applied without confirmation. If a file operation fails, no further blocks
+  are applied.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` md
+| Convo: Copy Output                     | `convo.code-block-panel-tag-copy`          | Copies the output of a file block                              |
+//// replace-with ////
+| Convo: Copy Output                     | `convo.code-block-panel-tag-copy`          | Copies the output of a file block                              |
+| Convo: Apply File Operation            | `convo.file-op-apply`                      | Applies a `FILE_OP` block                                      |
+| Convo: Preview File Operation          | `convo.file-op-preview`                    | Lists the files matched by a `FILE_OP` block                   |
+```
+</FILE_CONTENT>
+
+Notes:
+- `FILE_OP` tags inside the fenced content of another block, such as a `FILE_CONTENT` block that contains example markup, are ignored by the parser.
+- In the guided review, the File Operations page shows matches as they are when you open it. Ops are re-resolved when applied, so a `delete` that targets a file renamed earlier in the same message resolves against the state at apply time.
+- Folders matched by a non-glob `delete` path are moved to the trash recursively. Globs only match files.
+
+
+> user

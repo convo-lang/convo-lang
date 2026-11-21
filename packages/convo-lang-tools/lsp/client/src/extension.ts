@@ -10,6 +10,7 @@ import { registerConvoCodeBlockView } from './convo-code-block-view.js';
 import { registerConvoStdDocumentProvider } from './convo-std-document-provider.js';
 import { ConvoExt } from './ConvoExt.js';
 import { registerExtendTemplateCommand } from './extend-template.js';
+import { registerFileOpCommands } from './file-op-lib.js';
 import { createFoldingProviders } from './folding-provider.js';
 import { ConvoDocumentLinkProvider } from './link-provider.js';
 import { ConvoMakeExtTree } from './make/ConvoMakeExtTree.js';
@@ -30,6 +31,7 @@ export function activate(context:ExtensionContext){
     registerImagePasteHandler(context,ext);
     registerConvoCodeBlockView(context,ext);
     registerCodeBlockReview(context,ext);
+    registerFileOpCommands(context,ext);
     registerConvoStdDocumentProvider(context);
     registerExtendTemplateCommand(context,ext);
     registerAnswerQuestionsCommand(context,ext);

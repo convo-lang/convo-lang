@@ -31,7 +31,7 @@ export interface OutputTagCodeLensArgs extends OutputTagBase
 export interface OutputTagInfo extends OutputTagBase
 {
     range:Range;
-    type:'file'|'shell'|'other';
+    type:'file'|'shell'|'op'|'other';
 }
 
 export interface ParsedOutputTagInfo extends OutputTagInfo
@@ -47,6 +47,36 @@ export interface MessageTagGroup
     messageIndex:number;
     tags:ParsedOutputTagInfo[];
     isLast:boolean;
+}
+
+const getBlockType=(b:ConvoCodeBlock):OutputTagInfo['type']=>(
+    ('target-output-path' in b.attributes)?
+        'file'
+    :('target-shell-type' in b.attributes)?
+        'shell'
+    :b.fileOp?
+        'op'
+    :
+        'other'
+);
+
+/**
+ * Returns the target path of a block. File and op paths are resolved relative to baseDir. For
+ * rename ops the `from` path is used.
+ */
+const getBlockTargetPath=(b:ConvoCodeBlock,type:OutputTagInfo['type'],baseDir:string):string=>{
+    switch(type){
+        case 'shell':
+            return b.attributes['script-name']??'script';
+        case 'op':{
+            const p=b.attributes['path']??b.attributes['from']??'';
+            return baseDir?path.resolve(baseDir,p):p;
+        }
+        default:{
+            const p=b.attributes['target-output-path']??'';
+            return (baseDir && type==='file')?path.resolve(baseDir,p):p;
+        }
+    }
 }
 
 export const getOutputTags=(document:vscode.TextDocument):OutputTagInfo[]=>{
@@ -70,28 +100,15 @@ export const getOutputTagsFromSource=(source:string,document:vscode.TextDocument
         }
 
         for(const b of codeBlocks){
-            const type=(
-                ('target-output-path' in b.attributes)?
-                    'file'
-                :('target-shell-type' in b.attributes)?
-                    'shell'
-                :
-                    'other'
-            );
+            const type=getBlockType(b);
             const start=document.positionAt(b.startIndex);
             const end=document.positionAt(b.endIndex);
-            const targetPath=b.attributes['target-output-path']??'';
 
             const ac=b.attributes['cwd'];
 
             tags.push({
                 codeBlock:b,
-                targetPath:(baseDir && type==='file')?
-                    path.resolve(baseDir,targetPath)
-                :type==='shell'?
-                    (b.attributes['script-name']??'script')
-                :
-                    targetPath,
+                targetPath:getBlockTargetPath(b,type,baseDir),
                 type,
                 range:new vscode.Range(start,end),
                 index:b.index,
@@ -130,28 +147,15 @@ export const getParsedOutputTagGroups=(document:vscode.TextDocument):MessageTagG
         const tags:ParsedOutputTagInfo[]=[];
 
         for(const b of codeBlocks){
-            const type=(
-                ('target-output-path' in b.attributes)?
-                    'file'
-                :('target-shell-type' in b.attributes)?
-                    'shell'
-                :
-                    'other'
-            );
+            const type=getBlockType(b);
             const start=document.positionAt(message.s ?? b.startIndex);
             const end=document.positionAt(message.e ?? b.endIndex);
-            const targetPath=b.attributes['target-output-path']??'';
 
             tags.push({
                 codeBlock:b,
                 message,
                 messageIndex,
-                targetPath:(baseDir && type==='file')?
-                        path.resolve(baseDir,targetPath)
-                    :type==='shell'?
-                        (b.attributes['script-name']??'script')
-                    :
-                        targetPath,
+                targetPath:getBlockTargetPath(b,type,baseDir),
                 type,
                 range:new vscode.Range(start,end),
                 index:b.index,

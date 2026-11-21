@@ -108,6 +108,23 @@ export class OutputTagCodeLensProvider implements vscode.CodeLensProvider
                         }),
                     );
                     break;
+
+                case 'op':{
+                    const args:OutputTagCodeLensArgs={targetPath:tag.targetPath,index:tag.index,documentUri:document.uri,codeBlock:tag.codeBlock};
+                    lenses.push(
+                        new vscode.CodeLens(tag.range,{
+                            title:`Apply ${tag.codeBlock.fileOp}`,
+                            command:'convo.file-op-apply',
+                            arguments:[args],
+                        }),
+                        new vscode.CodeLens(tag.range,{
+                            title:'Preview',
+                            command:'convo.file-op-preview',
+                            arguments:[args],
+                        }),
+                    );
+                    break;
+                }
             }
         }
 

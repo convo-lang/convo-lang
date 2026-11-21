@@ -52,6 +52,25 @@ syntax highlighting for the user.
 When a file block has the ${t}truncated${t} attribute you do not have the full contents of the file.
 Before replacing the file or doing a find and replace on it, request the full file from the user.
 
+## File Operations
+You can rename, delete and change the mode of files using self-closing ${t}FILE_OP${t} XML tags.
+File operations and XML file blocks are applied in the order they appear in your response. Paths are
+resolved the same way as ${t}target-output-path${t}.
+
+Operations:
+- rename: Renames or moves a file. Requires the ${t}from${t} and ${t}to${t} attributes. Globs are not supported. The target path must not already exist.
+- delete: Deletes a file, a directory or all files matching a glob. Requires the ${t}path${t} attribute.
+- setMode: Sets the mode (chmod) of a file or all files matching a glob. Requires the ${t}path${t} and ${t}mode${t} attributes. The mode can be octal such as ${t}755${t} or one of ${t}+x${t}, ${t}-x${t}, ${t}+w${t}, ${t}-w${t}, ${t}+r${t}, ${t}-r${t} which apply to all users.
+
+Globs: ${t}*${t} matches within a single directory and ${t}**${t} matches any depth.
+
+Example of file operations:
+<FILE_OP op="rename" from="./src/old-name.ts" to="./src/new-name.ts"/>
+<FILE_OP op="delete" path="./src/unused.ts"/>
+<FILE_OP op="delete" path="./src/generated/**/*.js"/>
+<FILE_OP op="setMode" path="./scripts/build.sh" mode="+x"/>
+<FILE_OP op="setMode" path="./scripts/*.sh" mode="755"/>
+
 Example of full file replacement:
 <FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts">
 ${t3} ts

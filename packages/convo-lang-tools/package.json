@@ -189,6 +189,14 @@
                     "when": "false"
                 },
                 {
+                    "command": "convo.file-op-apply",
+                    "when": "false"
+                },
+                {
+                    "command": "convo.file-op-preview",
+                    "when": "false"
+                },
+                {
                     "command": "convo.code-block-review-next",
                     "when": "convo.codeBlockReviewActive"
                 },
@@ -309,6 +317,16 @@
                 {
                     "command": "convo.code-block-panel-tag-copy",
                     "when": "view == convoCodeBlocks && viewItem =~ /^code-block-file/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.file-op-apply",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-op/",
+                    "group": "inline"
+                },
+                {
+                    "command": "convo.file-op-preview",
+                    "when": "view == convoCodeBlocks && viewItem =~ /^code-block-op/",
                     "group": "inline"
                 },
                 {
@@ -437,6 +455,16 @@
                 "command": "convo.code-block-panel-tag-copy",
                 "title": "Convo: Copy Output",
                 "icon": "$(copy)"
+            },
+            {
+                "command": "convo.file-op-apply",
+                "title": "Convo: Apply File Operation",
+                "icon": "$(check)"
+            },
+            {
+                "command": "convo.file-op-preview",
+                "title": "Convo: Preview File Operation",
+                "icon": "$(eye)"
             },
             {
                 "command": "convo.output-tag-execute-shell",

@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { applyFileOpAsync, getFileOpLabel } from './file-op-lib.js';
 import { timeSince, timeSinceNext } from './util.js';
 
 const pinnedDocsStateKey='convo.codeBlocks.pinnedDocs';
@@ -265,7 +266,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         );
 
         if(action==='View First Diff'){
-            const first=tags[0];
+            const first=tags.find(t=>t.type==='file');
             if(first){
                 await showOutputDiffAsync(first);
             }
@@ -293,6 +294,8 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
             }
             if(tag.type==='file'){
                 await writeOutputTagAsync({...args,autoConfirm:true});
+            }else if(tag.type==='op'){
+                await applyFileOpAsync(args,{autoConfirm:true});
             }else if(tag.type==='shell'){
                 await commands.executeCommand('convo.output-tag-execute-shell',{...args,autoConfirm:true});
             }
@@ -801,8 +804,19 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
 
         this.description=getItemDescription(tag);
         this.tooltip=getItemTooltip(tag);
-        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.lang || 'text'}`;
-        this.iconPath=new vscode.ThemeIcon(tag.type==='shell'?'terminal':'file-code');
+        this.contextValue=`code-block-${tag.type}/${tag.codeBlock.fileOp || tag.codeBlock.lang || 'text'}`;
+        this.iconPath=new vscode.ThemeIcon(
+            tag.type==='shell'?
+                'terminal'
+            :tag.codeBlock.fileOp==='delete'?
+                'trash'
+            :tag.codeBlock.fileOp==='rename'?
+                'edit'
+            :tag.codeBlock.fileOp==='setMode'?
+                'lock'
+            :
+                'file-code'
+        );
         
 
         this.args={targetPath:tag.targetPath,index:tag.index,cwd:tag.cwd,documentUri:group.messageUri,codeBlock:tag.codeBlock};
@@ -844,6 +858,10 @@ const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
         return tag.codeBlock.attributes['script-name'] || 'script';
     }
 
+    if(tag.type==='op'){
+        return `${tag.codeBlock.fileOp} ${path.basename(tag.targetPath)}`;
+    }
+
     if(tag.type==='file'){
         return path.basename(tag.targetPath) || tag.targetPath;
     }
@@ -857,6 +875,8 @@ const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
         lang
     :tag.type==='file'?
         `${lang} • ${tag.targetPath}`
+    :tag.type==='op'?
+        getFileOpLabel(tag.codeBlock)
     :
         lang;
 }
@@ -866,6 +886,7 @@ const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
         `<${tag.codeBlock.tagName}>`,
         tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
         tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
+        tag.type==='op'?`Op: ${getFileOpLabel(tag.codeBlock)}`:undefined,
         tag.cwd?`CWD: ${tag.cwd}`:undefined,
         `Lang: ${tag.codeBlock.lang || 'text'}`,
     ].filter(Boolean);

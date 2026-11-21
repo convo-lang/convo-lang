@@ -1,13 +1,33 @@
 import { unescapeHtml } from '@iyio/common';
 import { unescapeConvo } from './convo-parser.js';
-import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey } from './convo-types.js';
+import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, isConvoFileOpType } from './convo-types.js';
 
 
 export const defaultConvoFindReplaceSeparator='//// replace-with ////';
 
+/**
+ * Name of the self-closing XML tag used to define file operations
+ */
+export const convoFileOpTagName='FILE_OP';
+
 const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```+[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```+[ \t\r\n]*<\/\k<tagName>>/g;
+const fileOpReg=/(?<start>(^|\r|\n)[ \t]*)<FILE_OP(?<attributes>(\s[^>]*?)?)\/>/g;
 const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
 
+const parseConvoCodeBlockAttributes=(attributes:string):Record<string,string>=>{
+    const atts:Record<string,string>={};
+    attReg.lastIndex=0;
+    let attMatch:RegExpExecArray|null;
+    while(attMatch=attReg.exec(attributes)){
+        atts[attMatch.groups?.['name']??'']=unescapeHtml(attMatch.groups?.['dq']??attMatch.groups?.['sq']??'');
+    }
+    return atts;
+}
+
+/**
+ * Parses XML tagged code blocks and self-closing `FILE_OP` tags. Blocks are returned in order of
+ * appearance. `FILE_OP` tags inside of the content of another block are ignored.
+ */
 export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
     let indexOffset:number;
     if(typeof indexOffsetOrParentMessage === 'number'){
@@ -21,46 +41,57 @@ export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOr
     }else{
         indexOffset=0;
     }
-    
+
+    const found:Omit<ConvoCodeBlock,'index'>[]=[];
+
     blockReg.lastIndex=0;
-
-    let blocks:ConvoCodeBlock[]|undefined;
-
     let match:RegExpMatchArray|null;
     while(match=blockReg.exec(text)){
         const start=match.groups?.['start']??'';
         const tagName=match.groups?.['tagName']??'';
-        const attributes=match.groups?.['attributes']??'';
         const lang=match.groups?.['lang']||'txt';
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
 
-        const atts:Record<string,string>={};
-
-        attReg.lastIndex=0;
-        let attMatch:RegExpExecArray|null;
-        while(attMatch=attReg.exec(attributes)){
-            atts[attMatch.groups?.['name']??'']=unescapeHtml(attMatch.groups?.['dq']??attMatch.groups?.['sq']??'');
-        }
-        const findReplace=atts['find-replace'];
-        const findReplaceSeparator=atts['find-replace-separator'];
-        if(!blocks){
-            blocks=[];
-        }
-        blocks.push({
+        found.push({
             tagName,
             attributes:atts,
             lang,
             content:normalizeConvoCodeBlockContent(tagName,match.groups?.['content']??'',atts),
-            index:blockIndexOffset+blocks.length,
             startIndex:indexOffset+(match.index??0)+start.length,
             endIndex:indexOffset+(match.index??0)+match[0].length,
             messageIndex,
-            findReplace:parseConvoBlockFindReplace(findReplace),
-            findReplaceSeparator,
-        })
-
+            findReplace:parseConvoBlockFindReplace(atts['find-replace']),
+            findReplaceSeparator:atts['find-replace-separator'],
+        });
     }
 
-    return blocks;
+    fileOpReg.lastIndex=0;
+    while(match=fileOpReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const startIndex=indexOffset+(match.index??0)+start.length;
+        if(found.some(b=>startIndex>=b.startIndex && startIndex<b.endIndex)){
+            continue;
+        }
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+        const op=atts['op'];
+        found.push({
+            tagName:convoFileOpTagName,
+            attributes:atts,
+            lang:'',
+            content:'',
+            startIndex,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            fileOp:isConvoFileOpType(op)?op:undefined,
+        });
+    }
+
+    if(!found.length){
+        return undefined;
+    }
+
+    found.sort((a,b)=>a.startIndex-b.startIndex);
+    return found.map((b,i)=>({...b,index:blockIndexOffset+i}));
 }
 
 export const parseConvoBlockFindReplace=(value:string|null|undefined):number|'all'|undefined=>{

@@ -12,6 +12,7 @@ import { OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroup
 import { notifyCompletionAsync } from './completion-notification.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
+import { applyFileOpAsync } from './file-op-lib.js';
 import { ConvoMakeExtBuild } from './make/ConvoMakeExtBuild.js';
 import { ConvoMakeExtTarget } from './make/ConvoMakeExtTarget.js';
 import { registerOutTagCommands } from './output-tag-code-lens.js';
@@ -780,7 +781,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
     context.subscriptions.push(commands.registerCommand('convo.complete-apply-all', async () => {
         await completeAsync({},{
             progressTitle:'Completing and applying',
-            progressMessage:'File blocks will be written and scripts will be executed automatically',
+            progressMessage:'File blocks and file operations will be applied and scripts will be executed automatically',
             onComplete:applyLastAssistantBlocksAsync,
         });
     }));
@@ -1019,6 +1020,7 @@ const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=
 
     const replaced=new Set<string>();
     const written=new Set<string>();
+    let ops=0;
     for(const tag of group.tags){
         const args:OutputTagCodeLensArgs={
             targetPath:tag.targetPath,
@@ -1044,12 +1046,18 @@ const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=
                 return;
             }
             written.add(tag.targetPath);
+        }else if(tag.type==='op'){
+            if(!await applyFileOpAsync(args,{autoConfirm:true})){
+                void window.showErrorMessage(`Stopped applying code blocks at ${tag.codeBlock.fileOp} file operation`);
+                return;
+            }
+            ops++;
         }else if(tag.type==='shell'){
             await commands.executeCommand('convo.output-tag-execute-shell',args);
         }
     }
 
-    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}`);
+    void window.showInformationMessage(`Wrote ${written.size} file${written.size===1?'':'s'}${ops?` · applied ${ops} file operation${ops===1?'':'s'}`:''}`);
 }
 
 const example=/*convo*/`
