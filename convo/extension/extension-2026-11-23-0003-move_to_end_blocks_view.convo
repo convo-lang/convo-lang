@@ -1,0 +1,180 @@
+@import ./_extension.convo !template
+
+> user
+When the file blocks divider is click the current should be moved to the end of the target convo file
+
+@time 2026-11-23T13:29:16-05:00
+@tokenUsage 151083 / 629 / $0.616912
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before making changes:
+
+1. Which divider do you mean?
+   - a) The `----------------------` separator items between messages in the Code Blocks view (list layout)
+   - b) The dashed or solid dividers drawn above each change in the guided review diff
+   - c) Something else
+
+2. By "current", do you mean the text cursor? Should clicking:
+   - a) Move the cursor to the end of the convo document and scroll it into view
+   - b) Do (a) and also add a new `> user` message if the document doesn't already end with one
+
+3. How should the convo document be shown if it isn't the active editor?
+   - a) Reuse the editor group it's already visible in, otherwise use the active group (like the completion notification's `Open` button)
+   - b) Always open it in the active group
+   - c) Open it beside the current editor
+
+4. Should the editor take focus after clicking?
+   - a) Yes, focus the editor so you can start typing
+   - b) No, keep focus in the Code Blocks view
+
+5. The tree layout has no separator items. Should anything change there?
+   - a) No, only the list layout separators
+   - b) Add a clickable item, such as "Go to end", at the bottom of each document in the tree layout as well
+
+
+> user
+1. a
+2. a
+3. a
+4. a
+5. b
+
+
+@time 2026-11-23T13:31:57-05:00
+@tokenUsage 151426 / 3474 / $0.675184
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Clicking a divider in the list layout, or a new `Go to end` item in the tree layout, now moves the cursor to the end of the convo document. The document opens in the editor group it is already visible in (otherwise the active group) and takes focus. I haven't run or tested these changes.
+
+The click handling is a new internal command, `convo.code-block-go-to-end`, in its own file. It isn't added to `package.json` because it needs the document URI from the tree item and isn't meant for the Command Palette.
+
+<FILE_CONTENT name="code-block-go-to-end.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-go-to-end.ts">
+``` ts
+import { ExtensionContext, Uri, commands, window, workspace } from 'vscode';
+import { ConvoExt } from './ConvoExt.js';
+import { revealDocumentEndAsync } from './util.js';
+
+/**
+ * Registers the internal `convo.code-block-go-to-end` command used by the divider items and the
+ * `Go to end` items of the Code Blocks view. The command moves the cursor to the end of the given
+ * convo document.
+ */
+export const registerCodeBlockGoToEnd=(context:ExtensionContext,ext:ConvoExt)=>{
+    context.subscriptions.push(commands.registerCommand('convo.code-block-go-to-end',goToDocumentEndAsync));
+}
+
+/**
+ * Shows the document in the editor group it is already visible in, or the active group, focuses
+ * it and moves the cursor to the end of the document.
+ */
+export const goToDocumentEndAsync=async (uri?:Uri):Promise<void>=>{
+    if(!uri){
+        return;
+    }
+    const key=uri.toString();
+    const visible=window.visibleTextEditors.find(e=>e.document.uri.toString()===key && e.viewColumn!==undefined);
+    const doc=await workspace.openTextDocument(uri);
+    const editor=await window.showTextDocument(doc,{preview:false,preserveFocus:false,viewColumn:visible?.viewColumn});
+    await revealDocumentEndAsync(editor);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+import { registerCodeBlockAppliedState } from './code-block-applied.js';
+//// replace-with ////
+import { registerCodeBlockAppliedState } from './code-block-applied.js';
+import { registerCodeBlockGoToEnd } from './code-block-go-to-end.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+    registerCodeBlockReview(context,ext);
+//// replace-with ////
+    registerCodeBlockReview(context,ext);
+    registerCodeBlockGoToEnd(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+            items.push(new ConvoSeparatorItem(this.provider));
+        }
+        return items;
+    }
+}
+
+class ConvoSeparatorItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        title='----------------------',
+    ){
+        super(provider,title,TreeItemCollapsibleState.None);
+        this.iconPath=new vscode.ThemeIcon('empty');
+        this.resourceUri=Uri.parse(`convo-code-separator://separator`);
+    }
+}
+//// replace-with ////
+            items.push(new ConvoSeparatorItem(this.provider,this.doc.uri));
+        }
+        if(treeMode){
+            items.push(new ConvoGoToEndItem(this.provider,this.doc.uri));
+        }
+        return items;
+    }
+}
+
+class ConvoSeparatorItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        documentUri:Uri,
+        title='----------------------',
+    ){
+        super(provider,title,TreeItemCollapsibleState.None);
+        this.iconPath=new vscode.ThemeIcon('empty');
+        this.resourceUri=Uri.parse(`convo-code-separator://separator`);
+        this.tooltip='Go to end of document';
+        this.command={
+            title:'Go to End',
+            command:'convo.code-block-go-to-end',
+            arguments:[documentUri],
+        };
+    }
+}
+
+class ConvoGoToEndItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        documentUri:Uri,
+    ){
+        super(provider,'Go to end',TreeItemCollapsibleState.None);
+        this.iconPath=new vscode.ThemeIcon('arrow-down');
+        this.tooltip='Go to end of document';
+        this.command={
+            title:'Go to End',
+            command:'convo.code-block-go-to-end',
+            arguments:[documentUri],
+        };
+    }
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+``` md
+- The list layout shows each message followed by its blocks.
+//// replace-with ////
+- The list layout shows each message followed by its blocks and a divider.
+- Clicking a divider in the list layout, or the `Go to end` item at the bottom of each document in
+  the tree layout, moves the cursor to the end of the convo document. The document is shown in the
+  editor group it is already visible in, or the active group, and is focused.
+```
+</FILE_CONTENT>
+
+
+> user

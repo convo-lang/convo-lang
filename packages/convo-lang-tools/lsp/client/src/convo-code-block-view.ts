@@ -743,7 +743,10 @@ class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
             for(const tag of group.tags){
                 items.push(new ConvoCodeBlockItem(this.provider,group,tag,false))
             }
-            items.push(new ConvoSeparatorItem(this.provider));
+            items.push(new ConvoSeparatorItem(this.provider,this.doc.uri));
+        }
+        if(treeMode){
+            items.push(new ConvoGoToEndItem(this.provider,this.doc.uri));
         }
         return items;
     }
@@ -753,11 +756,35 @@ class ConvoSeparatorItem extends ConvoCodeBlockTreeItem
 {
     public constructor(
         provider:ConvoCodeBlockTreeProvider,
+        documentUri:Uri,
         title='----------------------',
     ){
         super(provider,title,TreeItemCollapsibleState.None);
         this.iconPath=new vscode.ThemeIcon('empty');
         this.resourceUri=Uri.parse(`convo-code-separator://separator`);
+        this.tooltip='Go to end of document';
+        this.command={
+            title:'Go to End',
+            command:'convo.code-block-go-to-end',
+            arguments:[documentUri],
+        };
+    }
+}
+
+class ConvoGoToEndItem extends ConvoCodeBlockTreeItem
+{
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        documentUri:Uri,
+    ){
+        super(provider,'Go to end',TreeItemCollapsibleState.None);
+        this.iconPath=new vscode.ThemeIcon('arrow-down');
+        this.tooltip='Go to end of document';
+        this.command={
+            title:'Go to End',
+            command:'convo.code-block-go-to-end',
+            arguments:[documentUri],
+        };
     }
 }
 

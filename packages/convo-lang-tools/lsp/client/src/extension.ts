@@ -5,6 +5,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 import { registerAnswerQuestionsCommand } from './answer-questions.js';
 import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
 import { registerCodeBlockAppliedState } from './code-block-applied.js';
+import { registerCodeBlockGoToEnd } from './code-block-go-to-end.js';
 import { registerCodeBlockReview } from './code-block-review.js';
 import { registerCodeBlockTreeMode } from './code-block-tree.js';
 import { registerCompletionCommands } from './completion-provider.js';
@@ -35,6 +36,7 @@ export function activate(context:ExtensionContext){
     registerCodeBlockTreeMode(context,ext);
     registerConvoCodeBlockView(context,ext);
     registerCodeBlockReview(context,ext);
+    registerCodeBlockGoToEnd(context,ext);
     registerFileOpCommands(context,ext);
     registerConvoStdDocumentProvider(context);
     registerExtendTemplateCommand(context,ext);

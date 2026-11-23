@@ -502,7 +502,10 @@ workspace.
   file are listed separately.
 - Scripts are placed at the root of the message. File operations are placed by their `path`, or
   `from` for renames. Glob paths use the folder before the first glob segment.
-- The list layout shows each message followed by its blocks.
+- The list layout shows each message followed by its blocks and a divider.
+- Clicking a divider in the list layout, or the `Go to end` item at the bottom of each document in
+  the tree layout, moves the cursor to the end of the convo document. The document is shown in the
+  editor group it is already visible in, or the active group, and is focused.
 
 - Each message group shows its role, its age (for messages with a time tag) and a block count
   badge. The last message is highlighted.
