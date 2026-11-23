@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
+import { codeBlockAppliedChangeEmitter, getCodeBlockAppliedStatus } from './code-block-applied.js';
 import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
 import { applyFileOpAsync, getFileOpLabel } from './file-op-lib.js';
 import { timeSince, timeSinceNext } from './util.js';
@@ -106,6 +107,10 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
 
     context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
         provider.handleDocumentChanged(document);
+    }));
+
+    context.subscriptions.push(codeBlockAppliedChangeEmitter.event(()=>{
+        provider.refresh();
     }));
 
     void provider.initializeAsync();
@@ -219,6 +224,12 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
                     propagate:false,
                 };
             }
+
+            case 'convo-code-block-applied':
+                return {
+                    color:new vscode.ThemeColor('disabledForeground'),
+                    propagate:false,
+                };
 
             default:
                 return undefined;
@@ -802,7 +813,11 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
     ){
         super(provider,getItemLabel(tag),TreeItemCollapsibleState.None);
 
-        this.description=getItemDescription(tag);
+        const status=getCodeBlockAppliedStatus(tag);
+        this.description=`${getItemDescription(tag)}${status?` • ${status}`:''}`;
+        if(status){
+            this.resourceUri=Uri.parse(`convo-code-block-applied://${tag.codeBlock.messageIndex}-${tag.index}/${encodeURIComponent(tag.documentUri.toString())}`);
+        }
         this.tooltip=getItemTooltip(tag);
         this.contextValue=`code-block-${tag.type}/${tag.codeBlock.fileOp || tag.codeBlock.lang || 'text'}`;
         this.iconPath=new vscode.ThemeIcon(
@@ -874,7 +889,7 @@ const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
     return tag.type==='shell'?
         lang
     :tag.type==='file'?
-        `${lang} • ${tag.targetPath}`
+        `${lang} • ${workspace.asRelativePath(tag.targetPath)}`
     :tag.type==='op'?
         getFileOpLabel(tag.codeBlock)
     :

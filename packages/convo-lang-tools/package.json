@@ -772,6 +772,12 @@
                     "default": false,
                     "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
                     "order": 10
+                },
+                "convo.persistAppliedCodeBlocks": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Save which code blocks have been applied in workspace state so they stay marked as applied after reloading. When disabled applied state is only kept in memory",
+                    "order": 11
                 }
             }
         },

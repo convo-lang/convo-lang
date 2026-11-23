@@ -4,6 +4,7 @@ import { ExtensionContext, languages, window } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { registerAnswerQuestionsCommand } from './answer-questions.js';
 import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCodeBlockAppliedState } from './code-block-applied.js';
 import { registerCodeBlockReview } from './code-block-review.js';
 import { registerCompletionCommands } from './completion-provider.js';
 import { registerConvoCodeBlockView } from './convo-code-block-view.js';
@@ -26,6 +27,7 @@ export function activate(context:ExtensionContext){
 
     const ext=new ConvoExt();
 
+    registerCodeBlockAppliedState(context,ext);
     registerCompletionCommands(context,ext);
     registerTypingHandler(context);
     registerImagePasteHandler(context,ext);

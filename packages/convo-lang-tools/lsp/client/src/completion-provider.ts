@@ -8,7 +8,8 @@ import { realpath } from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, ProgressLocation, Range, Selection, TextDocument, Uri, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { extensionPublisher } from './build-const.js';
-import { OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
+import { markCodeBlocksApplied } from './code-block-applied.js';
+import { OutputTagBase, OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
 import { notifyCompletionAsync } from './completion-notification.js';
 import { ConvoCliShell } from './ConvoCliShell.js';
 import { ConvoExt } from './ConvoExt.js';
@@ -907,7 +908,7 @@ export const registerCompletionCommands=(context:ExtensionContext,ext:ConvoExt)=
         if(showingConfigChange){
             return;
         }
-        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion')){
+        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion') && !e.affectsConfiguration('convo.persistAppliedCodeBlocks')){
             clearTimeout(configChangeIv);
             configChangeIv=setTimeout(()=>{
                 showingConfigChange=true;
@@ -1036,7 +1037,8 @@ const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=
                 }
                 replaced.add(tag.targetPath);
             }
-            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true});
+            const applied:OutputTagBase[]=[];
+            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true,appliedTags:applied});
             if(content===undefined){
                 void window.showErrorMessage(`Stopped applying code blocks at ${path.basename(tag.targetPath)}`);
                 return;
@@ -1045,6 +1047,7 @@ const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=
                 void window.showErrorMessage(`Failed to write output to ${tag.targetPath}. Stopped applying code blocks.`);
                 return;
             }
+            markCodeBlocksApplied(applied);
             written.add(tag.targetPath);
         }else if(tag.type==='op'){
             if(!await applyFileOpAsync(args,{autoConfirm:true})){

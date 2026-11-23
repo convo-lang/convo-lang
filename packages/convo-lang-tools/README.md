@@ -83,9 +83,11 @@ icon in the top right of any `.convo` file, or by running `Convo: Open Settings`
 | `convo.awsBedrockRegion`       | `us-east-1`                | AWS region used for Bedrock                                                                |
 | `convo.notifyOnCompletion`     | `true`                     | Show a notification when a completion finishes for a document that is not the active editor |
 | `convo.alwaysRunOutputScripts` | `false`                    | Run `RUNNABLE_SCRIPT` blocks without a confirmation prompt                                 |
+| `convo.persistAppliedCodeBlocks` | `true`                   | Save the applied state of code blocks across reloads. When off, it is kept in memory only  |
 
-When a `convo.*` setting changes, other than `convo.notifyOnCompletion`, the extension asks you to
-reload the window so the change takes effect.
+When a `convo.*` setting changes, other than `convo.notifyOnCompletion` and
+`convo.persistAppliedCodeBlocks`, the extension asks you to reload the window so the change takes
+effect.
 
 
 ## Quick Start
@@ -487,6 +489,14 @@ The Convo-Lang activity bar includes a Code Blocks view. It lists the output blo
 - Each message group shows its role, its age (for messages with a time tag) and a block count
   badge. The last message is highlighted.
 - Clicking a group or block jumps to it in the document.
+- File blocks show their target path relative to the project. Files outside the workspace show
+  the absolute path.
+- Blocks that have been written, applied or run are dimmed and marked `applied`, or `ran` for
+  scripts. This works from code lenses, the Code Blocks view, guided reviews and
+  `Complete and Apply All`. Find-replace blocks whose find text isn't found are not marked.
+  Editing a block doesn't reset its state.
+- Applied state is saved per workspace. Set `convo.persistAppliedCodeBlocks` to `false` to keep it
+  in memory only.
 - Inline actions on file blocks: Open, Write, Diff and Copy.
 - Inline actions on script blocks: Run Script and Run Script and Complete.
 - Inline actions on file operation blocks: Apply and Preview.

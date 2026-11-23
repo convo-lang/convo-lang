@@ -1,0 +1,512 @@
+@import ./_extension.convo !template
+
+> user
+After a code block is applied display it in the list as applied
+
+Only display the project path instead of absolute path to the right of the file block target file name
+
+@time 2026-11-21T13:52:11-05:00
+@tokenUsage 141816 / 1029 / $0.587844
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+I have a few questions before making changes.
+
+1. Which actions should mark a block as applied?
+   - a) Only file blocks (Write Output, Apply All, guided review, Complete and Apply All)
+   - b) File blocks and file operations
+   - c) File blocks, file operations, and scripts that were run (shown as "ran")
+
+2. How should applied state be tracked?
+   - a) In memory, keyed by document, message index and block index. Cleared on reload.
+   - b) Saved in workspaceState so it survives reloads
+   - c) Detected by comparing the target file's current content to the block output. This also catches blocks applied outside the view, but costs a file read per block on refresh and doesn't work for file ops or scripts.
+   - d) Combination of a or b for ops and scripts, and c for file blocks
+
+3. How should an applied block look in the Code Blocks view?
+   - a) Swap the icon for a check icon (`pass` / `check`)
+   - b) Append `• applied` to the description
+   - c) Dim the item using a file decoration, like the separator
+   - d) Some combination of the above (please specify)
+
+4. If a block's content is edited after it was applied, should it revert to not applied?
+   - a) Yes
+   - b) No, keep it applied until reload or until state is cleared
+
+5. For the project path in the description:
+   - a) Use `workspace.asRelativePath(targetPath,false)`, for example `src/example.ts`
+   - b) Same, but include the workspace folder name in multi-root workspaces
+   
+   For files outside the workspace:
+   - c) Show the absolute path
+   - d) Show the path relative to the convo file
+
+6. Should the same project-relative path also be used elsewhere?
+   - a) Only the file block description in the Code Blocks view
+   - b) Also the tooltip (currently `Path: <absolute>`)
+   - c) Also the file operation descriptions, which currently show the raw attribute paths
+
+
+> user
+1. c
+2. b by default, add an option to the extension config to disable and only store in memory
+3. b and c
+4. b
+5. b, c
+6. a
+
+
+@time 2026-11-23T05:45:18-05:00
+@tokenUsage 144766 / 14497 / $0.8690040000000001
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes. Applied state lives in a new `code-block-applied.ts` file. It's saved in workspace state unless the new `convo.persistAppliedCodeBlocks` setting is turned off.
+
+Blocks are marked at the point where each change actually happens:
+- **File blocks:** when written.
+- **Find-replace blocks:** only the blocks whose find text was found are marked.
+- **File operations:** when applied.
+- **Scripts:** marked `ran` once you confirm the run.
+
+In the Code Blocks view, marked blocks show `• applied` or `• ran` in their description and are dimmed. File blocks now show their path relative to the project instead of the absolute path.
+
+<FILE_CONTENT name="code-block-applied.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-applied.ts">
+``` ts
+import { EventEmitter, ExtensionContext, Uri, workspace } from 'vscode';
+import type { OutputTagBase } from './code-block-lib.js';
+import { ConvoExt } from './ConvoExt.js';
+
+/**
+ * Status of a code block that has been acted on. File blocks and file operations are `applied`,
+ * scripts are `ran`.
+ */
+export type CodeBlockAppliedStatus='applied'|'ran';
+
+type AppliedRef=Pick<OutputTagBase,'documentUri'|'index'|'codeBlock'>;
+
+const stateKey='convo.codeBlocks.applied';
+const persistConfigKey='persistAppliedCodeBlocks';
+
+/**
+ * Applied status of blocks keyed by document URI then by `{messageIndex}:{blockIndex}`
+ */
+let appliedState:Record<string,Record<string,CodeBlockAppliedStatus>>={};
+let extContext:ExtensionContext|undefined;
+
+/**
+ * Fires with the URI of the convo document when the applied state of one of its blocks changes
+ */
+export const codeBlockAppliedChangeEmitter=new EventEmitter<Uri>();
+
+/**
+ * Registers tracking of applied code blocks. State is saved in workspace state unless
+ * `convo.persistAppliedCodeBlocks` is false, in which case it is only kept in memory.
+ */
+export const registerCodeBlockAppliedState=(context:ExtensionContext,ext:ConvoExt)=>{
+    extContext=context;
+    if(isPersistEnabled()){
+        appliedState={...context.workspaceState.get<typeof appliedState>(stateKey)};
+    }
+    context.subscriptions.push(
+        codeBlockAppliedChangeEmitter,
+        workspace.onDidChangeConfiguration(e=>{
+            if(e.affectsConfiguration(`convo.${persistConfigKey}`)){
+                void saveAsync();
+            }
+        }),
+    );
+}
+
+/**
+ * Marks the given blocks with the given status
+ */
+export const markCodeBlocksApplied=(tags:AppliedRef[],status:CodeBlockAppliedStatus='applied')=>{
+    const uris=new Map<string,Uri>();
+    for(const tag of tags){
+        const key=tag.documentUri.toString();
+        (appliedState[key]??={})[getBlockKey(tag)]=status;
+        uris.set(key,tag.documentUri);
+    }
+    if(!uris.size){
+        return;
+    }
+    void saveAsync();
+    for(const uri of uris.values()){
+        codeBlockAppliedChangeEmitter.fire(uri);
+    }
+}
+
+/**
+ * Returns the applied status of the given block or undefined if it has not been applied
+ */
+export const getCodeBlockAppliedStatus=(tag:AppliedRef):CodeBlockAppliedStatus|undefined=>{
+    return appliedState[tag.documentUri.toString()]?.[getBlockKey(tag)];
+}
+
+const getBlockKey=(tag:AppliedRef):string=>`${tag.codeBlock.messageIndex}:${tag.index}`;
+
+const isPersistEnabled=():boolean=>workspace.getConfiguration('convo').get<boolean>(persistConfigKey,true);
+
+const saveAsync=async ():Promise<void>=>{
+    await extContext?.workspaceState.update(stateKey,isPersistEnabled()?appliedState:undefined);
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+//// replace-with ////
+import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
+import { registerCodeBlockAppliedState } from './code-block-applied.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="extension.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/extension.ts" find-replace>
+``` ts
+    const ext=new ConvoExt();
+
+//// replace-with ////
+    const ext=new ConvoExt();
+
+    registerCodeBlockAppliedState(context,ext);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+import { revealDocumentInVisibleEditorsAsync } from './util';
+//// replace-with ////
+import { revealDocumentInVisibleEditorsAsync } from './util';
+import { markCodeBlocksApplied } from './code-block-applied.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+    const targetPath=tag.targetPath;
+    const outputContent=await getCodeBlockOutputAsync(tag);
+    if(outputContent===undefined){
+        return;
+    }
+
+    if(!await writeFileContentAsync(targetPath,outputContent)){
+        void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+        return;
+    }
+
+//// replace-with ////
+    const targetPath=tag.targetPath;
+    const applied:OutputTagBase[]=[];
+    const outputContent=await getCodeBlockOutputAsync(tag,{appliedTags:applied});
+    if(outputContent===undefined){
+        return;
+    }
+
+    if(!await writeFileContentAsync(targetPath,outputContent)){
+        void window.showErrorMessage(`Failed to write output to ${targetPath}`);
+        return;
+    }
+
+    markCodeBlocksApplied(applied);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+    failOnNotFound?:boolean;
+}
+//// replace-with ////
+    failOnNotFound?:boolean;
+    /**
+     * Receives the blocks included in the output. Blocks with find-replace targets that are not
+     * found are not included.
+     */
+    appliedTags?:OutputTagBase[];
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+    if(!isPartialConvoCodeBlock(tag.codeBlock)){
+        return tag.codeBlock.content;
+    }
+//// replace-with ////
+    if(!isPartialConvoCodeBlock(tag.codeBlock)){
+        options?.appliedTags?.push(tag);
+        return tag.codeBlock.content;
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+            }else{
+                content=replacement.content;
+            }
+//// replace-with ////
+            }else{
+                content=replacement.content;
+                options?.appliedTags?.push(r);
+            }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" find-replace>
+``` ts
+        const allowed=await confirmShellRunAsync(context,tag);
+        if(!allowed){
+            return;
+        }
+    }
+//// replace-with ////
+        const allowed=await confirmShellRunAsync(context,tag);
+        if(!allowed){
+            return;
+        }
+    }
+
+    markCodeBlocksApplied([tag],'ran');
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="file-op-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/file-op-lib.ts" find-replace>
+``` ts
+import { HasArgs, OutputTagBase, OutputTagCodeLensArgs, getFileBlockArgs, getOutputTagFromArgsAsync } from './code-block-lib.js';
+//// replace-with ////
+import { markCodeBlocksApplied } from './code-block-applied.js';
+import { HasArgs, OutputTagBase, OutputTagCodeLensArgs, getFileBlockArgs, getOutputTagFromArgsAsync } from './code-block-lib.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="file-op-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/file-op-lib.ts" find-replace>
+``` ts
+    if(!autoConfirm){
+        void window.showInformationMessage(`Applied ${plan.label}`);
+    }
+    return true;
+//// replace-with ////
+    markCodeBlocksApplied([tag]);
+
+    if(!autoConfirm){
+        void window.showInformationMessage(`Applied ${plan.label}`);
+    }
+    return true;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+import { OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
+//// replace-with ////
+import { markCodeBlocksApplied } from './code-block-applied.js';
+import { OutputTagBase, OutputTagCodeLensArgs, getCodeBlockOutputAsync, getParsedOutputTagGroups, writeFileContentAsync } from './code-block-lib.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion')){
+//// replace-with ////
+        if(e.affectsConfiguration('convo') && !e.affectsConfiguration('convo.notifyOnCompletion') && !e.affectsConfiguration('convo.persistAppliedCodeBlocks')){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" find-replace>
+``` ts
+            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true});
+            if(content===undefined){
+                void window.showErrorMessage(`Stopped applying code blocks at ${path.basename(tag.targetPath)}`);
+                return;
+            }
+            if(!await writeFileContentAsync(tag.targetPath,content)){
+                void window.showErrorMessage(`Failed to write output to ${tag.targetPath}. Stopped applying code blocks.`);
+                return;
+            }
+//// replace-with ////
+            const applied:OutputTagBase[]=[];
+            const content=await getCodeBlockOutputAsync(args,{failOnNotFound:true,appliedTags:applied});
+            if(content===undefined){
+                void window.showErrorMessage(`Stopped applying code blocks at ${path.basename(tag.targetPath)}`);
+                return;
+            }
+            if(!await writeFileContentAsync(tag.targetPath,content)){
+                void window.showErrorMessage(`Failed to write output to ${tag.targetPath}. Stopped applying code blocks.`);
+                return;
+            }
+            markCodeBlocksApplied(applied);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" find-replace>
+``` ts
+import { ConvoExt } from './ConvoExt.js';
+//// replace-with ////
+import { ConvoExt } from './ConvoExt.js';
+import { markCodeBlocksApplied } from './code-block-applied.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" find-replace>
+``` ts
+            const preview=buildFilePreview(base??'',getPageSteps(steps,targetPath));
+            for(const nf of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${nf.tag.index+1}`);
+            }
+            if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
+                continue;
+            }
+            if(await writeFileContentAsync(targetPath,preview.content)){
+                written++;
+//// replace-with ////
+            const fileSteps=getPageSteps(steps,targetPath);
+            const preview=buildFilePreview(base??'',fileSteps);
+            for(const nf of preview.notFound){
+                errors.push(`find-replace target not found. path:${targetPath}, block:#${nf.tag.index+1}`);
+            }
+            if(preview.content===base || (base===undefined && !preview.labels.some(l=>l.ranges.length))){
+                continue;
+            }
+            if(await writeFileContentAsync(targetPath,preview.content)){
+                written++;
+                markCodeBlocksApplied(fileSteps.filter(fs=>!preview.notFound.includes(fs)).map(fs=>fs.tag));
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+import { ConvoExt } from './ConvoExt.js';
+//// replace-with ////
+import { ConvoExt } from './ConvoExt.js';
+import { codeBlockAppliedChangeEmitter, getCodeBlockAppliedStatus } from './code-block-applied.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        provider.handleDocumentChanged(document);
+    }));
+//// replace-with ////
+    context.subscriptions.push(workspace.onDidSaveTextDocument((document)=>{
+        provider.handleDocumentChanged(document);
+    }));
+
+    context.subscriptions.push(codeBlockAppliedChangeEmitter.event(()=>{
+        provider.refresh();
+    }));
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+            case 'convo-code-separator':{
+
+                return {
+                    color:new vscode.ThemeColor('disabledForeground'),
+                    propagate:false,
+                };
+            }
+//// replace-with ////
+            case 'convo-code-separator':{
+
+                return {
+                    color:new vscode.ThemeColor('disabledForeground'),
+                    propagate:false,
+                };
+            }
+
+            case 'convo-code-block-applied':
+                return {
+                    color:new vscode.ThemeColor('disabledForeground'),
+                    propagate:false,
+                };
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+        super(provider,getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        this.description=getItemDescription(tag);
+//// replace-with ////
+        super(provider,getItemLabel(tag),TreeItemCollapsibleState.None);
+
+        const status=getCodeBlockAppliedStatus(tag);
+        this.description=`${getItemDescription(tag)}${status?` • ${status}`:''}`;
+        if(status){
+            this.resourceUri=Uri.parse(`convo-code-block-applied://${tag.codeBlock.messageIndex}-${tag.index}/${encodeURIComponent(tag.documentUri.toString())}`);
+        }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" find-replace>
+``` ts
+        `${lang} • ${tag.targetPath}`
+//// replace-with ////
+        `${lang} • ${workspace.asRelativePath(tag.targetPath)}`
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "convo.alwaysRunOutputScripts": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
+                    "order": 10
+                }
+//// replace-with ////
+                "convo.alwaysRunOutputScripts": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
+                    "order": 10
+                },
+                "convo.persistAppliedCodeBlocks": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Save which code blocks have been applied in workspace state so they stay marked as applied after reloading. When disabled applied state is only kept in memory",
+                    "order": 11
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+``` md
+| `convo.alwaysRunOutputScripts` | `false`                    | Run `RUNNABLE_SCRIPT` blocks without a confirmation prompt                                 |
+//// replace-with ////
+| `convo.alwaysRunOutputScripts` | `false`                    | Run `RUNNABLE_SCRIPT` blocks without a confirmation prompt                                 |
+| `convo.persistAppliedCodeBlocks` | `true`                   | Save the applied state of code blocks across reloads. When off, it is kept in memory only  |
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+``` md
+When a `convo.*` setting changes, other than `convo.notifyOnCompletion`, the extension asks you to
+reload the window so the change takes effect.
+//// replace-with ////
+When a `convo.*` setting changes, other than `convo.notifyOnCompletion` and
+`convo.persistAppliedCodeBlocks`, the extension asks you to reload the window so the change takes
+effect.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+``` md
+- Clicking a group or block jumps to it in the document.
+//// replace-with ////
+- Clicking a group or block jumps to it in the document.
+- File blocks show their target path relative to the project. Files outside the workspace show
+  the absolute path.
+- Blocks that have been written, applied or run are dimmed and marked `applied`, or `ran` for
+  scripts. This works from code lenses, the Code Blocks view, guided reviews and
+  `Complete and Apply All`. Find-replace blocks whose find text isn't found are not marked.
+  Editing a block doesn't reset its state.
+- Applied state is saved per workspace. Set `convo.persistAppliedCodeBlocks` to `false` to keep it
+  in memory only.
+```
+</FILE_CONTENT>
+
+
+> user

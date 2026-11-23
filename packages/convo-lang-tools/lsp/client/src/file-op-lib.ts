@@ -4,6 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ExtensionContext, RelativePattern, Uri, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
+import { markCodeBlocksApplied } from './code-block-applied.js';
 import { HasArgs, OutputTagBase, OutputTagCodeLensArgs, getFileBlockArgs, getOutputTagFromArgsAsync } from './code-block-lib.js';
 
 const globReg=/[*?{}[\]]/;
@@ -220,6 +221,8 @@ export const applyFileOpAsync=async (tag:OutputTagBase,{autoConfirm}:ApplyFileOp
         void window.showErrorMessage(`${plan.label}: ${getErrorMessage(ex)}`);
         return false;
     }
+
+    markCodeBlocksApplied([tag]);
 
     if(!autoConfirm){
         void window.showInformationMessage(`Applied ${plan.label}`);

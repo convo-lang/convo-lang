@@ -3,6 +3,7 @@ import { getErrorMessage } from '@iyio/common';
 import * as path from 'path';
 import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputText, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
+import { markCodeBlocksApplied } from './code-block-applied.js';
 import { MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, getParsedOutputTagGroups, outputPreviewChangeEmitter, outputPreviewContent, readFileContentAsync, writeFileContentAsync } from './code-block-lib.js';
 import { applyFileOpAsync, getFileOpPreviewText, resolveFileOpAsync } from './file-op-lib.js';
 
@@ -636,7 +637,8 @@ const applyAcceptedAsync=async (steps:ReviewStep[]):Promise<void>=>{
 
         try{
             const base=await readFileContentAsync(targetPath);
-            const preview=buildFilePreview(base??'',getPageSteps(steps,targetPath));
+            const fileSteps=getPageSteps(steps,targetPath);
+            const preview=buildFilePreview(base??'',fileSteps);
             for(const nf of preview.notFound){
                 errors.push(`find-replace target not found. path:${targetPath}, block:#${nf.tag.index+1}`);
             }
@@ -645,6 +647,7 @@ const applyAcceptedAsync=async (steps:ReviewStep[]):Promise<void>=>{
             }
             if(await writeFileContentAsync(targetPath,preview.content)){
                 written++;
+                markCodeBlocksApplied(fileSteps.filter(fs=>!preview.notFound.includes(fs)).map(fs=>fs.tag));
             }else{
                 errors.push(`Failed to write output to ${targetPath}`);
             }

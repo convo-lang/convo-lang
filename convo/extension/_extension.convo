@@ -1,4 +1,6 @@
 @import ../base.convo
+@import ../../tsconfig.base.json !file
+@import ../../tsconfig.json !file
 @import ../../packages/convo-lang-tools/README.md !file
 @import ../../packages/convo-lang-tools/package.json !file
 @import ../../packages/convo-lang-tools/syntaxes/* !file

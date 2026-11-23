@@ -8,6 +8,7 @@ import { Readable } from 'stream';
 import * as vscode from 'vscode';
 import { commands, ExtensionContext, Range, Uri, window, workspace, WorkspaceEdit } from "vscode";
 import { revealDocumentInVisibleEditorsAsync } from './util';
+import { markCodeBlocksApplied } from './code-block-applied.js';
 
 export interface OutputTagBase
 {
@@ -289,7 +290,8 @@ export const writeFileContentAsync=async (targetPath:string,content:string):Prom
 
 const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
     const targetPath=tag.targetPath;
-    const outputContent=await getCodeBlockOutputAsync(tag);
+    const applied:OutputTagBase[]=[];
+    const outputContent=await getCodeBlockOutputAsync(tag,{appliedTags:applied});
     if(outputContent===undefined){
         return;
     }
@@ -299,6 +301,7 @@ const _writeOutputTagAsync=async (tag:OutputTagBase):Promise<void>=>{
         return;
     }
 
+    markCodeBlocksApplied(applied);
     void window.showInformationMessage(`Wrote output to ${targetPath}`);
 }
 
@@ -308,6 +311,11 @@ export interface CodeBlockOutputOptions
      * If true undefined is returned when any find-replace target is not found
      */
     failOnNotFound?:boolean;
+    /**
+     * Receives the blocks included in the output. Blocks with find-replace targets that are not
+     * found are not included.
+     */
+    appliedTags?:OutputTagBase[];
 }
 
 /**
@@ -318,6 +326,7 @@ export interface CodeBlockOutputOptions
 export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
     const targetPath=tag.targetPath;
     if(!isPartialConvoCodeBlock(tag.codeBlock)){
+        options?.appliedTags?.push(tag);
         return tag.codeBlock.content;
     }
     try{
@@ -338,6 +347,7 @@ export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlock
                 notFound.push(`find-replace target not found. path:${tag.documentUri}, index:${r.codeBlock.index}, separator:${r.codeBlock.findReplaceSeparator??defaultConvoFindReplaceSeparator}`)
             }else{
                 content=replacement.content;
+                options?.appliedTags?.push(r);
             }
         }
         if(notFound.length){
@@ -437,6 +447,8 @@ export const executeShellOutputTagAsync=async (
             return;
         }
     }
+
+    markCodeBlocksApplied([tag],'ran');
 
     const document=await workspace.openTextDocument(tag.documentUri);
     const scriptName=escapeXmlAttr(targetPath);
