@@ -24,14 +24,14 @@
         "bin/"
     ],
     "optionalDependencies": {
-        "@convo-lang/cli-linux-x64": "0.9.12",
-        "@convo-lang/cli-linux-arm64": "0.9.12",
-        "@convo-lang/cli-windows-x64": "0.9.12",
-        "@convo-lang/cli-windows-arm64": "0.9.12",
-        "@convo-lang/cli-darwin-x64": "0.9.12",
-        "@convo-lang/cli-darwin-arm64": "0.9.12",
-        "@convo-lang/cli-linux-x64-musl": "0.9.12",
-        "@convo-lang/cli-linux-arm64-musl": "0.9.12"
+        "@convo-lang/cli-linux-x64": "0.9.13",
+        "@convo-lang/cli-linux-arm64": "0.9.13",
+        "@convo-lang/cli-windows-x64": "0.9.13",
+        "@convo-lang/cli-windows-arm64": "0.9.13",
+        "@convo-lang/cli-darwin-x64": "0.9.13",
+        "@convo-lang/cli-darwin-arm64": "0.9.13",
+        "@convo-lang/cli-linux-x64-musl": "0.9.13",
+        "@convo-lang/cli-linux-arm64-musl": "0.9.13"
     },
     "publishConfig": {
         "access": "public"
