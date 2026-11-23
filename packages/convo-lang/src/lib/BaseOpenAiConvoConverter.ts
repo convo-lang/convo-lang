@@ -243,13 +243,31 @@ export class BaseOpenAiConvoConverter implements ConvoConversationConverter<Chat
                     if(items.length===1 && (typeof items[0]?.text === 'string')){
                         content=items[0]?.text??'';
                     }else{
-                        content=items.map<ChatCompletionContentPart>(i=>i.image?{
-                            type:'image_url',
-                            image_url:{url:i.image.url}
-                        }:{
-                            type:'text',
-                            text:i.text??''
-                        })
+                        let hasImg=false;
+                        content=items.map<ChatCompletionContentPart>(i=>{
+                            if(i.image){
+                                if(i.image.url.startsWith('data:')){
+                                    hasImg=true;
+                                    return {
+                                        type:'image_url',
+                                        image_url:{url:i.image.url}
+                                    }
+                                }else{
+                                    return {
+                                        type:'text',
+                                        text:i.text??''
+                                    }
+                                }
+                            }else{
+                                return {
+                                    type:'text',
+                                    text:i.text??''
+                                }
+                            }
+                        });
+                        if(!hasImg){
+                            content=m.content??'';
+                        }
                     }
                 }else{
                     content=m.content??'';
