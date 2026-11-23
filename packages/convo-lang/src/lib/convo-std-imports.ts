@@ -1,5 +1,8 @@
-import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction } from "./convo-lib.js";
-import { ConvoImport, ConvoModule } from "./convo-types.js";
+import { getErrorMessage } from "@iyio/common";
+import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction, defaultConvoWebSearchLimit } from "./convo-lib.js";
+import { convoImportMessageWrapper, convoWebSearchMessageWrapper } from "./convo-message-wrappers.js";
+import { ConvoImport, ConvoModule, ConvoWebSearchResult } from "./convo-types.js";
+import { convoWebSearchService } from "./convo.deps.js";
 
 export const getStdConvoImportAsync=async (name:string):Promise<ConvoModule|undefined>=>{
     if(name.startsWith(convoStdImportPrefix)){
@@ -329,7 +332,7 @@ When asked to run Python code you should use a ${t}RUNNABLE_SCRIPT${t}
 Use the ${t}addFileImports${t} function to import files by name. Files imported using ${t}addFileImports${t} will be updated in place in context as changes are made to the files, so reimporting is unnecessary after making a change.
 
 # Imports files in to context. Returns an array of file paths imported.
-@importWrapper
+@messageWrapper startFileImport endFileImport
 > extern addFileImports(
     # Paths of files to import
     paths:array(string)
@@ -338,6 +341,44 @@ Use the ${t}addFileImports${t} function to import files by name. Files imported 
             externScopeFunctions:{
                 addFileImports,
             },
+            messageWrappers:[convoImportMessageWrapper],
+        };
+
+        case 'web-search.convo':return {
+            name,
+            uri:name,
+            convo:/*convo*/`
+> define
+SearchResultItem=struct(
+    # Link to source
+    link?:string
+    result:string
+)
+SearchResult=struct(
+    results:array(SearchResultItem)
+)
+
+> system
+Use the ${t}searchWeb${t} function to search the web when you need current information or
+information you do not know.
+
+# Searches the web and returns a list of results
+@messageWrapper searchWeb searchResult
+> extern searchWeb(
+    # Search query
+    query:string
+    # Max number of results to return. Defaults to ${defaultConvoWebSearchLimit}
+    limit?:number
+    # Number of results to skip
+    offset?:number
+    # If true the content of the page each result links to is included in the result. This is slower and should only be used when result snippets are not enough
+    includeLinkTarget?:boolean
+) -> SearchResult
+`.trim(),
+            externScopeFunctions:{
+                searchWeb,
+            },
+            messageWrappers:[convoWebSearchMessageWrapper],
         };
 
         default:
@@ -362,6 +403,36 @@ const addFileImports=createConvoScopeFunction((scope,ctx)=>{
         convoVars.__resultImports
     );
     return paths;
+});
+
+/**
+ * Searches the web using the registered `convoWebSearchService`. Errors are returned as a result
+ * item so the model can see them.
+ */
+const searchWeb=createConvoScopeFunction(async (scope)=>{
+    const args=convoLabeledScopeParamsToObj(scope);
+    const query=args['query']??scope.paramValues?.[0];
+    const errorResult=(error:string):ConvoWebSearchResult=>({results:[{result:`Web search failed: ${error}`}]});
+
+    const service=convoWebSearchService.get();
+    if(!service){
+        return errorResult('No web search service is configured');
+    }
+    if(typeof query !== 'string' || !query.trim()){
+        return errorResult('A search query is required');
+    }
+
+    try{
+        const r=await service.searchAsync({
+            query,
+            limit:args['limit']??defaultConvoWebSearchLimit,
+            offset:args['offset'],
+            includeLinkTarget:args['includeLinkTarget'],
+        });
+        return r.success?r.result:errorResult(r.error);
+    }catch(ex){
+        return errorResult(getErrorMessage(ex));
+    }
 });
 
 export const convoStdImportHandler=async (_import:ConvoImport):Promise<ConvoModule|undefined>=>{

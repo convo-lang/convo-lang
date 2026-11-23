@@ -1,4 +1,4 @@
-import { convoDefaultModelParam, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam } from "@convo-lang/convo-lang";
+import { convoDefaultModelParam, firecrawlApiKeyParam, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam } from "@convo-lang/convo-lang";
 import { awsBedrockApiKeyParam, awsBedrockProfileParam, awsBedrockRegionParam } from "@convo-lang/convo-lang-bedrock";
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCliConfig, createConvoCliAsync } from "@convo-lang/convo-lang-cli";
@@ -161,6 +161,8 @@ export class ConvoExt
 
                 [openRouterApiKeyParam.typeName]:config.get<string>('openRouterApiKey')?.trim()||undefined,
                 [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
+
+                [firecrawlApiKeyParam.typeName]:config.get<string>('firecrawlApiKey')?.trim()||undefined,
 
             }) as Record<string,string>,
             unregisteredVars:{

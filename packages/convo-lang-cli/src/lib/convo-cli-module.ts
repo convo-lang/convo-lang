@@ -1,4 +1,4 @@
-import { ConvoHttpImportService, ConvoProjectConfig, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
+import { ConvoHttpImportService, ConvoProjectConfig, FirecrawlConvoWebSearch, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoWebSearchService, firecrawlApiKeyParam, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
 import type { ConvoDbLayerConfig } from '@convo-lang/db/LayeredConvoDb.js';
 import { EnvParams, ScopeRegistration, deleteUndefined } from "@iyio/common";
@@ -48,6 +48,11 @@ export const convoCliModule=(
     scope.use(convoOpenRouterModule);
     //reg.use(convoAnthropicModule);
     scope.implementService(convoGitService,()=>new ConvoCliGitService());
+
+    const firecrawlApiKey=config.env?.[firecrawlApiKeyParam.typeName]||globalThis.process?.env['FIRECRAWL_API_KEY'];
+    if(firecrawlApiKey){
+        scope.implementService(convoWebSearchService,()=>new FirecrawlConvoWebSearch({apiKey:firecrawlApiKey}));
+    }
 
     convoCliDbModule(scope);
     

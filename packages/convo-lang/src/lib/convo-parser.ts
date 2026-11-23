@@ -1444,11 +1444,13 @@ export const parseConvoCode:CodeParser<ConvoMessage[],ConvoParsingOptions>=(code
                         break;
                     }
 
-                    case convoTags.importWrapper:
-                        if(msg.fn){
-                            msg.importWrapper=true;
+                    case convoTags.messageWrapper:{
+                        const [callRole,resultRole]=tag.value?.trim().split(/\s+/)??[];
+                        if(msg.fn && callRole && resultRole){
+                            msg.messageWrapper={callRole,resultRole};
                         }
                         break;
+                    }
 
                     case convoTags.docRef:
                         if(tag.value){

@@ -22,7 +22,7 @@ import { defaultConvoRagServiceCallback } from "./convo-rag-lib.js";
 import { ConvoDocumentReference, ConvoRagCallback } from "./convo-rag-types.js";
 import { convoStdImportHandler } from "./convo-std-imports.js";
 import { convoScript } from "./convo-template.js";
-import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionChunk, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoFlatMessageSourceMessageKey, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
+import { AppendConvoMessageObjOptions, AppendConvoOptions, BeforeCreateConversationExeCtx, CloneConversationOptions, ConvoAgentDef, ConvoAppend, ConvoCapability, ConvoCompletion, ConvoCompletionChunk, ConvoCompletionMessage, ConvoCompletionOptions, ConvoCompletionService, ConvoCompletionServiceAndModel, ConvoCompletionStartEvt, ConvoConversationCache, ConvoConversationConverter, ConvoDefItem, ConvoExecuteResult, ConvoFlatCompletionCallback, ConvoFnCallInfo, ConvoFunction, ConvoFunctionDef, ConvoImport, ConvoImportContext, ConvoImportHandler, ConvoImportService, ConvoImportSourceEvt, ConvoImportTest, ConvoMarkdownLine, ConvoMessage, ConvoMessageAndOptStatement, ConvoMessageModification, ConvoMessagePart, ConvoMessagePrefixOptions, ConvoMessageTemplate, ConvoMessageTriggerEvent, ConvoMessageWrapperHandler, ConvoModelInfo, ConvoModelInputOutputPair, ConvoModule, ConvoObject, ConvoParsingResult, ConvoPostCompletionMessage, ConvoPrintFunction, ConvoQueueRef, ConvoRagMode, ConvoScope, ConvoScopeFunction, ConvoStartOfConversationCallback, ConvoStatement, ConvoSubTask, ConvoTag, ConvoTask, ConvoThreadFilter, ConvoTokenUsage, ConvoTransformResult, ConvoTrigger, ConvoTypeDef, ConvoVarDef, FlatConvoConversation, FlatConvoConversationBase, FlatConvoMessage, FlatConvoTransform, FlattenConvoOptions, ForkConversationOptions, InlineConvoPrompt, allConvoMessageModificationAction, baseConvoToolChoice, convoFlatMessageSourceMessageKey, convoImportMatchRegKey, convoMessageSourcePathKey, convoObjFlag, isConvoCapability, isConvoMessageModification, isConvoMessageModificationAction, isConvoRagMode, isConvoReasoningEffort, isConvoResponseVerbosity } from "./convo-types.js";
 import { schemeToConvoTypeString, zodSchemeToConvoTypeString } from "./convo-zod.js";
 import { convoCacheService, convoCompletionService, convoConversationConverterProvider, convoDefaultModelParam, convoGitService, convoImportService } from "./convo.deps.js";
 import { isConvoObject } from "./convoAsync.js";
@@ -2541,12 +2541,7 @@ export class Conversation
                 if(additionalOptions?.returnOnCall && msg.callFn){
                     cMsg = msg;
                 }else if(msg.callFn){
-                    const importWrapper=(
-                        isDefaultTask &&
-                        !lastMsgIsFnCall &&
-                        !exe.getVar(convoVars.__disableImportWrappers) &&
-                        this._messages.some(m=>m.importWrapper && m.fn && !m.fn.call && m.fn.name===msg.callFn)
-                    );
+                    const messageWrapper=(isDefaultTask && !lastMsgIsFnCall)?this.getWriteMessageWrapper(msg.callFn,exe):undefined;
                     let callTags='';
                     let callMessage:ConvoMessage|undefined;
                     if(lastMsgIsFnCall){
@@ -2561,7 +2556,7 @@ export class Conversation
                         }(${
                             msg.callParams===undefined?'':spreadConvoArgs(msg.callParams,true)
                         })`
-                        const result=(isDefaultTask && !importWrapper)?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
+                        const result=(isDefaultTask && !messageWrapper)?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
                         includeTokenUsage=false;
                         callMessage=result.result?.[0];
                         if(result.result?.length!==1 || !callMessage){
@@ -2626,8 +2621,8 @@ export class Conversation
                     if(!nextCallerExcludeMessages){
                         nextCallerExcludeMessages=[];
                     }
-                    if(importWrapper){
-                        this.appendImportWrapper(exe,callTags);
+                    if(messageWrapper){
+                        this.appendMessageWrapper(messageWrapper,exe,callTags,msg.callParams,lastResultValue);
                     }else{
                         const lastContentMessage=getLastConvoContentMessage(flat.messages);
                         nextCallerExcludeMessages.push(...this.appendFunctionSetters(
@@ -3359,7 +3354,7 @@ export class Conversation
         this.importMessages.push(msg);
 
         // imports of result messages are inserted after the message so they follow the function call
-        const insertAfter=msg.role===convoRoles.result || msg.role===convoRoles.endFileImport;
+        const insertAfter=msg.role===convoRoles.result || this.getMessageWrapperHandler(msg.role)?.resultRole===msg.role;
         let afterIndex=insertAfter?this._messages.indexOf(msg)+1:0;
 
         for(const t of msg.tags){
@@ -3942,6 +3937,12 @@ export class Conversation
                     }
                 }
 
+                const messageWrapper=this.getMessageWrapperHandler(msg.role);
+                if(messageWrapper && (msg.role===messageWrapper.callRole || sourceMessages[i+1]?.role===messageWrapper.resultRole)){
+                    // merged into the flat function result created by the last result message of the wrapper
+                    continue;
+                }
+
                 let defaultLabel:string|undefined=undefined;
                 switch(msg.role){
 
@@ -4029,10 +4030,6 @@ export class Conversation
                         copySourceMessages();
                         sourceMessages.splice(i,1);
                         i--;
-                        continue messagesLoop;
-
-                    case convoRoles.startFileImport:
-                        // merged into the flat result created by endFileImport
                         continue messagesLoop;
 
                     default:
@@ -4168,8 +4165,8 @@ export class Conversation
                         maxTaskMsgCount=safeParseNumber(maxTasks,maxTaskMsgCount);
                     }
                 }
-                if(msg.role===convoRoles.endFileImport){
-                    if(!this.flattenImportWrapper(flat,msg,sourceMessages,i,exe)){
+                if(messageWrapper){
+                    if(!this.flattenMessageWrapper(messageWrapper,flat,sourceMessages,i,exe)){
                         continue;
                     }
                 }else if(msg.fn){
@@ -5953,7 +5950,7 @@ export class Conversation
     }
 
     /**
-     * Returns the source path of the most recent startFileImport, endFileImport or result message.
+     * Returns the source path of the most recent result or message wrapper message.
      * Messages added by imports are skipped since they use the path of the imported file. Falls
      * back to the last message with a source path.
      */
@@ -5965,7 +5962,7 @@ export class Conversation
             if(!msg || !path){
                 continue;
             }
-            if(resultSourcePathRoles.includes(msg.role)){
+            if(msg.role===convoRoles.result || this.getMessageWrapperHandler(msg.role)){
                 return path;
             }
             if(!fallback){
@@ -5976,50 +5973,100 @@ export class Conversation
     }
 
     /**
-     * Appends startFileImport and endFileImport messages in place of call and result messages
+     * Returns the message wrapper handler that uses the given role as its call or result role.
+     * Handlers are registered by imported modules.
      */
-    private appendImportWrapper(exe:ConvoExecutionContext,callTags:string){
-        const {importTags,filePath}=this.takeResultImports(exe);
-        this.append(
-            `${callTags}> ${convoRoles.startFileImport}\n${importTags}> ${convoRoles.endFileImport}\n`,
-            {filePath}
-        );
+    public getMessageWrapperHandler(role:string|null|undefined):ConvoMessageWrapperHandler|undefined{
+        if(!role){
+            return undefined;
+        }
+        for(const name in this.importedModules){
+            const handler=this.importedModules[name]?.messageWrappers?.find(h=>h.callRole===role || h.resultRole===role);
+            if(handler){
+                return handler;
+            }
+        }
+        return undefined;
     }
 
     /**
-     * Converts an endFileImport message into a flat function result equivalent to the call and
-     * result messages of the import wrapper function. Returns false if no import wrapper
-     * function is defined.
+     * Returns the message wrapper handler used to write calls to the given function. Undefined is
+     * returned if the function does not use a message wrapper or the wrapper is disabled.
      */
-    private flattenImportWrapper(
+    private getWriteMessageWrapper(fnName:string,exe:ConvoExecutionContext):ConvoMessageWrapperHandler|undefined{
+        if(exe.getVar(convoVars.__disableMessageWrappers)){
+            return undefined;
+        }
+        const wrapper=this._messages.find(m=>m.messageWrapper && m.fn && !m.fn.call && m.fn.name===fnName)?.messageWrapper;
+        const handler=wrapper?this.getMessageWrapperHandler(wrapper.callRole):undefined;
+        if( !wrapper ||
+            !handler ||
+            handler.callRole!==wrapper.callRole ||
+            handler.resultRole!==wrapper.resultRole ||
+            (handler.disableVar && exe.getVar(handler.disableVar))
+        ){
+            return undefined;
+        }
+        return handler;
+    }
+
+    /**
+     * Appends the messages created by the message wrapper in place of call and result messages
+     */
+    private appendMessageWrapper(
+        handler:ConvoMessageWrapperHandler,
+        exe:ConvoExecutionContext,
+        callTags:string,
+        args:any,
+        returnValue:any
+    ){
+        const {importTags,filePath}=this.takeResultImports(exe);
+        this.append(handler.toConvo({
+            callTags,
+            importTags,
+            args:(args && (typeof args === 'object') && !Array.isArray(args))?args:{},
+            returnValue,
+            exe,
+        }),{filePath});
+    }
+
+    /**
+     * Converts the last result message of a message wrapper into a flat function result
+     * equivalent to the call and result messages of the wrapped function. Returns false if the
+     * call message or wrapped function is not found.
+     */
+    private flattenMessageWrapper(
+        handler:ConvoMessageWrapperHandler,
         flat:FlatConvoMessage,
-        msg:ConvoMessage,
         messages:ConvoMessage[],
         index:number,
         exe:ConvoExecutionContext
     ):boolean{
-        let start:ConvoMessage|undefined;
-        for(let i=index-1;i>=0;i--){
-            const m=messages[i];
-            if(m?.role===convoRoles.startFileImport){
-                start=m;
-                break;
-            }
-            if(m?.role===convoRoles.endFileImport){
-                break;
-            }
+        let i=index;
+        while(i>=0 && messages[i]?.role===handler.resultRole){
+            i--;
         }
-        const fn=messages.find(m=>m.importWrapper && m.fn && !m.fn.call && (!start?.head || m.fn.name===start.head))?.fn;
+        const call=messages[i];
+        if(call?.role!==handler.callRole){
+            return false;
+        }
+        const fn=messages.find(m=>(
+            m.fn &&
+            !m.fn.call &&
+            m.messageWrapper?.callRole===handler.callRole &&
+            m.messageWrapper.resultRole===handler.resultRole &&
+            (!call.head || m.fn.name===call.head)
+        ))?.fn;
         if(!fn){
             return false;
         }
-        const paths=msg.tags?.filter(t=>t.name===convoTags.import && t.value).map(t=>parseBaseConvoImport(t.value??'').name)??[];
+        const {params,returnValue}=handler.fromMessages(call,messages.slice(i+1,index+1),fn);
         flat.role='function';
         flat.called=fn;
-        flat.calledParams={[fn.params[0]?.label??'paths']:paths};
-        flat.calledReturn=paths;
-        if(start?.tags){
-            flat.tags={...convoTagsToMap(start.tags,exe),...flat.tags};
+        flat.calledParams=params;
+        flat.calledReturn=returnValue;
+        if(call.tags){
+            flat.tags={...convoTagsToMap(call.tags,exe),...flat.tags};
         }
         return true;
     }
@@ -6285,15 +6332,6 @@ const secondPassRoles:(string|undefined)[]=[
     convoRoles.cacheBreakpoint,
 ]
 
-/**
- * Roles of messages written by the conversation after function calls. Their source path is used to
- * resolve relative result imports.
- */
-const resultSourcePathRoles:(string|undefined)[]=[
-    convoRoles.startFileImport,
-    convoRoles.endFileImport,
-    convoRoles.result,
-]
 
 
 

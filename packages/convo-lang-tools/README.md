@@ -20,6 +20,7 @@ VSCode tools for Convo-Lang
 - [Prompts as Source Files](#prompts-as-source-files)
 - [Example Workflows](#example-workflows)
 - [File Blocks and Bash Blocks](#file-blocks-and-bash-blocks)
+- [Web Search](#web-search)
 - [Working with Output Blocks](#working-with-output-blocks)
 - [Commands](#commands)
 - [Editor Features](#editor-features)
@@ -78,6 +79,7 @@ icon in the top right of any `.convo` file, or by running `Convo: Open Settings`
 | `convo.openAiApiKey`           |                            | OpenAI, or OpenAI compatible, API key                                                      |
 | `convo.openRouterBaseUrl`      | `https://openrouter.ai/api`| API base URL of OpenRouter                                                                 |
 | `convo.openRouterApiKey`       |                            | OpenRouter API key                                                                         |
+| `convo.firecrawlApiKey`        |                            | Firecrawl API key used by the web search tool (`std://web-search.convo`)                   |
 | `convo.awsBedrockProfile`      |                            | AWS profile name used for Bedrock                                                          |
 | `convo.awsBedrockApiKey`       |                            | AWS Bedrock API key                                                                        |
 | `convo.awsBedrockRegion`       | `us-east-1`                | AWS region used for Bedrock                                                                |
@@ -455,6 +457,42 @@ exit code, signal or cancellation is noted at the end of the output.
 
 Before running a script, the extension asks for confirmation. Choosing `Always Run Script` sets
 `convo.alwaysRunOutputScripts` to `true` and skips the prompt from then on.
+
+
+## Web Search
+
+Import the web search tool to let the model search the web:
+
+```convo
+@import std://web-search.convo
+```
+
+Web search uses Firecrawl. Set `convo.firecrawlApiKey` to a Firecrawl API key. If no key is set,
+calls to the tool return an error result that the model can see.
+
+The model calls the `searchWeb` function. Each call is written to the conversation as a
+`searchWeb` message, followed by one `searchResult` message per result:
+
+```convo
+@limit 3
+> searchWeb
+typescript allman brace formatter
+
+@sourceLink https://example.com/a
+> searchResult
+Example Title
+
+Snippet text...
+```
+
+- `limit` defaults to 5. `@limit` and `@offset` are only written when they are passed. Firecrawl
+  ignores `offset`.
+- `includeLinkTarget` adds the markdown of each result page in a `LINK_TARGET_CONTENT` tag. This is
+  slower and uses more Firecrawl credits. The call message is tagged `@includeLinkTarget`.
+- When there are no results, a single empty `searchResult` message tagged `@emptySearchResult` is
+  written.
+- Set `__disableWebSearchWrapper` to `true` to write normal call and result messages instead.
+  `__disableMessageWrappers` disables all message wrappers, including file import wrappers.
 
 
 ## Working with Output Blocks

@@ -1,0 +1,1516 @@
+@import ./_extension-and-core.convo !template
+
+> user
+Lets implement a web search tool that can be enabled by importing `std://web-search.convo`.
+The web search tool should use a custom message syntax similar to `startFileImport` and `endFileImport`.
+
+Custom messages Example:
+``` convo {{===
+// only define @limit and @offset if passed to the searchWeb function
+@limit N 
+@offset N
+> searchWeb
+Search query here
+
+@sourceLink URL of result here
+> searchResult
+Search result here
+===}}```
+
+Tool:
+``` convo {{===
+> define
+SearchResultItem=struct(
+    // Link to source
+    link?:string
+    result:string
+)
+SearchResult=struct(
+    results:array(SearchResultItem)
+)
+
+> searchWeb(query:string limit?:number offset?:number) -> SearchResult
+===}}```
+
+A new `ConvoWebSearch` service interface will need to be created.
+
+The first implementation will use Firecrawl using fetch, no package
+
+@time 2026-11-23T13:22:44-05:00
+@tokenUsage 425172 / 2158 / $1.743848
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write any code, I have some questions about the design.
+
+**1. How the custom messages get written**
+
+`startFileImport`/`endFileImport` currently depend on the `@importWrapper` tag and hard-coded logic in `Conversation`. For `searchWeb`/`searchResult`, should I:
+
+- a) Add a separate, specific tag such as `@webSearchWrapper`, with its own append and flatten logic next to the import wrapper code
+- b) Make it general: a `@messageWrapper callRole resultRole` tag, then refactor the import wrapper to use it too
+- c) Hard-code `searchWeb` only. No tag; the function name is matched directly
+
+**2. Result message granularity**
+
+Your example shows one `> searchResult` message per result, each with its own `@sourceLink`. Confirm:
+
+- a) One `searchResult` message per result item (as in the example)
+- b) A single `searchResult` message containing all results
+
+And when there are zero results:
+
+- a) Write a single empty `> searchResult`
+- b) Write nothing after `> searchWeb`
+
+**3. Flattening**
+
+When flattened, should `searchWeb` plus its following `searchResult` messages become one function call/result, like `endFileImport` does? In that case `calledParams` would be `{query,limit,offset}` and `calledReturn` would be the `SearchResult` object.
+
+- a) Yes
+- b) No, keep them as plain content messages (and say which role they should map to)
+
+**4. Opt-out variable**
+
+Should there be a `__disableWebSearchWrapper` variable, mirroring `__disableImportWrappers`, that falls back to normal call/result messages?
+
+- a) Yes
+- b) No
+
+**5. Service location and registration**
+
+- a) Put the `ConvoWebSearch` interface in `convo-types.ts`, add a `convoWebSearchService` dependency in `convo.deps.ts`, and put a `FirecrawlConvoWebSearch` class in `packages/convo-lang/src/lib/`
+- b) Same, but put the Firecrawl implementation in a new package (for example `@convo-lang/convo-lang-firecrawl`)
+
+**6. Firecrawl API details**
+
+Which endpoint should I use?
+
+- a) v2 `POST https://api.firecrawl.dev/v2/search`
+- b) v1 `POST https://api.firecrawl.dev/v1/search`
+
+Firecrawl search has no native `offset`. How should offset work?
+
+- a) Request `limit+offset` results and slice off the first `offset`
+- b) Ignore offset for Firecrawl
+
+What should `result` contain?
+
+- a) The title plus the snippet/description only (fast and cheap)
+- b) The scraped page markdown (`scrapeOptions:{formats:['markdown']}`), which is slower and costs more credits
+- c) Snippets by default, with an optional `__webSearchScrape` variable to enable markdown
+
+What should the default `limit` be when it isn't passed?
+
+- a) 5
+- b) 10
+- c) Firecrawl's default
+
+**7. API key**
+
+- a) A `firecrawlApiKey` param via `defineStringParam` (env `FIRECRAWL_API_KEY`), following the OpenAI and OpenRouter params
+- b) Only passed through the constructor options
+
+**8. VSCode extension integration**
+
+- a) Add a `convo.firecrawlApiKey` setting, pass it through `ConvoExt.getCliConfig()`, register the Firecrawl service, and update the README
+- b) Core library only for now
+
+If (a), how should the service get registered?
+
+- a) In the CLI (`convo-lang-cli`) whenever the key is present, so the CLI and extension both get it
+- b) Only in the extension
+
+Note: I don't have the CLI source in context, so for (a) you'd need to share it.
+
+**9. Escaping**
+
+Search result content will be run through `escapeConvo` so lines starting with `>` or containing `\{{` can't break the conversation. Should the `@sourceLink` value also have newlines collapsed, using `escapeConvoTagValue`?
+
+- a) Yes
+- b) No
+
+To write this, I'd also need `convo.deps.ts` and `index.ts` for `convo-lang` (plus the CLI config/init files if you pick 8a with CLI registration). Could you include those?
+
+
+> user
+1. b
+2. a
+3. a, and tag with `@emptySearchResult`
+4. a, and add a __disableMessageWrappers var to disable all wrappers
+5. a
+6.
+  - endpoint: a
+  - offset: b
+  - result: a by default and add a `includeLinkTarget?:boolean` to the `searchWeb` function
+  - limit: 5
+7. a
+8. a, a
+9. a
+
+I have imported the requested files
+
+Tell me about the firecrawl v2 api and show me the types you plane to add for approval
+
+@time 2026-11-23T14:48:46-05:00
+@tokenUsage 441496 / 5771 / $1.881404
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+## Firecrawl v2 search API
+
+**Endpoint**
+
+`POST https://api.firecrawl.dev/v2/search`
+
+**Headers**
+
+- `Authorization: Bearer fc-...`
+- `Content-Type: application/json`
+
+**Request body** (only the fields that matter here)
+
+| Field | Type | Notes |
+|---|---|---|
+| `query` | string | Required |
+| `limit` | number | Default 5, max 100 |
+| `sources` | `('web'\|'news'\|'images')[]` | Default `['web']` |
+| `scrapeOptions` | object | When set, each result page is also scraped. For example `{formats:['markdown'],onlyMainContent:true}` |
+| `tbs`, `location`, `country`, `timeout` | | Time filter, geo targeting and timeout. Not used for now |
+
+There is no `offset` or pagination parameter. As agreed, offset will be ignored.
+
+**Response**
+
+```json
+{
+    "success": true,
+    "data": {
+        "web": [
+            {
+                "url": "https://example.com",
+                "title": "Example",
+                "description": "Snippet text...",
+                "position": 1,
+                "markdown": "...only present when scrapeOptions requests markdown"
+            }
+        ]
+    },
+    "warning": "optional",
+    "creditsUsed": 2
+}
+```
+
+On error, the response is a non-2xx status with `{success:false,error:"..."}`.
+
+**Cost**
+
+A search without scraping costs about 2 credits per 10 results. With `scrapeOptions`, each result also costs a scrape credit and the request is much slower.
+
+`includeLinkTarget:true` will map to `scrapeOptions:{formats:['markdown'],onlyMainContent:true}`.
+
+## Planned types
+
+### convo-types.ts: web search service
+
+```ts
+export interface ConvoWebSearchRequest
+{
+    query:string;
+    /**
+     * Max number of results
+     * @default 5
+     */
+    limit?:number;
+    /**
+     * Number of results to skip. Ignored by services that do not support offsets.
+     */
+    offset?:number;
+    /**
+     * If true the content of the page each result links to is included in the result
+     */
+    includeLinkTarget?:boolean;
+}
+
+export interface ConvoWebSearchResultItem
+{
+    /**
+     * Link to source
+     */
+    link?:string;
+    result:string;
+}
+
+export interface ConvoWebSearchResult
+{
+    results:ConvoWebSearchResultItem[];
+}
+
+export interface ConvoWebSearch
+{
+    searchAsync(request:ConvoWebSearchRequest):PromiseResultType<ConvoWebSearchResult>;
+}
+```
+
+### convo-types.ts: generic message wrappers
+
+```ts
+/**
+ * Converts function calls into custom call and result messages and back into a function
+ * call and result when flattened. Functions use a handler by applying the
+ * `@messageWrapper {callRole} {resultRole}` tag.
+ */
+export interface ConvoMessageWrapperHandler
+{
+    callRole:string;
+    resultRole:string;
+    /**
+     * Name of a variable that, when true, disables the wrapper and writes normal call and
+     * result messages
+     */
+    disableVar?:string;
+    /**
+     * Returns the convo source to append in place of the call and result messages. callTags
+     * contains the prefix and tool id tags of the call.
+     */
+    toConvo(ctx:ConvoMessageWrapperWriteCtx):ConvoMessageWrapperWriteResult;
+    /**
+     * Converts the call message and the result messages that follow it into a function call
+     * and return value
+     */
+    fromMessages(call:ConvoMessage,results:ConvoMessage[],fn:ConvoFunction):ConvoMessageWrapperCall;
+}
+
+export interface ConvoMessageWrapperWriteCtx
+{
+    callTags:string;
+    args:Record<string,any>;
+    returnValue:any;
+    exe:ConvoExecutionContext;
+}
+
+export interface ConvoMessageWrapperWriteResult
+{
+    source:string;
+    /**
+     * File path assigned to the appended messages
+     */
+    filePath?:string;
+}
+
+export interface ConvoMessageWrapperCall
+{
+    params:Record<string,any>;
+    returnValue:any;
+}
+
+export interface ConvoMessageWrapper
+{
+    callRole:string;
+    resultRole:string;
+}
+```
+
+Additions to existing types:
+
+- `ConvoMessage.messageWrapper?:ConvoMessageWrapper` replaces `importWrapper?:boolean`. It is parsed from the `@messageWrapper` tag.
+- `ConvoModule.messageWrappers?:ConvoMessageWrapperHandler[]` lets std imports register handlers. The `file-imports.convo` module will register the import wrapper handler, which moves the `__resultImports` and `filePath` logic out of `Conversation`.
+
+### convo-lib.ts additions
+
+- `convoRoles.searchWeb` and `convoRoles.searchResult`. Roles that aren't in `convoRoles` are treated as user messages, and empty user messages are dropped during flattening, so these roles need to be listed.
+- `convoTags`:
+  - `messageWrapper` replaces `importWrapper`
+  - `sourceLink`
+  - `emptySearchResult`
+  - `limit`
+  - `offset`
+  - `includeLinkTarget`
+- `convoVars`:
+  - `__disableMessageWrappers`
+  - `__disableWebSearchWrapper`
+  - `__disableImportWrappers` is kept as the import handler's `disableVar`
+
+### convo.deps.ts
+
+```ts
+export const convoWebSearchService=defineService<ConvoWebSearch>('ConvoWebSearch');
+```
+
+### FirecrawlConvoWebSearch.ts
+
+```ts
+export const firecrawlApiKeyParam=defineStringParam('firecrawlApiKey');
+export const firecrawlBaseUrlParam=defineStringParam('firecrawlBaseUrl','https://api.firecrawl.dev');
+
+export interface FirecrawlConvoWebSearchOptions
+{
+    apiKey?:string;
+    baseUrl?:string;
+}
+
+interface FirecrawlSearchRequest
+{
+    query:string;
+    limit:number;
+    scrapeOptions?:{formats:'markdown'[];onlyMainContent?:boolean};
+}
+
+interface FirecrawlSearchWebItem
+{
+    url:string;
+    title?:string;
+    description?:string;
+    markdown?:string;
+}
+
+interface FirecrawlSearchResponse
+{
+    success:boolean;
+    data?:{web?:FirecrawlSearchWebItem[]};
+    warning?:string;
+    error?:string;
+}
+
+export class FirecrawlConvoWebSearch implements ConvoWebSearch
+{
+    public static fromScope(scope:Scope):FirecrawlConvoWebSearch;
+    public searchAsync(request:ConvoWebSearchRequest):PromiseResultType<ConvoWebSearchResult>;
+}
+```
+
+### Example of written messages
+
+```convo
+@toolId call_abc
+@limit 3
+\> searchWeb
+typescript allman brace formatter
+
+@sourceLink https://example.com/a
+\> searchResult
+Example Title
+
+Snippet text...
+```
+
+When there are no results, the call is followed by a single empty result message:
+
+```convo
+@emptySearchResult
+\> searchResult
+```
+
+## Remaining questions
+
+1. What should the `result` text format be?
+    - a) `{title}\n\n{description}`, with the page markdown appended after a blank line when `includeLinkTarget` is true
+    - b) Same, but when `includeLinkTarget` is true the markdown replaces the description
+
+2. If the service isn't registered or the key is missing, how should `searchWeb` behave?
+    - a) Return an error string as the result so the model sees it
+    - b) Throw, which fails the completion
+
+3. For CLI registration, "whenever the key is present" means checking the param at registration time. Which approach?
+    - a) Register `FirecrawlConvoWebSearch` only if `firecrawlApiKey` resolves to a value after the params are added
+    - b) Always register it and return an error result when the key is missing
+
+    `convo-cli-types.ts` isn't in context. The extension can pass the key through `ConvoCliConfig.env` like the other keys, so no change to that file should be needed.
+
+4. Should `includeLinkTarget` be written as an `@includeLinkTarget` tag on `> searchWeb` (only when true), so it survives flattening back into `calledParams`?
+    - a) Yes
+    - b) No
+
+
+> user
+1. a, but wrap the link target content in a `<LINK_TARGET_CONTENT>` xml tag
+2. a
+3. a
+4. a
+
+
+@time 2026-11-23T15:03:18-05:00
+@tokenUsage 449559 / 42686 / $2.651956
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here is the implementation. I made three small changes to the approved types:
+
+- `toConvo` returns a string. `Conversation` now takes the queued result imports and the file path before calling the handler and passes `importTags` in the context. Because of this, `ConvoMessageWrapperWriteResult` is no longer needed.
+- `FirecrawlConvoWebSearch` has no `fromScope`. The constructor falls back to `firecrawlApiKeyParam` and `firecrawlBaseUrlParam`. The CLI passes the key in directly and only registers the service when a key exists, either in `config.env` or in `FIRECRAWL_API_KEY`.
+- The import wrapper and web search wrapper handlers are in a new file, `convo-message-wrappers.ts`. The std modules register them through `ConvoModule.messageWrappers`.
+
+When a conversation is flattened, the wrapper messages become a function result at the last `resultRole` message in the sequence. This means imports on `endFileImport` are still loaded and inserted after it, the same as before.
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" find-replace>
+``` ts
+    /**
+     * If true the message is a function tagged with `@importWrapper`. Calls to the function are
+     * written as `startFileImport` and `endFileImport` messages instead of call and result messages.
+     */
+    importWrapper?:boolean;
+//// replace-with ////
+    /**
+     * Defined when the message is a function tagged with `@messageWrapper {callRole} {resultRole}`.
+     * Calls to the function are written using the call and result roles of the wrapper instead of
+     * call and result messages.
+     */
+    messageWrapper?:ConvoMessageWrapper;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" find-replace>
+``` ts
+    /**
+     * The file path of module
+     */
+    filePath?:string;
+//// replace-with ////
+    /**
+     * Message wrapper handlers registered when the module is imported
+     */
+    messageWrappers?:ConvoMessageWrapperHandler[];
+
+    /**
+     * The file path of module
+     */
+    filePath?:string;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" find-replace>
+``` ts
+    appendToParent?:string|((parent:Conversation)=>string|undefined);
+}
+//// replace-with ////
+    appendToParent?:string|((parent:Conversation)=>string|undefined);
+}
+
+export interface ConvoWebSearchRequest
+{
+    query:string;
+    /**
+     * Max number of results
+     * @default 5
+     */
+    limit?:number;
+    /**
+     * Number of results to skip. Ignored by services that do not support offsets.
+     */
+    offset?:number;
+    /**
+     * If true the content of the page each result links to is included in the result
+     */
+    includeLinkTarget?:boolean;
+}
+
+export interface ConvoWebSearchResultItem
+{
+    /**
+     * Link to source
+     */
+    link?:string;
+    result:string;
+}
+
+export interface ConvoWebSearchResult
+{
+    results:ConvoWebSearchResultItem[];
+}
+
+/**
+ * Searches the web
+ */
+export interface ConvoWebSearch
+{
+    searchAsync(request:ConvoWebSearchRequest):PromiseResultType<ConvoWebSearchResult>;
+}
+
+/**
+ * Call and result roles of a function tagged with `@messageWrapper {callRole} {resultRole}`
+ */
+export interface ConvoMessageWrapper
+{
+    callRole:string;
+    resultRole:string;
+}
+
+/**
+ * Converts function calls into custom call and result messages and back into a function call
+ * and result when flattened. Functions use a handler by applying the
+ * `@messageWrapper {callRole} {resultRole}` tag. Handlers are registered by imported modules.
+ */
+export interface ConvoMessageWrapperHandler extends ConvoMessageWrapper
+{
+    /**
+     * Name of a variable that, when true, disables the wrapper and writes normal call and
+     * result messages
+     */
+    disableVar?:string;
+    /**
+     * Returns the convo source to append in place of the call and result messages
+     */
+    toConvo(ctx:ConvoMessageWrapperWriteCtx):string;
+    /**
+     * Converts the call message and the result messages that follow it into a function call
+     * and return value
+     */
+    fromMessages(call:ConvoMessage,results:ConvoMessage[],fn:ConvoFunction):ConvoMessageWrapperCall;
+}
+
+export interface ConvoMessageWrapperWriteCtx
+{
+    /**
+     * Prefix and tool id tags of the call. Should be placed before the call message.
+     */
+    callTags:string;
+    /**
+     * Import tags queued by the `__resultImports` variable. Should be placed before the last
+     * result message.
+     */
+    importTags:string;
+    args:Record<string,any>;
+    returnValue:any;
+    exe:ConvoExecutionContext;
+}
+
+export interface ConvoMessageWrapperCall
+{
+    params:Record<string,any>;
+    returnValue:any;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+    /**
+     * Starts an import wrapper. Replaces the call message of functions tagged with `@importWrapper`.
+     * When flattened, the message is merged into the function result created by the
+     * following `endFileImport` message.
+     */
+    startFileImport:'startFileImport',
+
+    /**
+     * Ends an import wrapper. Replaces the result message of functions tagged with `@importWrapper`.
+     * Import tags are applied to this message, and when flattened it becomes a function result.
+     */
+    endFileImport:'endFileImport',
+} as const;
+//// replace-with ////
+    /**
+     * Starts an import wrapper. Replaces the call message of functions tagged with
+     * `@messageWrapper startFileImport endFileImport`. When flattened, the message is merged into
+     * the function result created by the following `endFileImport` message.
+     */
+    startFileImport:'startFileImport',
+
+    /**
+     * Ends an import wrapper. Replaces the result message of functions tagged with
+     * `@messageWrapper startFileImport endFileImport`. Import tags are applied to this message,
+     * and when flattened it becomes a function result.
+     */
+    endFileImport:'endFileImport',
+
+    /**
+     * Web search query. Replaces the call message of functions tagged with
+     * `@messageWrapper searchWeb searchResult`.
+     */
+    searchWeb:'searchWeb',
+
+    /**
+     * A single web search result. Replaces the result message of functions tagged with
+     * `@messageWrapper searchWeb searchResult`.
+     */
+    searchResult:'searchResult',
+} as const;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+    /**
+     * When applied to a function, calls to the function are written as `startFileImport` and
+     * `endFileImport` messages instead of call and result messages. Imports queued in the
+     * `__resultImports` variable are added to the `endFileImport` message.
+     */
+    importWrapper:'importWrapper',
+//// replace-with ////
+    /**
+     * When applied to a function, calls to the function are written using custom call and result
+     * roles instead of call and result messages. A message wrapper handler registered by an
+     * imported module must exist for the roles.
+     * @usage (@)messageWrapper {callRole} {resultRole}
+     */
+    messageWrapper:'messageWrapper',
+
+    /**
+     * Link to the source of a web search result
+     */
+    sourceLink:'sourceLink',
+
+    /**
+     * Applied to the result message written when a web search returns no results
+     */
+    emptySearchResult:'emptySearchResult',
+
+    /**
+     * Max number of results of a web search
+     */
+    limit:'limit',
+
+    /**
+     * Number of results skipped by a web search
+     */
+    offset:'offset',
+
+    /**
+     * Indicates the content of the page each web search result links to was included
+     */
+    includeLinkTarget:'includeLinkTarget',
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+    /**
+     * When true, functions tagged with `@importWrapper` are written as standard call and result
+     * messages instead of `startFileImport` and `endFileImport` messages.
+     */
+    __disableImportWrappers:'__disableImportWrappers',
+//// replace-with ////
+    /**
+     * When true, file import functions are written as standard call and result messages instead
+     * of `startFileImport` and `endFileImport` messages.
+     */
+    __disableImportWrappers:'__disableImportWrappers',
+
+    /**
+     * When true, web search functions are written as standard call and result messages instead
+     * of `searchWeb` and `searchResult` messages.
+     */
+    __disableWebSearchWrapper:'__disableWebSearchWrapper',
+
+    /**
+     * When true, all functions tagged with `@messageWrapper` are written as standard call and
+     * result messages.
+     */
+    __disableMessageWrappers:'__disableMessageWrappers',
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-lib.ts" find-replace>
+``` ts
+export const defaultConvoRagTol=1.2;
+//// replace-with ////
+export const defaultConvoRagTol=1.2;
+
+/**
+ * Default max number of web search results
+ */
+export const defaultConvoWebSearchLimit=5;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-message-wrappers.ts" target-output-path="../../packages/convo-lang/src/lib/convo-message-wrappers.ts">
+``` ts
+import { deleteUndefined, safeParseNumberOrUndefined } from '@iyio/common';
+import { containsConvoTag, convoRoles, convoTags, convoVars, escapeConvo, escapeConvoTagValue, getConvoTag, parseBaseConvoImport } from './convo-lib.js';
+import { ConvoMessageWrapperHandler, ConvoWebSearchResult } from './convo-types.js';
+
+/**
+ * Writes calls to file import functions as `startFileImport` and `endFileImport` messages. Imports
+ * queued in the `__resultImports` variable are added to the `endFileImport` message.
+ */
+export const convoImportMessageWrapper:ConvoMessageWrapperHandler={
+    callRole:convoRoles.startFileImport,
+    resultRole:convoRoles.endFileImport,
+    disableVar:convoVars.__disableImportWrappers,
+    toConvo:({callTags,importTags})=>`${callTags}> ${convoRoles.startFileImport}\n${importTags}> ${convoRoles.endFileImport}\n`,
+    fromMessages:(call,results,fn)=>{
+        const paths=results.flatMap(r=>r.tags?.filter(t=>t.name===convoTags.import && t.value).map(t=>parseBaseConvoImport(t.value??'').name)??[]);
+        return {params:{[fn.params[0]?.label??'paths']:paths},returnValue:paths};
+    },
+};
+
+/**
+ * Writes calls to web search functions as a `searchWeb` message followed by a `searchResult`
+ * message for each result. If there are no results a single empty `searchResult` message tagged
+ * with `@emptySearchResult` is written.
+ */
+export const convoWebSearchMessageWrapper:ConvoMessageWrapperHandler={
+    callRole:convoRoles.searchWeb,
+    resultRole:convoRoles.searchResult,
+    disableVar:convoVars.__disableWebSearchWrapper,
+    toConvo:({callTags,importTags,args,returnValue})=>{
+        const results=(returnValue as ConvoWebSearchResult|undefined)?.results??[];
+        const out:string[]=[`${
+            callTags
+        }${
+            getValueTag(convoTags.limit,args['limit'])
+        }${
+            getValueTag(convoTags.offset,args['offset'])
+        }${
+            args['includeLinkTarget']?`@${convoTags.includeLinkTarget}\n`:''
+        }> ${convoRoles.searchWeb}\n${escapeConvo(String(args['query']??''))}`];
+
+        if(!results.length){
+            out.push(`@${convoTags.emptySearchResult}\n${importTags}> ${convoRoles.searchResult}`);
+        }
+        out.push(...results.map((r,i)=>`${
+            r.link?`@${convoTags.sourceLink} ${escapeConvoTagValue(r.link)}\n`:''
+        }${
+            i===results.length-1?importTags:''
+        }> ${convoRoles.searchResult}\n${escapeConvo(r.result)}`));
+
+        return `${out.join('\n\n')}\n`;
+    },
+    fromMessages:(call,results)=>({
+        params:deleteUndefined({
+            query:call.content??'',
+            limit:safeParseNumberOrUndefined(getConvoTag(call.tags,convoTags.limit)?.value),
+            offset:safeParseNumberOrUndefined(getConvoTag(call.tags,convoTags.offset)?.value),
+            includeLinkTarget:containsConvoTag(call.tags,convoTags.includeLinkTarget)?true:undefined,
+        }),
+        returnValue:{
+            results:results.filter(r=>!containsConvoTag(r.tags,convoTags.emptySearchResult)).map(r=>deleteUndefined({
+                link:getConvoTag(r.tags,convoTags.sourceLink)?.value,
+                result:r.content??'',
+            })),
+        } satisfies ConvoWebSearchResult,
+    }),
+};
+
+const getValueTag=(name:string,value:any):string=>(value===undefined || value===null)?'':`@${name} ${value}\n`;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="FirecrawlConvoWebSearch.ts" target-output-path="../../packages/convo-lang/src/lib/FirecrawlConvoWebSearch.ts">
+``` ts
+import { defineStringParam, getErrorMessage, joinPaths } from "@iyio/common";
+import { defaultConvoWebSearchLimit } from "./convo-lib.js";
+import { ConvoWebSearch, ConvoWebSearchRequest, ConvoWebSearchResult } from "./convo-types.js";
+import { PromiseResultType, StatusCode } from "./result-type.js";
+
+export const firecrawlApiKeyParam=defineStringParam('firecrawlApiKey');
+export const firecrawlBaseUrlParam=defineStringParam('firecrawlBaseUrl','https://api.firecrawl.dev');
+
+export interface FirecrawlConvoWebSearchOptions
+{
+    /**
+     * Firecrawl API key. Defaults to the `firecrawlApiKey` param
+     */
+    apiKey?:string;
+    /**
+     * Defaults to the `firecrawlBaseUrl` param
+     */
+    baseUrl?:string;
+}
+
+interface FirecrawlSearchRequest
+{
+    query:string;
+    limit:number;
+    scrapeOptions?:{formats:'markdown'[];onlyMainContent?:boolean};
+}
+
+interface FirecrawlSearchWebItem
+{
+    url:string;
+    title?:string;
+    description?:string;
+    markdown?:string;
+}
+
+interface FirecrawlSearchResponse
+{
+    success:boolean;
+    data?:{web?:FirecrawlSearchWebItem[]};
+    warning?:string;
+    error?:string;
+}
+
+/**
+ * Searches the web using the Firecrawl v2 search API. Offsets are not supported by Firecrawl and
+ * are ignored.
+ */
+export class FirecrawlConvoWebSearch implements ConvoWebSearch
+{
+    private readonly apiKey?:string;
+    private readonly baseUrl?:string;
+
+    public constructor({apiKey,baseUrl}:FirecrawlConvoWebSearchOptions={}){
+        this.apiKey=apiKey;
+        this.baseUrl=baseUrl;
+    }
+
+    public async searchAsync({
+        query,
+        limit=defaultConvoWebSearchLimit,
+        includeLinkTarget,
+    }:ConvoWebSearchRequest):PromiseResultType<ConvoWebSearchResult>{
+        const apiKey=this.apiKey??firecrawlApiKeyParam.get();
+        if(!apiKey){
+            return {success:false,error:'Firecrawl API key not configured',statusCode:401};
+        }
+
+        const body:FirecrawlSearchRequest={query,limit};
+        if(includeLinkTarget){
+            body.scrapeOptions={formats:['markdown'],onlyMainContent:true};
+        }
+
+        try{
+            const r=await fetch(joinPaths(this.baseUrl??firecrawlBaseUrlParam(),'/v2/search'),{
+                method:'POST',
+                headers:{
+                    'Authorization':`Bearer ${apiKey}`,
+                    'Content-Type':'application/json',
+                },
+                body:JSON.stringify(body),
+            });
+            const data=await r.json().catch(()=>undefined) as FirecrawlSearchResponse|undefined;
+            if(!r.ok || !data?.success){
+                return {
+                    success:false,
+                    error:data?.error??`Firecrawl search failed with status ${r.status}`,
+                    statusCode:(r.ok?500:r.status) as StatusCode,
+                };
+            }
+            return {
+                success:true,
+                result:{
+                    results:(data.data?.web??[]).map(item=>({
+                        link:item.url,
+                        result:formatFirecrawlResult(item,includeLinkTarget),
+                    })),
+                },
+            };
+        }catch(ex){
+            return {success:false,error:getErrorMessage(ex),statusCode:500};
+        }
+    }
+}
+
+/**
+ * Returns the title and description of the item. When includeLinkTarget is true the markdown of
+ * the linked page is appended in a LINK_TARGET_CONTENT tag.
+ */
+const formatFirecrawlResult=(item:FirecrawlSearchWebItem,includeLinkTarget?:boolean):string=>{
+    const text=[item.title,item.description].filter(Boolean).join('\n\n');
+    return (includeLinkTarget && item.markdown)?
+        `${text}\n\n<LINK_TARGET_CONTENT>\n${item.markdown}\n</LINK_TARGET_CONTENT>`
+    :
+        text;
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo.deps.ts" target-output-path="../../packages/convo-lang/src/lib/convo.deps.ts" find-replace>
+``` ts
+import type { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoEmbeddingsService, ConvoImportService, ConvoProjectConfig, ConvoTranscriptionService, ConvoTtsService } from "./convo-types.js";
+//// replace-with ////
+import type { ConvoCompletionService, ConvoConversationCache, ConvoConversationConverter, ConvoEmbeddingsService, ConvoImportService, ConvoProjectConfig, ConvoTranscriptionService, ConvoTtsService, ConvoWebSearch } from "./convo-types.js";
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo.deps.ts" target-output-path="../../packages/convo-lang/src/lib/convo.deps.ts" find-replace>
+``` ts
+export const convoGitService=defineService<ConvoGitService>('ConvoGitService');
+//// replace-with ////
+export const convoGitService=defineService<ConvoGitService>('ConvoGitService');
+export const convoWebSearchService=defineService<ConvoWebSearch>('ConvoWebSearch');
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="index.ts" target-output-path="../../packages/convo-lang/src/index.ts" find-replace>
+``` ts
+export * from './lib/convo-mcp-types.js';
+//// replace-with ////
+export * from './lib/convo-mcp-types.js';
+export * from './lib/convo-message-wrappers.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="index.ts" target-output-path="../../packages/convo-lang/src/index.ts" find-replace>
+``` ts
+export * from './lib/HttpConvoCompletionService.js';
+//// replace-with ////
+export * from './lib/FirecrawlConvoWebSearch.js';
+export * from './lib/HttpConvoCompletionService.js';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-parser.ts" target-output-path="../../packages/convo-lang/src/lib/convo-parser.ts" find-replace>
+``` ts
+                    case convoTags.importWrapper:
+                        if(msg.fn){
+                            msg.importWrapper=true;
+                        }
+                        break;
+//// replace-with ////
+                    case convoTags.messageWrapper:{
+                        const [callRole,resultRole]=tag.value?.trim().split(/\s+/)??[];
+                        if(msg.fn && callRole && resultRole){
+                            msg.messageWrapper={callRole,resultRole};
+                        }
+                        break;
+                    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" find-replace>
+``` ts
+import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction } from "./convo-lib.js";
+import { ConvoImport, ConvoModule } from "./convo-types.js";
+//// replace-with ////
+import { getErrorMessage } from "@iyio/common";
+import { convoLabeledScopeParamsToObj, convoStdImportPrefix, convoVars, createConvoScopeFunction, defaultConvoWebSearchLimit } from "./convo-lib.js";
+import { convoImportMessageWrapper, convoWebSearchMessageWrapper } from "./convo-message-wrappers.js";
+import { ConvoImport, ConvoModule, ConvoWebSearchResult } from "./convo-types.js";
+import { convoWebSearchService } from "./convo.deps.js";
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" find-replace>
+``` ts
+# Imports files in to context. Returns an array of file paths imported.
+@importWrapper
+\> extern addFileImports(
+    # Paths of files to import
+    paths:array(string)
+)
+`.trim(),
+            externScopeFunctions:{
+                addFileImports,
+            },
+        };
+//// replace-with ////
+# Imports files in to context. Returns an array of file paths imported.
+@messageWrapper startFileImport endFileImport
+\> extern addFileImports(
+    # Paths of files to import
+    paths:array(string)
+)
+`.trim(),
+            externScopeFunctions:{
+                addFileImports,
+            },
+            messageWrappers:[convoImportMessageWrapper],
+        };
+
+        case 'web-search.convo':return {
+            name,
+            uri:name,
+            convo:/*convo*/`
+\> define
+SearchResultItem=struct(
+    # Link to source
+    link?:string
+    result:string
+)
+SearchResult=struct(
+    results:array(SearchResultItem)
+)
+
+\> system
+Use the ${t}searchWeb${t} function to search the web when you need current information or
+information you do not know.
+
+# Searches the web and returns a list of results
+@messageWrapper searchWeb searchResult
+\> extern searchWeb(
+    # Search query
+    query:string
+    # Max number of results to return. Defaults to ${defaultConvoWebSearchLimit}
+    limit?:number
+    # Number of results to skip
+    offset?:number
+    # If true the content of the page each result links to is included in the result. This is slower and should only be used when result snippets are not enough
+    includeLinkTarget?:boolean
+) -> SearchResult
+`.trim(),
+            externScopeFunctions:{
+                searchWeb,
+            },
+            messageWrappers:[convoWebSearchMessageWrapper],
+        };
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" find-replace>
+``` ts
+export const convoStdImportHandler=async (_import:ConvoImport):Promise<ConvoModule|undefined>=>{
+//// replace-with ////
+/**
+ * Searches the web using the registered `convoWebSearchService`. Errors are returned as a result
+ * item so the model can see them.
+ */
+const searchWeb=createConvoScopeFunction(async (scope)=>{
+    const args=convoLabeledScopeParamsToObj(scope);
+    const query=args['query']??scope.paramValues?.[0];
+    const errorResult=(error:string):ConvoWebSearchResult=>({results:[{result:`Web search failed: ${error}`}]});
+
+    const service=convoWebSearchService.get();
+    if(!service){
+        return errorResult('No web search service is configured');
+    }
+    if(typeof query !== 'string' || !query.trim()){
+        return errorResult('A search query is required');
+    }
+
+    try{
+        const r=await service.searchAsync({
+            query,
+            limit:args['limit']??defaultConvoWebSearchLimit,
+            offset:args['offset'],
+            includeLinkTarget:args['includeLinkTarget'],
+        });
+        return r.success?r.result:errorResult(r.error);
+    }catch(ex){
+        return errorResult(getErrorMessage(ex));
+    }
+});
+
+export const convoStdImportHandler=async (_import:ConvoImport):Promise<ConvoModule|undefined>=>{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+ConvoMessageTriggerEvent, ConvoModelInfo,
+//// replace-with ////
+ConvoMessageTriggerEvent, ConvoMessageWrapperHandler, ConvoModelInfo,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                }else if(msg.callFn){
+                    const importWrapper=(
+                        isDefaultTask &&
+                        !lastMsgIsFnCall &&
+                        !exe.getVar(convoVars.__disableImportWrappers) &&
+                        this._messages.some(m=>m.importWrapper && m.fn && !m.fn.call && m.fn.name===msg.callFn)
+                    );
+//// replace-with ////
+                }else if(msg.callFn){
+                    const messageWrapper=(isDefaultTask && !lastMsgIsFnCall)?this.getWriteMessageWrapper(msg.callFn,exe):undefined;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                        const result=(isDefaultTask && !importWrapper)?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
+//// replace-with ////
+                        const result=(isDefaultTask && !messageWrapper)?this.append(callMsg,{streamingId:msg.streamingId}):this.parseCode(callMsg);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                    if(importWrapper){
+                        this.appendImportWrapper(exe,callTags);
+                    }else{
+//// replace-with ////
+                    if(messageWrapper){
+                        this.appendMessageWrapper(messageWrapper,exe,callTags,msg.callParams,lastResultValue);
+                    }else{
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+        const insertAfter=msg.role===convoRoles.result || msg.role===convoRoles.endFileImport;
+//// replace-with ////
+        const insertAfter=msg.role===convoRoles.result || this.getMessageWrapperHandler(msg.role)?.resultRole===msg.role;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                let defaultLabel:string|undefined=undefined;
+                switch(msg.role){
+//// replace-with ////
+                const messageWrapper=this.getMessageWrapperHandler(msg.role);
+                if(messageWrapper && (msg.role===messageWrapper.callRole || sourceMessages[i+1]?.role===messageWrapper.resultRole)){
+                    // merged into the flat function result created by the last result message of the wrapper
+                    continue;
+                }
+
+                let defaultLabel:string|undefined=undefined;
+                switch(msg.role){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                    case convoRoles.startFileImport:
+                        // merged into the flat result created by endFileImport
+                        continue messagesLoop;
+
+                    default:
+//// replace-with ////
+                    default:
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+                if(msg.role===convoRoles.endFileImport){
+                    if(!this.flattenImportWrapper(flat,msg,sourceMessages,i,exe)){
+                        continue;
+                    }
+                }else if(msg.fn){
+//// replace-with ////
+                if(messageWrapper){
+                    if(!this.flattenMessageWrapper(messageWrapper,flat,sourceMessages,i,exe)){
+                        continue;
+                    }
+                }else if(msg.fn){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+    /**
+     * Returns the source path of the most recent startFileImport, endFileImport or result message.
+//// replace-with ////
+    /**
+     * Returns the source path of the most recent result or message wrapper message.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+            if(resultSourcePathRoles.includes(msg.role)){
+//// replace-with ////
+            if(msg.role===convoRoles.result || this.getMessageWrapperHandler(msg.role)){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+    /**
+     * Appends startFileImport and endFileImport messages in place of call and result messages
+     */
+    private appendImportWrapper(exe:ConvoExecutionContext,callTags:string){
+        const {importTags,filePath}=this.takeResultImports(exe);
+        this.append(
+            `${callTags}> ${convoRoles.startFileImport}\n${importTags}> ${convoRoles.endFileImport}\n`,
+            {filePath}
+        );
+    }
+
+    /**
+     * Converts an endFileImport message into a flat function result equivalent to the call and
+     * result messages of the import wrapper function. Returns false if no import wrapper
+     * function is defined.
+     */
+    private flattenImportWrapper(
+        flat:FlatConvoMessage,
+        msg:ConvoMessage,
+        messages:ConvoMessage[],
+        index:number,
+        exe:ConvoExecutionContext
+    ):boolean{
+        let start:ConvoMessage|undefined;
+        for(let i=index-1;i>=0;i--){
+            const m=messages[i];
+            if(m?.role===convoRoles.startFileImport){
+                start=m;
+                break;
+            }
+            if(m?.role===convoRoles.endFileImport){
+                break;
+            }
+        }
+        const fn=messages.find(m=>m.importWrapper && m.fn && !m.fn.call && (!start?.head || m.fn.name===start.head))?.fn;
+        if(!fn){
+            return false;
+        }
+        const paths=msg.tags?.filter(t=>t.name===convoTags.import && t.value).map(t=>parseBaseConvoImport(t.value??'').name)??[];
+        flat.role='function';
+        flat.called=fn;
+        flat.calledParams={[fn.params[0]?.label??'paths']:paths};
+        flat.calledReturn=paths;
+        if(start?.tags){
+            flat.tags={...convoTagsToMap(start.tags,exe),...flat.tags};
+        }
+        return true;
+    }
+//// replace-with ////
+    /**
+     * Returns the message wrapper handler that uses the given role as its call or result role.
+     * Handlers are registered by imported modules.
+     */
+    public getMessageWrapperHandler(role:string|null|undefined):ConvoMessageWrapperHandler|undefined{
+        if(!role){
+            return undefined;
+        }
+        for(const name in this.importedModules){
+            const handler=this.importedModules[name]?.messageWrappers?.find(h=>h.callRole===role || h.resultRole===role);
+            if(handler){
+                return handler;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Returns the message wrapper handler used to write calls to the given function. Undefined is
+     * returned if the function does not use a message wrapper or the wrapper is disabled.
+     */
+    private getWriteMessageWrapper(fnName:string,exe:ConvoExecutionContext):ConvoMessageWrapperHandler|undefined{
+        if(exe.getVar(convoVars.__disableMessageWrappers)){
+            return undefined;
+        }
+        const wrapper=this._messages.find(m=>m.messageWrapper && m.fn && !m.fn.call && m.fn.name===fnName)?.messageWrapper;
+        const handler=wrapper?this.getMessageWrapperHandler(wrapper.callRole):undefined;
+        if( !wrapper ||
+            !handler ||
+            handler.callRole!==wrapper.callRole ||
+            handler.resultRole!==wrapper.resultRole ||
+            (handler.disableVar && exe.getVar(handler.disableVar))
+        ){
+            return undefined;
+        }
+        return handler;
+    }
+
+    /**
+     * Appends the messages created by the message wrapper in place of call and result messages
+     */
+    private appendMessageWrapper(
+        handler:ConvoMessageWrapperHandler,
+        exe:ConvoExecutionContext,
+        callTags:string,
+        args:any,
+        returnValue:any
+    ){
+        const {importTags,filePath}=this.takeResultImports(exe);
+        this.append(handler.toConvo({
+            callTags,
+            importTags,
+            args:(args && (typeof args === 'object') && !Array.isArray(args))?args:{},
+            returnValue,
+            exe,
+        }),{filePath});
+    }
+
+    /**
+     * Converts the last result message of a message wrapper into a flat function result
+     * equivalent to the call and result messages of the wrapped function. Returns false if the
+     * call message or wrapped function is not found.
+     */
+    private flattenMessageWrapper(
+        handler:ConvoMessageWrapperHandler,
+        flat:FlatConvoMessage,
+        messages:ConvoMessage[],
+        index:number,
+        exe:ConvoExecutionContext
+    ):boolean{
+        let i=index;
+        while(i>=0 && messages[i]?.role===handler.resultRole){
+            i--;
+        }
+        const call=messages[i];
+        if(call?.role!==handler.callRole){
+            return false;
+        }
+        const fn=messages.find(m=>(
+            m.fn &&
+            !m.fn.call &&
+            m.messageWrapper?.callRole===handler.callRole &&
+            m.messageWrapper.resultRole===handler.resultRole &&
+            (!call.head || m.fn.name===call.head)
+        ))?.fn;
+        if(!fn){
+            return false;
+        }
+        const {params,returnValue}=handler.fromMessages(call,messages.slice(i+1,index+1),fn);
+        flat.role='function';
+        flat.called=fn;
+        flat.calledParams=params;
+        flat.calledReturn=returnValue;
+        if(call.tags){
+            flat.tags={...convoTagsToMap(call.tags,exe),...flat.tags};
+        }
+        return true;
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" find-replace>
+``` ts
+/**
+ * Roles of messages written by the conversation after function calls. Their source path is used to
+ * resolve relative result imports.
+ */
+const resultSourcePathRoles:(string|undefined)[]=[
+    convoRoles.startFileImport,
+    convoRoles.endFileImport,
+    convoRoles.result,
+]
+
+//// replace-with ////
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-cli-module.ts" target-output-path="../../packages/convo-lang-cli/src/lib/convo-cli-module.ts" find-replace>
+``` ts
+import { ConvoHttpImportService, ConvoProjectConfig, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
+//// replace-with ////
+import { ConvoHttpImportService, ConvoProjectConfig, FirecrawlConvoWebSearch, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, convoWebSearchService, firecrawlApiKeyParam, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-cli-module.ts" target-output-path="../../packages/convo-lang-cli/src/lib/convo-cli-module.ts" find-replace>
+``` ts
+    scope.implementService(convoGitService,()=>new ConvoCliGitService());
+//// replace-with ////
+    scope.implementService(convoGitService,()=>new ConvoCliGitService());
+
+    const firecrawlApiKey=config.env?.[firecrawlApiKeyParam.typeName]||globalThis.process?.env['FIRECRAWL_API_KEY'];
+    if(firecrawlApiKey){
+        scope.implementService(convoWebSearchService,()=>new FirecrawlConvoWebSearch({apiKey:firecrawlApiKey}));
+    }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="ConvoExt.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/ConvoExt.ts" find-replace>
+``` ts
+import { convoDefaultModelParam, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam } from "@convo-lang/convo-lang";
+//// replace-with ////
+import { convoDefaultModelParam, firecrawlApiKeyParam, openAiApiKeyParam, openAiBaseUrlParam, openRouterApiKeyParam, openRouterBaseUrlParam } from "@convo-lang/convo-lang";
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="ConvoExt.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/ConvoExt.ts" find-replace>
+``` ts
+                [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
+//// replace-with ////
+                [openRouterBaseUrlParam.typeName]:config.get<string>('openRouterBaseUrl')?.trim()||undefined,
+
+                [firecrawlApiKeyParam.typeName]:config.get<string>('firecrawlApiKey')?.trim()||undefined,
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="package.json" target-output-path="../../packages/convo-lang-tools/package.json" find-replace>
+``` json
+                "convo.notifyOnCompletion": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display a notification when a completion finishes for a document that is not in the active editor",
+                    "order": 9
+                },
+                "convo.alwaysRunOutputScripts": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
+                    "order": 10
+                },
+                "convo.persistAppliedCodeBlocks": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Save which code blocks have been applied in workspace state so they stay marked as applied after reloading. When disabled applied state is only kept in memory",
+                    "order": 11
+                }
+//// replace-with ////
+                "convo.firecrawlApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Firecrawl API key used by the web search tool (std://web-search.convo)",
+                    "order": 9
+                },
+                "convo.notifyOnCompletion": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display a notification when a completion finishes for a document that is not in the active editor",
+                    "order": 10
+                },
+                "convo.alwaysRunOutputScripts": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run RUNNABLE_SCRIPT blocks without displaying a confirmation prompt",
+                    "order": 11
+                },
+                "convo.persistAppliedCodeBlocks": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Save which code blocks have been applied in workspace state so they stay marked as applied after reloading. When disabled applied state is only kept in memory",
+                    "order": 12
+                }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+```` md
+- [File Blocks and Bash Blocks](#file-blocks-and-bash-blocks)
+//// replace-with ////
+- [File Blocks and Bash Blocks](#file-blocks-and-bash-blocks)
+- [Web Search](#web-search)
+````
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+```` md
+| `convo.openRouterApiKey`       |                            | OpenRouter API key                                                                         |
+//// replace-with ////
+| `convo.openRouterApiKey`       |                            | OpenRouter API key                                                                         |
+| `convo.firecrawlApiKey`        |                            | Firecrawl API key used by the web search tool (`std://web-search.convo`)                   |
+````
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" find-replace>
+```` md
+## Working with Output Blocks
+
+### Code lenses
+//// replace-with ////
+## Web Search
+
+Import the web search tool to let the model search the web:
+
+```convo
+@import std://web-search.convo
+```
+
+Web search uses Firecrawl. Set `convo.firecrawlApiKey` to a Firecrawl API key. If no key is set,
+calls to the tool return an error result that the model can see.
+
+The model calls the `searchWeb` function. Each call is written to the conversation as a
+`searchWeb` message, followed by one `searchResult` message per result:
+
+```convo
+@limit 3
+\> searchWeb
+typescript allman brace formatter
+
+@sourceLink https://example.com/a
+\> searchResult
+Example Title
+
+Snippet text...
+```
+
+- `limit` defaults to 5. `@limit` and `@offset` are only written when they are passed. Firecrawl
+  ignores `offset`.
+- `includeLinkTarget` adds the markdown of each result page in a `LINK_TARGET_CONTENT` tag. This is
+  slower and uses more Firecrawl credits. The call message is tagged `@includeLinkTarget`.
+- When there are no results, a single empty `searchResult` message tagged `@emptySearchResult` is
+  written.
+- Set `__disableWebSearchWrapper` to `true` to write normal call and result messages instead.
+  `__disableMessageWrappers` disables all message wrappers, including file import wrappers.
+
+
+## Working with Output Blocks
+
+### Code lenses
+````
+</FILE_CONTENT>
+
+A few things to check:
+
+- **`@importWrapper` is removed.** Any user-defined function that used it now needs `@messageWrapper startFileImport endFileImport`. It also needs `std://file-imports.convo` imported, because that module registers the handler.
+- **Handlers come only from imported modules.** If a conversation contains `searchWeb` or `searchResult` messages but doesn't import `std://web-search.convo`, those messages are flattened as plain content messages instead of a function result.
+- **Param resolution is untested.** `firecrawlApiKeyParam.get()` and `firecrawlBaseUrlParam()` rely on the same root-scope param resolution that `convoDefaultModelParam.get()` uses.
+
+
+> user

@@ -307,17 +307,30 @@ export const convoRoles={
     cacheBreakpoint:'cacheBreakpoint',
 
     /**
-     * Starts an import wrapper. Replaces the call message of functions tagged with `@importWrapper`.
-     * When flattened, the message is merged into the function result created by the
-     * following `endFileImport` message.
+     * Starts an import wrapper. Replaces the call message of functions tagged with
+     * `@messageWrapper startFileImport endFileImport`. When flattened, the message is merged into
+     * the function result created by the following `endFileImport` message.
      */
     startFileImport:'startFileImport',
 
     /**
-     * Ends an import wrapper. Replaces the result message of functions tagged with `@importWrapper`.
-     * Import tags are applied to this message, and when flattened it becomes a function result.
+     * Ends an import wrapper. Replaces the result message of functions tagged with
+     * `@messageWrapper startFileImport endFileImport`. Import tags are applied to this message,
+     * and when flattened it becomes a function result.
      */
     endFileImport:'endFileImport',
+
+    /**
+     * Web search query. Replaces the call message of functions tagged with
+     * `@messageWrapper searchWeb searchResult`.
+     */
+    searchWeb:'searchWeb',
+
+    /**
+     * A single web search result. Replaces the result message of functions tagged with
+     * `@messageWrapper searchWeb searchResult`.
+     */
+    searchResult:'searchResult',
 } as const;
 
 /**
@@ -1006,10 +1019,22 @@ export const convoVars={
     __resultImports:'__resultImports',
 
     /**
-     * When true, functions tagged with `@importWrapper` are written as standard call and result
-     * messages instead of `startFileImport` and `endFileImport` messages.
+     * When true, file import functions are written as standard call and result messages instead
+     * of `startFileImport` and `endFileImport` messages.
      */
     __disableImportWrappers:'__disableImportWrappers',
+
+    /**
+     * When true, web search functions are written as standard call and result messages instead
+     * of `searchWeb` and `searchResult` messages.
+     */
+    __disableWebSearchWrapper:'__disableWebSearchWrapper',
+
+    /**
+     * When true, all functions tagged with `@messageWrapper` are written as standard call and
+     * result messages.
+     */
+    __disableMessageWrappers:'__disableMessageWrappers',
 
 } as const;
 
@@ -1047,6 +1072,11 @@ export const convoControlResultKeys={
 } as const;
 
 export const defaultConvoRagTol=1.2;
+
+/**
+ * Default max number of web search results
+ */
+export const defaultConvoWebSearchLimit=5;
 
 export const convoEvents={
 
@@ -1524,11 +1554,37 @@ export const convoTags={
     importRole:'importRole',
 
     /**
-     * When applied to a function, calls to the function are written as `startFileImport` and
-     * `endFileImport` messages instead of call and result messages. Imports queued in the
-     * `__resultImports` variable are added to the `endFileImport` message.
+     * When applied to a function, calls to the function are written using custom call and result
+     * roles instead of call and result messages. A message wrapper handler registered by an
+     * imported module must exist for the roles.
+     * @usage (@)messageWrapper {callRole} {resultRole}
      */
-    importWrapper:'importWrapper',
+    messageWrapper:'messageWrapper',
+
+    /**
+     * Link to the source of a web search result
+     */
+    sourceLink:'sourceLink',
+
+    /**
+     * Applied to the result message written when a web search returns no results
+     */
+    emptySearchResult:'emptySearchResult',
+
+    /**
+     * Max number of results of a web search
+     */
+    limit:'limit',
+
+    /**
+     * Number of results skipped by a web search
+     */
+    offset:'offset',
+
+    /**
+     * Indicates the content of the page each web search result links to was included
+     */
+    includeLinkTarget:'includeLinkTarget',
 
     /**
      * Causes a message to be concatenated with the previous message. Both the message the tag

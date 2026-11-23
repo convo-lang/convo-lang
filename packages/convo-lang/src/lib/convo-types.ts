@@ -247,10 +247,11 @@ export interface ConvoMessage
     importMatch?:ConvoImportMatch;
 
     /**
-     * If true the message is a function tagged with `@importWrapper`. Calls to the function are
-     * written as `startFileImport` and `endFileImport` messages instead of call and result messages.
+     * Defined when the message is a function tagged with `@messageWrapper {callRole} {resultRole}`.
+     * Calls to the function are written using the call and result roles of the wrapper instead of
+     * call and result messages.
      */
-    importWrapper?:boolean;
+    messageWrapper?:ConvoMessageWrapper;
 
     /**
      * Array of code blocks found in the message. By default codeBlocks will always be undefined.
@@ -2241,6 +2242,11 @@ export interface ConvoModule
     components?:Record<string,ConvoComponentDef>;
 
     /**
+     * Message wrapper handlers registered when the module is imported
+     */
+    messageWrappers?:ConvoMessageWrapperHandler[];
+
+    /**
      * The file path of module
      */
     filePath?:string;
@@ -2738,4 +2744,98 @@ export interface ConvoMessageScope
     closeRole:string;
     removeMessagesFromParent:boolean|((msg:ConvoMessage,parent:Conversation)=>boolean);
     appendToParent?:string|((parent:Conversation)=>string|undefined);
+}
+
+export interface ConvoWebSearchRequest
+{
+    query:string;
+    /**
+     * Max number of results
+     * @default 5
+     */
+    limit?:number;
+    /**
+     * Number of results to skip. Ignored by services that do not support offsets.
+     */
+    offset?:number;
+    /**
+     * If true the content of the page each result links to is included in the result
+     */
+    includeLinkTarget?:boolean;
+}
+
+export interface ConvoWebSearchResultItem
+{
+    /**
+     * Link to source
+     */
+    link?:string;
+    result:string;
+}
+
+export interface ConvoWebSearchResult
+{
+    results:ConvoWebSearchResultItem[];
+}
+
+/**
+ * Searches the web
+ */
+export interface ConvoWebSearch
+{
+    searchAsync(request:ConvoWebSearchRequest):PromiseResultType<ConvoWebSearchResult>;
+}
+
+/**
+ * Call and result roles of a function tagged with `@messageWrapper {callRole} {resultRole}`
+ */
+export interface ConvoMessageWrapper
+{
+    callRole:string;
+    resultRole:string;
+}
+
+/**
+ * Converts function calls into custom call and result messages and back into a function call
+ * and result when flattened. Functions use a handler by applying the
+ * `@messageWrapper {callRole} {resultRole}` tag. Handlers are registered by imported modules.
+ */
+export interface ConvoMessageWrapperHandler extends ConvoMessageWrapper
+{
+    /**
+     * Name of a variable that, when true, disables the wrapper and writes normal call and
+     * result messages
+     */
+    disableVar?:string;
+    /**
+     * Returns the convo source to append in place of the call and result messages
+     */
+    toConvo(ctx:ConvoMessageWrapperWriteCtx):string;
+    /**
+     * Converts the call message and the result messages that follow it into a function call
+     * and return value
+     */
+    fromMessages(call:ConvoMessage,results:ConvoMessage[],fn:ConvoFunction):ConvoMessageWrapperCall;
+}
+
+export interface ConvoMessageWrapperWriteCtx
+{
+    /**
+     * Prefix and tool id tags of the call. Should be placed before the call message.
+     */
+    callTags:string;
+    /**
+     * Import tags queued by the `__resultImports` variable. Should be placed before the last
+     * result message.
+     */
+    importTags:string;
+    args:Record<string,any>;
+    returnValue:any;
+    exe:ConvoExecutionContext;
+}
+
+export interface ConvoMessageWrapperCall
+{
+    params:Record<string,any>;
+    returnValue:any;
 }
