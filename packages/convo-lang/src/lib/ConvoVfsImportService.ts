@@ -1,4 +1,4 @@
-import { getDirectoryName, getUriProtocol, joinPaths, normalizePath } from "@iyio/common";
+import { escapeRegex, getDirectoryName, getUriProtocol, joinPaths, normalizePath } from "@iyio/common";
 import { VfsDirReadRecursiveOptions, vfs } from "@iyio/vfs";
 import { ConvoImport, ConvoImportService, ConvoModule } from "./convo-types.js";
 
@@ -18,7 +18,11 @@ export class ConvoVfsImportService implements ConvoImportService
             let rOptions:VfsDirReadRecursiveOptions|undefined;
             if(path.includes('**')){
                 const [p,f]=path.split('**');
-                rOptions=f?{path:p||'/',filter:{endsWith:f}}:undefined;
+                if(f?.includes('*')){
+                    rOptions={path:p||'/',filter:{match:f.split('*').map(v=>escapeRegex(v)).join('[^/]+'),stringMatchIsReg:true}};
+                }else{
+                    rOptions=f?{path:p||'/',filter:{endsWith:f}}:undefined;
+                }
             }
 
             const items=await (rOptions?vfs().readDirRecursiveAsync(rOptions):vfs().readDirAsync(path));

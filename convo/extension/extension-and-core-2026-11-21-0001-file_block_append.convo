@@ -1,0 +1,707 @@
+@import ./_extension-and-core.convo !template
+
+> user
+Add a `append` and `prepend` option to file blocks 
+
+@time 2026-11-21T11:54:53-05:00
+@tokenUsage 413885 / 1163 / $1.6788
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I make changes, a few questions:
+
+1. Syntax: how should the model mark a block as append or prepend?
+   - a) Boolean attributes: `<FILE_CONTENT target-output-path="./a.ts" append>` / `prepend`
+   - b) A single attribute: `mode="append"` / `mode="prepend"`
+
+2. Joining: how should the new content be joined with the existing content?
+   - a) Ensure exactly one newline between them (add one only if missing)
+   - b) Raw concatenation, no newline handling
+   - c) Default to a), with an optional `append-separator` / `prepend-separator` attribute
+
+3. Missing target file: what should happen if the file doesn't exist?
+   - a) Create it with the block content
+   - b) Show an error and skip the block
+
+4. Combining with find-replace: if a block has both `append` and `find-replace`:
+   - a) Treat as invalid. Ignore `append`/`prepend` and use find-replace
+   - b) Treat as invalid. Show an error
+
+5. Multiple blocks per file: should append, prepend and find-replace blocks for the same file in one message be applied in order and combined into a single write, like find-replace blocks are today?
+   - a) Yes, all non-full-file blocks for a file are chained in message order
+   - b) No, each block is applied independently
+
+6. Where should the logic live?
+   - a) Core: add `append`/`prepend` to `ConvoCodeBlock`, parse them in `convo-code-block-lib.ts`, and add a shared helper to apply a block to existing content. The extension (Write Output, Open Diff, Copy, Apply All, Complete and Apply All, guided review) uses that helper
+   - b) Extension only
+
+7. Model instructions: should I update `std://file-blocks.convo` with a description of the new attributes and an example of each?
+   - a) Yes
+   - b) No
+
+8. Guided review: should appended/prepended content be highlighted as its own change, labeled `append` / `prepend` in the code lens (e.g. `block #2 · append · ○ pending`)?
+   - a) Yes
+   - b) No, just show the diff
+
+My defaults would be 1a, 2a, 3a, 4b, 5a, 6a, 7a, 8a. Let me know if that works or what to change.
+
+
+> user
+1. a
+2. a, add a `no-newline` attribute that does Raw concatenation, no newline handling
+3. a
+4. a
+5. a
+6. a
+7. a
+8. a
+
+
+@time 2026-11-21T12:53:38-05:00
+@tokenUsage 414694 / 20613 / $2.071036
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Here are the changes:
+
+- Core: `FILE_CONTENT` blocks get `insertMode` (`append`/`prepend`) and `noNewline`. `append` and `prepend` are ignored when the block uses `find-replace`.
+- Core: a new `applyConvoBlockToContent` helper applies full, find-replace, append and prepend blocks. A new `isPartialConvoCodeBlock` helper identifies non-full blocks.
+- Extension: Write Output, Open Diff, Copy, Apply All, Complete and Apply All, and guided review all use the shared helpers. All non-full blocks for a file in a message are chained in order. A missing target file is treated as empty, so it gets created.
+- Guided review: appended and prepended content gets its own highlighted change, labeled `append` or `prepend`.
+- `std://file-blocks.convo` and the README are updated.
+
+About `no-newline`: a fenced block always has a newline before the closing fence, so that newline is dropped. Without this, "raw" prepend could never join content on the same line.
+
+<FILE_CONTENT name="convo-code-block-lib.ts" target-output-path="../../packages/convo-lang/src/lib/convo-code-block-lib.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307">
+``` ts
+import { unescapeHtml } from '@iyio/common';
+import { unescapeConvo } from './convo-parser.js';
+import { ConvoBlockInsertMode, ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, isConvoFileOpType } from './convo-types.js';
+
+
+export const defaultConvoFindReplaceSeparator='//// replace-with ////';
+
+/**
+ * Name of the self-closing XML tag used to define file operations
+ */
+export const convoFileOpTagName='FILE_OP';
+
+const blockReg=/(?<start>(^|\r|\n)[ \t]*)<(?<tagName>[\w-]+)(?<attributes>[^>]*)>[ \t\r\n]*```+[ \t]*(?<lang>[\w-]*)(?<content>[\s\S]*?)```+[ \t\r\n]*<\/\k<tagName>>/g;
+const fileOpReg=/(?<start>(^|\r|\n)[ \t]*)<FILE_OP(?<attributes>(\s[^>]*?)?)\/>/g;
+const attReg=/(?<name>[\w-]+)([ \t]*=[ \t]*("(?<dq>[^"]*)"|'(?<sq>[^']*)'))?/g;
+
+const parseConvoCodeBlockAttributes=(attributes:string):Record<string,string>=>{
+    const atts:Record<string,string>={};
+    attReg.lastIndex=0;
+    let attMatch:RegExpExecArray|null;
+    while(attMatch=attReg.exec(attributes)){
+        atts[attMatch.groups?.['name']??'']=unescapeHtml(attMatch.groups?.['dq']??attMatch.groups?.['sq']??'');
+    }
+    return atts;
+}
+
+const getConvoBlockInsertMode=(atts:Record<string,string>):ConvoBlockInsertMode|undefined=>(
+    ('append' in atts)?
+        'append'
+    :('prepend' in atts)?
+        'prepend'
+    :
+        undefined
+);
+
+/**
+ * Parses XML tagged code blocks and self-closing `FILE_OP` tags. Blocks are returned in order of
+ * appearance. `FILE_OP` tags inside of the content of another block are ignored.
+ */
+export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOrParentMessage?:ConvoMessage|number,blockIndexOffset=0):ConvoCodeBlock[]|undefined=>{
+    let indexOffset:number;
+    if(typeof indexOffsetOrParentMessage === 'number'){
+        indexOffset=indexOffsetOrParentMessage;
+    }else if(indexOffsetOrParentMessage){
+        const src=indexOffsetOrParentMessage[convoMessageSourceReferenceKey];
+        if(src && indexOffsetOrParentMessage.s!==undefined && indexOffsetOrParentMessage.e!==undefined){
+            text=src.source.substring(indexOffsetOrParentMessage.s,indexOffsetOrParentMessage.e);
+        }
+        indexOffset=indexOffsetOrParentMessage.s??0;
+    }else{
+        indexOffset=0;
+    }
+
+    const found:Omit<ConvoCodeBlock,'index'>[]=[];
+
+    blockReg.lastIndex=0;
+    let match:RegExpMatchArray|null;
+    while(match=blockReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const tagName=match.groups?.['tagName']??'';
+        const lang=match.groups?.['lang']||'txt';
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+        const findReplace=parseConvoBlockFindReplace(atts['find-replace']);
+
+        found.push({
+            tagName,
+            attributes:atts,
+            lang,
+            content:normalizeConvoCodeBlockContent(tagName,match.groups?.['content']??'',atts),
+            startIndex:indexOffset+(match.index??0)+start.length,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            findReplace,
+            findReplaceSeparator:atts['find-replace-separator'],
+            insertMode:findReplace?undefined:getConvoBlockInsertMode(atts),
+            noNewline:('no-newline' in atts)?true:undefined,
+        });
+    }
+
+    fileOpReg.lastIndex=0;
+    while(match=fileOpReg.exec(text)){
+        const start=match.groups?.['start']??'';
+        const startIndex=indexOffset+(match.index??0)+start.length;
+        if(found.some(b=>startIndex>=b.startIndex && startIndex<b.endIndex)){
+            continue;
+        }
+        const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+        const op=atts['op'];
+        found.push({
+            tagName:convoFileOpTagName,
+            attributes:atts,
+            lang:'',
+            content:'',
+            startIndex,
+            endIndex:indexOffset+(match.index??0)+match[0].length,
+            messageIndex,
+            fileOp:isConvoFileOpType(op)?op:undefined,
+        });
+    }
+
+    if(!found.length){
+        return undefined;
+    }
+
+    found.sort((a,b)=>a.startIndex-b.startIndex);
+    return found.map((b,i)=>({...b,index:blockIndexOffset+i}));
+}
+
+export const parseConvoBlockFindReplace=(value:string|null|undefined):number|'all'|undefined=>{
+    if(value===''){
+        return 1;
+    }
+    if(!value){
+        return undefined;
+    }
+    if(value==='all'){
+        return 'all';
+    }
+    const n=Number(value);
+    return isFinite(n)?n:undefined;
+}
+
+/**
+ * Returns true if the block modifies existing content using find-replace, append or prepend
+ * instead of replacing the full content.
+ */
+export const isPartialConvoCodeBlock=(block:ConvoCodeBlock):boolean=>{
+    return (block.findReplace || block.insertMode)?true:false;
+}
+
+const trimBlockStart=(content:string):string=>{
+    if(content.startsWith('\r')){
+        content=content.substring(1);
+    }
+    if(content.startsWith('\n')){
+        content=content.substring(1);
+    }
+    return content;
+}
+
+const trimBlockEnd=(content:string):string=>{
+    if(content.endsWith('\n')){
+        content=content.substring(0,content.length-1);
+        if(content.endsWith('\r')){
+            content=content.substring(0,content.length-1);
+        }
+    }
+    return content;
+}
+
+/**
+ * A range of content replaced by a find-replace code block
+ */
+export interface ConvoBlockReplaceRange
+{
+    /**
+     * Start index of the matched content in the source content
+     */
+    sourceStart:number;
+    /**
+     * End index, exclusive, of the matched content in the source content
+     */
+    sourceEnd:number;
+    /**
+     * Start index of the replacement in the resulting content
+     */
+    start:number;
+    /**
+     * End index, exclusive, of the replacement in the resulting content
+     */
+    end:number;
+}
+
+export interface ReplaceConvoBlockResult{
+    content:string;
+    replaceCount:number;
+    /**
+     * Ranges of each replacement in order of appearance
+     */
+    ranges:ConvoBlockReplaceRange[];
+}
+export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    const sep=block.findReplaceSeparator??defaultConvoFindReplaceSeparator;
+    const i=block.content.indexOf(sep);
+    const find=trimBlockEnd(i===-1?block.content:block.content.substring(0,i));
+    const replace=trimBlockEnd(trimBlockStart(i===-1?'':block.content.substring(i+sep.length)));
+
+    const ranges:ConvoBlockReplaceRange[]=[];
+
+    const parts=content.split(find);
+    if(parts.length===1){
+        return {content,replaceCount:0,ranges};
+    }
+
+    const limit=block.findReplace==='all'?Number.MAX_SAFE_INTEGER:(block.findReplace??1);
+    const output:string[]=[];
+    let sourceIndex=0;
+    let index=0;
+    for(let p=0;p<parts.length;p++){
+        const part=parts[p]!;
+        output.push(part);
+        sourceIndex+=part.length;
+        index+=part.length;
+        if(p===parts.length-1){
+            break;
+        }
+        if(ranges.length<limit){
+            ranges.push({sourceStart:sourceIndex,sourceEnd:sourceIndex+find.length,start:index,end:index+replace.length});
+            output.push(replace);
+            index+=replace.length;
+        }else{
+            output.push(find);
+            index+=find.length;
+        }
+        sourceIndex+=find.length;
+    }
+
+    return {content:output.join(''),replaceCount:ranges.length,ranges};
+}
+
+/**
+ * Appends or prepends the content of the block to the given content. Unless `noNewline` is true a
+ * newline is added between the content and appended content if the content does not end with one.
+ * When `noNewline` is true the newline before the closing code fence of the block is dropped.
+ */
+export const insertConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    const insert=block.noNewline?trimBlockEnd(block.content):block.content;
+    if(block.insertMode==='prepend'){
+        return {
+            content:insert+content,
+            replaceCount:1,
+            ranges:[{sourceStart:0,sourceEnd:0,start:0,end:insert.length}],
+        };
+    }
+    const sep=(!block.noNewline && content && !content.endsWith('\n'))?'\n':'';
+    const start=content.length+sep.length;
+    return {
+        content:content+sep+insert,
+        replaceCount:1,
+        ranges:[{sourceStart:content.length,sourceEnd:content.length,start,end:start+insert.length}],
+    };
+}
+
+/**
+ * Applies a file block to the given content. Find-replace, append and prepend blocks modify the
+ * content and full file blocks replace it.
+ */
+export const applyConvoBlockToContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    if(block.findReplace){
+        return replaceConvoBlockContent(content,block);
+    }
+    if(block.insertMode){
+        return insertConvoBlockContent(content,block);
+    }
+    return {
+        content:block.content,
+        replaceCount:1,
+        ranges:[{sourceStart:0,sourceEnd:content.length,start:0,end:block.content.length}],
+    };
+}
+
+/**
+ * Maps an index in the source content of a replacement to the index in the resulting content.
+ * Indexes inside of a replaced range are clamped to the replacement. End indexes at the position
+ * of inserted content stay before the inserted content.
+ */
+export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[],isEnd=false):number=>{
+    let offset=0;
+    for(const r of ranges){
+        if(index<r.sourceStart || (isEnd && index===r.sourceStart && r.sourceStart===r.sourceEnd)){
+            break;
+        }
+        if(index<r.sourceEnd){
+            return Math.min(r.start+index-r.sourceStart,r.end);
+        }
+        offset=r.end-r.sourceEnd;
+    }
+    return index+offset;
+}
+
+export const normalizeConvoCodeBlockContent=(tag:string,content:string,attrs?:Record<string,string>):string=>{
+    content=trimBlockStart(trimBlockEnd(content));
+
+    content=unescapeConvo(content);
+
+    const closing=attrs?.['closing-escape'];
+    
+    if(closing){
+        content=content.split(closing).join(`</${tag}>`);
+    }
+
+    return content.endsWith('\n')?content:content+'\n';
+}
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+    findReplaceSeparator?:string;
+
+    /**
+     * The file operation of a self-closing `FILE_OP` block.
+//// replace-with ////
+    findReplaceSeparator?:string;
+
+    /**
+     * Appends or prepends the content of the block to the target file instead of replacing the
+     * full content. Defined using the `append` or `prepend` boolean attributes. Undefined when
+     * the block uses find-replace.
+     */
+    insertMode?:ConvoBlockInsertMode;
+
+    /**
+     * If true appended or prepended content is joined without adding a newline. The newline
+     * before the closing code fence is not included in the joined content. Defined using the
+     * `no-newline` boolean attribute.
+     */
+    noNewline?:boolean;
+
+    /**
+     * The file operation of a self-closing `FILE_OP` block.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-types.ts" target-output-path="../../packages/convo-lang/src/lib/convo-types.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+/**
+ * File operations that can be defined using self-closing `FILE_OP` XML tags.
+//// replace-with ////
+/**
+ * Controls how the content of a file block is inserted into the target file
+ * - append: Content is added to the end of the file
+ * - prepend: Content is added to the start of the file
+ */
+export type ConvoBlockInsertMode='append'|'prepend';
+
+/**
+ * File operations that can be defined using self-closing `FILE_OP` XML tags.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 4 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` ts
+- find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
+==== NEW ====
+- find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
+- append: Appends the content of the block to the end of the file instead of replacing the full content. A newline is added between the existing content and the appended content if the file does not end with one. If the file does not exist it is created. Ignored when used with find-replace.
+- prepend: Prepends the content of the block to the start of the file instead of replacing the full content. If the file does not exist it is created. Ignored when used with find-replace.
+- no-newline: Used with append and prepend to join the content without adding a newline. The newline before the closing code fence is not included in the joined content.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-std-imports.ts" target-output-path="../../packages/convo-lang/src/lib/convo-std-imports.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 4 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` ts
+    first_name:string;
+${t3}
+((CLOSE_TAG[FILE_CONTENT]))
+
+
+`.trim()};
+
+        case 'bash-blocks.convo':return {
+==== NEW ====
+    first_name:string;
+${t3}
+((CLOSE_TAG[FILE_CONTENT]))
+
+
+Example of appending to a file:
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" append>
+${t3} ts
+export const exampleName='Example';
+${t3}
+((CLOSE_TAG[FILE_CONTENT]))
+
+
+Example of prepending to a file:
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" prepend>
+${t3} ts
+import { Other } from './other';
+${t3}
+((CLOSE_TAG[FILE_CONTENT]))
+
+
+`.trim()};
+
+        case 'bash-blocks.convo':return {
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+import { ConvoCodeBlock, ConvoMessage, defaultConvoFindReplaceSeparator, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+//// replace-with ////
+import { ConvoCodeBlock, ConvoMessage, applyConvoBlockToContent, defaultConvoFindReplaceSeparator, escapeConvo, isPartialConvoCodeBlock, parseConvoCode } from '@convo-lang/convo-lang';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-lib.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-lib.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
+    const targetPath=tag.targetPath;
+    if(!tag.codeBlock.findReplace){
+        return tag.codeBlock.content;
+    }
+    try{
+        const doc=await workspace.openTextDocument(tag.documentUri);
+        if(!doc){
+            const msg=`Failed to find document for Convo-Lang file-replace block: ${tag.documentUri}`;
+            console.error(msg);
+            await window.showErrorMessage(msg);
+            return;
+        }
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
+        outputs.sort((a,b)=>a.index-b.index);
+        const openTarget=getOpenFileDocument(targetPath);
+        let content=openTarget?openTarget.getText():await readFileAsStringAsync(targetPath);
+        let notFound:string[]=[];
+        for(const r of outputs){
+            const replacement=replaceConvoBlockContent(content,r.codeBlock);
+//// replace-with ////
+/**
+ * Returns the output of a file block. Find-replace, append and prepend blocks targeting the same
+ * file in the same message are applied in order to the current content of the file. Missing
+ * files are treated as empty.
+ */
+export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
+    const targetPath=tag.targetPath;
+    if(!isPartialConvoCodeBlock(tag.codeBlock)){
+        return tag.codeBlock.content;
+    }
+    try{
+        const doc=await workspace.openTextDocument(tag.documentUri);
+        if(!doc){
+            const msg=`Failed to find document for Convo-Lang file-replace block: ${tag.documentUri}`;
+            console.error(msg);
+            await window.showErrorMessage(msg);
+            return;
+        }
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && isPartialConvoCodeBlock(t.codeBlock) && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
+        outputs.sort((a,b)=>a.index-b.index);
+        let content=await readFileContentAsync(targetPath)??'';
+        const notFound:string[]=[];
+        for(const r of outputs){
+            const replacement=applyConvoBlockToContent(content,r.codeBlock);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+//// replace-with ////
+import { ConvoBlockReplaceRange, applyConvoBlockToContent, isPartialConvoCodeBlock, mapConvoBlockReplaceIndex } from '@convo-lang/convo-lang';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+/**
+ * Applies the given steps to the base content in order. Labels of previous steps are remapped as
+ * each find-replace block is applied. Full file blocks replace the content and clear the ranges of
+ * all previous labels.
+ */
+const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
+    let content=base;
+    let labels:BlockLabel[]=[];
+    const notFound:ReviewStep[]=[];
+
+    for(const step of steps){
+        const block=step.tag.codeBlock;
+        if(!block.findReplace){
+            content=block.content;
+            labels=[...labels.map(l=>({step:l.step,ranges:[]})),{step,ranges:[{start:0,end:content.length}]}];
+            continue;
+        }
+
+        const result=replaceConvoBlockContent(content,block);
+//// replace-with ////
+/**
+ * Applies the given steps to the base content in order. Labels of previous steps are remapped as
+ * each find-replace, append or prepend block is applied. Full file blocks replace the content and
+ * clear the ranges of all previous labels.
+ */
+const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
+    let content=base;
+    let labels:BlockLabel[]=[];
+    const notFound:ReviewStep[]=[];
+
+    for(const step of steps){
+        const block=step.tag.codeBlock;
+        if(!isPartialConvoCodeBlock(block)){
+            content=block.content;
+            labels=[...labels.map(l=>({step:l.step,ranges:[]})),{step,ranges:[{start:0,end:content.length}]}];
+            continue;
+        }
+
+        const result=applyConvoBlockToContent(content,block);
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+    end:mapConvoBlockReplaceIndex(range.end,ranges),
+//// replace-with ////
+    end:mapConvoBlockReplaceIndex(range.end,ranges,true),
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="code-block-review.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/code-block-review.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+        :block.findReplace?
+            'find-replace'
+        :
+            'full file'
+//// replace-with ////
+        :block.findReplace?
+            'find-replace'
+        :
+            (block.insertMode??'full file')
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+import { convoTags } from '@convo-lang/convo-lang';
+//// replace-with ////
+import { convoTags, isPartialConvoCodeBlock } from '@convo-lang/convo-lang';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="convo-code-block-view.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/convo-code-block-view.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+            if(tag.codeBlock.findReplace){
+                if(replaceBlocks[tag.targetPath]){
+//// replace-with ////
+            if(isPartialConvoCodeBlock(tag.codeBlock)){
+                if(replaceBlocks[tag.targetPath]){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+//// replace-with ////
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, isPartialConvoCodeBlock, parseConvoCode } from '@convo-lang/convo-lang';
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="completion-provider.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/completion-provider.ts" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" find-replace>
+``` ts
+            if(tag.codeBlock.findReplace){
+                if(replaced.has(tag.targetPath)){
+//// replace-with ////
+            if(isPartialConvoCodeBlock(tag.codeBlock)){
+                if(replaced.has(tag.targetPath)){
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 2 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` md
+- When a message has several find-replace blocks for the same file, they are applied in order.
+- If any find text is not found, an error lists the missing targets.
+==== NEW ====
+- When a message has several find-replace, append or prepend blocks for the same file, they are
+  applied in order and combined into one write.
+- If any find text is not found, an error lists the missing targets.
+
+#### Append and prepend
+
+The `append` and `prepend` attributes add the content of a block to the end or start of the
+target file instead of replacing it.
+
+~~~xml
+<FILE_CONTENT name="example.ts" target-output-path="./src/example.ts" append>
+``` ts
+export const other='world';
+```
+((CLOSE_TAG[FILE_CONTENT]))
+~~~
+
+- A newline is added between the existing content and the new content if one is missing.
+- `no-newline` joins the content without adding a newline. The newline before the closing code
+  fence is not included.
+- If the target file doesn't exist, it is created.
+- `append` and `prepend` are ignored when combined with `find-replace`.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 2 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` md
+- `Open Diff` opens a diff between the current file and the proposed output. For find-replace
+  blocks, all replacements are applied first.
+==== NEW ====
+- `Open Diff` opens a diff between the current file and the proposed output. For find-replace,
+  append and prepend blocks, all such blocks for the file in the message are applied in order first.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 2 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` md
+  operation and runs every script in the message after a single confirmation. Find-replace blocks
+  targeting the same file are combined into one write.
+==== NEW ====
+  operation and runs every script in the message after a single confirmation. Find-replace, append
+  and prepend blocks targeting the same file are combined into one write.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 2 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` md
+  start at 1 and follow the order of blocks in the message.
+==== NEW ====
+  start at 1 and follow the order of blocks in the message. The kind in the label is `full file`,
+  `find-replace`, `append` or `prepend`.
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="f50dcc5734b2cf7de3fbb019344ec2b378c94307" comment="The contents of this XML tag contain 2 instances of its own closing tag. The instances have be replaced with ((CLOSE_TAG[FILE_CONTENT]))" closing-escape="((CLOSE_TAG[FILE_CONTENT]))" find-replace find-replace-separator="==== NEW ====">
+``` md
+- Files are written without confirmation. Find-replace blocks targeting the same file are combined
+  into one write.
+==== NEW ====
+- Files are written without confirmation. Find-replace, append and prepend blocks targeting the
+  same file are combined into one write.
+```
+</FILE_CONTENT>
+
+Notes:
+- `mapConvoBlockReplaceIndex` has a new optional `isEnd` parameter. When content is appended at the end of the file, an earlier change that ends at the old end of file keeps its range instead of growing to include the appended content.
+- Find-replace blocks on a missing file now report "not found" instead of a read error, because missing files are treated as empty. This is a side effect of 3a.
+
+
+> user

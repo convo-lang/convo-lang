@@ -1,4 +1,4 @@
-import { ConvoCodeBlock, ConvoMessage, defaultConvoFindReplaceSeparator, escapeConvo, parseConvoCode, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { applyConvoBlockToContent, ConvoCodeBlock, ConvoMessage, defaultConvoFindReplaceSeparator, escapeConvo, isPartialConvoCodeBlock, parseConvoCode } from '@convo-lang/convo-lang';
 import { getErrorMessage } from '@iyio/common';
 import { readFileAsStringAsync } from '@iyio/node-common';
 import { spawn } from 'child_process';
@@ -310,9 +310,14 @@ export interface CodeBlockOutputOptions
     failOnNotFound?:boolean;
 }
 
+/**
+ * Returns the output of a file block. Find-replace, append and prepend blocks targeting the same
+ * file in the same message are applied in order to the current content of the file. Missing
+ * files are treated as empty.
+ */
 export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlockOutputOptions):Promise<string|undefined>=>{
     const targetPath=tag.targetPath;
-    if(!tag.codeBlock.findReplace){
+    if(!isPartialConvoCodeBlock(tag.codeBlock)){
         return tag.codeBlock.content;
     }
     try{
@@ -323,13 +328,12 @@ export const getCodeBlockOutputAsync=async (tag:OutputTagBase,options?:CodeBlock
             await window.showErrorMessage(msg);
             return;
         }
-        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && t.codeBlock.findReplace && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
+        const outputs=getOutputTags(doc).filter(t=>t.targetPath===tag.targetPath && isPartialConvoCodeBlock(t.codeBlock) && t.codeBlock.messageIndex===tag.codeBlock.messageIndex);
         outputs.sort((a,b)=>a.index-b.index);
-        const openTarget=getOpenFileDocument(targetPath);
-        let content=openTarget?openTarget.getText():await readFileAsStringAsync(targetPath);
-        let notFound:string[]=[];
+        let content=await readFileContentAsync(targetPath)??'';
+        const notFound:string[]=[];
         for(const r of outputs){
-            const replacement=replaceConvoBlockContent(content,r.codeBlock);
+            const replacement=applyConvoBlockToContent(content,r.codeBlock);
             if(!replacement.replaceCount){
                 notFound.push(`find-replace target not found. path:${tag.documentUri}, index:${r.codeBlock.index}, separator:${r.codeBlock.findReplaceSeparator??defaultConvoFindReplaceSeparator}`)
             }else{

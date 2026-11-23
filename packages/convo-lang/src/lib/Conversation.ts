@@ -5936,13 +5936,7 @@ export class Conversation
         if(file && (typeof file === 'string')){
             filePath=file;
         }else{
-            for(let i=this._messages.length-1;i>=0;i--){
-                const path=this._messages[i]?.[convoMessageSourcePathKey];
-                if(path){
-                    filePath=path;
-                    break;
-                }
-            }
+            filePath=this.getResultSourcePath();
         }
         const resultImports=exe.getVar(convoVars.__resultImports);
         if(!Array.isArray(resultImports) || !resultImports.length){
@@ -5959,12 +5953,35 @@ export class Conversation
     }
 
     /**
+     * Returns the source path of the most recent startFileImport, endFileImport or result message.
+     * Messages added by imports are skipped since they use the path of the imported file. Falls
+     * back to the last message with a source path.
+     */
+    private getResultSourcePath():string|undefined{
+        let fallback:string|undefined;
+        for(let i=this._messages.length-1;i>=0;i--){
+            const msg=this._messages[i];
+            const path=msg?.[convoMessageSourcePathKey];
+            if(!msg || !path){
+                continue;
+            }
+            if(resultSourcePathRoles.includes(msg.role)){
+                return path;
+            }
+            if(!fallback){
+                fallback=path;
+            }
+        }
+        return fallback;
+    }
+
+    /**
      * Appends startFileImport and endFileImport messages in place of call and result messages
      */
     private appendImportWrapper(exe:ConvoExecutionContext,callTags:string){
         const {importTags,filePath}=this.takeResultImports(exe);
         this.append(
-            `${callTags}> ${convoRoles.startFileImport}\n\n${importTags}> ${convoRoles.endFileImport}\n`,
+            `${callTags}> ${convoRoles.startFileImport}\n${importTags}> ${convoRoles.endFileImport}\n`,
             {filePath}
         );
     }
@@ -6266,6 +6283,16 @@ const secondPassRoles:(string|undefined)[]=[
     convoRoles.queue,
     convoRoles.flush,
     convoRoles.cacheBreakpoint,
+]
+
+/**
+ * Roles of messages written by the conversation after function calls. Their source path is used to
+ * resolve relative result imports.
+ */
+const resultSourcePathRoles:(string|undefined)[]=[
+    convoRoles.startFileImport,
+    convoRoles.endFileImport,
+    convoRoles.result,
 ]
 
 

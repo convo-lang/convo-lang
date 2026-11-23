@@ -17,6 +17,7 @@
         "test-coachford":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../coachford",
         "test-grid":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../grid",
         "test-ns":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../pathwayplus",
+        "test-lisas":"lsp/build-lsp.sh && code --extensionDevelopmentPath=$(pwd) ../../../lisas",
         "publish-ext":"./publish.sh",
         "publish-ext-open":"./publish-ovsx.sh"
     }

@@ -1,0 +1,168 @@
+@import ./_extension-and-core.convo !template
+@import ../../packages/convo-lang-cli/src/lib/ConvoFsImportService.ts !file
+
+> user
+Finish implementing the `ConvoFsImportService.ts` service
+
+@time 2026-11-22T20:53:19-05:00
+@tokenUsage 418819 / 1012 / $1.695516
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I write the glob branch, a few questions:
+
+1. How should globs be matched?
+   - a) `fs.promises.glob` from Node (needs Node 22+, no new dependency)
+   - b) A manual recursive `readdir` with a regex built from the pattern (works on any Node version, no dependency)
+   - c) Add a dependency such as `fast-glob` or `tinyglobby`
+
+2. Which glob syntax should be supported?
+   - a) The same as `ConvoVfsImportService`: `*` matches within a directory and `**` matches any depth
+   - b) Also support `?` and `{a,b}` braces
+   - c) Full glob syntax (only realistic with 1a or 1c)
+
+3. Should some paths be skipped when matching?
+   - a) Skip `node_modules` and `.git`
+   - b) Skip all hidden files and folders, plus `node_modules`
+   - c) Skip nothing
+
+4. If a glob matches no files, what should happen?
+   - a) Return an empty array. `Conversation.importAsync` then throws "Convo import not found".
+   - b) Return `null`
+
+5. How should `relativeName` work for glob matches?
+   - a) The path relative to the importing convo file's directory, the same as the non-glob branch (for example `./src/a.ts` stays `src/a.ts`)
+   - b) The path relative to the static base of the glob
+
+6. Should I also tidy up the non-glob branch? For example, use `node:path` for `relativeName` and check `isConvo` against the resolved path.
+   - a) Yes
+   - b) No, only implement the glob branch
+
+
+> user
+1. b
+2. a
+3. node_modules, .git, venv
+4. a
+5. a
+6. a
+
+
+@time 2026-11-22T20:58:57-05:00
+@tokenUsage 419376 / 4028 / $1.7580639999999998
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+<FILE_CONTENT name="ConvoFsImportService.ts" target-output-path="../../packages/convo-lang-cli/src/lib/ConvoFsImportService.ts" dirty file-hash="405f0d4838fde43776982440e0de671040914db2">
+``` ts
+import { ConvoImport, ConvoImportService, ConvoModule } from "@convo-lang/convo-lang";
+import { escapeRegex, getUriProtocol } from "@iyio/common";
+import { Dirent } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative, resolve, sep } from "node:path";
+
+/**
+ * Directories skipped when matching globs
+ */
+const ignoredDirs=new Set(['node_modules','.git','venv']);
+
+/**
+ * Imports files from the local file system. Glob paths are supported where `*` matches within a
+ * directory and `**` matches any depth.
+ */
+export class ConvoFsImportService implements ConvoImportService
+{
+    public canImport(path:string):boolean
+    {
+        const proto=getUriProtocol(path);
+        return !proto || proto==='file';
+    }
+
+    public async handleImport(_import:ConvoImport):Promise<ConvoModule|ConvoModule[]|null>
+    {
+        const path=_import.targetPath??_import.name;
+        if(!path.includes('*')){
+            return await loadModuleAsync(path,_import.name,_import.sourceDirectory);
+        }
+
+        const files=await matchGlobAsync(path);
+        return await Promise.all(files.map(f=>loadModuleAsync(f,f,_import.sourceDirectory)));
+    }
+}
+
+const loadModuleAsync=async (filePath:string,name:string,sourceDirectory:string|undefined):Promise<ConvoModule>=>{
+    const isConvo=filePath.toLowerCase().endsWith('.convo');
+    const file=await readFile(filePath,'utf8');
+    return {
+        name,
+        convo:isConvo?file:undefined,
+        content:isConvo?undefined:file,
+        filePath,
+        relativeName:relative(resolve(sourceDirectory??'.'),resolve(filePath)).split(sep).join('/'),
+    };
+}
+
+/**
+ * Returns the sorted paths of all files matching the glob path. The static part of the path
+ * before the first segment containing a `*` is used as the base directory.
+ */
+const matchGlobAsync=async (globPath:string):Promise<string[]>=>{
+    const parts=globPath.split(/[\\/]/);
+    const globStart=parts.findIndex(p=>p.includes('*'));
+    const baseParts=parts.slice(0,globStart);
+    const base=baseParts.length?(baseParts.join('/')||'/'):'.';
+    const patternParts=parts.slice(globStart);
+    const pattern=patternParts.join('/');
+    const maxDepth=pattern.includes('**')?Number.POSITIVE_INFINITY:patternParts.length;
+
+    const files:string[]=[];
+    await walkAsync(base,'',1,maxDepth,globToRegex(pattern),files);
+    return files.sort((a,b)=>a.localeCompare(b));
+}
+
+const walkAsync=async (dir:string,rel:string,depth:number,maxDepth:number,reg:RegExp,out:string[]):Promise<void>=>{
+    let entries:Dirent[];
+    try{
+        entries=await readdir(dir,{withFileTypes:true});
+    }catch{
+        return;
+    }
+    for(const e of entries){
+        const r=rel?`${rel}/${e.name}`:e.name;
+        const full=join(dir,e.name);
+        if(e.isDirectory()){
+            if(depth<maxDepth && !ignoredDirs.has(e.name)){
+                await walkAsync(full,r,depth+1,maxDepth,reg,out);
+            }
+        }else if(e.isFile() && reg.test(r)){
+            out.push(full);
+        }
+    }
+}
+
+/**
+ * Converts a glob pattern to a regex. `**` followed by a slash matches zero or more directories,
+ * `**` matches any characters and `*` matches any characters within a directory.
+ */
+const globToRegex=(pattern:string):RegExp=>{
+    const src=pattern.split(/(\*\*\/|\*\*|\*)/).map(p=>(
+        p==='**/'?
+            '(?:.*/)?'
+        :p==='**'?
+            '.*'
+        :p==='*'?
+            '[^/]*'
+        :
+            escapeRegex(p)
+    )).join('');
+    return new RegExp(`^${src}$`);
+}
+```
+</FILE_CONTENT>
+
+Notes:
+- Each glob match uses its file path as the module `name`, the same as `ConvoVfsImportService`. This keeps the modules unique in `importedModules`.
+- `**.ts` matches `.ts` files at any depth, the same as `**/*.ts`. This matches how the VFS service handles a `**` suffix.
+- `node_modules`, `.git` and `venv` are skipped only as directories while walking. Unreadable directories are ignored.
+- If nothing matches, an empty array is returned, so `Conversation.importAsync` throws its "not found" error.
+
+
+> user

@@ -1,0 +1,137 @@
+@import ./_extension-and-core.convo !template
+
+> user
+There is an issue when consecutive `> startImport` `> endImport` blocks are appended, relative import
+paths are not working correctly since the path of the last import is used
+
+@time 2026-11-21T13:31:19-05:00
+@tokenUsage 416227 / 2203 / $1.7089679999999998
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+## Cause
+
+`takeResultImports` in `Conversation.ts` finds the base path for relative imports in two steps. First it reads `__file`. Without a scope, that falls back to `__mainFile`, which is often unset. Then it scans `_messages` backwards for the last message with `convoMessageSourcePathKey`.
+
+The scan breaks on repeated calls:
+
+1. The first `endFileImport` is appended with the correct convo file path.
+2. `loadImportsAsync` inserts the imported file's messages right after it. `registerModuleAsync` tags those messages with the imported file's own path, for example `../src/foo.ts`.
+3. On the next call, the backwards scan finds those imported messages first. Relative paths then resolve against the last imported file's directory instead of the convo file's directory.
+
+The same function also builds normal `> result` messages through `appendFunctionSetters`, so those are affected as well.
+
+## Questions
+
+1. Which fix approach do you prefer?
+   - a) Track imported messages in a private `WeakSet` filled in `registerModuleAsync`, and skip them when scanning for the base path. This is a small, contained change.
+   - b) Resolve paths to absolute in `addFileImports` at call time. This only fixes `addFileImports`, not other code that sets `__resultImports`.
+   - c) Reuse the path of the most recent `startFileImport`/`endFileImport`/`result` message that was appended by the conversation, not by an import.
+
+2. If no non-imported message has a source path, what should happen?
+   - a) Fall back to the current behavior: use the last message with any path.
+   - b) Leave the path undefined.
+
+3. Should the fix apply to both `endFileImport` and regular `> result` messages, since they share `takeResultImports`?
+   - a) Yes, both.
+   - b) Only the import wrapper path.
+
+My suggestion is 1a, 2a and 3a.
+
+
+> user
+1. c
+2. a
+3. a
+
+
+@time 2026-11-21T13:36:46-05:00
+@tokenUsage 416863 / 2578 / $1.719012
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+## Change
+
+`takeResultImports` now scans backwards for the most recent `startFileImport`, `endFileImport` or `result` message that has a source path, and uses that path. These messages are appended by the conversation itself with the convo file path. Imported file content, such as `!file` imports, is added as `system` messages, so the scan skips it. If no matching message is found, it falls back to the current behavior and uses the last message with any source path.
+
+Because `appendImportWrapper` and `appendFunctionSetters` both use `takeResultImports`, the fix covers import wrappers and regular `> result` messages.
+
+One limitation: an imported `.convo` module that contains its own `> result` messages, with a file path set, could still match the scan. I expect this to be rare.
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` ts
+        if(file && (typeof file === 'string')){
+            filePath=file;
+        }else{
+            for(let i=this._messages.length-1;i>=0;i--){
+                const path=this._messages[i]?.[convoMessageSourcePathKey];
+                if(path){
+                    filePath=path;
+                    break;
+                }
+            }
+        }
+//// replace-with ////
+        if(file && (typeof file === 'string')){
+            filePath=file;
+        }else{
+            filePath=this.getResultSourcePath();
+        }
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` ts
+    /**
+     * Appends startFileImport and endFileImport messages in place of call and result messages
+     */
+//// replace-with ////
+    /**
+     * Returns the source path of the most recent startFileImport, endFileImport or result message.
+     * Messages added by imports are skipped since they use the path of the imported file. Falls
+     * back to the last message with a source path.
+     */
+    private getResultSourcePath():string|undefined{
+        let fallback:string|undefined;
+        for(let i=this._messages.length-1;i>=0;i--){
+            const msg=this._messages[i];
+            const path=msg?.[convoMessageSourcePathKey];
+            if(!msg || !path){
+                continue;
+            }
+            if(resultSourcePathRoles.includes(msg.role)){
+                return path;
+            }
+            if(!fallback){
+                fallback=path;
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * Appends startFileImport and endFileImport messages in place of call and result messages
+     */
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="Conversation.ts" target-output-path="../../packages/convo-lang/src/lib/Conversation.ts" last-commit="ac3dc121395b07761abffc3fb600e1e14393ab75" find-replace>
+``` ts
+    convoRoles.cacheBreakpoint,
+]
+//// replace-with ////
+    convoRoles.cacheBreakpoint,
+]
+
+/**
+ * Roles of messages written by the conversation after function calls. Their source path is used to
+ * resolve relative result imports.
+ */
+const resultSourcePathRoles:(string|undefined)[]=[
+    convoRoles.startFileImport,
+    convoRoles.endFileImport,
+    convoRoles.result,
+]
+```
+</FILE_CONTENT>
+
+
+> user

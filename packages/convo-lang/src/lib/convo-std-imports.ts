@@ -42,6 +42,9 @@ XML File Block Attributes:
 - truncated: If present only part of the file is displayed. A ${t}<FILE_CONTENT_TRUNCATION/>${t} tag marks the end of the displayed content
 - find-replace: Find and replace content instead of replacing the full content. Defaults to finding and replacing the first instance of the string to find. Can be used as a boolean attribute or the attribute can be a number or the value "all".
 - find-replace-separator: Used to define a custom separator between content to find and the content to replace it with. The default separator is ${t}//// replace-with ////${t}
+- append: Appends the content of the block to the end of the file instead of replacing the full content. A newline is added between the existing content and the appended content if the file does not end with one. If the file does not exist it is created. Ignored when used with find-replace.
+- prepend: Prepends the content of the block to the start of the file instead of replacing the full content. If the file does not exist it is created. Ignored when used with find-replace.
+- no-newline: Used with append and prepend to join the content without adding a newline. The newline before the closing code fence is not included in the joined content.
 
 When replacing content using find and replace make sure the file-replace-separator is not in the text of the content to find, if it is use a custom file-replace-separator.
 DO NOT USE any of the following characters in a file-replace-separator: ${t}<>&"'${t}. The file-replace-separator must be a valid XML attribute without using escape characters.
@@ -127,6 +130,22 @@ ${t3} ts
     name:string;
 +++ CUSTOM_SEP +++
     first_name:string;
+${t3}
+</FILE_CONTENT>
+
+
+Example of appending to a file:
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" append>
+${t3} ts
+export const exampleName='Example';
+${t3}
+</FILE_CONTENT>
+
+
+Example of prepending to a file:
+<FILE_CONTENT name="example.ts" target-output-path="./path/to/example.ts" prepend>
+${t3} ts
+import { Other } from './other';
 ${t3}
 </FILE_CONTENT>
 

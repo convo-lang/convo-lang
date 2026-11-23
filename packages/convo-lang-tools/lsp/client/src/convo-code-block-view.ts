@@ -1,4 +1,4 @@
-import { convoTags } from '@convo-lang/convo-lang';
+import { convoTags, isPartialConvoCodeBlock } from '@convo-lang/convo-lang';
 import { DisposeContainer } from '@iyio/common';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -286,7 +286,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
                 codeBlock:tag.codeBlock,
                 documentUri:target.group.messageUri,
             }
-            if(tag.codeBlock.findReplace){
+            if(isPartialConvoCodeBlock(tag.codeBlock)){
                 if(replaceBlocks[tag.targetPath]){
                     continue;
                 }

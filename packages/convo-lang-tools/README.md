@@ -359,8 +359,28 @@ export const value='goodbye';
 
 - `find-replace` can be a boolean, a number, or `all` to replace every match.
 - `find-replace-separator` sets a custom separator.
-- When a message has several find-replace blocks for the same file, they are applied in order.
+- When a message has several find-replace, append or prepend blocks for the same file, they are
+  applied in order and combined into one write.
 - If any find text is not found, an error lists the missing targets.
+
+#### Append and prepend
+
+The `append` and `prepend` attributes add the content of a block to the end or start of the
+target file instead of replacing it.
+
+~~~xml
+<FILE_CONTENT name="example.ts" target-output-path="./src/example.ts" append>
+``` ts
+export const other='world';
+```
+</FILE_CONTENT>
+~~~
+
+- A newline is added between the existing content and the new content if one is missing.
+- `no-newline` joins the content without adding a newline. The newline before the closing code
+  fence is not included.
+- If the target file doesn't exist, it is created.
+- `append` and `prepend` are ignored when combined with `find-replace`.
 
 Target paths are resolved relative to the `.convo` file.
 
@@ -450,8 +470,8 @@ Recognized output blocks get code lenses directly above them in the editor:
 - `Open Output` opens the target file.
 - `Write Output` asks for confirmation, with an option to view the diff first, then writes the
   file. If the target is open in an editor, it is updated through the editor and saved.
-- `Open Diff` opens a diff between the current file and the proposed output. For find-replace
-  blocks, all replacements are applied first.
+- `Open Diff` opens a diff between the current file and the proposed output. For find-replace,
+  append and prepend blocks, all such blocks for the file in the message are applied in order first.
 - `Copy Output` copies the final output to the clipboard.
 - `Apply {op}` asks for confirmation, listing the matched files, then applies the file operation.
 - `Preview` lists the files a file operation matches. Selecting a file opens it.
@@ -473,8 +493,8 @@ The Convo-Lang activity bar includes a Code Blocks view. It lists the output blo
 - Inline action on message groups: `Review`. This starts a guided review of the file blocks in the
   message. See [Guided review](#guided-review).
 - Inline action on message groups: `Apply All`. This writes every file, applies every file
-  operation and runs every script in the message after a single confirmation. Find-replace blocks
-  targeting the same file are combined into one write.
+  operation and runs every script in the message after a single confirmation. Find-replace, append
+  and prepend blocks targeting the same file are combined into one write.
 - Documents can be pinned so they stay in the view while you work in other files. Clicking a
   document item switches the view to that document.
 
@@ -489,7 +509,8 @@ block in the message, one file at a time.
 - Within a file, changes are visited from top to bottom across all blocks.
 - Every change has a code lens with a label, such as `block #3 · find-replace · ○ pending`, and
   `Accept` or `Reject` actions for its block. Other changes have a `Go to` action. Block numbers
-  start at 1 and follow the order of blocks in the message.
+  start at 1 and follow the order of blocks in the message. The kind in the label is `full file`,
+  `find-replace`, `append` or `prepend`.
 - The code lens of the current change adds `Previous`, `Next`, `Skip File` and `Cancel`. `Finish`
   appears once every block is accepted or rejected.
 - Each change is marked with a divider. The current block has a solid divider, highlighted lines
@@ -552,8 +573,8 @@ title bar of `.convo` files.
   scripts will be executed automatically.
 - File operations are applied without confirmation. If a file operation fails, no further blocks
   are applied.
-- Files are written without confirmation. Find-replace blocks targeting the same file are combined
-  into one write.
+- Files are written without confirmation. Find-replace, append and prepend blocks targeting the
+  same file are combined into one write.
 - Scripts still ask for confirmation unless `convo.alwaysRunOutputScripts` is `true`.
 - If a find-replace target isn't found, an error is shown and no further blocks are applied.
 - Nothing is applied if the completion fails or is cancelled.

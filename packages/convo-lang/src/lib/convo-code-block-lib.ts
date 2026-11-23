@@ -1,6 +1,6 @@
 import { unescapeHtml } from '@iyio/common';
 import { unescapeConvo } from './convo-parser.js';
-import { ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, isConvoFileOpType } from './convo-types.js';
+import { ConvoBlockInsertMode, ConvoCodeBlock, ConvoMessage, convoMessageSourceReferenceKey, isConvoFileOpType } from './convo-types.js';
 
 
 export const defaultConvoFindReplaceSeparator='//// replace-with ////';
@@ -23,6 +23,15 @@ const parseConvoCodeBlockAttributes=(attributes:string):Record<string,string>=>{
     }
     return atts;
 }
+
+const getConvoBlockInsertMode=(atts:Record<string,string>):ConvoBlockInsertMode|undefined=>(
+    ('append' in atts)?
+        'append'
+    :('prepend' in atts)?
+        'prepend'
+    :
+        undefined
+);
 
 /**
  * Parses XML tagged code blocks and self-closing `FILE_OP` tags. Blocks are returned in order of
@@ -51,6 +60,7 @@ export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOr
         const tagName=match.groups?.['tagName']??'';
         const lang=match.groups?.['lang']||'txt';
         const atts=parseConvoCodeBlockAttributes(match.groups?.['attributes']??'');
+        const findReplace=parseConvoBlockFindReplace(atts['find-replace']);
 
         found.push({
             tagName,
@@ -60,8 +70,10 @@ export const parseConvoCodeBlocks=(text:string,messageIndex:number,indexOffsetOr
             startIndex:indexOffset+(match.index??0)+start.length,
             endIndex:indexOffset+(match.index??0)+match[0].length,
             messageIndex,
-            findReplace:parseConvoBlockFindReplace(atts['find-replace']),
+            findReplace,
             findReplaceSeparator:atts['find-replace-separator'],
+            insertMode:findReplace?undefined:getConvoBlockInsertMode(atts),
+            noNewline:('no-newline' in atts)?true:undefined,
         });
     }
 
@@ -106,6 +118,14 @@ export const parseConvoBlockFindReplace=(value:string|null|undefined):number|'al
     }
     const n=Number(value);
     return isFinite(n)?n:undefined;
+}
+
+/**
+ * Returns true if the block modifies existing content using find-replace, append or prepend
+ * instead of replacing the full content.
+ */
+export const isPartialConvoCodeBlock=(block:ConvoCodeBlock):boolean=>{
+    return (block.findReplace || block.insertMode)?true:false;
 }
 
 const trimBlockStart=(content:string):string=>{
@@ -199,13 +219,55 @@ export const replaceConvoBlockContent=(content:string,block:ConvoCodeBlock):Repl
 }
 
 /**
- * Maps an index in the source content of a replacement to the index in the resulting content.
- * Indexes inside of a replaced range are clamped to the replacement.
+ * Appends or prepends the content of the block to the given content. Unless `noNewline` is true a
+ * newline is added between the content and appended content if the content does not end with one.
+ * When `noNewline` is true the newline before the closing code fence of the block is dropped.
  */
-export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[]):number=>{
+export const insertConvoBlockContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    const insert=block.noNewline?trimBlockEnd(block.content):block.content;
+    if(block.insertMode==='prepend'){
+        return {
+            content:insert+content,
+            replaceCount:1,
+            ranges:[{sourceStart:0,sourceEnd:0,start:0,end:insert.length}],
+        };
+    }
+    const sep=(!block.noNewline && content && !content.endsWith('\n'))?'\n':'';
+    const start=content.length+sep.length;
+    return {
+        content:content+sep+insert,
+        replaceCount:1,
+        ranges:[{sourceStart:content.length,sourceEnd:content.length,start,end:start+insert.length}],
+    };
+}
+
+/**
+ * Applies a file block to the given content. Find-replace, append and prepend blocks modify the
+ * content and full file blocks replace it.
+ */
+export const applyConvoBlockToContent=(content:string,block:ConvoCodeBlock):ReplaceConvoBlockResult=>{
+    if(block.findReplace){
+        return replaceConvoBlockContent(content,block);
+    }
+    if(block.insertMode){
+        return insertConvoBlockContent(content,block);
+    }
+    return {
+        content:block.content,
+        replaceCount:1,
+        ranges:[{sourceStart:0,sourceEnd:content.length,start:0,end:block.content.length}],
+    };
+}
+
+/**
+ * Maps an index in the source content of a replacement to the index in the resulting content.
+ * Indexes inside of a replaced range are clamped to the replacement. End indexes at the position
+ * of inserted content stay before the inserted content.
+ */
+export const mapConvoBlockReplaceIndex=(index:number,ranges:ConvoBlockReplaceRange[],isEnd=false):number=>{
     let offset=0;
     for(const r of ranges){
-        if(index<r.sourceStart){
+        if(index<r.sourceStart || (isEnd && index===r.sourceStart && r.sourceStart===r.sourceEnd)){
             break;
         }
         if(index<r.sourceEnd){

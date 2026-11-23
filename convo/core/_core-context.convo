@@ -16,3 +16,4 @@
 @import ../../packages/convo-lang/src/lib/BaseOpenAiConvoCompletionService.ts !file
 @import ../../packages/convo-lang/src/lib/BaseOpenAiConvoConverter.ts !file
 @import ../../packages/convo-lang/src/lib/result-type.ts !file
+@import ../../packages/convo-lang/src/lib/ConvoVfsImportService.ts !file

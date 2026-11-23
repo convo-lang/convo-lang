@@ -1,4 +1,4 @@
-import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, parseConvoCode } from '@convo-lang/convo-lang';
+import { Conversation, ConvoMakeTargetRebuild, FlattenConvoOptions, convoResultErrorName, convoRoles, convoVars, flatConvoMessagesToTextView, getSerializableFlatConvoConversation, isPartialConvoCodeBlock, parseConvoCode } from '@convo-lang/convo-lang';
 import { ConvoBrowserCtrl } from "@convo-lang/convo-lang-browser";
 import { ConvoCli, ConvoCliOptions, createConvoCliAsync, initConvoCliAsync } from '@convo-lang/convo-lang-cli';
 import { ConvoMakeCtrl, getConvoMakeOptionsFromVars } from "@convo-lang/convo-lang-make";
@@ -1030,7 +1030,7 @@ const applyLastAssistantBlocksAsync=async (document:TextDocument):Promise<void>=
             documentUri:doc.uri,
         };
         if(tag.type==='file'){
-            if(tag.codeBlock.findReplace){
+            if(isPartialConvoCodeBlock(tag.codeBlock)){
                 if(replaced.has(tag.targetPath)){
                     continue;
                 }

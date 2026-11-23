@@ -1,4 +1,4 @@
-import { ConvoHttpImportService, ConvoProjectConfig, ConvoVfsImportService, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
+import { ConvoHttpImportService, ConvoProjectConfig, convoCapabilitiesParams, convoDbProvider, convoDefaultModelParam, convoGitService, convoImportService, convoOpenAiModule, convoOpenRouterModule, convoProjectConfig, openAiApiKeyParam, openAiAudioModelParam, openAiBaseUrlParam, openAiChatModelParam, openAiImageModelParam, openAiSecretsParam, openAiVisionModelParam } from '@convo-lang/convo-lang';
 import { convoMcpClientModule } from "@convo-lang/convo-lang-mcp-client";
 import type { ConvoDbLayerConfig } from '@convo-lang/db/LayeredConvoDb.js';
 import { EnvParams, ScopeRegistration, deleteUndefined } from "@iyio/common";
@@ -6,6 +6,7 @@ import { nodeCommonModule } from "@iyio/node-common";
 import { VfsCtrl, vfs } from '@iyio/vfs';
 import { ConvoCliConfig, ConvoCliOptions } from "./convo-cli-types.js";
 import { ConvoCliGitService } from './ConvoCliGitService.js';
+import { ConvoFsImportService } from './ConvoFsImportService.js';
 import { ConvoTsToolImportService } from './ConvoTsToolImportService.js';
 
 export const convoCliModule=(
@@ -51,7 +52,7 @@ export const convoCliModule=(
     convoCliDbModule(scope);
     
 
-    scope.implementService(convoImportService,()=>new ConvoVfsImportService());
+    scope.implementService(convoImportService,()=>new ConvoFsImportService());
     scope.implementService(convoImportService,()=>new ConvoHttpImportService());
     scope.implementService(convoImportService,()=>new ConvoTsToolImportService());
 

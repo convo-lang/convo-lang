@@ -331,11 +331,32 @@ export interface ConvoCodeBlock
     findReplaceSeparator?:string;
 
     /**
+     * Appends or prepends the content of the block to the target file instead of replacing the
+     * full content. Defined using the `append` or `prepend` boolean attributes. Undefined when
+     * the block uses find-replace.
+     */
+    insertMode?:ConvoBlockInsertMode;
+
+    /**
+     * If true appended or prepended content is joined without adding a newline. The newline
+     * before the closing code fence is not included in the joined content. Defined using the
+     * `no-newline` boolean attribute.
+     */
+    noNewline?:boolean;
+
+    /**
      * The file operation of a self-closing `FILE_OP` block. Undefined for other blocks or when the
      * op attribute is not a valid file operation. FILE_OP blocks have empty content and lang.
      */
     fileOp?:ConvoFileOpType;
 }
+
+/**
+ * Controls how the content of a file block is inserted into the target file
+ * - append: Content is added to the end of the file
+ * - prepend: Content is added to the start of the file
+ */
+export type ConvoBlockInsertMode='append'|'prepend';
 
 /**
  * File operations that can be defined using self-closing `FILE_OP` XML tags.

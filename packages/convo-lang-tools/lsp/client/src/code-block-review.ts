@@ -1,4 +1,4 @@
-import { ConvoBlockReplaceRange, mapConvoBlockReplaceIndex, replaceConvoBlockContent } from '@convo-lang/convo-lang';
+import { ConvoBlockReplaceRange, applyConvoBlockToContent, isPartialConvoCodeBlock, mapConvoBlockReplaceIndex } from '@convo-lang/convo-lang';
 import { getErrorMessage } from '@iyio/common';
 import * as path from 'path';
 import { CodeLens, CodeLensProvider, ConfigurationTarget, Disposable, EventEmitter, ExtensionContext, Position, Range, Selection, StatusBarAlignment, Tab, TabInputText, TabInputTextDiff, TextDocument, TextEditor, TextEditorRevealType, ThemeColor, Uri, commands, languages, window, workspace } from 'vscode';
@@ -534,8 +534,8 @@ class CodeBlockReview implements CodeLensProvider, Disposable
 
 /**
  * Applies the given steps to the base content in order. Labels of previous steps are remapped as
- * each find-replace block is applied. Full file blocks replace the content and clear the ranges of
- * all previous labels.
+ * each find-replace, append or prepend block is applied. Full file blocks replace the content and
+ * clear the ranges of all previous labels.
  */
 const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
     let content=base;
@@ -544,13 +544,13 @@ const buildFilePreview=(base:string,steps:ReviewStep[]):FilePreview=>{
 
     for(const step of steps){
         const block=step.tag.codeBlock;
-        if(!block.findReplace){
+        if(!isPartialConvoCodeBlock(block)){
             content=block.content;
             labels=[...labels.map(l=>({step:l.step,ranges:[]})),{step,ranges:[{start:0,end:content.length}]}];
             continue;
         }
 
-        const result=replaceConvoBlockContent(content,block);
+        const result=applyConvoBlockToContent(content,block);
         if(!result.replaceCount){
             notFound.push(step);
             labels.push({step,ranges:[]});
@@ -597,7 +597,7 @@ const getChanges=(labels:BlockLabel[],steps:ReviewStep[]):ReviewChange[]=>{
 
 const mapRange=(range:BlockRange,ranges:ConvoBlockReplaceRange[]):BlockRange=>({
     start:mapConvoBlockReplaceIndex(range.start,ranges),
-    end:mapConvoBlockReplaceIndex(range.end,ranges),
+    end:mapConvoBlockReplaceIndex(range.end,ranges,true),
 });
 
 const getPageSteps=(steps:ReviewStep[],pageKey:string):ReviewStep[]=>(
@@ -677,7 +677,7 @@ const getLabelText=(change:ReviewChange,isCurrent:boolean):string=>{
         :block.findReplace?
             'find-replace'
         :
-            'full file'
+            (block.insertMode??'full file')
     );
     return `${isCurrent?'▶ ':''}block #${step.tag.index+1} · ${kind} · ${getStatusIcon(step.status)} ${step.status}${change.range?'':' · not found'}`;
 }
