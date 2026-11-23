@@ -1,0 +1,114 @@
+@import ./_extension.convo !template
+
+> user
+Allow the Answer questions command identify question numbers that start with "Q" or "q".
+
+For example:
+``` txt
+Q1. Does that plan work?
+- a) Yes, one step per response, and I wait for your OK between steps
+- b) Yes, but do steps 1 to 3 together, then 4 and 5
+- c) Change it (please say how)
+```
+
+@time 2026-11-23T08:36:19-05:00
+@tokenUsage 150827 / 548 / $0.6142679999999999
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+Before I make the change, a few quick questions:
+
+1. How should the placeholders in the user message be written when the questions use a `Q` prefix?
+   - a) Keep the prefix as written, for example `Q1. ` (or `q1. `)
+   - b) Always use plain numbers, for example `1. `
+   - c) Always use an uppercase `Q`, for example `Q1. `, regardless of the case used
+
+2. If a message mixes styles, such as `1.` and `Q1.`, how should they be treated?
+   - a) As the same question, deduplicated by number (the first style seen is used)
+   - b) As separate questions
+
+3. Which separators after the number should be accepted for the `Q` style?
+   - a) Only `.`, for example `Q1.`, to match the current behavior
+   - b) `.`, `:` and `)`, for example `Q1.`, `Q1:` and `Q1)`
+   - c) Also allow no separator, for example `Q1 Does that plan work?`
+
+4. Should a space between `Q` and the number be allowed, such as `Q 1.`?
+   - a) No
+   - b) Yes
+
+5. Should I update the README description of `Convo: Answer Questions` to mention the `Q` prefix?
+   - a) Yes
+   - b) No
+
+
+> user
+1. b
+2. a
+3. b
+4. b
+5. a
+
+
+@time 2026-11-23T08:38:01-05:00
+@tokenUsage 151259 / 1585 / $0.636736
+@model open-router/anthropic/claude-opus-5.5
+> assistant
+The Answer Questions command now also recognizes `Q` and `q` prefixed question numbers. Placeholders are still written as plain numbers, and a question numbered both `1.` and `Q1.` is counted once.
+
+- With a `Q` prefix, the number can be followed by `.`, `:` or `)`.
+- Spaces are allowed between `Q` and the number, for example `Q 1.`.
+- Plain numbered items still require a `.`, the same as before.
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts" last-commit="894d525ab2be15cf773b42c6732a05408034136d" find-replace>
+``` ts
+const questionReg=/(^|\n)[ *~`_]*(\d+)[ *~`_]*\./g;
+//// replace-with ////
+/**
+ * Matches numbered questions such as `1.`, `**2.**`, `Q3.`, `q4:` and `Q 5)`. Group 2 contains
+ * the number of Q prefixed questions and group 3 the number of plain numbered questions.
+ */
+const questionReg=/(^|\n)[ *~`_]*(?:[Qq][ \t]*(\d+)[ *~`_]*[.:)]|(\d+)[ *~`_]*\.)/g;
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="answer-questions.ts" target-output-path="../../packages/convo-lang-tools/lsp/client/src/answer-questions.ts" last-commit="894d525ab2be15cf773b42c6732a05408034136d" find-replace>
+``` ts
+/**
+ * Returns the unique question numbers found in the given content in order of first appearance
+ */
+const getQuestionNumbers=(content:string):string[]=>{
+    const numbers:string[]=[];
+    for(const match of content.matchAll(questionReg)){
+        const n=match[2];
+//// replace-with ////
+/**
+ * Returns the unique question numbers found in the given content in order of first appearance.
+ * Q prefixed questions and plain numbered questions with the same number are treated as the same
+ * question.
+ */
+const getQuestionNumbers=(content:string):string[]=>{
+    const numbers:string[]=[];
+    for(const match of content.matchAll(questionReg)){
+        const n=match[2]??match[3];
+```
+</FILE_CONTENT>
+
+<FILE_CONTENT name="README.md" target-output-path="../../packages/convo-lang-tools/README.md" last-commit="735979f7a20a4f5e948993c944d7d4071865cbbe" find-replace>
+``` md
+Finds the numbered items in the last assistant message, such as `1.` or `**2.**`. It then adds
+matching numbered placeholders in a user message at the end of the document and places the cursor
+after the first one. If the document already ends with a user message after the assistant
+message, the placeholders are added to it.
+//// replace-with ////
+Finds the numbered items in the last assistant message, such as `1.` or `**2.**`. Numbers
+prefixed with `Q` or `q` are also found, such as `Q1.`, `q2:` or `Q 3)`. It then adds matching
+numbered placeholders in a user message at the end of the document and places the cursor after
+the first one. If the document already ends with a user message after the assistant message, the
+placeholders are added to it.
+
+- Placeholders always use plain numbers, such as `1. `, even when the questions use a `Q` prefix.
+- Questions with the same number, such as `1.` and `Q1.`, are only added once.
+```
+</FILE_CONTENT>
+
+
+> user

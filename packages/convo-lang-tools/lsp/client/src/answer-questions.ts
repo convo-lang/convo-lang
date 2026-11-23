@@ -2,7 +2,11 @@ import { ConvoMessage, convoRoles, parseConvoCode } from '@convo-lang/convo-lang
 import { ExtensionContext, Range, Selection, TextEditorRevealType, ViewColumn, WorkspaceEdit, commands, window, workspace } from 'vscode';
 import { ConvoExt } from './ConvoExt.js';
 
-const questionReg=/(^|\n)[ *~`_]*(\d+)[ *~`_]*\./g;
+/**
+ * Matches numbered questions such as `1.`, `**2.**`, `Q3.`, `q4:` and `Q 5)`. Group 2 contains
+ * the number of Q prefixed questions and group 3 the number of plain numbered questions.
+ */
+const questionReg=/(^|\n)[ *~`_]*(?:[Qq][ \t]*(\d+)[ *~`_]*[.:)]|(\d+)[ *~`_]*\.)/g;
 
 /**
  * URIs of documents word wrapping has been enabled for by the split command
@@ -133,12 +137,14 @@ const getLastAssistantQuestions=(text:string):AssistantQuestions|undefined=>{
 }
 
 /**
- * Returns the unique question numbers found in the given content in order of first appearance
+ * Returns the unique question numbers found in the given content in order of first appearance.
+ * Q prefixed questions and plain numbered questions with the same number are treated as the same
+ * question.
  */
 const getQuestionNumbers=(content:string):string[]=>{
     const numbers:string[]=[];
     for(const match of content.matchAll(questionReg)){
-        const n=match[2];
+        const n=match[2]??match[3];
         if(n && !numbers.includes(n)){
             numbers.push(n);
         }

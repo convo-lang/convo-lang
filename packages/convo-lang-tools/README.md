@@ -655,10 +655,14 @@ rebuilds the target from scratch instead of continuing the conversation.
 | Convo: Answer Questions Split  | `convo.answer-questions-split`  | `Ctrl+Shift+L` / `Cmd+Shift+L`               |
 
 #### Convo: Answer Questions
-Finds the numbered items in the last assistant message, such as `1.` or `**2.**`. It then adds
-matching numbered placeholders in a user message at the end of the document and places the cursor
-after the first one. If the document already ends with a user message after the assistant
-message, the placeholders are added to it.
+Finds the numbered items in the last assistant message, such as `1.` or `**2.**`. Numbers
+prefixed with `Q` or `q` are also found, such as `Q1.`, `q2:` or `Q 3)`. It then adds matching
+numbered placeholders in a user message at the end of the document and places the cursor after
+the first one. If the document already ends with a user message after the assistant message, the
+placeholders are added to it.
+
+- Placeholders always use plain numbers, such as `1. `, even when the questions use a `Q` prefix.
+- Questions with the same number, such as `1.` and `Q1.`, are only added once.
 
 #### Convo: Answer Questions Split
 - Splits the editor if the document isn't already shown twice.
