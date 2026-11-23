@@ -1,5 +1,6 @@
 @import ../../tsconfig.base.json !file
 @import ../../packages/convo-lang/tsconfig.json !file
+@import ../../packages/convo-lang/src/index.ts !file
 @import ../../packages/convo-lang/src/lib/Conversation.ts !file
 @import ../../packages/convo-lang/src/lib/ConvoExecutionContext.ts !file
 @import ../../packages/convo-lang/src/lib/convo-parser.ts !file
@@ -17,3 +18,8 @@
 @import ../../packages/convo-lang/src/lib/BaseOpenAiConvoConverter.ts !file
 @import ../../packages/convo-lang/src/lib/result-type.ts !file
 @import ../../packages/convo-lang/src/lib/ConvoVfsImportService.ts !file
+@import ../../packages/convo-lang-cli/src/lib/ConvoFsImportService.ts !file
+@import ../../packages/convo-lang/src/lib/convo.deps.ts !file
+@import ../../packages/convo-lang-cli/src/lib/ConvoCli.ts !file
+@import ../../packages/convo-lang-cli/src/lib/convo-cli-module.ts !file
+@import ../../packages/convo-lang-cli/src/lib/convo-cli-types.ts !file
