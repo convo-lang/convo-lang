@@ -6,6 +6,7 @@ import { commands, ExtensionContext, TreeItem, TreeItemCollapsibleState, Uri, wi
 import { ConvoExt } from './ConvoExt.js';
 import { codeBlockAppliedChangeEmitter, getCodeBlockAppliedStatus } from './code-block-applied.js';
 import { getFileBlockArgs, getParsedOutputTagGroups, HasArgs, MessageTagGroup, OutputTagCodeLensArgs, ParsedOutputTagInfo, setClipboardUsingOutputTagAsync, showOutputDiffAsync, writeOutputTagAsync } from './code-block-lib.js';
+import { buildCodeBlockTree, CodeBlockTreeFolder, codeBlockTreeModeChangeEmitter, getCodeBlockTreeFolderTags, isCodeBlockTreeMode } from './code-block-tree.js';
 import { applyFileOpAsync, getFileOpLabel } from './file-op-lib.js';
 import { timeSince, timeSinceNext } from './util.js';
 
@@ -53,7 +54,7 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
         provider.refresh();
     }));
 
-    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeMessageItem)=>{
+    context.subscriptions.push(commands.registerCommand('convo.code-block-group-apply-all',async (item?:ConvoCodeMessageItem|ConvoCodeFolderItem)=>{
         await provider.applyAllAsync(item);
     }));
 
@@ -110,6 +111,10 @@ export const registerConvoCodeBlockView=(context:ExtensionContext,ext:ConvoExt)=
     }));
 
     context.subscriptions.push(codeBlockAppliedChangeEmitter.event(()=>{
+        provider.refresh();
+    }));
+
+    context.subscriptions.push(codeBlockTreeModeChangeEmitter.event(()=>{
         provider.refresh();
     }));
 
@@ -256,21 +261,21 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
         ));
     }
 
-    public async applyAllAsync(item?:ConvoCodeMessageItem):Promise<void>
+    public async applyAllAsync(item?:ConvoCodeMessageItem|ConvoCodeFolderItem):Promise<void>
     {
-        const target=item;
-        if(!target){
+        if(!item){
             return;
         }
 
-        const tags=target.group.tags;
+        const isFolder=item instanceof ConvoCodeFolderItem;
+        const tags=isFolder?item.tags:item.group.tags;
 
         if(!tags.length){
             return;
         }
 
         const action=await window.showWarningMessage(
-            `Apply ${tags.length} code block action${tags.length===1?'':'s'} from this message?`,
+            `Apply ${tags.length} code block action${tags.length===1?'':'s'} from this ${isFolder?'folder':'message'}?`,
             {modal:true},
             'Apply All',
             'View First Diff',
@@ -295,7 +300,7 @@ class ConvoCodeBlockTreeProvider implements vscode.TreeDataProvider<ConvoCodeBlo
                 index:tag.index,
                 cwd:tag.cwd,
                 codeBlock:tag.codeBlock,
-                documentUri:target.group.messageUri,
+                documentUri:item.group.messageUri,
             }
             if(isPartialConvoCodeBlock(tag.codeBlock)){
                 if(replaceBlocks[tag.targetPath]){
@@ -723,15 +728,20 @@ class ConvoCodeBlockDocItem extends ConvoCodeBlockTreeItem
     {
         const items:ConvoCodeBlockTreeItem[]=[];
         const groups=getParsedOutputTagGroups(this.doc);
+        const treeMode=isCodeBlockTreeMode();
 
         for(let i=0;i<groups.length;i++){
             const group=groups[i];
             if(!group){
                 continue;
             }
-            items.push(new ConvoCodeMessageItem(this.provider,group));
+            if(treeMode){
+                items.push(new ConvoCodeMessageItem(this.provider,group,true));
+                continue;
+            }
+            items.push(new ConvoCodeMessageItem(this.provider,group,false));
             for(const tag of group.tags){
-                items.push(new ConvoCodeBlockItem(this.provider,group,tag))
+                items.push(new ConvoCodeBlockItem(this.provider,group,tag,false))
             }
             items.push(new ConvoSeparatorItem(this.provider));
         }
@@ -757,13 +767,17 @@ class ConvoCodeMessageItem extends ConvoCodeBlockTreeItem
     public constructor(
         provider:ConvoCodeBlockTreeProvider,
         public readonly group:MessageTagGroup,
+        private readonly treeMode:boolean,
     ){
         
-        super(provider,getGroupLabel(group),TreeItemCollapsibleState.None);
+        super(provider,getGroupLabel(group),treeMode?TreeItemCollapsibleState.Expanded:TreeItemCollapsibleState.None);
         this.description=`${group.tags.length} block${group.tags.length===1?'':'s'}`;
         this.contextValue='code-block-group';
         this.iconPath=new vscode.ThemeIcon('comment-discussion');
         this.resourceUri=Uri.parse(`convo-code-message-group://${group.messageIndex}/${encodeURIComponent(getGroupResourceKey(group))}`);
+        if(treeMode){
+            this.id=`tree:${group.messageUri.toString()}:${group.messageIndex}`;
+        }
 
         this.command={
             title:'Goto Message',
@@ -798,6 +812,38 @@ class ConvoCodeMessageItem extends ConvoCodeBlockTreeItem
             })
         }
     }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return this.treeMode?getFolderChildItems(this.provider,this.group,buildCodeBlockTree(this.group.tags,getItemLabel)):[];
+    }
+}
+
+class ConvoCodeFolderItem extends ConvoCodeBlockTreeItem
+{
+    /**
+     * All blocks under the folder in apply order
+     */
+    public readonly tags:ParsedOutputTagInfo[];
+
+    public constructor(
+        provider:ConvoCodeBlockTreeProvider,
+        public readonly group:MessageTagGroup,
+        public readonly folder:CodeBlockTreeFolder,
+    ){
+        super(provider,folder.name,TreeItemCollapsibleState.Expanded);
+        this.tags=getCodeBlockTreeFolderTags(folder);
+        this.id=`tree:${group.messageUri.toString()}:${group.messageIndex}:${folder.path}`;
+        this.description=`${this.tags.length} block${this.tags.length===1?'':'s'}`;
+        this.tooltip=folder.path;
+        this.contextValue='code-block-folder';
+        this.iconPath=new vscode.ThemeIcon('folder');
+    }
+
+    public override async getChildren():Promise<ConvoCodeBlockTreeItem[]>
+    {
+        return getFolderChildItems(this.provider,this.group,this.folder);
+    }
 }
 
 
@@ -810,11 +856,12 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
         provider:ConvoCodeBlockTreeProvider,
         public readonly group:MessageTagGroup,
         public readonly tag:ParsedOutputTagInfo,
+        treeMode:boolean,
     ){
         super(provider,getItemLabel(tag),TreeItemCollapsibleState.None);
 
         const status=getCodeBlockAppliedStatus(tag);
-        this.description=`${getItemDescription(tag)}${status?` • ${status}`:''}`;
+        this.description=`${getItemDescription(tag,treeMode)}${status?` • ${status}`:''} (${tag.index+1})`;
         if(status){
             this.resourceUri=Uri.parse(`convo-code-block-applied://${tag.codeBlock.messageIndex}-${tag.index}/${encodeURIComponent(tag.documentUri.toString())}`);
         }
@@ -843,6 +890,14 @@ class ConvoCodeBlockItem extends ConvoCodeBlockTreeItem
         };
     }
 }
+
+/**
+ * Returns the child folder items followed by the block items of the given folder
+ */
+const getFolderChildItems=(provider:ConvoCodeBlockTreeProvider,group:MessageTagGroup,folder:CodeBlockTreeFolder):ConvoCodeBlockTreeItem[]=>[
+    ...folder.folders.map(f=>new ConvoCodeFolderItem(provider,group,f)),
+    ...folder.tags.map(t=>new ConvoCodeBlockItem(provider,group,t,true)),
+];
 
 const getGroupLabel=(group:MessageTagGroup):string=>{
     const role=group.message.role ?? 'message';
@@ -884,12 +939,16 @@ const getItemLabel=(tag:ParsedOutputTagInfo):string=>{
     return tag.codeBlock.tagName;
 }
 
-const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
+/**
+ * Returns the description of a block. In tree mode the path of file blocks is omitted since it
+ * is shown by the folders of the tree.
+ */
+const getItemDescription=(tag:ParsedOutputTagInfo,treeMode:boolean):string=>{
     const lang=tag.codeBlock.lang || 'text';
     return tag.type==='shell'?
         lang
     :tag.type==='file'?
-        `${lang} • ${workspace.asRelativePath(tag.targetPath)}`
+        (treeMode?lang:`${lang} • ${workspace.asRelativePath(tag.targetPath)}`)
     :tag.type==='op'?
         getFileOpLabel(tag.codeBlock)
     :
@@ -899,6 +958,7 @@ const getItemDescription=(tag:ParsedOutputTagInfo):string=>{
 const getItemTooltip=(tag:ParsedOutputTagInfo):string=>{
     const lines=[
         `<${tag.codeBlock.tagName}>`,
+        `Index: ${tag.index+1}`,
         tag.type==='file'?`Path: ${tag.targetPath}`:undefined,
         tag.type==='shell'?`Script: ${tag.targetPath}`:undefined,
         tag.type==='op'?`Op: ${getFileOpLabel(tag.codeBlock)}`:undefined,

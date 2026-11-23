@@ -6,6 +6,7 @@ import { registerAnswerQuestionsCommand } from './answer-questions.js';
 import { createConvoPathCompletionProvider } from './autocomplete-provider.js';
 import { registerCodeBlockAppliedState } from './code-block-applied.js';
 import { registerCodeBlockReview } from './code-block-review.js';
+import { registerCodeBlockTreeMode } from './code-block-tree.js';
 import { registerCompletionCommands } from './completion-provider.js';
 import { registerConvoCodeBlockView } from './convo-code-block-view.js';
 import { registerConvoStdDocumentProvider } from './convo-std-document-provider.js';
@@ -31,6 +32,7 @@ export function activate(context:ExtensionContext){
     registerCompletionCommands(context,ext);
     registerTypingHandler(context);
     registerImagePasteHandler(context,ext);
+    registerCodeBlockTreeMode(context,ext);
     registerConvoCodeBlockView(context,ext);
     registerCodeBlockReview(context,ext);
     registerFileOpCommands(context,ext);

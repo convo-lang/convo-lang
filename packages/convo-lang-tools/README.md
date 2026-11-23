@@ -486,6 +486,24 @@ applying it are respected.
 The Convo-Lang activity bar includes a Code Blocks view. It lists the output blocks of the active
 `.convo` document, grouped by message, along with any pinned documents.
 
+Blocks are shown in a tree layout by default. Use the `Show Code Blocks as List` and
+`Show Code Blocks as Tree` button in the view title to switch layouts. The layout is saved per
+workspace.
+
+- Every block description ends with the 1-based index of the block in its message, in
+  parentheses. For example `ts (3)` in the tree layout, `ts • src/lib/example.ts (3)` in the list
+  layout and `ts • applied (3)` for applied blocks. Blocks are applied in index order.
+- In the tree layout each message expands into folders based on the target path of its blocks,
+  relative to the workspace. Files outside the workspace use their absolute path. All items start
+  expanded.
+- Folders with a single child folder and no blocks are compacted into one node, such as
+  `src/lib/utils`.
+- Folders are listed first, then blocks, each sorted alphabetically. Blocks targeting the same
+  file are listed separately.
+- Scripts are placed at the root of the message. File operations are placed by their `path`, or
+  `from` for renames. Glob paths use the folder before the first glob segment.
+- The list layout shows each message followed by its blocks.
+
 - Each message group shows its role, its age (for messages with a time tag) and a block count
   badge. The last message is highlighted.
 - Clicking a group or block jumps to it in the document.
@@ -505,6 +523,8 @@ The Convo-Lang activity bar includes a Code Blocks view. It lists the output blo
 - Inline action on message groups: `Apply All`. This writes every file, applies every file
   operation and runs every script in the message after a single confirmation. Find-replace, append
   and prepend blocks targeting the same file are combined into one write.
+- Inline action on folders in the tree layout: `Apply All`. This applies every block under the
+  folder in index order after a single confirmation.
 - Documents can be pinned so they stay in the view while you work in other files. Clicking a
   document item switches the view to that document.
 
@@ -669,6 +689,8 @@ or selection.
 | Command                                | ID                                         | Description                                                    |
 |----------------------------------------|--------------------------------------------|----------------------------------------------------------------|
 | Convo: Refresh code blocks             | `convo.code-blocks-refresh`                | Refreshes the Code Blocks view                                 |
+| Convo: Show Code Blocks as Tree        | `convo.code-blocks-view-tree`              | Shows blocks in a folder tree based on their target paths      |
+| Convo: Show Code Blocks as List        | `convo.code-blocks-view-flat`              | Shows blocks in a flat list under each message                 |
 | Convo: Switch Code Block View          | `convo.code-block-view-switch`             | Picks the convo document shown in the Code Blocks view         |
 | Convo: Pin Code Block View             | `convo.code-block-view-pin`                | Pins a document to the Code Blocks view                        |
 | Convo: Unpin Code Block View           | `convo.code-block-view-unpin`              | Unpins a document from the Code Blocks view                    |

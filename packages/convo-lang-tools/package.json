@@ -219,12 +219,30 @@
                 {
                     "command": "convo.code-block-review-cancel",
                     "when": "convo.codeBlockReviewActive"
+                },
+                {
+                    "command": "convo.code-blocks-view-flat",
+                    "when": "convo.codeBlocksTreeView"
+                },
+                {
+                    "command": "convo.code-blocks-view-tree",
+                    "when": "!convo.codeBlocksTreeView"
                 }
             ],
             "view/title": [
                 {
                     "command": "convo.refresh-make-targets",
                     "when": "view == convoMakeBuild",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-view-flat",
+                    "when": "view == convoCodeBlocks && convo.codeBlocksTreeView",
+                    "group": "navigation"
+                },
+                {
+                    "command": "convo.code-blocks-view-tree",
+                    "when": "view == convoCodeBlocks && !convo.codeBlocksTreeView",
                     "group": "navigation"
                 },
                 {
@@ -296,7 +314,7 @@
                 },
                 {
                     "command": "convo.code-block-group-apply-all",
-                    "when": "view == convoCodeBlocks && viewItem == code-block-group",
+                    "when": "view == convoCodeBlocks && (viewItem == code-block-group || viewItem == code-block-folder)",
                     "group": "inline"
                 },
                 {
@@ -384,6 +402,16 @@
                 "command": "convo.code-blocks-refresh",
                 "title": "Convo: Refresh code blocks",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "convo.code-blocks-view-tree",
+                "title": "Convo: Show Code Blocks as Tree",
+                "icon": "$(list-tree)"
+            },
+            {
+                "command": "convo.code-blocks-view-flat",
+                "title": "Convo: Show Code Blocks as List",
+                "icon": "$(list-flat)"
             },
             {
                 "command": "convo.code-block-view-switch",
